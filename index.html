@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ms">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>eOuting ITU</title>
+    <link rel="stylesheet" href="assets/style.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Institut Teknologi Unggas</p>
+        <h1>eOuting ITU</h1>
+        <p class="subtitle">Sistem Digital Kebenaran Outing Pelajar</p>
+      </div>
+      <div class="clock-panel" aria-live="polite">
+        <span id="todayDate">-</span>
+        <strong id="todayDay">-</strong>
+        <span id="currentTime">-</span>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="access-screen" id="accessScreen">
+        <div class="section-heading">
+          <h2>Masuk Sistem</h2>
+          <p>Sila pilih peranan anda.</p>
+        </div>
+
+        <div class="role-grid" id="roleGrid">
+          <button class="role-card" type="button" data-role-choice="student">
+            <strong>Pelajar</strong>
+            <span>Mohon outing dan semak status permohonan.</span>
+          </button>
+          <button class="role-card" type="button" data-role-choice="warden">
+            <strong>Warden</strong>
+            <span>Lulus / tolak permohonan dan pantau pelajar.</span>
+          </button>
+          <button class="role-card" type="button" data-role-choice="guard">
+            <strong>Guard</strong>
+            <span>Sahkan keluar dan masuk pelajar di pos guard.</span>
+          </button>
+        </div>
+
+        <form class="access-panel" id="studentLoginPanel">
+          <h3>Masuk sebagai Pelajar</h3>
+          <label for="studentLoginSelect">Nama Pelajar</label>
+          <select id="studentLoginSelect" required></select>
+
+          <label for="matricInput">No. Matrik</label>
+          <input id="matricInput" type="text" placeholder="Contoh: M001" required>
+
+          <button class="primary-action" type="submit">Masuk sebagai Pelajar</button>
+          <p class="form-message" id="studentLoginMessage"></p>
+        </form>
+
+        <form class="access-panel" id="wardenLoginPanel">
+          <h3>Masuk sebagai Warden</h3>
+          <label for="wardenSelect">Nama Warden</label>
+          <select id="wardenSelect" required></select>
+
+          <button class="primary-action" type="submit">Masuk sebagai Warden</button>
+        </form>
+
+        <form class="access-panel" id="guardLoginPanel">
+          <h3>Masuk sebagai Guard</h3>
+          <label for="guardSelect">Nama Guard</label>
+          <select id="guardSelect" required></select>
+
+          <button class="primary-action" type="submit">Masuk sebagai Guard</button>
+        </form>
+      </section>
+
+      <section class="app-workspace" id="appWorkspace">
+        <div class="session-bar">
+          <div>
+            <span id="sessionRole">-</span>
+            <strong id="sessionName">-</strong>
+          </div>
+          <button class="secondary-action" id="logoutButton" type="button">Tukar Peranan</button>
+        </div>
+
+        <nav class="tabs" aria-label="Bahagian sistem">
+        <button class="tab-button active" type="button" data-tab="pelajar">Pelajar</button>
+        <button class="tab-button" type="button" data-tab="warden">Warden</button>
+        <button class="tab-button" type="button" data-tab="guard">Guard</button>
+        <button class="tab-button" type="button" data-tab="dashboard">Dashboard</button>
+        </nav>
+
+        <section class="notice" id="ruleNotice"></section>
+
+        <section class="tab-panel active" id="pelajar" aria-labelledby="tab-pelajar">
+        <div class="section-heading">
+          <h2>Permohonan Pelajar</h2>
+          <p>Permohonan outing hanya dibuka pada Selasa dan Rabu bermula 5:00 PM.</p>
+        </div>
+
+        <form class="form-card" id="requestForm">
+          <div class="identity-panel">
+            <span>Pelajar</span>
+            <strong id="loggedStudentName">-</strong>
+            <small id="loggedStudentMeta">-</small>
+          </div>
+
+          <label for="requestTypeSelect">Jenis Permohonan</label>
+          <select id="requestTypeSelect" required>
+            <option value="OUTING_BIASA">Outing Biasa</option>
+            <option value="KECEMASAN">Kecemasan</option>
+          </select>
+
+          <label for="purposeInput">Tujuan Outing</label>
+          <textarea id="purposeInput" rows="3" placeholder="Contoh: membeli barang keperluan" required></textarea>
+
+          <label for="locationInput">Lokasi Outing</label>
+          <input id="locationInput" type="text" placeholder="Contoh: Pekan Merlimau" required>
+
+          <label for="vehicleTypeSelect">Jenis Kenderaan</label>
+          <select id="vehicleTypeSelect" required>
+            <option value="Jalan kaki">Jalan kaki</option>
+            <option value="Motosikal sendiri">Motosikal sendiri</option>
+            <option value="Kereta sendiri">Kereta sendiri</option>
+            <option value="Grab / e-hailing">Grab / e-hailing</option>
+            <option value="Dihantar keluarga">Dihantar keluarga</option>
+            <option value="Tumpang rakan">Tumpang rakan</option>
+            <option value="Lain-lain">Lain-lain</option>
+          </select>
+
+          <label for="vehicleDetailInput">Butiran Kenderaan</label>
+          <textarea id="vehicleDetailInput" rows="2" placeholder="No. plat atau nota ringkas jika ada"></textarea>
+
+          <div class="emergency-fields" id="emergencyFields">
+            <h3>Maklumat Kecemasan</h3>
+
+            <label for="emergencyReasonInput">Sebab Kecemasan</label>
+            <textarea id="emergencyReasonInput" rows="3" placeholder="Contoh: waris sakit, kematian keluarga, urusan hospital"></textarea>
+
+            <label for="guardianPhoneInput">No. Telefon Waris / Penjaga</label>
+            <input id="guardianPhoneInput" type="tel" placeholder="Contoh: 0123456789">
+
+            <label for="guardianRelationSelect">Hubungan Waris</label>
+            <select id="guardianRelationSelect">
+              <option value="">Pilih jika berkaitan</option>
+              <option value="Ibu">Ibu</option>
+              <option value="Bapa">Bapa</option>
+              <option value="Penjaga">Penjaga</option>
+              <option value="Datuk/Nenek">Datuk/Nenek</option>
+              <option value="Adik-beradik">Adik-beradik</option>
+              <option value="Saudara">Saudara</option>
+              <option value="Lain-lain">Lain-lain</option>
+            </select>
+
+            <label for="emergencyNoteInput">Catatan Kecemasan</label>
+            <textarea id="emergencyNoteInput" rows="2" placeholder="Contoh: keluarga datang ambil di pos guard"></textarea>
+          </div>
+
+          <button class="primary-action" type="submit">Hantar Permohonan</button>
+          <p class="form-message" id="studentMessage"></p>
+        </form>
+        <h3 class="list-title">Rekod Saya</h3>
+        <div class="record-list" id="studentRecordsList"></div>
+        </section>
+
+        <section class="tab-panel" id="warden" aria-labelledby="tab-warden">
+        <div class="section-heading">
+          <h2>Semakan Warden</h2>
+          <p>Luluskan atau tolak permohonan sebelum guard boleh sahkan pelajar keluar.</p>
+        </div>
+        <h3 class="list-title">Menunggu Kelulusan</h3>
+        <div class="record-list" id="wardenList"></div>
+        <h3 class="list-title">Telah Diluluskan</h3>
+        <div class="record-list" id="wardenApprovedList"></div>
+        </section>
+
+        <section class="tab-panel" id="guard" aria-labelledby="tab-guard">
+        <div class="section-heading">
+          <h2>Pengesahan Guard</h2>
+          <p>Guard hanya boleh sahkan keluar untuk permohonan yang telah diluluskan warden.</p>
+        </div>
+
+        <h3 class="list-title">Sedia Untuk Keluar</h3>
+        <div class="record-list" id="guardApprovedList"></div>
+
+        <h3 class="list-title">Sedang Keluar</h3>
+        <div class="record-list" id="guardOutList"></div>
+        </section>
+
+        <section class="tab-panel" id="dashboard" aria-labelledby="tab-dashboard">
+        <div class="section-heading">
+          <h2>Dashboard Hari Ini</h2>
+          <p>Pantauan ringkas status keluar masuk pelajar.</p>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card">
+            <span>Menunggu Kelulusan</span>
+            <strong id="countPending">0</strong>
+          </article>
+          <article class="summary-card">
+            <span>Diluluskan</span>
+            <strong id="countApproved">0</strong>
+          </article>
+          <article class="summary-card">
+            <span>Sedang Keluar</span>
+            <strong id="countOut">0</strong>
+          </article>
+          <article class="summary-card">
+            <span>Sudah Pulang</span>
+            <strong id="countReturned">0</strong>
+          </article>
+          <article class="summary-card alert-card">
+            <span>Lewat</span>
+            <strong id="countLate">0</strong>
+          </article>
+          <article class="summary-card alert-card">
+            <span>Belum Masuk</span>
+            <strong id="countNotReturned">0</strong>
+          </article>
+          <article class="summary-card emergency-card">
+            <span>Kecemasan</span>
+            <strong id="countEmergency">0</strong>
+          </article>
+        </div>
+
+        <h3 class="list-title">Rekod Outing Hari Ini</h3>
+        <div class="record-list" id="allRecordsList"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="assets/app.js"></script>
+  </body>
+</html>

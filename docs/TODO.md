@@ -22,6 +22,10 @@ Senarai kerja pembangunan sistem eOuting ITU.
 - [ ] Bina dashboard guard.
 - [ ] Tambah responsive mobile layout.
 - [ ] Tambah loading state dan error message.
+- [ ] Draft mock access: pelajar guna nama + `no_matrik`.
+- [ ] Draft mock access: warden pilih nama warden sahaja.
+- [ ] Draft mock access: guard pilih nama guard sahaja.
+- [ ] Pastikan tiada PIN diperlukan untuk Warden/Guard semasa frontend mock testing.
 
 ## Phase 3: Backend Google Apps Script
 
@@ -36,6 +40,7 @@ Senarai kerja pembangunan sistem eOuting ITU.
 - [ ] Bina API `checkInStudent`.
 - [ ] Bina API `markSelfieReceived`.
 - [ ] Bina audit log.
+- [ ] Bina backend validation wajib untuk setiap role/action.
 
 ## Phase 4: Rules dan validation
 
@@ -45,6 +50,11 @@ Senarai kerja pembangunan sistem eOuting ITU.
 - [ ] Prevent duplicate outing aktif.
 - [ ] Guard tidak boleh sahkan keluar tanpa kelulusan warden.
 - [ ] Pelajar tidak boleh edit timestamp.
+- [ ] Live mode: validate pelajar melalui `student_id`, `no_matrik`, dan `status = Aktif` dari `STUDENTS`.
+- [ ] Live mode: validate warden melalui `warden_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
+- [ ] Live mode: validate guard melalui `guard_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
+- [ ] Pastikan frontend hiding tidak dianggap sebagai security sebenar.
+- [ ] Kemas kini schema `STUDENTS`: `student_id`, `no_matrik`, `nama`, `kelas`, `jantina`, `status`.
 
 ## Phase 5: Testing
 

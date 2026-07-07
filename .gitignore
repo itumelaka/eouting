@@ -1,14 +1,16 @@
-.env
-.env.*
-*.log
 .DS_Store
 Thumbs.db
 
-# Apps Script local/config secrets
-.clasp.json
-.clasp.json.bak
-appsscript.local.json
+# Local editor and OS files
+.vscode/
+.idea/
 
 # Temporary files
-tmp/
-temp/
+*.log
+*.tmp
+*.bak
+
+# Local environment files
+.env
+.env.*
+

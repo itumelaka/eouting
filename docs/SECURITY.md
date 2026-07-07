@@ -35,7 +35,16 @@ Apps Script internal secret
 
 ## PIN warden dan guard
 
-Untuk versi awal, sistem boleh guna PIN warden/guard.
+Untuk frontend mock / draft mode, Warden dan Guard belum perlu PIN supaya UI testing mudah dibuat.
+
+Mock access semasa hanya untuk testing frontend:
+
+- Student access guna nama + `no_matrik`.
+- Warden access guna selected warden name sahaja.
+- Guard access guna selected guard name sahaja.
+- Ini bukan authentication sebenar dan tidak boleh dianggap selamat untuk live mode.
+
+Untuk future live mode, sistem perlu guna PIN atau authentication lebih kuat untuk warden/guard.
 
 Tetapi:
 
@@ -43,6 +52,27 @@ Tetapi:
 - Simpan hash PIN jika boleh.
 - Jangan hardcode PIN dalam frontend.
 - Validation PIN perlu berlaku di Apps Script, bukan di frontend sahaja.
+
+## Validasi live mode
+
+Backend validation dalam Google Apps Script adalah wajib. Frontend hiding sahaja bukan security sebenar kerana kod GitHub Pages boleh dilihat dan diubah oleh pengguna.
+
+Keperluan validation live mode:
+
+- Student validation mesti semak `student_id`, `no_matrik`, dan `status = Aktif` dari sheet `STUDENTS`.
+- Warden validation mesti semak `warden_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
+- Guard validation mesti semak `guard_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
+
+Schema `STUDENTS` perlu ada medan asas berikut:
+
+```text
+student_id
+no_matrik
+nama
+kelas
+jantina
+status
+```
 
 ## Kawalan role
 
