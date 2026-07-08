@@ -35,6 +35,21 @@ const REQUEST_TYPE_LABEL = {
   KECEMASAN: "Kecemasan"
 };
 
+const BM_MONTHS = [
+  "Januari",
+  "Februari",
+  "Mac",
+  "April",
+  "Mei",
+  "Jun",
+  "Julai",
+  "Ogos",
+  "September",
+  "Oktober",
+  "November",
+  "Disember"
+];
+
 let outingRecords = [];
 let nextRequestNumber = 1;
 let currentSession = null;
@@ -42,6 +57,9 @@ let isLiveMode = false;
 let dataModeMessage = "";
 let studentRefreshIntervalId = null;
 let studentLastUpdatedAt = null;
+let monitoringRefreshIntervalId = null;
+let monitorLastUpdatedAt = null;
+let toastTimerId = null;
 const DEBUG_STUDENT_RECORDS = false;
 
 const els = {
@@ -54,11 +72,16 @@ const els = {
   studentLoginPanel: document.querySelector("#studentLoginPanel"),
   wardenLoginPanel: document.querySelector("#wardenLoginPanel"),
   guardLoginPanel: document.querySelector("#guardLoginPanel"),
+  roleGrid: document.querySelector("#roleGrid"),
   studentLoginSelect: document.querySelector("#studentLoginSelect"),
   matricInput: document.querySelector("#matricInput"),
   studentLoginMessage: document.querySelector("#studentLoginMessage"),
   wardenSelect: document.querySelector("#wardenSelect"),
+  wardenLoginMessage: null,
+  wardenPinInput: null,
   guardSelect: document.querySelector("#guardSelect"),
+  guardLoginMessage: null,
+  guardPinInput: null,
   logoutButton: document.querySelector("#logoutButton"),
   sessionRole: document.querySelector("#sessionRole"),
   sessionName: document.querySelector("#sessionName"),
@@ -99,6 +122,120 @@ document.querySelectorAll("[data-role-choice]").forEach((button) => {
   button.addEventListener("click", () => showLoginPanel(button.dataset.roleChoice));
 });
 
+function setupAccessEnhancements() {
+  setupClayRoleNav();
+  setupStaffPinFields();
+  setupMonitoringPanel();
+}
+
+function setupClayRoleNav() {
+  if (!els.roleGrid) {
+    return;
+  }
+
+  els.roleGrid.classList.add("clay-role-nav");
+  const roleLabels = {
+    student: "Pelajar",
+    warden: "Warden",
+    guard: "Guard"
+  };
+
+  els.roleGrid.querySelectorAll("[data-role-choice]").forEach((button) => {
+    const role = button.dataset.roleChoice;
+    button.classList.add("clay-role-button");
+    button.innerHTML = `<strong>${roleLabels[role] || button.textContent}</strong>`;
+  });
+
+  if (!els.roleGrid.querySelector('[data-role-choice="monitor"]')) {
+    const monitorButton = document.createElement("button");
+    monitorButton.className = "role-card clay-role-button";
+    monitorButton.type = "button";
+    monitorButton.dataset.roleChoice = "monitor";
+    monitorButton.innerHTML = "<strong>Pemantauan Semasa</strong>";
+    monitorButton.addEventListener("click", openMonitoringPage);
+    els.roleGrid.appendChild(monitorButton);
+  }
+}
+
+function setupStaffPinFields() {
+  if (!els.wardenPinInput) {
+    const wardenButton = els.wardenLoginPanel.querySelector('button[type="submit"]');
+    const label = document.createElement("label");
+    label.setAttribute("for", "wardenPinInput");
+    label.textContent = "PIN";
+    els.wardenPinInput = document.createElement("input");
+    els.wardenPinInput.id = "wardenPinInput";
+    els.wardenPinInput.type = "password";
+    els.wardenPinInput.inputMode = "numeric";
+    els.wardenPinInput.autocomplete = "current-password";
+    els.wardenPinInput.placeholder = "PIN Warden";
+    els.wardenLoginMessage = document.createElement("p");
+    els.wardenLoginMessage.className = "form-message";
+    els.wardenLoginPanel.insertBefore(label, wardenButton);
+    els.wardenLoginPanel.insertBefore(els.wardenPinInput, wardenButton);
+    els.wardenLoginPanel.appendChild(els.wardenLoginMessage);
+  }
+
+  if (!els.guardPinInput) {
+    const guardButton = els.guardLoginPanel.querySelector('button[type="submit"]');
+    const label = document.createElement("label");
+    label.setAttribute("for", "guardPinInput");
+    label.textContent = "PIN";
+    els.guardPinInput = document.createElement("input");
+    els.guardPinInput.id = "guardPinInput";
+    els.guardPinInput.type = "password";
+    els.guardPinInput.inputMode = "numeric";
+    els.guardPinInput.autocomplete = "current-password";
+    els.guardPinInput.placeholder = "PIN Guard";
+    els.guardLoginMessage = document.createElement("p");
+    els.guardLoginMessage.className = "form-message";
+    els.guardLoginPanel.insertBefore(label, guardButton);
+    els.guardLoginPanel.insertBefore(els.guardPinInput, guardButton);
+    els.guardLoginPanel.appendChild(els.guardLoginMessage);
+  }
+}
+
+function setupMonitoringPanel() {
+  if (document.querySelector("#monitor")) {
+    return;
+  }
+
+  const panel = document.createElement("section");
+  panel.className = "app-workspace monitor-workspace";
+  panel.id = "monitorWorkspace";
+  panel.innerHTML = `
+    <div class="session-bar">
+      <div>
+        <span>Paparan</span>
+        <strong>Pemantauan Semasa</strong>
+      </div>
+      <button class="secondary-action" id="monitorBackButton" type="button">Tukar Peranan</button>
+    </div>
+    <section class="tab-panel active" id="monitor">
+      <div class="section-heading">
+        <h2>Pemantauan Semasa</h2>
+        <p>Read-only. Akses boleh dihadkan kepada Warden/HEP pada versi akan datang.</p>
+      </div>
+      <div class="monitor-actions">
+        <button class="secondary-action" id="monitorRefreshButton" type="button">Refresh</button>
+        <small id="monitorLastUpdated"></small>
+      </div>
+      <div class="summary-grid monitor-summary" id="monitorSummary"></div>
+      <h3 class="list-title">Rekod Hari Ini</h3>
+      <div class="record-list" id="monitorRecordsList"></div>
+    </section>
+  `;
+  els.appShell.appendChild(panel);
+  els.monitorWorkspace = panel;
+  els.monitorBackButton = panel.querySelector("#monitorBackButton");
+  els.monitorRefreshButton = panel.querySelector("#monitorRefreshButton");
+  els.monitorLastUpdated = panel.querySelector("#monitorLastUpdated");
+  els.monitorSummary = panel.querySelector("#monitorSummary");
+  els.monitorRecordsList = panel.querySelector("#monitorRecordsList");
+  els.monitorBackButton.addEventListener("click", closeMonitoringPage);
+  els.monitorRefreshButton.addEventListener("click", refreshMonitoringRecords);
+}
+
 els.studentLoginPanel.addEventListener("submit", async (event) => {
   event.preventDefault();
   const selectedStudent = students.find((item) => item.id === els.studentLoginSelect.value);
@@ -113,30 +250,90 @@ els.studentLoginPanel.addEventListener("submit", async (event) => {
       startSession("student", mapLiveStudent(student));
     } catch (error) {
       els.studentLoginMessage.textContent = error.message;
+      showError(error.message, "Log Masuk Gagal");
     }
     return;
   }
 
   if (!selectedStudent || selectedStudent.no_matrik !== enteredMatric) {
-    els.studentLoginMessage.textContent = "Nama pelajar dan nombor matrik tidak sepadan.";
+    const message = "Nama pelajar dan nombor matrik tidak sepadan.";
+    els.studentLoginMessage.textContent = message;
+    showError(message, "Log Masuk Gagal");
     return;
   }
 
   startSession("student", selectedStudent);
 });
 
-els.wardenLoginPanel.addEventListener("submit", (event) => {
+els.wardenLoginPanel.addEventListener("submit", async (event) => {
   event.preventDefault();
-  startSession("warden", { name: els.wardenSelect.value });
+  const name = els.wardenSelect.value;
+  const pin = els.wardenPinInput ? els.wardenPinInput.value.trim() : "";
+  if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = "";
+
+  if (isLiveMode) {
+    try {
+      const warden = await apiPost("loginWarden", { nama_warden: name, pin });
+      startSession("warden", {
+        name: warden.nama_warden || name,
+        pin,
+        email: warden.email || "",
+        phone: warden.no_tel || ""
+      });
+    } catch (error) {
+      const message = "Nama warden atau PIN tidak sah.";
+      if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = message;
+      showError(message, "PIN Tidak Sah");
+    }
+    return;
+  }
+
+  if (pin && pin !== "949494") {
+    const message = "Nama warden atau PIN tidak sah.";
+    if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = message;
+    showError(message, "PIN Tidak Sah");
+    return;
+  }
+
+  startSession("warden", { name, pin });
 });
 
-els.guardLoginPanel.addEventListener("submit", (event) => {
+els.guardLoginPanel.addEventListener("submit", async (event) => {
   event.preventDefault();
-  startSession("guard", { name: els.guardSelect.value });
+  const name = els.guardSelect.value;
+  const pin = els.guardPinInput ? els.guardPinInput.value.trim() : "";
+  if (els.guardLoginMessage) els.guardLoginMessage.textContent = "";
+
+  if (isLiveMode) {
+    try {
+      const guard = await apiPost("loginGuard", { nama_guard: name, pin });
+      startSession("guard", {
+        name: guard.nama_guard || name,
+        pin,
+        email: guard.email || "",
+        phone: guard.no_tel || ""
+      });
+    } catch (error) {
+      const message = "Nama guard atau PIN tidak sah.";
+      if (els.guardLoginMessage) els.guardLoginMessage.textContent = message;
+      showError(message, "PIN Tidak Sah");
+    }
+    return;
+  }
+
+  if (pin && pin !== "949494") {
+    const message = "Nama guard atau PIN tidak sah.";
+    if (els.guardLoginMessage) els.guardLoginMessage.textContent = message;
+    showError(message, "PIN Tidak Sah");
+    return;
+  }
+
+  startSession("guard", { name, pin });
 });
 
 els.logoutButton.addEventListener("click", () => {
   stopStudentAutoRefresh();
+  stopMonitoringAutoRefresh();
   currentSession = null;
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
@@ -229,6 +426,9 @@ async function loadTodayRecords() {
       updateStudentLastUpdated();
     }
     render();
+    if (els.monitorWorkspace && els.monitorWorkspace.classList.contains("active")) {
+      renderMonitoring();
+    }
   } catch (error) {
     showModeNotice(`Live records unavailable: ${error.message}`);
     render();
@@ -361,6 +561,140 @@ function showModeNotice(message) {
   updateDataModeIndicator();
 }
 
+function ensureToastHost() {
+  let host = document.querySelector(".toast-host");
+
+  if (!host) {
+    host = document.createElement("div");
+    host.className = "toast-host";
+    host.setAttribute("aria-live", "polite");
+    host.setAttribute("aria-atomic", "true");
+    document.body.appendChild(host);
+  }
+
+  return host;
+}
+
+function dismissToast() {
+  const host = document.querySelector(".toast-host");
+
+  if (toastTimerId) {
+    window.clearTimeout(toastTimerId);
+    toastTimerId = null;
+  }
+
+  if (host) {
+    host.innerHTML = "";
+  }
+}
+
+function showToast(message, type = "info", title = "") {
+  const host = ensureToastHost();
+  const safeType = ["error", "success", "warning", "info"].includes(type) ? type : "info";
+  const titleMap = {
+    error: "Ralat",
+    success: "Berjaya",
+    warning: "Perhatian",
+    info: "Makluman"
+  };
+  const iconMap = {
+    error: "!",
+    success: "OK",
+    warning: "!",
+    info: "i"
+  };
+
+  if (toastTimerId) {
+    window.clearTimeout(toastTimerId);
+  }
+
+  host.innerHTML = `
+    <article class="toast-card ${safeType}" role="status">
+      <div class="toast-icon" aria-hidden="true">${escapeHtml(iconMap[safeType])}</div>
+      <div class="toast-content">
+        <strong>${escapeHtml(title || titleMap[safeType])}</strong>
+        <p>${escapeHtml(message)}</p>
+      </div>
+      <button class="toast-close" type="button" aria-label="Tutup makluman">x</button>
+    </article>
+  `;
+
+  const closeButton = host.querySelector(".toast-close");
+  if (closeButton) {
+    closeButton.addEventListener("click", dismissToast);
+  }
+
+  toastTimerId = window.setTimeout(dismissToast, 4000);
+}
+
+function showError(message, title = "Ralat") {
+  showToast(message, "error", title);
+}
+
+function showSuccess(message, title = "Berjaya") {
+  showToast(message, "success", title);
+}
+
+function showWarning(message, title = "Perhatian") {
+  showToast(message, "warning", title);
+}
+
+function showInfo(message, title = "Makluman") {
+  showToast(message, "info", title);
+}
+
+function setupFeedbackMessageObservers() {
+  observeFeedbackMessage(els.studentMessage, inferStudentMessageToast);
+}
+
+function observeFeedbackMessage(element, resolver) {
+  if (!element || element.dataset.toastObserved === "true") {
+    return;
+  }
+
+  element.dataset.toastObserved = "true";
+  let lastMessage = "";
+  const observer = new MutationObserver(() => {
+    const message = element.textContent.trim();
+
+    if (!message || message === lastMessage) {
+      return;
+    }
+
+    lastMessage = message;
+    const toast = resolver(message);
+    showToast(message, toast.type, toast.title);
+  });
+
+  observer.observe(element, {
+    childList: true,
+    characterData: true,
+    subtree: true
+  });
+}
+
+function inferStudentMessageToast(message) {
+  const lowerMessage = normalizeValue(message);
+
+  if (lowerMessage.includes("telah dihantar")) {
+    return { type: "success", title: "Permohonan Dihantar" };
+  }
+
+  if (
+    lowerMessage.includes("hanya dibuka") ||
+    lowerMessage.includes("sila") ||
+    lowerMessage.includes("sudah mempunyai")
+  ) {
+    return { type: "warning", title: "Perhatian" };
+  }
+
+  if (lowerMessage.includes("gagal") || lowerMessage.includes("ralat")) {
+    return { type: "error", title: "Ralat" };
+  }
+
+  return { type: "info", title: "Makluman" };
+}
+
 function ensureStudentRefreshControls() {
   if (els.studentRefreshButton) {
     return;
@@ -420,6 +754,119 @@ function stopStudentAutoRefresh() {
     window.clearInterval(studentRefreshIntervalId);
     studentRefreshIntervalId = null;
   }
+}
+
+function openMonitoringPage() {
+  stopStudentAutoRefresh();
+  hideLoginPanels();
+  currentSession = null;
+  els.accessScreen.classList.add("hidden");
+  els.appWorkspace.classList.remove("active");
+  if (els.monitorWorkspace) {
+    els.monitorWorkspace.classList.add("active");
+  }
+  refreshMonitoringRecords();
+  startMonitoringAutoRefresh();
+}
+
+function closeMonitoringPage() {
+  stopMonitoringAutoRefresh();
+  if (els.monitorWorkspace) {
+    els.monitorWorkspace.classList.remove("active");
+  }
+  els.accessScreen.classList.remove("hidden");
+}
+
+async function refreshMonitoringRecords() {
+  if (isLiveMode) {
+    await loadTodayRecords();
+  } else {
+    renderMonitoring();
+  }
+  monitorLastUpdatedAt = new Date();
+  updateMonitoringLastUpdated();
+}
+
+function startMonitoringAutoRefresh() {
+  stopMonitoringAutoRefresh();
+  if (!isLiveMode) {
+    return;
+  }
+
+  monitoringRefreshIntervalId = window.setInterval(() => {
+    refreshMonitoringRecords();
+  }, 30000);
+}
+
+function stopMonitoringAutoRefresh() {
+  if (monitoringRefreshIntervalId) {
+    window.clearInterval(monitoringRefreshIntervalId);
+    monitoringRefreshIntervalId = null;
+  }
+}
+
+function updateMonitoringLastUpdated() {
+  if (!els.monitorLastUpdated) {
+    return;
+  }
+
+  els.monitorLastUpdated.textContent = monitorLastUpdatedAt
+    ? `Dikemaskini: ${formatDisplayTime(monitorLastUpdatedAt)}`
+    : "";
+}
+
+function renderMonitoring() {
+  if (!els.monitorSummary || !els.monitorRecordsList) {
+    return;
+  }
+
+  const summaryItems = [
+    ["Menunggu Kelulusan", countByStatus(STATUS.pending)],
+    ["Diluluskan", countByStatus(STATUS.approved)],
+    ["Sedang Keluar", countByStatus(STATUS.out)],
+    ["Selesai", countByStatus(STATUS.returned)],
+    ["Lewat", outingRecords.filter((record) => record.lewat).length],
+    ["Ditolak", countByStatus(STATUS.rejected)],
+    ["Kecemasan", outingRecords.filter((record) => record.jenis_permohonan === REQUEST_TYPE.emergency).length]
+  ];
+
+  els.monitorSummary.innerHTML = summaryItems.map(([label, value]) => `
+    <article class="summary-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </article>
+  `).join("");
+
+  els.monitorRecordsList.innerHTML = outingRecords.length
+    ? outingRecords.map(monitorRecordCard).join("")
+    : emptyState("Belum ada rekod outing hari ini.");
+}
+
+function monitorRecordCard(record) {
+  return `
+    <article class="record-card">
+      <div class="record-top">
+        <div>
+          <h3>${escapeHtml(getRecordName(record) || "-")}</h3>
+          <div class="record-meta">${escapeHtml(getRecordId(record))} | ${escapeHtml(record.className || record.kelas || "-")}</div>
+        </div>
+        <div class="badge-stack">
+          <span class="badge ${badgeClass(record.status)}">${escapeHtml(record.status || "-")}</span>
+        </div>
+      </div>
+      <div class="record-detail">
+        <strong>Jenis:</strong> ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}<br>
+        <strong>Tujuan:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
+        <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
+        <strong>Kenderaan:</strong> ${escapeHtml(record.jenis_kenderaan || "-")}<br>
+        <strong>Masa Mohon:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}<br>
+        <strong>Warden:</strong> ${escapeHtml(record.warden_approve_by || record.approvedBy || "-")}<br>
+        <strong>Keluar:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_keluar || record.outAt))}<br>
+        <strong>Masuk:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_masuk || record.returnedAt))}<br>
+        <strong>Lewat:</strong> ${escapeHtml(record.lewatText || (record.lewat ? "Ya" : "-"))}
+      </div>
+    </article>
+  `;
 }
 
 function updateStudentLastUpdated() {
@@ -553,12 +1000,20 @@ function hideLoginPanels() {
   els.wardenLoginPanel.classList.remove("active");
   els.guardLoginPanel.classList.remove("active");
   els.matricInput.value = "";
+  if (els.wardenPinInput) els.wardenPinInput.value = "";
+  if (els.guardPinInput) els.guardPinInput.value = "";
+  if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = "";
+  if (els.guardLoginMessage) els.guardLoginMessage.textContent = "";
 }
 
 function startSession(role, user) {
   // Mock frontend access only. Real GAS backend must validate role and identity later.
   stopStudentAutoRefresh();
+  stopMonitoringAutoRefresh();
   currentSession = { role, user };
+  if (els.monitorWorkspace) {
+    els.monitorWorkspace.classList.remove("active");
+  }
   els.accessScreen.classList.add("hidden");
   els.appWorkspace.classList.add("active");
   els.sessionRole.textContent = roleLabel(role);
@@ -1012,11 +1467,17 @@ async function updateStatus(id, status) {
       await apiPost(action, {
         request_id: id,
         nama_warden: currentSession.user.name,
+        pin: currentSession.user.pin || "",
         catatan: status === STATUS.rejected ? "Ditolak oleh warden." : ""
       });
       await loadTodayRecords();
+      showSuccess(
+        status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
+        status === STATUS.approved ? "Diluluskan" : "Ditolak"
+      );
     } catch (error) {
       showModeNotice(`Live API error: ${error.message}`);
+      showError(error.message, "Tindakan Gagal");
     }
     return;
   }
@@ -1036,6 +1497,10 @@ async function updateStatus(id, status) {
     };
   });
   render();
+  showSuccess(
+    status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
+    status === STATUS.approved ? "Diluluskan" : "Ditolak"
+  );
 }
 
 async function confirmOut(id) {
@@ -1047,11 +1512,14 @@ async function confirmOut(id) {
     try {
       await apiPost("confirmOut", {
         request_id: id,
-        nama_guard: currentSession.user.name
+        nama_guard: currentSession.user.name,
+        pin: currentSession.user.pin || ""
       });
       await loadTodayRecords();
+      showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
     } catch (error) {
       showModeNotice(`Live API error: ${error.message}`);
+      showError(error.message, "Tindakan Gagal");
     }
     return;
   }
@@ -1062,7 +1530,7 @@ async function confirmOut(id) {
     }
 
     if (record.status !== STATUS.approved) {
-      alert("Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan.");
+      showWarning("Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan.");
       return record;
     }
 
@@ -1074,6 +1542,7 @@ async function confirmOut(id) {
     };
   });
   render();
+  showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
 }
 
 async function confirmIn(id) {
@@ -1085,11 +1554,14 @@ async function confirmIn(id) {
     try {
       await apiPost("confirmIn", {
         request_id: id,
-        nama_guard: currentSession.user.name
+        nama_guard: currentSession.user.name,
+        pin: currentSession.user.pin || ""
       });
       await loadTodayRecords();
+      showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
     } catch (error) {
       showModeNotice(`Live API error: ${error.message}`);
+      showError(error.message, "Tindakan Gagal");
     }
     return;
   }
@@ -1109,6 +1581,7 @@ async function confirmIn(id) {
     };
   });
   render();
+  showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
 }
 
 function recordCard(record, mode) {
@@ -1187,7 +1660,7 @@ function emergencyDetailHtml(record) {
 
   return `<br>
         <strong>Sebab Kecemasan:</strong> ${escapeHtml(record.sebab_kecemasan || "-")}<br>
-        <strong>No. Telefon Waris / Penjaga:</strong> ${escapeHtml(record.telefon_waris || "-")}<br>
+        <strong>No. Telefon Waris / Penjaga:</strong> ${escapeDisplayPhone(record.telefon_waris)}<br>
         <strong>Hubungan Waris:</strong> ${escapeHtml(record.hubungan_waris || "-")}<br>
         <strong>Catatan Kecemasan:</strong> ${escapeHtml(record.catatan_kecemasan || "-")}`;
 }
@@ -1239,33 +1712,107 @@ function formatTime(value) {
     return "-";
   }
 
-  return new Date(value).toLocaleTimeString("ms-MY", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  return formatDisplayTime(value);
 }
 
 function formatDisplayDateTime(value) {
-  if (!value) {
+  const date = parseFlexibleDate(value);
+  if (!date) {
     return "-";
   }
 
-  if (typeof value === "string") {
-    return value;
+  const parts = getKualaLumpurParts(date);
+  return `${parts.day} ${BM_MONTHS[Number(parts.month) - 1]} ${parts.year}, ${formatDisplayTime(date)}`;
+}
+
+function formatDisplayDate(value) {
+  const date = parseFlexibleDate(value);
+  if (!date) {
+    return "-";
   }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
+  const parts = getKualaLumpurParts(date);
+  return `${parts.day} ${BM_MONTHS[Number(parts.month) - 1]} ${parts.year}`;
+}
+
+function formatDisplayTime(value) {
+  const date = parseFlexibleDate(value);
+  if (!date) {
+    return "-";
   }
 
-  return date.toLocaleString("ms-MY", {
+  return date.toLocaleTimeString("ms-MY", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kuala_Lumpur"
+  }).replace("AM", "PG").replace("PM", "PTG");
+}
+
+function parseFlexibleDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const text = String(value).trim();
+  if (!text) {
+    return null;
+  }
+
+  const normalizedText = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? `${text}T00:00:00+08:00`
+    : text.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(:\d{2})?)$/, "$1T$2+08:00");
+  const date = new Date(normalizedText);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getKualaLumpurParts(date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+    timeZone: "Asia/Kuala_Lumpur"
+  }).formatToParts(date);
+
+  return parts.reduce((result, part) => {
+    if (part.type !== "literal") {
+      result[part.type] = part.value;
+    }
+    return result;
+  }, {});
+}
+
+function formatPhoneDisplay(value) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return "-";
+  }
+
+  const text = String(value).trim();
+  if (text.startsWith("0") || text.startsWith("+")) {
+    return text;
+  }
+
+  if (/^\d{9}$/.test(text) && text.startsWith("1")) {
+    return `0${text}`;
+  }
+
+  return text;
+}
+
+function escapeDisplayDateTime(value) {
+  return escapeHtml(formatDisplayDateTime(value));
+}
+
+function escapeDisplayTime(value) {
+  return escapeHtml(formatDisplayTime(value));
+}
+
+function escapeDisplayPhone(value) {
+  return escapeHtml(formatPhoneDisplay(value));
 }
 
 function normalizeValue(value) {
@@ -1286,6 +1833,8 @@ function escapeHtml(value) {
 }
 
 async function initApp() {
+  setupAccessEnhancements();
+  setupFeedbackMessageObservers();
   populateStudents();
   populateStaff();
   updateEmergencyFields();

@@ -88,6 +88,8 @@ function doPost(e) {
     const action = payload.action;
 
     if (action === "loginStudent") return jsonResponse(loginStudent(payload));
+    if (action === "loginWarden") return jsonResponse(loginWarden(payload));
+    if (action === "loginGuard") return jsonResponse(loginGuard(payload));
     if (action === "submitRequest") return jsonResponse(submitRequest(payload));
     if (action === "approveRequest") return jsonResponse(approveRequest(payload));
     if (action === "rejectRequest") return jsonResponse(rejectRequest(payload));
@@ -169,6 +171,52 @@ function loginStudent(payload) {
   return pick_(student, ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status"]);
 }
 
+function loginWarden(payload) {
+  const wardenName = payload.nama_warden || payload.warden_name || payload.name;
+  const pin = payload.pin;
+
+  if (!wardenName || !pin) {
+    throw new Error("Nama warden atau PIN tidak sah.");
+  }
+
+  const warden = findActiveWarden_(wardenName, pin);
+  if (!warden) {
+    throw new Error("Nama warden atau PIN tidak sah.");
+  }
+
+  return {
+    warden_id: warden.warden_id || "",
+    nama_warden: warden.nama_warden || "",
+    email: warden.email || "",
+    no_tel: warden.no_tel || "",
+    status: warden.status || "",
+    catatan: warden.catatan || ""
+  };
+}
+
+function loginGuard(payload) {
+  const guardName = payload.nama_guard || payload.guard_name || payload.name;
+  const pin = payload.pin;
+
+  if (!guardName || !pin) {
+    throw new Error("Nama guard atau PIN tidak sah.");
+  }
+
+  const guard = findActiveGuard_(guardName, pin);
+  if (!guard) {
+    throw new Error("Nama guard atau PIN tidak sah.");
+  }
+
+  return {
+    guard_id: guard.guard_id || "",
+    nama_guard: guard.nama_guard || "",
+    email: guard.email || "",
+    no_tel: guard.no_tel || "",
+    status: guard.status || "",
+    catatan: guard.catatan || ""
+  };
+}
+
 function submitRequest(payload) {
   const studentId = payload.student_id;
   const noMatrik = payload.no_matrik;
@@ -203,8 +251,8 @@ function submitRequest(payload) {
     tarikh: formatDate_(now),
     hari: getDayName_(now),
     jenis_permohonan: requestType,
-    student_id: student.student_id,
-    no_matrik: student.no_matrik,
+    student_id: String(student.student_id || ""),
+    no_matrik: String(student.no_matrik || ""),
     nama: student.nama,
     student_email: student.email || "",
     kelas: student.kelas || "",
@@ -213,7 +261,7 @@ function submitRequest(payload) {
     jenis_kenderaan: payload.jenis_kenderaan || payload.vehicle_type || "",
     butiran_kenderaan: payload.butiran_kenderaan || payload.vehicle_detail || "",
     sebab_kecemasan: payload.sebab_kecemasan || "",
-    telefon_waris: payload.telefon_waris || "",
+    telefon_waris: String(payload.telefon_waris || ""),
     hubungan_waris: payload.hubungan_waris || "",
     catatan_kecemasan: payload.catatan_kecemasan || "",
     masa_mohon: now_(),
@@ -245,7 +293,7 @@ function approveRequest(payload) {
     throw new Error("request_id dan nama warden diperlukan.");
   }
 
-  const warden = findActiveWarden_(wardenName);
+  const warden = findActiveWarden_(wardenName, payload.pin);
   if (!warden) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
@@ -277,7 +325,7 @@ function rejectRequest(payload) {
     throw new Error("request_id dan nama warden diperlukan.");
   }
 
-  const warden = findActiveWarden_(wardenName);
+  const warden = findActiveWarden_(wardenName, payload.pin);
   if (!warden) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
@@ -310,7 +358,7 @@ function confirmOut(payload) {
     throw new Error("request_id dan nama guard diperlukan.");
   }
 
-  const guard = findActiveGuard_(guardName);
+  const guard = findActiveGuard_(guardName, payload.pin);
   if (!guard) {
     throw new Error("Guard tidak dijumpai atau tidak aktif.");
   }
@@ -343,7 +391,7 @@ function confirmIn(payload) {
     throw new Error("request_id dan nama guard diperlukan.");
   }
 
-  const guard = findActiveGuard_(guardName);
+  const guard = findActiveGuard_(guardName, payload.pin);
   if (!guard) {
     throw new Error("Guard tidak dijumpai atau tidak aktif.");
   }
@@ -583,17 +631,19 @@ function findStudentByIdAndMatric_(studentId, noMatrik) {
   ));
 }
 
-function findActiveWarden_(wardenName) {
+function findActiveWarden_(wardenName, pin) {
   return getRowsAsObjects_(getSheet_(SHEETS.wardens)).find((warden) => (
     normalizeText_(warden.nama_warden) === normalizeText_(wardenName) &&
-    isActive_(warden.status)
+    isActive_(warden.status) &&
+    (pin === undefined || pin === null || pin === "" || String(warden.pin) === String(pin))
   ));
 }
 
-function findActiveGuard_(guardName) {
+function findActiveGuard_(guardName, pin) {
   return getRowsAsObjects_(getSheet_(SHEETS.guards)).find((guard) => (
     normalizeText_(guard.nama_guard) === normalizeText_(guardName) &&
-    isActive_(guard.status)
+    isActive_(guard.status) &&
+    (pin === undefined || pin === null || pin === "" || String(guard.pin) === String(pin))
   ));
 }
 
