@@ -281,6 +281,7 @@ function submitRequest(payload) {
   appendAuditLog("SUBMIT_REQUEST", requestId, "Student", student.nama, JSON.stringify({
     jenis_permohonan: requestType
   }));
+  sendTelegramMessage_(buildTelegramSubmitMessage_(record));
 
   return record;
 }
@@ -314,7 +315,9 @@ function approveRequest(payload) {
   });
 
   appendAuditLog("APPROVE_REQUEST", requestId, "Warden", warden.nama_warden, "");
-  return findRowByRequestId_(requestId).record;
+  const updatedRecord = findRowByRequestId_(requestId).record;
+  sendTelegramMessage_(buildTelegramStatusMessage_("✅ Permohonan Diluluskan Warden", updatedRecord));
+  return updatedRecord;
 }
 
 function rejectRequest(payload) {
@@ -347,7 +350,9 @@ function rejectRequest(payload) {
   });
 
   appendAuditLog("REJECT_REQUEST", requestId, "Warden", warden.nama_warden, payload.catatan || "");
-  return findRowByRequestId_(requestId).record;
+  const updatedRecord = findRowByRequestId_(requestId).record;
+  sendTelegramMessage_(buildTelegramStatusMessage_("❌ Permohonan Ditolak Warden", updatedRecord));
+  return updatedRecord;
 }
 
 function confirmOut(payload) {
@@ -379,7 +384,9 @@ function confirmOut(payload) {
   });
 
   appendAuditLog("CONFIRM_OUT", requestId, "Guard", guard.nama_guard, "");
-  return findRowByRequestId_(requestId).record;
+  const updatedRecord = findRowByRequestId_(requestId).record;
+  sendTelegramMessage_(buildTelegramStatusMessage_("🚪 Pelajar Disahkan Keluar", updatedRecord));
+  return updatedRecord;
 }
 
 function confirmIn(payload) {
@@ -417,7 +424,12 @@ function confirmIn(payload) {
   appendAuditLog("CONFIRM_IN", requestId, "Guard", guard.nama_guard, JSON.stringify({
     lewat: late
   }));
-  return findRowByRequestId_(requestId).record;
+  const updatedRecord = findRowByRequestId_(requestId).record;
+  sendTelegramMessage_(buildTelegramStatusMessage_(
+    late === "Ya" ? "⚠️ Pelajar Masuk Lewat" : "🏁 Pelajar Selesai Outing",
+    updatedRecord
+  ));
+  return updatedRecord;
 }
 
 function getTodayRecords() {
@@ -445,6 +457,131 @@ function appendAuditLog(action, requestId, userRole, userName, details) {
 
   appendObjectRow_(getSheet_(SHEETS.audit), HEADERS.AUDIT_LOG, record);
   return record;
+}
+
+function getTelegramConfig_() {
+  const properties = PropertiesService.getScriptProperties();
+  const enabledValue = String(properties.getProperty("TELEGRAM_ENABLED") || "").trim().toLowerCase();
+  const enabled = ["1", "true", "yes", "ya", "enabled", "on"].indexOf(enabledValue) !== -1;
+
+  return {
+    enabled: enabled,
+    token: properties.getProperty("TELEGRAM_BOT_TOKEN") || "",
+    chatId: properties.getProperty("TELEGRAM_CHAT_ID") || ""
+  };
+}
+
+function sendTelegramMessage_(message) {
+  const config = getTelegramConfig_();
+
+  if (!config.enabled || !config.token || !config.chatId || !message) {
+    return false;
+  }
+
+  try {
+    const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + config.token + "/sendMessage", {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({
+        chat_id: config.chatId,
+        text: message,
+        disable_web_page_preview: true
+      }),
+      muteHttpExceptions: true
+    });
+
+    return response.getResponseCode() >= 200 && response.getResponseCode() < 300;
+  } catch (error) {
+    return false;
+  }
+}
+
+function formatTelegramDateTime_(value) {
+  if (!value) {
+    return "-";
+  }
+
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, "Asia/Kuala_Lumpur", "dd/MM/yyyy HH:mm");
+  }
+
+  const text = String(value).trim();
+  const normalizedText = text.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(:\d{2})?)$/, "$1T$2+08:00");
+  const date = new Date(normalizedText);
+
+  if (!isNaN(date.getTime())) {
+    return Utilities.formatDate(date, "Asia/Kuala_Lumpur", "dd/MM/yyyy HH:mm");
+  }
+
+  return text;
+}
+
+function buildTelegramSubmitMessage_(record) {
+  const title = record.jenis_permohonan === REQUEST_TYPE.emergency
+    ? "🚨 Permohonan Kecemasan Baru"
+    : "📌 Permohonan Outing Baru";
+
+  return buildTelegramStatusMessage_(title, record);
+}
+
+function buildTelegramStatusMessage_(title, record) {
+  const lines = [
+    title,
+    "",
+    "ID: " + (record.request_id || "-"),
+    "Nama: " + (record.nama || "-"),
+    "No. Matrik: " + (record.no_matrik || "-"),
+    "Kelas: " + (record.kelas || "-"),
+    "Jenis: " + requestTypeLabel_(record.jenis_permohonan),
+    "Status: " + (record.status || "-"),
+    "Tujuan: " + (record.tujuan || "-"),
+    "Lokasi: " + (record.lokasi || "-"),
+    "Kenderaan: " + (record.jenis_kenderaan || "-")
+  ];
+
+  if (record.butiran_kenderaan) {
+    lines.push("Butiran: " + record.butiran_kenderaan);
+  }
+
+  if (record.jenis_permohonan === REQUEST_TYPE.emergency) {
+    lines.push("Sebab Kecemasan: " + (record.sebab_kecemasan || "-"));
+    lines.push("Telefon Waris: " + (record.telefon_waris || "-"));
+    lines.push("Hubungan Waris: " + (record.hubungan_waris || "-"));
+  }
+
+  if (record.warden_approve_by) {
+    lines.push("Warden: " + record.warden_approve_by);
+  }
+
+  if (record.guard_keluar_by) {
+    lines.push("Guard Keluar: " + record.guard_keluar_by);
+  }
+
+  if (record.guard_masuk_by) {
+    lines.push("Guard Masuk: " + record.guard_masuk_by);
+  }
+
+  if (record.lewat) {
+    lines.push("Lewat: " + record.lewat);
+  }
+
+  lines.push("");
+  lines.push("Masa Mohon: " + formatTelegramDateTime_(record.masa_mohon));
+  lines.push("Masa Approve/Tolak: " + formatTelegramDateTime_(record.masa_approve));
+  lines.push("Masa Keluar: " + formatTelegramDateTime_(record.masa_keluar));
+  lines.push("Masa Masuk: " + formatTelegramDateTime_(record.masa_masuk));
+
+  return lines.join("\n");
+}
+
+function requestTypeLabel_(requestType) {
+  if (requestType === REQUEST_TYPE.normal) return "Outing Biasa";
+  if (requestType === REQUEST_TYPE.emergency) return "Kecemasan";
+  return requestType || "-";
+}
+
+function testTelegramNotification() {
+  return sendTelegramMessage_("✅ Ujian Telegram eOuting ITU berjaya.");
 }
 
 function jsonResponse(data) {

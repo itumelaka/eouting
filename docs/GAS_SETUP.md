@@ -96,6 +96,61 @@ Who has access: Anyone with the link
 
 Jika Web App boleh dipanggil oleh sesiapa dengan link, backend validation wajib ketat. Jangan bergantung kepada frontend role hiding.
 
+## Telegram Notification V1.2
+
+Backend boleh hantar notifikasi Telegram untuk action penting:
+
+- Permohonan outing baru.
+- Permohonan kecemasan baru.
+- Warden luluskan permohonan.
+- Warden tolak permohonan.
+- Guard sahkan keluar.
+- Guard sahkan masuk.
+- Pelajar masuk lewat.
+
+Token bot dan chat ID **mesti** disimpan dalam Apps Script Script Properties, bukan dalam code repo.
+
+Script Properties yang digunakan:
+
+```text
+TELEGRAM_ENABLED
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+```
+
+Cadangan nilai:
+
+```text
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=<token daripada BotFather>
+TELEGRAM_CHAT_ID=<chat id group/channel/user>
+```
+
+Cara set di Apps Script:
+
+```text
+Project Settings -> Script Properties -> Add script property
+```
+
+Manual test selepas properties diset:
+
+```text
+Run function: testTelegramNotification
+```
+
+Expected message:
+
+```text
+✅ Ujian Telegram eOuting ITU berjaya.
+```
+
+Nota keselamatan:
+
+- Jangan hardcode Telegram token atau chat ID dalam `Code.gs`.
+- Jangan print token dalam logs.
+- Jika Telegram gagal, action utama eOuting masih perlu berjaya.
+- Selepas `clasp push`, deploy version baru supaya Web App menggunakan backend terbaru.
+
 ## Response Format
 
 Success:

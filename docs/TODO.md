@@ -37,6 +37,9 @@ Senarai kerja pembangunan sistem eOuting ITU selepas milestone **Live V1 proof-o
 
 ## Next Before Pilot
 
+- [ ] Configure Telegram Script Properties for V1.2 notifications.
+- [ ] Run `testTelegramNotification()` from Apps Script.
+- [ ] Test Telegram notification for submit, approve/reject, keluar, masuk, and late masuk.
 - [ ] Test more student names and edge cases.
 - [ ] Test inactive student login/request block.
 - [ ] Test duplicate active request cases.
@@ -62,7 +65,8 @@ Senarai kerja pembangunan sistem eOuting ITU selepas milestone **Live V1 proof-o
 
 ## Optional Future Enhancements
 
-- [ ] Optional notification later if required.
+- [ ] Telegram notification V1.2 polish after pilot feedback.
+- [ ] Optional WhatsApp notification later if required.
 - [ ] QR code outing pass.
 - [ ] Upload selfie to Google Drive.
 - [ ] Telegram/WhatsApp alert for late or not returned cases.
