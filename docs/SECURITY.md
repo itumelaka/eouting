@@ -43,6 +43,25 @@ Nota penting:
 - PIN tidak boleh didedahkan melalui frontend logs atau GET endpoints.
 - PIN tidak boleh hardcode di frontend.
 
+## Remember Device / PWA Session
+
+PWA menyokong pilihan `Ingat peranti ini` untuk mengurangkan login berulang semasa pilot.
+
+Realiti keselamatan:
+
+- Sesi disimpan di browser/PWA localStorage dengan expiry.
+- Student session tamat selepas 24 jam.
+- Warden/Guard session tamat selepas 12 jam.
+- Warden/Guard PIN hanya disimpan jika pengguna memilih `Ingat peranti ini`.
+- Shared guard PC perlu `Log Keluar` selepas digunakan.
+- Warden/Guard PIN tidak patut disimpan pada public/shared device kecuali diluluskan oleh operasi.
+
+Cadangan production:
+
+- Ganti PIN persistence dengan backend-issued session token.
+- Pertimbang Google login / domain restriction.
+- Elakkan simpan PIN plain text di client untuk rollout lebih luas.
+
 ## Jangan Commit Data Sensitif
 
 Jangan simpan perkara berikut dalam GitHub repo:
@@ -133,6 +152,7 @@ Audit log digunakan untuk:
 - PIN unik per Warden/Guard.
 - Hash PIN, bukan simpan plain text.
 - Google Account login / domain-restricted access.
+- Backend-issued session token untuk PWA remember-device.
 - Audit review berkala.
 - Role-based access hardening.
 - Deployment permissions lebih ketat.

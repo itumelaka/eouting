@@ -46,6 +46,9 @@ Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 - [x] Completed/rejected records do not block new request.
 - [x] False `Paparan Rekod` popup fix.
 - [x] Normal outing availability check fix.
+- [x] PWA cache/update behaviour improved.
+- [x] Manual `Muat Semula Sistem` helper.
+- [x] Visible app version footer.
 - [x] Live V1.2 pilot-ready milestone.
 
 ## Pilot Checklist
@@ -81,6 +84,7 @@ Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 
 ## Optional Future Enhancements
 
+- [ ] Automated version injection/build step.
 - [ ] Daily report/export.
 - [ ] Late-return escalation notification.
 - [ ] Optional WhatsApp notification later if required.

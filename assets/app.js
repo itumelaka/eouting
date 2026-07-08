@@ -1,4 +1,6 @@
+const APP_VERSION = "1.2.2";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
+const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 
 let students = [
   { id: "S001", no_matrik: "M001", name: "Ahmad Hakimi", className: "SKM 1", gender: "Lelaki", status: "Aktif" },
@@ -33,6 +35,13 @@ const REQUEST_TYPE = {
 const REQUEST_TYPE_LABEL = {
   OUTING_BIASA: "Outing Biasa",
   KECEMASAN: "Kecemasan"
+};
+
+const SESSION_STORAGE_KEY = "eouting_session_v1";
+const SESSION_DURATION_MS = {
+  student: 24 * 60 * 60 * 1000,
+  warden: 12 * 60 * 60 * 1000,
+  guard: 12 * 60 * 60 * 1000
 };
 
 const BM_MONTHS = [
@@ -75,13 +84,16 @@ const els = {
   roleGrid: document.querySelector("#roleGrid"),
   studentLoginSelect: document.querySelector("#studentLoginSelect"),
   matricInput: document.querySelector("#matricInput"),
+  studentRememberInput: document.querySelector("#studentRememberInput"),
   studentLoginMessage: document.querySelector("#studentLoginMessage"),
   wardenSelect: document.querySelector("#wardenSelect"),
   wardenLoginMessage: null,
   wardenPinInput: null,
+  wardenRememberInput: null,
   guardSelect: document.querySelector("#guardSelect"),
   guardLoginMessage: null,
   guardPinInput: null,
+  guardRememberInput: null,
   logoutButton: document.querySelector("#logoutButton"),
   sessionRole: document.querySelector("#sessionRole"),
   sessionName: document.querySelector("#sessionName"),
@@ -115,6 +127,8 @@ const els = {
   countLate: document.querySelector("#countLate"),
   countNotReturned: document.querySelector("#countNotReturned"),
   countEmergency: document.querySelector("#countEmergency"),
+  appVersionText: document.querySelector("#appVersionText"),
+  systemRefreshButton: document.querySelector("#systemRefreshButton"),
   dataModeIndicator: null
 };
 
@@ -169,10 +183,20 @@ function setupStaffPinFields() {
     els.wardenPinInput.inputMode = "numeric";
     els.wardenPinInput.autocomplete = "current-password";
     els.wardenPinInput.placeholder = "PIN Warden";
+    const rememberLabel = document.createElement("label");
+    rememberLabel.className = "remember-device";
+    els.wardenRememberInput = document.createElement("input");
+    els.wardenRememberInput.id = "wardenRememberInput";
+    els.wardenRememberInput.type = "checkbox";
+    const rememberText = document.createElement("span");
+    rememberText.textContent = "Ingat peranti ini";
+    rememberLabel.appendChild(els.wardenRememberInput);
+    rememberLabel.appendChild(rememberText);
     els.wardenLoginMessage = document.createElement("p");
     els.wardenLoginMessage.className = "form-message";
     els.wardenLoginPanel.insertBefore(label, wardenButton);
     els.wardenLoginPanel.insertBefore(els.wardenPinInput, wardenButton);
+    els.wardenLoginPanel.insertBefore(rememberLabel, wardenButton);
     els.wardenLoginPanel.appendChild(els.wardenLoginMessage);
   }
 
@@ -187,10 +211,20 @@ function setupStaffPinFields() {
     els.guardPinInput.inputMode = "numeric";
     els.guardPinInput.autocomplete = "current-password";
     els.guardPinInput.placeholder = "PIN Guard";
+    const rememberLabel = document.createElement("label");
+    rememberLabel.className = "remember-device";
+    els.guardRememberInput = document.createElement("input");
+    els.guardRememberInput.id = "guardRememberInput";
+    els.guardRememberInput.type = "checkbox";
+    const rememberText = document.createElement("span");
+    rememberText.textContent = "Ingat peranti ini";
+    rememberLabel.appendChild(els.guardRememberInput);
+    rememberLabel.appendChild(rememberText);
     els.guardLoginMessage = document.createElement("p");
     els.guardLoginMessage.className = "form-message";
     els.guardLoginPanel.insertBefore(label, guardButton);
     els.guardLoginPanel.insertBefore(els.guardPinInput, guardButton);
+    els.guardLoginPanel.insertBefore(rememberLabel, guardButton);
     els.guardLoginPanel.appendChild(els.guardLoginMessage);
   }
 }
@@ -247,7 +281,9 @@ els.studentLoginPanel.addEventListener("submit", async (event) => {
         nama: selectedStudent ? selectedStudent.name : "",
         no_matrik: enteredMatric
       });
-      startStudentSession(mapLiveStudent(student));
+      const mappedStudent = mapLiveStudent(student);
+      rememberSessionIfRequested("student", mappedStudent, els.studentRememberInput);
+      startStudentSession(mappedStudent);
     } catch (error) {
       els.studentLoginMessage.textContent = error.message;
       showError(error.message, "Log Masuk Gagal");
@@ -262,6 +298,7 @@ els.studentLoginPanel.addEventListener("submit", async (event) => {
     return;
   }
 
+  rememberSessionIfRequested("student", selectedStudent, els.studentRememberInput);
   startStudentSession(selectedStudent);
 });
 
@@ -280,6 +317,13 @@ els.wardenLoginPanel.addEventListener("submit", async (event) => {
         email: warden.email || "",
         phone: warden.no_tel || ""
       });
+      rememberSessionIfRequested("warden", {
+        name: warden.nama_warden || name,
+        nama_warden: warden.nama_warden || name,
+        pin,
+        email: warden.email || "",
+        phone: warden.no_tel || ""
+      }, els.wardenRememberInput);
     } catch (error) {
       const message = "Nama warden atau PIN tidak sah.";
       if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = message;
@@ -295,7 +339,9 @@ els.wardenLoginPanel.addEventListener("submit", async (event) => {
     return;
   }
 
-  startSession("warden", { name, pin });
+  const mockWarden = { name, nama_warden: name, pin };
+  rememberSessionIfRequested("warden", mockWarden, els.wardenRememberInput);
+  startSession("warden", mockWarden);
 });
 
 els.guardLoginPanel.addEventListener("submit", async (event) => {
@@ -313,6 +359,13 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
         email: guard.email || "",
         phone: guard.no_tel || ""
       });
+      rememberSessionIfRequested("guard", {
+        name: guard.nama_guard || name,
+        nama_guard: guard.nama_guard || name,
+        pin,
+        email: guard.email || "",
+        phone: guard.no_tel || ""
+      }, els.guardRememberInput);
     } catch (error) {
       const message = "Nama guard atau PIN tidak sah.";
       if (els.guardLoginMessage) els.guardLoginMessage.textContent = message;
@@ -328,10 +381,13 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
     return;
   }
 
-  startSession("guard", { name, pin });
+  const mockGuard = { name, nama_guard: name, pin };
+  rememberSessionIfRequested("guard", mockGuard, els.guardRememberInput);
+  startSession("guard", mockGuard);
 });
 
 els.logoutButton.addEventListener("click", () => {
+  clearSavedSession();
   stopStudentAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
@@ -339,6 +395,7 @@ els.logoutButton.addEventListener("click", () => {
   els.accessScreen.classList.remove("hidden");
   hideLoginPanels();
   els.studentLoginMessage.textContent = "";
+  showInfo("Anda telah log keluar.");
 });
 
 document.querySelectorAll(".tab-button").forEach((button) => {
@@ -387,7 +444,11 @@ async function apiPost(action, payload) {
 
 async function loadLiveMasters() {
   if (!GAS_WEB_APP_URL) {
-    setMockMode("");
+    if (ALLOW_MOCK_MODE) {
+      setMockMode("");
+    } else {
+      setLiveUnavailableMode("GAS Web App URL belum diset.");
+    }
     return;
   }
 
@@ -408,7 +469,11 @@ async function loadLiveMasters() {
     await loadTodayRecords();
     updateDataModeIndicator();
   } catch (error) {
-    setMockMode(`Live API unavailable. Using mock data. ${error.message}`);
+    if (ALLOW_MOCK_MODE) {
+      setMockMode(`Live API unavailable. Using mock data. ${error.message}`);
+    } else {
+      setLiveUnavailableMode(error.message);
+    }
   }
 }
 
@@ -540,20 +605,48 @@ function setMockMode(message) {
   render();
 }
 
+function setLiveUnavailableMode(message) {
+  isLiveMode = false;
+  dataModeMessage = message || "Live API unavailable.";
+  students = [];
+  wardens = [];
+  guards = [];
+  outingRecords = [];
+  populateStudents();
+  populateStaff();
+  updateDataModeIndicator();
+  hideLoginPanels();
+  els.appWorkspace.classList.remove("active");
+  els.accessScreen.classList.remove("hidden");
+  showError(
+    "Sistem tidak dapat berhubung dengan Google Sheets. Sila semak internet atau tekan Muat Semula Sistem.",
+    "Sambungan Live Gagal"
+  );
+}
+
 function updateDataModeIndicator() {
   if (!els.dataModeIndicator) {
     els.dataModeIndicator = document.createElement("p");
     els.dataModeIndicator.setAttribute("aria-live", "polite");
     els.dataModeIndicator.style.margin = "0 0 12px";
     els.dataModeIndicator.style.fontWeight = "700";
-    els.dataModeIndicator.style.color = isLiveMode ? "#15573b" : "#684200";
+    els.dataModeIndicator.style.color = isLiveMode ? "#15573b" : (ALLOW_MOCK_MODE ? "#8a2600" : "#9b111e");
     els.appShell.insertBefore(els.dataModeIndicator, els.appShell.firstElementChild);
   }
 
-  els.dataModeIndicator.style.color = isLiveMode ? "#15573b" : "#684200";
+  const isLiveUnavailable = !isLiveMode && !ALLOW_MOCK_MODE && Boolean(dataModeMessage);
+  els.dataModeIndicator.style.color = isLiveMode || (!ALLOW_MOCK_MODE && !dataModeMessage) ? "#15573b" : (ALLOW_MOCK_MODE ? "#8a2600" : "#9b111e");
+  els.dataModeIndicator.style.background = !isLiveMode && ALLOW_MOCK_MODE ? "#fff0d9" : "";
+  els.dataModeIndicator.style.border = !isLiveMode && ALLOW_MOCK_MODE ? "1px solid #ffb65c" : "";
+  els.dataModeIndicator.style.borderRadius = !isLiveMode && ALLOW_MOCK_MODE ? "8px" : "";
+  els.dataModeIndicator.style.padding = !isLiveMode && ALLOW_MOCK_MODE ? "8px 10px" : "";
   els.dataModeIndicator.textContent = isLiveMode
     ? "Live Mode: Google Sheets"
-    : `Mock Mode${dataModeMessage ? ` - ${dataModeMessage}` : ""}`;
+    : ALLOW_MOCK_MODE
+      ? `Mock Mode: Demo Data${dataModeMessage ? ` - ${dataModeMessage}` : ""}`
+      : isLiveUnavailable
+        ? `Live Mode: Google Sheets - Sambungan gagal (${dataModeMessage})`
+        : "Live Mode: Google Sheets";
 }
 
 function showModeNotice(message) {
@@ -643,6 +736,106 @@ function showInfo(message, title = "Makluman") {
   showToast(message, "info", title);
 }
 
+function setupAppVersionUi() {
+  if (els.appVersionText) {
+    els.appVersionText.textContent = `eOuting ITU • v${APP_VERSION}`;
+  }
+
+  if (els.systemRefreshButton) {
+    els.systemRefreshButton.addEventListener("click", refreshSystemCaches);
+  }
+}
+
+async function refreshSystemCaches() {
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames
+          .filter((cacheName) => cacheName.toLowerCase().includes("eouting"))
+          .map((cacheName) => caches.delete(cacheName))
+      );
+    }
+  } catch (error) {
+    console.warn("System refresh cache cleanup failed:", error);
+  } finally {
+    window.location.reload();
+  }
+}
+
+function setupServiceWorkerUpdates() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("./service-worker.js");
+      watchServiceWorkerUpdate(registration);
+      await registration.update();
+    } catch (error) {
+      console.warn("Service worker registration failed:", error);
+    }
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    document.documentElement.dataset.swControllerChanged = "true";
+  });
+}
+
+function watchServiceWorkerUpdate(registration) {
+  if (!registration) {
+    return;
+  }
+
+  registration.addEventListener("updatefound", () => {
+    const newWorker = registration.installing;
+    if (!newWorker) {
+      return;
+    }
+
+    newWorker.addEventListener("statechange", () => {
+      if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+        showUpdatePrompt();
+      }
+    });
+  });
+}
+
+function showUpdatePrompt() {
+  if (document.querySelector(".update-prompt")) {
+    return;
+  }
+
+  const host = ensureToastHost();
+  if (toastTimerId) {
+    window.clearTimeout(toastTimerId);
+    toastTimerId = null;
+  }
+
+  host.innerHTML = `
+    <article class="toast-card info update-prompt" role="status">
+      <div class="toast-icon" aria-hidden="true">i</div>
+      <div class="toast-content">
+        <strong>Versi Baru Tersedia</strong>
+        <p>Sistem eOuting telah dikemas kini. Sila muat semula untuk versi terbaru.</p>
+        <button class="toast-action" type="button">Muat Semula</button>
+      </div>
+      <button class="toast-close" type="button" aria-label="Tutup makluman">x</button>
+    </article>
+  `;
+
+  const reloadButton = host.querySelector(".toast-action");
+  const closeButton = host.querySelector(".toast-close");
+  if (reloadButton) reloadButton.addEventListener("click", () => window.location.reload());
+  if (closeButton) closeButton.addEventListener("click", dismissToast);
+}
+
 function startStudentSession(student) {
   try {
     startSession("student", student);
@@ -652,6 +845,153 @@ function startStudentSession(student) {
       showError("Paparan rekod gagal dimuat. Sila tekan Refresh Status.", "Paparan Rekod");
     }
   }
+}
+
+// Basic pilot device-session persistence. For production, replace PIN persistence with backend session token or Google login.
+function rememberSessionIfRequested(role, user, checkbox) {
+  if (!checkbox || !checkbox.checked) {
+    clearSavedSession();
+    return;
+  }
+
+  saveSession(role, user);
+}
+
+function saveSession(role, user) {
+  const duration = SESSION_DURATION_MS[role];
+  if (!duration || !user) {
+    return;
+  }
+
+  const session = {
+    role,
+    displayName: user.name || user.nama || user.nama_warden || user.nama_guard || "",
+    expiresAt: Date.now() + duration
+  };
+
+  if (role === "student") {
+    session.student_id = user.student_id || user.studentId || user.id || "";
+    session.no_matrik = user.no_matrik || user.noMatrik || "";
+    session.nama = user.nama || user.name || "";
+    session.email = user.email || "";
+    session.kelas = user.kelas || user.className || "";
+  }
+
+  if (role === "warden") {
+    session.nama_warden = user.nama_warden || user.name || "";
+    session.pin = user.pin || "";
+  }
+
+  if (role === "guard") {
+    session.nama_guard = user.nama_guard || user.name || "";
+    session.pin = user.pin || "";
+  }
+
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch (error) {
+    console.warn("Unable to save device session.");
+  }
+}
+
+function getSavedSession() {
+  try {
+    const rawSession = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!rawSession) {
+      return null;
+    }
+
+    const session = JSON.parse(rawSession);
+    if (!session.expiresAt || Date.now() > Number(session.expiresAt)) {
+      clearSavedSession();
+      return null;
+    }
+
+    return session;
+  } catch (error) {
+    clearSavedSession();
+    return null;
+  }
+}
+
+function clearSavedSession() {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Unable to clear device session.");
+  }
+}
+
+async function restoreSavedSession() {
+  const session = getSavedSession();
+  if (!session) {
+    return false;
+  }
+
+  if (session.role === "student") {
+    const student = findStudentForSavedSession(session) || {
+      id: session.student_id || "",
+      student_id: session.student_id || "",
+      studentId: session.student_id || "",
+      no_matrik: session.no_matrik || "",
+      noMatrik: session.no_matrik || "",
+      name: session.nama || session.displayName || "",
+      nama: session.nama || session.displayName || "",
+      email: session.email || "",
+      className: session.kelas || "",
+      kelas: session.kelas || ""
+    };
+    startStudentSession(student);
+    if (isLiveMode) {
+      await loadTodayRecords();
+    }
+    return true;
+  }
+
+  if (session.role === "warden") {
+    const wardenName = session.nama_warden || session.displayName || "";
+    const isKnownWarden = wardens.some((warden) => normalizeValue(warden) === normalizeValue(wardenName));
+    if (!session.pin || !isKnownWarden) {
+      clearSavedSession();
+      showInfo("Sesi warden tamat. Sila log masuk semula.");
+      return false;
+    }
+
+    startSession("warden", {
+      name: wardenName,
+      nama_warden: wardenName,
+      pin: session.pin
+    });
+    return true;
+  }
+
+  if (session.role === "guard") {
+    const guardName = session.nama_guard || session.displayName || "";
+    const isKnownGuard = guards.some((guard) => normalizeValue(guard) === normalizeValue(guardName));
+    if (!session.pin || !isKnownGuard) {
+      clearSavedSession();
+      showInfo("Sesi guard tamat. Sila log masuk semula.");
+      return false;
+    }
+
+    startSession("guard", {
+      name: guardName,
+      nama_guard: guardName,
+      pin: session.pin
+    });
+    return true;
+  }
+
+  clearSavedSession();
+  return false;
+}
+
+function findStudentForSavedSession(session) {
+  return students.find((student) => (
+    (session.student_id && normalizeValue(student.student_id || student.studentId || student.id) === normalizeValue(session.student_id)) ||
+    (session.no_matrik && normalizeValue(student.no_matrik || student.noMatrik) === normalizeValue(session.no_matrik)) ||
+    (session.nama && normalizeValue(student.nama || student.name) === normalizeValue(session.nama))
+  ));
 }
 
 function setupFeedbackMessageObservers() {
@@ -2031,14 +2371,23 @@ function escapeHtml(value) {
 }
 
 async function initApp() {
+  setupAppVersionUi();
+  setupServiceWorkerUpdates();
   setupAccessEnhancements();
   setupFeedbackMessageObservers();
-  populateStudents();
-  populateStaff();
   updateEmergencyFields();
   updateClock();
-  setMockMode("");
+  if (ALLOW_MOCK_MODE) {
+    setMockMode("");
+    await restoreSavedSession();
+    return;
+  } else {
+    updateDataModeIndicator();
+  }
   await loadLiveMasters();
+  if (isLiveMode) {
+    await restoreSavedSession();
+  }
 }
 
 initApp();

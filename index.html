@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/style.css?v=1.2.2">
   </head>
   <body>
     <header class="app-header">
@@ -57,6 +57,11 @@
           <label for="matricInput">No. Matrik</label>
           <input id="matricInput" type="text" placeholder="Contoh: xxxx-xxxx" required>
 
+          <label class="remember-device">
+            <input id="studentRememberInput" type="checkbox">
+            <span>Ingat peranti ini</span>
+          </label>
+
           <button class="primary-action" type="submit">Masuk sebagai Pelajar</button>
           <p class="form-message" id="studentLoginMessage"></p>
         </form>
@@ -84,7 +89,7 @@
             <span id="sessionRole">-</span>
             <strong id="sessionName">-</strong>
           </div>
-          <button class="secondary-action" id="logoutButton" type="button">Tukar Peranan</button>
+          <button class="secondary-action" id="logoutButton" type="button">Log Keluar</button>
         </div>
 
         <nav class="tabs" aria-label="Bahagian sistem">
@@ -232,16 +237,13 @@
         <div class="record-list" id="allRecordsList"></div>
         </section>
       </section>
+
+      <footer class="app-footer">
+        <span id="appVersionText">eOuting ITU • v1.2.2</span>
+        <button class="system-refresh-button" id="systemRefreshButton" type="button">Muat Semula Sistem</button>
+      </footer>
     </main>
 
-    <script src="assets/app.js"></script>
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("./service-worker.js")
-            .catch((error) => console.warn("Service worker registration failed:", error));
-        });
-      }
-    </script>
+    <script src="assets/app.js?v=1.2.2"></script>
   </body>
 </html>

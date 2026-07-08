@@ -383,6 +383,22 @@ textarea:focus {
   outline: 0;
 }
 
+.remember-device {
+  align-items: center;
+  background: #f6f8fc;
+  border: 1px solid rgba(8, 36, 92, 0.1);
+  border-radius: 8px;
+  color: var(--deep-navy);
+  display: flex;
+  gap: 9px;
+  padding: 9px 11px;
+}
+
+.remember-device input {
+  min-height: 0;
+  width: auto;
+}
+
 textarea {
   resize: vertical;
 }
@@ -558,6 +574,23 @@ textarea {
 .toast-close:focus {
   box-shadow: 0 0 0 3px rgba(255, 210, 31, 0.42);
   outline: 0;
+}
+
+.toast-action {
+  background: var(--primary);
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 800;
+  margin-top: 8px;
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.toast-action:hover {
+  background: var(--deep-navy);
 }
 
 @keyframes toastIn {
@@ -788,6 +821,34 @@ textarea {
   color: var(--muted);
   padding: 18px;
   text-align: center;
+}
+
+.app-footer {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  gap: 8px 12px;
+  justify-content: center;
+  margin: 18px 0 4px;
+  text-align: center;
+}
+
+.system-refresh-button {
+  background: #eef3fb;
+  border: 1px solid rgba(8, 36, 92, 0.14);
+  border-radius: 999px;
+  color: var(--deep-navy);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.system-refresh-button:hover {
+  border-color: rgba(8, 36, 92, 0.34);
 }
 
 .list-title {
