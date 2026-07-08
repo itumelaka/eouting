@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>eOuting ITU</title>
+    <meta name="theme-color" content="#061B49">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="eOuting">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
     <link rel="stylesheet" href="assets/style.css">
   </head>
@@ -230,5 +235,13 @@
     </main>
 
     <script src="assets/app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./service-worker.js")
+            .catch((error) => console.warn("Service worker registration failed:", error));
+        });
+      }
+    </script>
   </body>
 </html>
