@@ -1,4 +1,4 @@
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -3274,6 +3274,286 @@ function getExpectedReturnDate(record) {
   }
 
   return parseFlexibleDate(`${returnDate} ${String(returnTime).slice(0, 5)}`);
+}
+
+const loadLiveMastersOriginal = loadLiveMasters;
+loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
+  setStudentDropdownState("loading");
+
+  try {
+    const [studentResult, wardenResult, guardResult] = await Promise.allSettled([
+      apiGet("getStudents"),
+      apiGet("getWardens"),
+      apiGet("getGuards")
+    ]);
+
+    if (studentResult.status !== "fulfilled") {
+      throw studentResult.reason || new Error("Gagal memuatkan senarai pelajar.");
+    }
+
+    const liveStudents = normalizeStudentListResponse(studentResult.value);
+    students = liveStudents;
+    isLiveMode = true;
+    dataModeMessage = "Live Mode: Google Sheets";
+    updateDataModeIndicator();
+    renderStudentDropdownState(liveStudents);
+
+    if (wardenResult.status === "fulfilled") {
+      try {
+        updateWardenMasterList(wardenResult.value);
+      } catch (error) {
+        console.warn("Respons senarai warden tidak sah.", error);
+      }
+    } else {
+      console.warn("Gagal memuatkan senarai warden.", wardenResult.reason);
+    }
+
+    if (guardResult.status === "fulfilled") {
+      try {
+        updateGuardMasterList(guardResult.value);
+      } catch (error) {
+        console.warn("Respons senarai guard tidak sah.", error);
+      }
+    } else {
+      console.warn("Gagal memuatkan senarai guard.", guardResult.reason);
+    }
+  } catch (error) {
+    console.error("Gagal memuatkan senarai pelajar dari Google Sheets.", error);
+    isLiveMode = true;
+    dataModeMessage = "Live Mode: Google Sheets";
+    updateDataModeIndicator();
+    setStudentDropdownState("failed");
+    showStudentLoadFailurePanel();
+    showModeNotice("Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Sistem.");
+  }
+};
+
+function setStudentDropdownState(state) {
+  const stateText = {
+    loading: "Memuatkan senarai pelajar...",
+    failed: "Gagal memuatkan senarai pelajar",
+    empty: "Tiada pelajar ditemui"
+  };
+
+  if (!els.studentLoginSelect) {
+    return;
+  }
+
+  els.studentLoginSelect.innerHTML = `<option value="">${escapeHtml(stateText[state] || "")}</option>`;
+  els.studentLoginSelect.disabled = state !== "loaded";
+  setStudentLoginDisabled(state !== "loaded");
+}
+
+function renderStudentDropdownState(liveStudents) {
+  clearStudentLoadFailurePanel();
+
+  if (!Array.isArray(liveStudents) || liveStudents.length === 0) {
+    setStudentDropdownState("empty");
+    return;
+  }
+
+  els.studentLoginSelect.disabled = false;
+  setStudentLoginDisabled(false);
+  els.studentLoginSelect.innerHTML = liveStudents.map((student) => (
+    `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)} (${escapeHtml(student.no_matrik)})</option>`
+  )).join("");
+}
+
+function setStudentLoginDisabled(disabled) {
+  const button = els.studentLoginPanel ? els.studentLoginPanel.querySelector('button[type="submit"]') : null;
+  if (button) {
+    button.disabled = disabled;
+  }
+}
+
+function normalizeStudentListResponse(response) {
+  const rows = extractArrayResponse(response, "students");
+  const normalized = rows
+    .map((row) => normalizeStudentRow(row))
+    .filter(Boolean);
+
+  if (rows.length > 0 && normalized.length === 0) {
+    throw new Error("Format data pelajar tidak dikenali.");
+  }
+
+  return normalized;
+}
+
+function normalizeStudentRow(row) {
+  if (!row || typeof row !== "object") {
+    console.warn("Rekod pelajar bukan objek.", row);
+    return null;
+  }
+
+  const id = String(row.student_id || row.id || "").trim();
+  const name = String(row.nama || row.name || "").trim();
+  const matric = String(row.no_matrik || row.matric || "").trim();
+
+  if (!id || !name || !matric) {
+    console.warn("Rekod pelajar tidak lengkap.", row);
+    return null;
+  }
+
+  return {
+    id,
+    student_id: id,
+    no_matrik: matric,
+    name,
+    nama: name,
+    email: row.email || row.student_email || "",
+    className: row.kelas || row.className || "",
+    kelas: row.kelas || row.className || "",
+    gender: row.jantina || row.gender || "",
+    status: row.status || ""
+  };
+}
+
+function updateWardenMasterList(response) {
+  const rows = extractArrayResponse(response, "wardens");
+  wardens = rows
+    .map((row) => row && typeof row === "object" ? String(row.nama_warden || row.name || "").trim() : String(row || "").trim())
+    .filter(Boolean);
+
+  if (els.wardenSelect) {
+    els.wardenSelect.innerHTML = wardens.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  }
+}
+
+function updateGuardMasterList(response) {
+  const rows = extractArrayResponse(response, "guards");
+  guards = rows
+    .map((row) => row && typeof row === "object" ? String(row.nama_guard || row.name || "").trim() : String(row || "").trim())
+    .filter(Boolean);
+
+  if (els.guardSelect) {
+    els.guardSelect.innerHTML = guards.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  }
+}
+
+function extractArrayResponse(response, label) {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (response && Array.isArray(response.data)) {
+    return response.data;
+  }
+
+  console.warn(`Respons ${label} bukan array.`, response);
+  throw new Error(`Respons ${label} tidak sah.`);
+}
+
+async function retryLoadStudentsOnly() {
+  setStudentDropdownState("loading");
+  clearStudentLoadFailurePanel();
+
+  try {
+    const response = await apiGet("getStudents");
+    const liveStudents = normalizeStudentListResponse(response);
+    students = liveStudents;
+    isLiveMode = true;
+    dataModeMessage = "Live Mode: Google Sheets";
+    updateDataModeIndicator();
+    renderStudentDropdownState(liveStudents);
+  } catch (error) {
+    console.error("Cuba Lagi gagal memuatkan senarai pelajar.", error);
+    setStudentDropdownState("failed");
+    showStudentLoadFailurePanel();
+  }
+}
+
+function showStudentLoadFailurePanel() {
+  if (els.studentLoginMessage) {
+    els.studentLoginMessage.textContent = "Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Sistem.";
+  }
+
+  const button = ensureStudentRetryButton();
+  if (button) {
+    button.hidden = false;
+    button.disabled = false;
+  }
+}
+
+function clearStudentLoadFailurePanel() {
+  if (els.studentLoginMessage && els.studentLoginMessage.textContent.indexOf("Gagal memuatkan senarai pelajar") !== -1) {
+    els.studentLoginMessage.textContent = "";
+  }
+
+  const button = document.querySelector("#studentLoadRetryButton");
+  if (button) {
+    button.hidden = true;
+    button.disabled = false;
+  }
+}
+
+function ensureStudentRetryButton() {
+  if (!els.studentLoginPanel || !els.studentLoginMessage) {
+    return null;
+  }
+
+  let button = document.querySelector("#studentLoadRetryButton");
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "studentLoadRetryButton";
+    button.type = "button";
+    button.className = "live-retry-button";
+    button.textContent = "Cuba Lagi";
+    button.addEventListener("click", retryLoadStudentsOnly);
+    els.studentLoginMessage.insertAdjacentElement("afterend", button);
+  }
+
+  return button;
+}
+
+const setupAppVersionUiOriginal = setupAppVersionUi;
+setupAppVersionUi = function setupAppVersionUiWithHardRefresh() {
+  setupAppVersionUiOriginal();
+  setupSystemRefreshHardReload();
+};
+
+function setupSystemRefreshHardReload() {
+  if (!els.systemRefreshButton || els.systemRefreshButton.dataset.hardRefreshReady === "1") {
+    return;
+  }
+
+  els.systemRefreshButton.dataset.hardRefreshReady = "1";
+  els.systemRefreshButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    hardReloadAppShell();
+  }, true);
+}
+
+async function hardReloadAppShell() {
+  if (els.systemRefreshButton) {
+    els.systemRefreshButton.disabled = true;
+    els.systemRefreshButton.textContent = "Memuat semula...";
+  }
+
+  try {
+    clearSavedSession();
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    students = [];
+    setStudentDropdownState("loading");
+
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames
+        .filter((name) => name.indexOf("eouting-cache-") === 0)
+        .map((name) => caches.delete(name)));
+    }
+
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+  } catch (error) {
+    console.warn("Muat Semula Sistem tidak dapat membersihkan cache sepenuhnya.", error);
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("_reload", String(Date.now()));
+  window.location.replace(url.toString());
 }
 
 async function initApp() {
