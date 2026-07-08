@@ -1,6 +1,7 @@
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.3.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
+const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
 
 let students = [
   { id: "S001", no_matrik: "M001", name: "Ahmad Hakimi", className: "SKM 1", gender: "Lelaki", status: "Aktif" },
@@ -129,7 +130,8 @@ const els = {
   countEmergency: document.querySelector("#countEmergency"),
   appVersionText: document.querySelector("#appVersionText"),
   systemRefreshButton: document.querySelector("#systemRefreshButton"),
-  dataModeIndicator: null
+  dataModeIndicator: null,
+  liveRetryButton: null
 };
 
 document.querySelectorAll("[data-role-choice]").forEach((button) => {
@@ -304,14 +306,24 @@ function setupStatisticsPanel() {
         <p>Ringkasan bulanan kekerapan outing pelajar</p>
       </div>
       <div class="stats-filter-card">
-        <label for="statsMonthSelect">Bulan</label>
-        <select id="statsMonthSelect"></select>
-        <label for="statsYearSelect">Tahun</label>
-        <select id="statsYearSelect"></select>
-        <label for="statsClassSelect">Kelas</label>
-        <select id="statsClassSelect"></select>
-        <button class="primary-action" id="statsGenerateButton" type="button">Jana Statistik</button>
-        <button class="secondary-action" id="statsRefreshButton" type="button">Refresh</button>
+        <div class="stats-filter-grid">
+          <div class="stats-filter-field">
+            <label for="statsMonthSelect">Bulan</label>
+            <select id="statsMonthSelect"></select>
+          </div>
+          <div class="stats-filter-field stats-filter-year">
+            <label for="statsYearSelect">Tahun</label>
+            <select id="statsYearSelect"></select>
+          </div>
+          <div class="stats-filter-field">
+            <label for="statsClassSelect">Kelas</label>
+            <select id="statsClassSelect"></select>
+          </div>
+        </div>
+        <div class="stats-filter-actions">
+          <button class="primary-action" id="statsGenerateButton" type="button">Jana Statistik</button>
+          <button class="secondary-action" id="statsRefreshButton" type="button">Refresh</button>
+        </div>
       </div>
       <div class="summary-grid stats-summary" id="statsSummary"></div>
       <section class="stats-section">
@@ -350,6 +362,7 @@ function setupStatisticsPanel() {
   els.statsBackButton.addEventListener("click", closeStatisticsPage);
   els.statsGenerateButton.addEventListener("click", loadStatistics);
   els.statsRefreshButton.addEventListener("click", loadStatistics);
+  setStatisticsYearOptions();
 }
 
 els.studentLoginPanel.addEventListener("submit", async (event) => {
@@ -494,19 +507,13 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 });
 
 async function apiGet(action) {
-  const response = await fetch(`${GAS_WEB_APP_URL}?action=${encodeURIComponent(action)}`);
-  const result = await response.json();
-
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error || `API GET failed: ${action}`);
-  }
-
-  return result.data;
+  return apiGetWithParams(action);
 }
 
 async function apiGetWithParams(action, params = {}) {
   const searchParams = new URLSearchParams({
-    action
+    action,
+    _ts: String(Date.now())
   });
 
   Object.keys(params).forEach((key) => {
@@ -515,14 +522,35 @@ async function apiGetWithParams(action, params = {}) {
     }
   });
 
-  const response = await fetch(`${GAS_WEB_APP_URL}?${searchParams.toString()}`);
-  const result = await response.json();
+  return fetchApiGetWithRetry(action, searchParams);
+}
 
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error || `API GET failed: ${action}`);
+async function fetchApiGetWithRetry(action, searchParams) {
+  const retryDelays = [0, 600, 1200];
+  let lastError = null;
+
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    if (retryDelays[attempt]) {
+      await delay(retryDelays[attempt]);
+    }
+
+    searchParams.set("_ts", String(Date.now()));
+
+    try {
+      const response = await fetch(`${GAS_WEB_APP_URL}?${searchParams.toString()}`, {
+        cache: "no-store"
+      });
+      return await parseApiResponse(response, action);
+    } catch (error) {
+      lastError = error;
+      console.warn(`Live API GET failed. Attempt ${attempt + 1}/${retryDelays.length}.`, {
+        action,
+        message: error.message
+      });
+    }
   }
 
-  return result.data;
+  throw lastError || new Error(LIVE_API_UNSTABLE_MESSAGE);
 }
 
 async function apiPost(action, payload) {
@@ -571,6 +599,7 @@ async function loadLiveMasters() {
     populateStaff();
     await loadTodayRecords();
     updateDataModeIndicator();
+    hideLiveRetryButton();
   } catch (error) {
     if (ALLOW_MOCK_MODE) {
       setMockMode(`Live API unavailable. Using mock data. ${error.message}`);
@@ -601,6 +630,61 @@ async function loadTodayRecords() {
     showModeNotice(`Live records unavailable: ${error.message}`);
     render();
   }
+}
+
+async function apiPost(action, payload) {
+  const response = await fetch(GAS_WEB_APP_URL, {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action, ...payload })
+  });
+  return parseApiResponse(response, action);
+}
+
+async function parseApiResponse(response, action) {
+  const text = await response.text();
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith("<")) {
+    console.warn("Live API returned HTML instead of JSON.", {
+      action,
+      status: response.status,
+      preview: trimmed.slice(0, 160)
+    });
+    throw new Error(LIVE_API_UNSTABLE_MESSAGE);
+  }
+
+  let result = null;
+  try {
+    result = JSON.parse(text);
+  } catch (error) {
+    console.warn("Live API JSON parse failed.", {
+      action,
+      status: response.status,
+      message: error.message,
+      preview: trimmed.slice(0, 160)
+    });
+    throw new Error(LIVE_API_UNSTABLE_MESSAGE);
+  }
+
+  if (!response.ok || !result.ok) {
+    throw new Error(cleanApiError(result.error));
+  }
+
+  return result.data;
+}
+
+function cleanApiError(message) {
+  const text = String(message || "").trim();
+  if (!text || text.startsWith("<") || text.includes("Unexpected token")) {
+    return LIVE_API_UNSTABLE_MESSAGE;
+  }
+  return text;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function mapLiveStudent(student) {
@@ -710,7 +794,7 @@ function setMockMode(message) {
 
 function setLiveUnavailableMode(message) {
   isLiveMode = false;
-  dataModeMessage = message || "Live API unavailable.";
+  dataModeMessage = message || LIVE_API_UNSTABLE_MESSAGE;
   students = [];
   wardens = [];
   guards = [];
@@ -718,13 +802,61 @@ function setLiveUnavailableMode(message) {
   populateStudents();
   populateStaff();
   updateDataModeIndicator();
+  showLiveRetryButton();
   hideLoginPanels();
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
   showError(
-    "Sistem tidak dapat berhubung dengan Google Sheets. Sila semak internet atau tekan Muat Semula Sistem.",
-    "Sambungan Live Gagal"
+    "Sistem tidak dapat berhubung dengan Google Sheets buat masa ini. Sila tekan Cuba Lagi atau Muat Semula Sistem.",
+    "Sambungan Live Tidak Stabil"
   );
+}
+
+function showLiveRetryButton() {
+  if (!els.dataModeIndicator) {
+    setupDataModeIndicator();
+  }
+
+  if (!els.dataModeIndicator) {
+    return;
+  }
+
+  if (!els.liveRetryButton) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "live-retry-button";
+    button.textContent = "Cuba Lagi";
+    button.addEventListener("click", retryLiveConnection);
+    els.dataModeIndicator.insertAdjacentElement("afterend", button);
+    els.liveRetryButton = button;
+  }
+
+  els.liveRetryButton.hidden = false;
+  els.liveRetryButton.disabled = false;
+}
+
+function hideLiveRetryButton() {
+  if (els.liveRetryButton) {
+    els.liveRetryButton.hidden = true;
+    els.liveRetryButton.disabled = false;
+  }
+}
+
+async function retryLiveConnection() {
+  if (els.liveRetryButton) {
+    els.liveRetryButton.disabled = true;
+  }
+
+  try {
+    await loadLiveMasters();
+    if (isLiveMode) {
+      showSuccess("Sambungan live berjaya dipulihkan.", "Live Mode");
+    }
+  } finally {
+    if (els.liveRetryButton && !isLiveMode) {
+      els.liveRetryButton.disabled = false;
+    }
+  }
 }
 
 function updateDataModeIndicator() {
@@ -747,9 +879,9 @@ function updateDataModeIndicator() {
     ? "Live Mode: Google Sheets"
     : ALLOW_MOCK_MODE
       ? `Mock Mode: Demo Data${dataModeMessage ? ` - ${dataModeMessage}` : ""}`
-      : isLiveUnavailable
-        ? `Live Mode: Google Sheets - Sambungan gagal (${dataModeMessage})`
-        : "Live Mode: Google Sheets";
+    : isLiveUnavailable
+      ? "Live Mode: Google Sheets - Sambungan tidak stabil"
+      : "Live Mode: Google Sheets";
 }
 
 function showModeNotice(message) {
@@ -2092,7 +2224,28 @@ function populateStatsClassFilter() {
   els.statsClassSelect.value = classNames.includes(selectedValue) ? selectedValue : "";
 }
 
+function setStatisticsYearOptions() {
+  if (!els.statsYearSelect) {
+    return;
+  }
+
+  const allowedYears = [2026, 2027, 2028, 2029, 2030];
+  const selectedYear = Number(els.statsYearSelect.value);
+  const malaysiaYear = Number(new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(new Date()));
+  const defaultYear = allowedYears.includes(malaysiaYear) ? malaysiaYear : 2026;
+  const yearToUse = allowedYears.includes(selectedYear) ? selectedYear : defaultYear;
+
+  els.statsYearSelect.innerHTML = allowedYears
+    .map((year) => `<option value="${year}">${year}</option>`)
+    .join("");
+  els.statsYearSelect.value = String(yearToUse);
+}
+
 async function loadStatistics() {
+  setStatisticsYearOptions();
   const params = {
     month: els.statsMonthSelect.value,
     year: els.statsYearSelect.value,
