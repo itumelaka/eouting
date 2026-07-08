@@ -2748,6 +2748,27 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function updateClock() {
+  const now = new Date();
+  els.todayDate.textContent = new Intl.DateTimeFormat("ms-MY", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(now);
+  els.todayDay.textContent = new Intl.DateTimeFormat("ms-MY", {
+    weekday: "long",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(now);
+  els.currentTime.textContent = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(now);
+}
+
 async function initApp() {
   setupAppVersionUi();
   setupServiceWorkerUpdates();
