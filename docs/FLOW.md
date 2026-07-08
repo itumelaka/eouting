@@ -1,12 +1,14 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow **Pilot-ready Live V1.2** untuk eOuting ITU.
+Dokumen ini menerangkan flow **Pilot-running Live v1.3.1** untuk eOuting ITU.
 
 Status semasa:
 
 - GitHub Pages frontend live: `https://itumelaka.github.io/eouting`
 - Google Sheets live backend melalui GAS Web App.
+- Ujian operasi sebenar telah berjalan dan rekod outing berjaya disimpan.
 - PWA install support.
+- Remember-device session.
 - Student `Rekod Aktif` / `Sejarah Hari Ini`.
 - Warden/Guard PIN login.
 - Pemantauan Semasa read-only.
@@ -26,7 +28,7 @@ KELUAR
 SELESAI
 ```
 
-## Flow Digital V1.2
+## Flow Digital Live v1.3.1
 
 ```text
 Pelajar login nama + no_matrik
@@ -53,7 +55,7 @@ Guard sahkan masuk
    ↓
 Status: SELESAI + Telegram alert masuk / lewat jika berkaitan
    ↓
-Pelajar, dashboard, dan Pemantauan Semasa papar status terkini
+Pelajar, dashboard, Pemantauan Semasa, dan Statistik papar rekod terkini
 ```
 
 ## Pelajar
@@ -184,19 +186,28 @@ Dashboard Hari Ini memaparkan:
 
 `Statistik` ialah paparan read-only untuk ringkasan bulanan outing.
 
-Paparan ini menunjukkan:
+Filter tersedia:
+
+- Bulan
+- Tahun
+- Kelas
+
+Paparan Statistik menunjukkan:
 
 - Jumlah permohonan bulanan.
-- Jumlah selesai, kecemasan, lewat, dan pelajar terlibat.
-- `Juara Outing Bulanan` / ranking kekerapan outing.
+- Jumlah outing selesai.
+- Jumlah kecemasan.
+- Jumlah lewat.
+- Jumlah pelajar terlibat.
+- `Juara Outing Bulanan` / Ranking Kekerapan Outing.
 - Ringkasan mengikut kelas.
 - Pecahan status permohonan.
 
-V1.3.0 tidak memerlukan PIN untuk Statistik, sama seperti Pemantauan Semasa. Versi akan datang boleh hadkan akses Statistik kepada Warden/HEP sahaja.
+Statistik sekarang dibuka sebagai read-only, sama seperti Pemantauan Semasa. Versi akan datang boleh hadkan akses Statistik kepada Warden/HEP sahaja jika diperlukan.
 
 ## Prinsip Penting
 
 - Frontend role hiding bukan security sebenar.
 - Semua validation penting dibuat dalam GAS backend.
 - Semua action penting direkod dalam `AUDIT_LOG`.
-- Live V1.3.0 ialah pilot-ready untuk ujian operasi sebenar, bukan final production security.
+- Live v1.3.1 ialah pilot-running untuk ujian operasi sebenar, bukan final production security.

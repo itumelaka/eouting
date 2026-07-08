@@ -7,7 +7,7 @@ Status semasa:
 - Spreadsheet title: `eOuting ITU Database`
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - GitHub Pages frontend: `https://itumelaka.github.io/eouting`
-- GAS backend Live V1.2: siap
+- GAS backend Live v1.3.1: siap
 - Basic PWA setup: siap
 - Telegram Bot notification: siap, config melalui Script Properties
 
@@ -94,7 +94,32 @@ Nota format:
 
 - `no_matrik` perlu diformat sebagai **Plain text**.
 - `telefon_waris` perlu diformat sebagai **Plain text**.
+- `no_tel` dan nombor telefon lain perlu kekal **Plain text** supaya digit awal tidak hilang.
 - Masa dan tarikh boleh disimpan sebagai Date/DateTime atau string yang konsisten; frontend dan backend V1 sudah menyokong paparan BM friendly.
+
+## Statistik Outing
+
+Action `getOutingStats` menggunakan tab `OUTING_REQUESTS` sebagai **source of truth**. Statistik dikira daripada rekod outing yang sudah disimpan, bukan daripada data dummy frontend.
+
+Field utama yang digunakan untuk kiraan statistik:
+
+- `tarikh` atau fallback `masa_mohon`
+- `status`
+- `student_id`
+- `nama`
+- `kelas`
+- `jenis_permohonan`
+- `lewat`
+
+Status yang dikira:
+
+- `MENUNGGU_KELULUSAN`
+- `DILULUSKAN_WARDEN`
+- `DITOLAK_WARDEN`
+- `KELUAR`
+- `SELESAI`
+
+Paparan Statistik boleh filter mengikut bulan, tahun, dan kelas. Tahun frontend v1.3.1 dihadkan kepada 2026-2030 untuk operasi semasa.
 
 ## Tab: AUDIT_LOG
 

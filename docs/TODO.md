@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
+Senarai kerja selepas milestone **Pilot-running Live v1.3.1**.
 
 ## Done / Completed
 
@@ -49,15 +49,26 @@ Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 - [x] PWA cache/update behaviour improved.
 - [x] Manual `Muat Semula Sistem` helper.
 - [x] Visible app version footer.
-- [x] Statistik Outing V1.3.0.
+- [x] Remember-device session.
+- [x] Mock Mode restricted to `?mock=1`.
+- [x] Header clock 24-hour format.
+- [x] Statistik Outing v1.3.0.
 - [x] Monthly outing totals.
 - [x] Juara Outing Bulanan leaderboard.
 - [x] Class summary and status summary.
-- [x] Live V1.2 pilot-ready milestone.
+- [x] Statistik filter polish.
+- [x] Statistik year range 2026-2030.
+- [x] API hardening v1.3.1.
+- [x] GET retry/cache-busting.
+- [x] User-friendly live connection error.
+- [x] `Cuba Lagi` button.
+- [x] Live v1.3.1 pilot-running milestone.
+- [x] Ujian operasi sebenar awal berjaya.
 
 ## Pilot Checklist
 
-- [ ] Test with real students during actual outing.
+- [ ] Continue real pilot monitoring.
+- [ ] Verify Statistik after more outing records.
 - [ ] Verify Telegram alerts in real operation.
 - [ ] Check warden response flow during live outing.
 - [ ] Check guard keluar/masuk flow at pos guard.
@@ -68,7 +79,7 @@ Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 - [ ] Test Kecemasan outside normal outing window.
 - [ ] Test late / belum masuk cases.
 - [ ] Clean test data before official use.
-- [ ] Assign unique PINs to Warden/Guard.
+- [ ] Assign unique PINs to Warden/Guard before wider rollout.
 - [ ] Prepare Canva/manual guide for Pelajar.
 - [ ] Prepare Canva/manual guide for Warden/Guard.
 - [ ] Prepare SOP for HEP/warden/guard.
@@ -90,10 +101,10 @@ Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 ## Optional Future Enhancements
 
 - [ ] Automated version injection/build step.
-- [ ] Daily report/export.
+- [ ] Daily report / Copy WhatsApp summary.
+- [ ] Belum Pulang view.
 - [ ] Late-return escalation notification.
 - [ ] Optional WhatsApp notification later if required.
-- [ ] QR code outing pass.
 - [ ] Upload selfie to Google Drive.
 - [ ] Weekly/monthly report.
 - [ ] Export CSV/PDF.

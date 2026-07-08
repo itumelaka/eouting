@@ -65,7 +65,13 @@ Semak flow asas browser/local:
 20. Pastikan Telegram alert keluar/masuk diterima.
 21. Semak Dashboard Hari Ini.
 22. Semak Pemantauan Semasa.
-23. Tekan `Log Keluar` dan pastikan sesi localStorage dibuang.
+23. Semak Statistik Outing.
+24. Pastikan pilihan tahun Statistik hanya `2026`, `2027`, `2028`, `2029`, `2030`.
+25. Test filter Statistik mengikut bulan, tahun, dan kelas.
+26. Jika boleh, test sambungan live tidak stabil dan pastikan mesej friendly dipaparkan.
+27. Tekan `Cuba Lagi` dan pastikan app cuba reload live data tanpa clear browser data.
+28. Tekan `Muat Semula Sistem` jika PWA/browser memegang cache lama.
+29. Tekan `Log Keluar` dan pastikan sesi localStorage dibuang.
 
 ## Mock Mode Development
 
@@ -81,11 +87,25 @@ https://itumelaka.github.io/eouting/?mock=1
 Tanpa `?mock=1`, app tidak akan fallback senyap kepada demo data. Jika sambungan live gagal, pengguna akan nampak mesej:
 
 ```text
-Sambungan Live Gagal
-Sistem tidak dapat berhubung dengan Google Sheets. Sila semak internet atau tekan Muat Semula Sistem.
+Sambungan Live Tidak Stabil
+Sistem tidak dapat berhubung dengan Google Sheets buat masa ini. Sila tekan Cuba Lagi atau Muat Semula Sistem.
 ```
 
-Untuk pilot/production, pengguna perlu semak internet atau tekan `Muat Semula Sistem`, bukan terus guna mock data.
+Untuk pilot/production, pengguna perlu semak internet, tekan `Cuba Lagi`, atau tekan `Muat Semula Sistem`, bukan terus guna mock data.
+
+## Testing Checklist v1.3.1
+
+- Test live mode di `https://itumelaka.github.io/eouting`.
+- Test Statistik page.
+- Test year options 2026-2030.
+- Test month/class filters.
+- Test API unstable handling jika boleh.
+- Test butang `Cuba Lagi`.
+- Test `Muat Semula Sistem`.
+- Test remember-device refresh/reopen.
+- Test `?mock=1` untuk demo mode sahaja.
+- Test header clock format 24 jam.
+- Test `Rekod Aktif` / `Sejarah Hari Ini`.
 
 ## GitHub Pages Testing
 
@@ -194,3 +214,4 @@ Commit hanya bila perubahan sudah diuji dan memang mahu disimpan ke repo.
 - Warden/Guard PIN jangan disimpan pada public/shared device kecuali diluluskan untuk operasi pilot.
 - Production improvement: backend-issued session token atau Google login menggantikan PIN persistence.
 - Mock Mode ialah demo sahaja dan tidak boleh digunakan untuk operasi sebenar.
+- Jika pengguna masih nampak raw HTML atau `Unexpected token <`, app v1.3.1 sepatutnya convert kepada mesej sambungan live yang friendly. Jika raw error masih muncul, inspect Network tab untuk response GAS yang gagal.

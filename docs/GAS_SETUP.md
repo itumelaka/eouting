@@ -8,7 +8,7 @@ Status semasa:
 - Spreadsheet title: `eOuting ITU Database`
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - Apps Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
-- GAS backend Live V1.2: siap
+- GAS backend Live v1.3.1: siap
 - `clasp` workflow: configured
 - Telegram Bot notification: siap
 
@@ -22,10 +22,11 @@ GAS backend V1:
 - Menulis permohonan ke `OUTING_REQUESTS`.
 - Mengemaskini status approve/reject/keluar/masuk.
 - Mengambil rekod hari ini untuk student status, dashboard, dan monitoring.
+- Mengira Statistik Outing bulanan melalui `getOutingStats`.
 - Menulis tindakan penting ke `AUDIT_LOG`.
 - Validate identity, role, status, PIN, dan action permission.
 
-## Functions V1
+## Functions Live v1.3.1
 
 ```text
 doGet(e)
@@ -39,6 +40,7 @@ rejectRequest(payload)
 confirmOut(payload)
 confirmIn(payload)
 getTodayRecords()
+getOutingStats(params)
 appendAuditLog(action, requestId, userRole, userName, details)
 jsonResponse(data)
 errorResponse(message)
@@ -79,6 +81,9 @@ Nota penting:
 - `clasp push` hanya update fail Apps Script dalam project.
 - Web app users tidak semestinya dapat backend terbaru selepas `clasp push`.
 - Untuk live web app, buat deployment version baru.
+- Selepas tambah atau ubah GAS actions, jalankan `clasp push`.
+- Kemudian update Apps Script Web App melalui `Manage deployments -> Edit -> New version -> Deploy`.
+- Jika `/exec` memulangkan `Unknown action` tetapi code sudah wujud secara local, deployment version kemungkinan masih stale.
 
 Workflow ringkas:
 

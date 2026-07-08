@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan realiti keselamatan untuk **Pilot-ready Live V1.2** eOuting ITU.
+Dokumen ini menerangkan realiti keselamatan untuk **Pilot-running Live v1.3.1** eOuting ITU.
 
 Status semasa:
 
@@ -10,6 +10,7 @@ Status semasa:
 - Warden/Guard PIN login: siap
 - Telegram Bot notification: siap
 - Audit log asas: siap
+- Mock Mode hanya melalui `?mock=1`
 
 ## Prinsip Utama
 
@@ -25,9 +26,9 @@ Jangan anggap perkara berikut sebagai security sebenar:
 
 Security sebenar mesti dibuat di GAS backend dan kawalan akses Google/Spreadsheet.
 
-## V1.2 PIN Reality
+## PIN Reality
 
-Live V1.2 menggunakan PIN sebagai basic internal access control untuk Warden dan Guard.
+Live v1.3.1 menggunakan PIN sebagai basic internal access control untuk Warden dan Guard.
 
 PIN testing sementara:
 
@@ -38,6 +39,7 @@ PIN testing sementara:
 Nota penting:
 
 - Ini bukan bank-grade security.
+- Ini bukan final production security.
 - PIN testing perlu ditukar sebelum rollout lebih luas.
 - Setiap Warden/Guard patut diberi PIN unik.
 - PIN tidak boleh didedahkan melalui frontend logs atau GET endpoints.
@@ -86,6 +88,7 @@ Amalan wajib:
 - Beri akses hanya kepada akaun yang perlu.
 - Semak akses owner/editor secara berkala.
 - Jangan publish Spreadsheet kepada public.
+- Spreadsheet sharing mesti kekal restricted kepada akaun yang perlu sahaja.
 
 ## Telegram Security
 
@@ -126,6 +129,7 @@ GAS backend V1 mesti validate:
 | `confirmOut` | Guard |
 | `confirmIn` | Guard |
 | `getTodayRecords` | Live app / monitoring use |
+| `getOutingStats` | Live app / Statistik read-only |
 
 ## Audit Log
 
@@ -159,9 +163,10 @@ Audit log digunakan untuk:
 - SOP siapa boleh akses Pemantauan Semasa.
 - Backup dan retention policy untuk Spreadsheet.
 
-## Had Sistem V1.2
+## Had Sistem v1.3.1
 
-- Live V1.2 ialah pilot-ready untuk ujian operasi sebenar, bukan final production security.
+- Live v1.3.1 ialah pilot-running untuk ujian operasi sebenar, bukan final production security.
 - Link GitHub Pages boleh dibuka oleh sesiapa yang ada URL.
 - Jika GAS Web App dibuka kepada anyone with link, backend validation mesti ketat.
 - PWA cache menyimpan fail frontend statik sahaja.
+- Remember-device session ialah convenience untuk pilot dan bukan pengganti authentication production.

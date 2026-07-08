@@ -2,7 +2,7 @@
 
 **eOuting ITU** ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas bagi urusan outing.
 
-Status semasa: **Pilot-ready Live V1.2** untuk ujian operasi sebenar bersama pelajar. Sistem sudah berfungsi end-to-end, tetapi belum dianggap final production atau bank-grade security.
+Status semasa: **Pilot-running Live v1.3.1** untuk ujian operasi sebenar. Flow outing sebenar telah diuji dengan pelajar, rekod berjaya disimpan ke Google Sheets, dan notifikasi operasi berjalan. Sistem masih dalam fasa pilot-running, bukan final production atau production-grade security.
 
 Live frontend:
 
@@ -16,36 +16,47 @@ https://itumelaka.github.io/eouting
 - **Backend:** Google Apps Script Web App
 - **Database:** Google Sheets
 - **Notification:** Telegram Bot
-- **Deployment helper:** `clasp`
 - **PWA:** supported
+- **Deployment helper:** `clasp`
+- **Version:** Live v1.3.1
 
-## Milestone Live V1.2
+## Ringkasan Feature
 
-Flow utama sudah berjalan:
-
-```text
-student submit -> warden approve/reject -> guard keluar/masuk -> student status -> monitoring -> Telegram alert
-```
-
-Fungsi terkini:
-
-- Live GitHub Pages frontend.
-- Google Apps Script backend.
-- Google Sheets database.
-- PWA install support.
-- Student login guna nama + `no_matrik`.
-- Warden login guna nama + PIN.
-- Guard login guna nama + PIN.
-- Student submit `Outing Biasa` atau `Kecemasan`.
+- Pelajar login guna nama + `no_matrik`.
+- Warden/Guard login guna nama + PIN.
+- Pelajar submit `Outing Biasa` atau `Kecemasan`.
 - Warden approve / reject.
 - Guard confirm keluar / masuk.
 - `Rekod Saya` memisahkan `Rekod Aktif` dan `Sejarah Hari Ini`.
-- Rekod selesai/ditolak kekal sebagai sejarah compact dan tidak block permohonan baru.
-- Active record masih block duplicate request.
 - Pemantauan Semasa read-only.
-- BM date/time formatting dan phone display formatting.
-- 3D clay role navigation dan toast popup.
-- Telegram Bot notification berfungsi.
+- Statistik Outing bulanan.
+- Telegram notifications untuk action penting.
+- PWA support.
+- Remember-device session.
+- `Muat Semula Sistem` untuk bantu refresh cache PWA/browser.
+
+## Milestone Live v1.3.1
+
+Flow utama pilot-running:
+
+```text
+student submit -> warden approve/reject -> guard keluar/masuk -> student status -> monitoring -> statistik -> Telegram alert
+```
+
+Perkara terkini:
+
+- Ujian operasi sebenar berjaya dijalankan dengan rekod outing pelajar sebenar.
+- Statistik Outing tersedia dengan summary cards, ranking kekerapan outing, Juara Outing Bulanan, class summary, status summary, dan filter bulan/tahun/kelas.
+- Statistik year dropdown dihadkan kepada 2026-2030.
+- Layout filter Statistik dipolish dan responsive.
+- API/live fetch handling diperkukuh dalam v1.3.1.
+- GET requests menggunakan cache-busting dan retry ringkas.
+- Response HTML/error daripada GAS tidak lagi dipaparkan sebagai raw `Unexpected token <`.
+- Mesej friendly dipaparkan jika sambungan live tidak stabil.
+- Butang `Cuba Lagi` tersedia untuk ulang cuba live loading.
+- Header clock menggunakan format 24 jam.
+- PWA/cache update handling, remember-device session, dan Mock Mode `?mock=1` kekal tersedia.
+- Telegram notification kekal berfungsi.
 
 ## Role Flow Semasa
 
@@ -75,6 +86,12 @@ Fungsi terkini:
 - Paparan read-only untuk rekod hari ini.
 - Sesuai untuk semakan operasi harian oleh pihak berkaitan.
 
+### Statistik Outing
+
+- Paparan read-only untuk ringkasan bulanan.
+- Filter mengikut bulan, tahun, dan kelas.
+- Menunjukkan total permohonan, selesai, kecemasan, lewat, leaderboard, ringkasan kelas, dan pecahan status.
+
 ## Waktu Operasi Outing Biasa
 
 Outing Biasa:
@@ -91,7 +108,8 @@ Outing Biasa:
 - GitHub Pages: `https://itumelaka.github.io/eouting`
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - GAS Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
+- Local repo path: `C:\Users\burnk\OneDrive\Documents-assets\eouting`
 
 ## Nota Operasi
 
-Live V1.2 ini sesuai untuk pilot / ujian operasi sebenar. Sebelum rollout lebih luas, tetapkan PIN unik, semak sharing Spreadsheet, kawal Telegram group membership, dan sediakan SOP untuk HEP/warden/guard.
+Live v1.3.1 ini sesuai untuk pilot-running dan ujian operasi sebenar. Sebelum rollout lebih luas, tetapkan PIN unik, semak sharing Spreadsheet, kawal Telegram group membership, bersihkan data test jika perlu, dan sediakan SOP untuk HEP/warden/guard.
