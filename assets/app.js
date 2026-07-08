@@ -647,8 +647,10 @@ function startStudentSession(student) {
   try {
     startSession("student", student);
   } catch (error) {
-    console.error("Student view render failed:", error);
-    showError("Paparan rekod gagal dimuat. Sila tekan Refresh Status.", "Paparan Rekod");
+    console.warn("Student view render warning:", error);
+    if (!els.studentRecordsList || !els.studentRecordsList.innerHTML.trim()) {
+      showError("Paparan rekod gagal dimuat. Sila tekan Refresh Status.", "Paparan Rekod");
+    }
   }
 }
 
@@ -1469,6 +1471,7 @@ function renderStudent() {
   const studentRecords = outingRecords.filter(isRecordForCurrentStudent);
   debugStudentRecords(studentRecords);
   els.studentRecordsList.innerHTML = renderStudentRecordSections(studentRecords);
+  bindStudentHistoryToggles();
   updateStudentSubmitState();
 }
 
@@ -1510,7 +1513,80 @@ function isStudentHistoryRecord(record) {
 }
 
 function studentHistoryCard(record) {
-  return studentStatusCard(record).replace('<article class="record-card">', '<article class="record-card student-history-card">');
+  const statusInfo = studentStatusInfo(record);
+  const isRejected = (record.rawStatus || reverseDisplayStatus(record.status)) === "DITOLAK_WARDEN";
+  const inTime = record.masa_masuk || record.returnedAt
+    ? `<span>Masuk: ${escapeHtml(formatDisplayDateTime(record.masa_masuk || record.returnedAt))}</span>`
+    : "";
+  const noteDetail = isRejected && record.catatan
+    ? `<span>Catatan: ${escapeHtml(record.catatan)}</span>`
+    : "";
+  const detailsId = `history-${String(getRecordId(record) || "record").replace(/[^a-z0-9_-]/gi, "-")}`;
+  const vehicleDetail = record.butiran_kenderaan
+    ? `<br><strong>Butiran Kenderaan:</strong> ${escapeHtml(record.butiran_kenderaan)}`
+    : "";
+  const emergencyDetail = emergencyDetailHtml(record);
+  const actorDetail = actorDetailHtml(record);
+
+  return `
+    <article class="history-card">
+      <div class="history-summary">
+        <div>
+          <h4>${escapeHtml(getRecordId(record))}</h4>
+          <p>${escapeHtml(requestTypeLabel(record.jenis_permohonan))} | ${escapeHtml(record.purpose || record.tujuan || "-")}</p>
+        </div>
+        <span class="badge ${statusInfo.badgeClass}">${escapeHtml(statusInfo.badge)}</span>
+      </div>
+      <div class="history-meta">
+        <span>Lokasi: ${escapeHtml(record.location || record.lokasi || "-")}</span>
+        <span>Mohon: ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}</span>
+        ${inTime}
+        ${noteDetail}
+      </div>
+      <button class="history-toggle" type="button" data-history-toggle="${detailsId}" aria-expanded="false">
+        Lihat Butiran
+      </button>
+      <div class="history-details" id="${detailsId}" hidden>
+        <div class="record-detail">
+          <strong>Status Semasa:</strong> ${escapeHtml(statusInfo.message)}<br>
+          <strong>Jenis Permohonan:</strong> ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}<br>
+          <strong>Tujuan:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
+          <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
+          <strong>Kenderaan:</strong> ${escapeHtml(record.jenis_kenderaan || "-")}
+          ${vehicleDetail}
+          ${emergencyDetail}
+          ${actorDetail}
+        </div>
+        <div class="record-times">
+          <span>Mohon: ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}</span>
+          <span>Lulus/Tolak: ${escapeHtml(formatDisplayDateTime(record.masa_approve || record.approvedAt || record.rejectedAt))}</span>
+          <span>Keluar: ${escapeHtml(formatDisplayDateTime(record.masa_keluar || record.outAt))}</span>
+          <span>Masuk: ${escapeHtml(formatDisplayDateTime(record.masa_masuk || record.returnedAt))}</span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function bindStudentHistoryToggles() {
+  if (!els.studentRecordsList) {
+    return;
+  }
+
+  els.studentRecordsList.querySelectorAll("[data-history-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const details = document.getElementById(button.dataset.historyToggle);
+      if (!details) {
+        console.warn("History details element not found.");
+        return;
+      }
+
+      const willShow = details.hidden;
+      details.hidden = !willShow;
+      button.setAttribute("aria-expanded", String(willShow));
+      button.textContent = willShow ? "Sembunyi Butiran" : "Lihat Butiran";
+    });
+  });
 }
 
 function renderWarden() {
