@@ -1,150 +1,119 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan aliran kerja sistem eOuting ITU berdasarkan proses manual semasa di Institut Teknologi Unggas.
+Dokumen ini menerangkan flow V1 untuk sistem eOuting ITU.
 
-## Flow manual semasa
+Status semasa:
 
-1. Pelajar ingin keluar outing selepas waktu pejabat.
-2. Pelajar menyerahkan kad outing kepada warden bertugas.
-3. Warden menandatangani kad outing sebagai kebenaran keluar.
-4. Pelajar menyerahkan atau meletakkan kad outing di pos guard.
-5. Pelajar menulis rekod keluar dalam buku outing guard.
-6. Pelajar keluar dari kawasan institut.
-7. Pelajar pulang sebelum atau pada jam 10:00 malam.
-8. Pelajar menandatangani buku outing di pos guard.
-9. Pelajar mengambil selfie dan menghantar bukti pulang ke WhatsApp group.
+- Frontend mock role-based access: siap
+- Basic PWA setup: siap
+- GitHub Pages live: `https://itumelaka.github.io/eouting`
+- Main Google Spreadsheet database: disediakan
+- GAS backend: belum dibina
 
-## Flow digital yang dicadangkan
+## Flow Digital V1
 
 ```text
-Pelajar Mohon
+Pelajar login
+   ↓
+Pelajar submit Outing Biasa / Kecemasan
    ↓
 Menunggu Kelulusan Warden
    ↓
-Diluluskan / Ditolak Warden
+Warden luluskan / tolak
    ↓
-Jika diluluskan, guard sahkan keluar
+Jika diluluskan, Guard sahkan keluar
    ↓
 Pelajar keluar outing
    ↓
 Guard sahkan masuk
    ↓
-Warden semak status akhir
+Dashboard papar status, lewat, belum masuk, dan kecemasan
 ```
 
-## Langkah 1: Pelajar membuat permohonan
+## 1. Student Login
 
-Pelajar mengisi maklumat asas:
+Pelajar login menggunakan:
 
 - Nama pelajar
-- Kelas / kumpulan
-- Tujuan outing
-- Lokasi outing
-- No telefon
-- Masa permohonan
+- `no_matrik`
 
-Status selepas submit:
+Live mode nanti mesti semak pelajar dalam tab `STUDENTS`.
 
-```text
-MENUNGGU KELULUSAN WARDEN
-```
+Syarat wajib:
 
-Pada tahap ini, pelajar masih belum dibenarkan keluar.
+- `status = Aktif` boleh login dan mohon outing.
+- `status = Tidak Aktif` tidak boleh login dan tidak boleh mohon outing.
 
-## Langkah 2: Warden membuat keputusan
+## 2. Student Submit Request
 
-Warden menyemak permohonan melalui dashboard warden.
+Pelajar boleh submit:
 
-Tindakan warden:
+- `Outing Biasa`
+- `Kecemasan`
+
+Maklumat outing:
+
+- Tujuan
+- Lokasi
+- Jenis kenderaan
+- Butiran kenderaan
+
+Untuk `Kecemasan`, maklumat tambahan:
+
+- Sebab kecemasan
+- Telefon waris
+- Hubungan waris
+- Catatan kecemasan
+
+## 3. Rule Masa Permohonan
+
+Outing Biasa:
+
+- Hanya Selasa / Rabu
+- Hanya selepas 5:00 PM
+
+Kecemasan:
+
+- Boleh dihantar bila-bila masa
+- Masih perlu kelulusan warden
+
+## 4. Warden Approval
+
+Warden pilih nama dalam mock mode.
+
+Tindakan:
 
 - Luluskan
 - Tolak
-- Tambah catatan
 
-Jika diluluskan, status berubah kepada:
+Live mode nanti GAS backend mesti validate identity warden dan status warden sebelum update rekod.
 
-```text
-DILULUSKAN WARDEN
-```
+## 5. Guard Confirmation
 
-Jika ditolak, status berubah kepada:
+Guard pilih nama dalam mock mode.
 
-```text
-DITOLAK WARDEN
-```
+Tindakan:
 
-## Langkah 3: Guard sahkan keluar
+- Confirm keluar
+- Confirm masuk
 
-Guard hanya boleh sahkan keluar jika permohonan telah diluluskan oleh warden.
+Guard hanya boleh confirm keluar selepas permohonan diluluskan warden.
 
-Maklumat yang direkod:
+## 6. Dashboard
 
-- Masa keluar sebenar
-- Nama guard / ID guard
-- Status keluar
+Dashboard perlu papar ringkasan:
 
-Status selepas guard sahkan keluar:
+- Menunggu Kelulusan
+- Diluluskan
+- Sedang Keluar
+- Sudah Pulang
+- Lewat
+- Belum Masuk
+- Kecemasan
 
-```text
-KELUAR
-```
+## Prinsip Penting
 
-## Langkah 4: Guard sahkan masuk
-
-Apabila pelajar pulang, guard sahkan masuk dalam sistem.
-
-Maklumat yang direkod:
-
-- Masa masuk sebenar
-- Nama guard / ID guard
-- Status pulang
-- Flag lewat atau tidak
-
-Jika masa masuk sebelum atau pada 10:00 malam:
-
-```text
-SELESAI
-```
-
-Jika masa masuk selepas 10:00 malam:
-
-```text
-SELESAI - LEWAT
-```
-
-## Langkah 5: Bukti pulang
-
-Untuk versi awal, bukti selfie masih boleh dihantar ke WhatsApp group seperti proses manual semasa.
-
-Dalam sistem, warden boleh tanda:
-
-```text
-Bukti WhatsApp diterima: Ya / Tidak
-```
-
-Untuk versi akan datang, sistem boleh ditambah fungsi upload selfie ke Google Drive.
-
-## Status lifecycle
-
-Status yang dicadangkan:
-
-```text
-MOHON
-MENUNGGU KELULUSAN
-DILULUSKAN WARDEN
-DITOLAK WARDEN
-KELUAR
-SELESAI
-SELESAI - LEWAT
-BELUM MASUK
-DIBATALKAN
-```
-
-## Prinsip penting
-
-- Pelajar tidak boleh approve sendiri.
-- Pelajar tidak boleh sahkan keluar sendiri.
-- Pelajar tidak boleh sahkan masuk sendiri.
-- Guard tidak boleh sahkan keluar jika belum diluluskan warden.
-- Masa keluar dan masuk direkod oleh sistem, bukan ditaip manual oleh pelajar.
-- Semua tindakan penting perlu masuk ke audit log.
+- Frontend role hiding bukan security sebenar.
+- Semua validation sebenar mesti dibuat dalam GAS backend.
+- Semua action penting perlu masuk `AUDIT_LOG`.
+- Mock records kekal dalam memory semasa role switching untuk tujuan UI testing sahaja.

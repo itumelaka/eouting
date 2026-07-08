@@ -1,52 +1,49 @@
 # Setup Google Apps Script untuk eOuting ITU
 
-Google Apps Script digunakan sebagai backend/API antara GitHub Pages dan Google Sheets.
+Google Apps Script akan digunakan sebagai backend/API antara GitHub Pages dan Google Sheets.
 
-## Kenapa perlu Google Apps Script?
+Status semasa:
 
-GitHub Pages hanya boleh host frontend statik seperti HTML, CSS dan JavaScript.
+- Frontend live: `https://itumelaka.github.io/eouting`
+- Spreadsheet title: `eOuting ITU Database`
+- Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
+- Apps Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
+- GAS backend code: belum dibina
+- `GAS_WEB_APP_URL` di frontend: kekal kosong sehingga deploy
 
-Untuk menulis data ke Google Sheets, sistem perlukan backend. Google Apps Script sesuai kerana ia boleh:
+## Tujuan GAS Backend
 
-- Menerima request daripada frontend.
-- Membaca senarai pelajar daripada Google Sheets.
-- Menulis permohonan outing ke Google Sheets.
-- Mengemaskini status kelulusan, keluar dan masuk.
-- Mengurus audit log.
+GAS backend V1 perlu:
 
-## Komponen yang diperlukan
+- Membaca data `STUDENTS`, `WARDENS`, dan `GUARDS`.
+- Menulis permohonan ke `OUTING_REQUESTS`.
+- Mengemaskini status approve/reject/keluar/masuk.
+- Membina dashboard data daripada Spreadsheet.
+- Menulis semua tindakan penting ke `AUDIT_LOG`.
+- Validate identity, role, dan status.
 
-1. GitHub repo untuk frontend:
-
-```text
-https://github.com/itumelaka/eouting
-```
-
-2. GitHub Pages untuk paparan sistem:
-
-```text
-https://itumelaka.github.io/eouting/
-```
-
-3. Google Spreadsheet sebagai database.
-
-4. Google Apps Script project sebagai backend/API.
-
-## Cadangan nama Apps Script project
+## Functions Yang Akan Dibina
 
 ```text
-eOuting ITU API
-```
-
-## Cadangan nama Google Spreadsheet
-
-```text
-eOuting ITU Database
+doGet(e)
+doPost(e)
+getStudents()
+getWardens()
+getGuards()
+submitRequest(payload)
+approveRequest(payload)
+rejectRequest(payload)
+confirmOut(payload)
+confirmIn(payload)
+getTodayRecords()
+appendAuditLog(action, requestId, userRole, userName, details)
+jsonResponse(data)
+errorResponse(message)
 ```
 
 ## Deployment Apps Script
 
-Apps Script perlu dideploy sebagai Web App.
+Apps Script perlu dideploy sebagai Web App selepas backend siap.
 
 Cadangan setting awal:
 
@@ -55,69 +52,44 @@ Execute as: Me
 Who has access: Anyone with the link
 ```
 
-Nota: Setting ini memudahkan frontend GitHub Pages berhubung dengan GAS. Namun kawalan akses tetap perlu dibuat dalam kod, contohnya PIN warden/guard dan validation request.
+Nota: Jika Web App boleh dipanggil oleh sesiapa dengan link, backend validation menjadi wajib. Jangan bergantung pada frontend role hiding.
 
-## API action yang dicadangkan
+## Rule Validation Wajib
 
-Frontend boleh memanggil GAS dengan action seperti berikut:
+GAS perlu semak:
 
-```text
-getStudents
-createOutingRequest
-getTodayRequests
-approveRequest
-rejectRequest
-checkOutStudent
-checkInStudent
-markSelfieReceived
-getDashboardSummary
-```
+- Student login guna nama + `no_matrik`.
+- Student mesti `status = Aktif`.
+- `Outing Biasa` hanya Selasa/Rabu selepas 5:00 PM.
+- `Kecemasan` boleh dihantar bila-bila masa tetapi tetap perlu kelulusan warden.
+- Warden mesti valid sebelum approve/reject.
+- Guard mesti valid sebelum confirm keluar/masuk.
+- Guard tidak boleh confirm keluar jika belum diluluskan warden.
+- Masa masuk selepas had pulang perlu ditanda `lewat`.
+- Semua action penting perlu ditulis ke `AUDIT_LOG`.
 
-## Contoh struktur request
+## Response Format Cadangan
 
-```json
-{
-  "action": "createOutingRequest",
-  "student_id": "S001",
-  "tujuan": "Beli barang keperluan",
-  "lokasi": "Kedai berhampiran"
-}
-```
-
-## Contoh struktur response
+Success:
 
 ```json
 {
   "ok": true,
-  "message": "Permohonan berjaya dihantar.",
-  "data": {
-    "request_id": "REQ-20260707-0001",
-    "status": "MENUNGGU KELULUSAN"
-  }
+  "data": {}
 }
 ```
 
-## Rule validation dalam GAS
+Error:
 
-GAS perlu semak:
-
-- Hari mestilah Selasa atau Rabu.
-- Masa permohonan mestilah selepas 5:00 petang.
-- Pelajar mestilah aktif.
-- Pelajar tidak boleh ada outing aktif yang belum selesai.
-- Guard tidak boleh check-out jika belum diluluskan warden.
-- Masa masuk selepas 10:00 malam perlu ditanda lewat.
-
-## Fail Apps Script yang dicadangkan
-
-```text
-Code.gs
-Config.gs
-Sheets.gs
-Auth.gs
-OutingService.gs
-DashboardService.gs
-AuditService.gs
+```json
+{
+  "ok": false,
+  "message": "Ralat ringkas untuk frontend."
+}
 ```
 
-Untuk permulaan, semua boleh diletakkan dalam `Code.gs` dahulu. Bila sistem makin besar, baru pecahkan ikut fail.
+## Nota Pelaksanaan
+
+- Untuk V1, semua code boleh bermula dalam `Code.gs`.
+- Jangan commit deployment URL, token, secret, password, API key atau PIN sebenar.
+- Selepas deploy, frontend baru boleh disambungkan kepada `GAS_WEB_APP_URL`.

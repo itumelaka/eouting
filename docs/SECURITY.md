@@ -2,120 +2,112 @@
 
 Dokumen ini menerangkan kawalan keselamatan asas untuk sistem eOuting ITU.
 
-## Prinsip utama
+Status semasa:
 
-Sistem ini mengurus data dalaman pelajar. Oleh itu, jangan anggap ia sekadar borang biasa.
+- Frontend GitHub Pages: `https://itumelaka.github.io/eouting`
+- Basic PWA setup: siap
+- Frontend mock role-based access: siap
+- Main Spreadsheet database: disediakan
+- GAS backend: belum dibina
 
-Data seperti nama pelajar, kelas, rekod outing, masa keluar, masa masuk dan catatan warden perlu dijaga dengan baik.
+## Prinsip Utama
 
-## Jangan commit data sensitif
+Frontend GitHub Pages ialah laman statik. Semua kod frontend boleh dilihat oleh pengguna.
+
+Jangan anggap perkara berikut sebagai security sebenar:
+
+- Tab atau panel yang disembunyikan di frontend.
+- Role switching di frontend mock mode.
+- Warden/Guard pilih nama sahaja dalam mock mode.
+- `GAS_WEB_APP_URL` kosong di frontend.
+
+Security sebenar mesti dibuat dalam GAS backend.
+
+## Jangan Commit Data Sensitif
 
 Jangan simpan perkara berikut dalam GitHub repo:
 
-- Senarai penuh pelajar sebenar jika tidak perlu.
-- No kad pengenalan.
-- No telefon sensitif.
-- Password atau PIN plain text.
-- Apps Script deployment secret jika ada.
-- Spreadsheet ID jika dianggap dalaman dan tidak mahu didedahkan.
+- Password.
+- Token.
+- Secret.
+- API key.
+- PIN sebenar.
+- Deployment credential.
+- Data pelajar penuh yang tidak perlu didedahkan.
 
-## Frontend bukan tempat simpan rahsia
+## Mock Mode Semasa
 
-GitHub Pages ialah laman statik. Semua kod frontend boleh dilihat oleh pengguna.
+Mock access semasa hanya untuk UI testing:
 
-Jangan letak perkara ini dalam `index.html` atau JavaScript frontend:
+- Pelajar guna nama + `no_matrik`.
+- Warden pilih nama sahaja.
+- Guard pilih nama sahaja.
+- Tiada PIN sebenar digunakan dalam frontend mock mode.
 
-```text
-password admin
-PIN sebenar
-secret key
-private token
-Apps Script internal secret
-```
+Ini bukan authentication sebenar.
 
-## PIN warden dan guard
+## Live Mode Validation
 
-Untuk frontend mock / draft mode, Warden dan Guard belum perlu PIN supaya UI testing mudah dibuat.
+GAS backend V1 mesti validate:
 
-Mock access semasa hanya untuk testing frontend:
+- Student identity: nama + `no_matrik`.
+- Student status: hanya `Aktif` boleh login/request outing.
+- Warden identity dan status sebelum approve/reject.
+- Guard identity dan status sebelum confirm keluar/masuk.
+- Role/action permission untuk setiap request.
+- Outing Biasa hanya Selasa/Rabu selepas 5:00 PM.
+- Kecemasan boleh dihantar bila-bila masa tetapi tetap perlu kelulusan warden.
 
-- Student access guna nama + `no_matrik`.
-- Warden access guna selected warden name sahaja.
-- Guard access guna selected guard name sahaja.
-- Ini bukan authentication sebenar dan tidak boleh dianggap selamat untuk live mode.
-
-Untuk future live mode, sistem perlu guna PIN atau authentication lebih kuat untuk warden/guard.
-
-Tetapi:
-
-- Jangan simpan PIN sebagai plain text dalam Google Sheets.
-- Simpan hash PIN jika boleh.
-- Jangan hardcode PIN dalam frontend.
-- Validation PIN perlu berlaku di Apps Script, bukan di frontend sahaja.
-
-## Validasi live mode
-
-Backend validation dalam Google Apps Script adalah wajib. Frontend hiding sahaja bukan security sebenar kerana kod GitHub Pages boleh dilihat dan diubah oleh pengguna.
-
-Keperluan validation live mode:
-
-- Student validation mesti semak `student_id`, `no_matrik`, dan `status = Aktif` dari sheet `STUDENTS`.
-- Warden validation mesti semak `warden_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
-- Guard validation mesti semak `guard_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
-
-Schema `STUDENTS` perlu ada medan asas berikut:
-
-```text
-student_id
-no_matrik
-nama
-kelas
-jantina
-status
-```
-
-## Kawalan role
-
-Setiap action perlu semak role.
-
-Contoh:
+## Role Permission
 
 | Action | Role dibenarkan |
 |---|---|
-| createOutingRequest | Pelajar |
+| submitRequest | Student |
 | approveRequest | Warden |
 | rejectRequest | Warden |
-| checkOutStudent | Guard |
-| checkInStudent | Guard |
-| markSelfieReceived | Warden |
+| confirmOut | Guard |
+| confirmIn | Guard |
+| getTodayRecords | Warden / Guard / dashboard role yang dibenarkan |
 
-## Audit log
+## Audit Log
 
 Semua tindakan penting perlu direkod dalam `AUDIT_LOG`.
 
-Sekurang-kurangnya rekod:
+Header V1:
 
-- Siapa buat tindakan.
-- Bila tindakan dibuat.
-- Apa tindakan dibuat.
-- Request ID yang terlibat.
+```text
+timestamp | action | request_id | user_role | user_name | details
+```
 
-## Had sistem V1
+Audit log perlu digunakan untuk:
 
-Versi awal mungkin tidak setanding sistem enterprise login penuh.
+- Permohonan dihantar.
+- Permohonan diluluskan.
+- Permohonan ditolak.
+- Guard sahkan keluar.
+- Guard sahkan masuk.
+- Error atau validation penting jika perlu.
 
-Risiko yang perlu diketahui:
+## PIN / Authentication Future
+
+PIN tidak digunakan dalam frontend mock mode.
+
+Untuk live mode, sistem boleh tambah:
+
+- PIN warden/guard.
+- Hash PIN di Spreadsheet.
+- Google Account login untuk warden.
+- Kaedah authentication lebih kuat.
+
+Jika PIN digunakan:
+
+- Jangan hardcode PIN di frontend.
+- Jangan simpan PIN plain text jika boleh dielakkan.
+- Validation PIN mesti berlaku di GAS backend.
+
+## Had Sistem V1
 
 - Link GitHub Pages boleh dibuka oleh sesiapa yang ada URL.
-- Jika Apps Script Web App dibuka kepada anyone with link, backend perlu validation yang baik.
-- PIN mudah boleh dikongsi.
-- Upload selfie ke Google Drive memerlukan kawalan akses tambahan.
-
-## Cadangan penambahbaikan V2
-
-- Login Google Account untuk warden.
-- Separate dashboard untuk guard.
-- QR code outing pass yang ada request ID.
-- Expiry outing pass pada jam 10:00 malam.
-- Upload selfie ke Google Drive.
-- Telegram alert kepada warden jika pelajar belum masuk selepas 10:00 malam.
+- PWA cache menyimpan fail frontend statik sahaja.
+- Jika GAS Web App dibuka kepada anyone with link, backend validation wajib ketat.
+- Spreadsheet mengandungi data dalaman dan perlu dijaga aksesnya.

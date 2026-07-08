@@ -1,121 +1,103 @@
 # Struktur Database Google Sheets
 
-Database utama eOuting ITU dicadangkan menggunakan Google Sheets.
+Database utama eOuting ITU menggunakan Google Sheets.
+
+Status semasa:
+
+- Spreadsheet title: `eOuting ITU Database`
+- Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
+- GitHub Pages frontend: `https://itumelaka.github.io/eouting`
+- Basic PWA setup: siap
+- GAS backend: belum dibina
 
 Setiap tab dalam Google Sheets mewakili satu jadual data.
 
 ## Tab: STUDENTS
 
-Menyimpan senarai pelajar aktif.
+Menyimpan senarai pelajar.
 
-| Column | Keterangan |
-|---|---|
-| student_id | ID unik pelajar |
-| nama | Nama penuh pelajar |
-| kelas | Kelas / kumpulan |
-| jantina | Lelaki / Perempuan |
-| no_telefon | No telefon pelajar jika perlu |
-| status | Aktif / Tidak Aktif |
+Header V1:
 
-Contoh:
+```text
+student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan
+```
 
-| student_id | nama | kelas | jantina | no_telefon | status |
-|---|---|---|---|---|---|
-| S001 | Ahmad Hakimi | A1 | Lelaki |  | Aktif |
-| S002 | Nur Aisyah | A1 | Perempuan |  | Aktif |
+Peraturan status pelajar:
+
+- `Aktif` = boleh login dan mohon outing.
+- `Tidak Aktif` = tidak boleh login dan tidak boleh mohon outing.
 
 ## Tab: WARDENS
 
-Menyimpan senarai warden yang boleh meluluskan permohonan.
+Menyimpan senarai warden yang boleh meluluskan atau menolak permohonan.
 
-| Column | Keterangan |
-|---|---|
-| warden_id | ID unik warden |
-| nama_warden | Nama warden |
-| pin_hash | PIN yang telah di-hash, bukan plain text |
-| status | Aktif / Tidak Aktif |
+Header V1:
+
+```text
+warden_id | nama_warden | email | no_tel | pin | status | catatan
+```
+
+Nota: PIN tidak digunakan dalam frontend mock mode. Untuk live mode, validation PIN atau authentication lebih kuat mesti dibuat di GAS backend.
 
 ## Tab: GUARDS
 
 Menyimpan senarai guard / pengguna pos guard.
 
-| Column | Keterangan |
-|---|---|
-| guard_id | ID unik guard |
-| nama_guard | Nama guard |
-| pin_hash | PIN yang telah di-hash, bukan plain text |
-| status | Aktif / Tidak Aktif |
+Header V1:
+
+```text
+guard_id | nama_guard | email | no_tel | pin | status | catatan
+```
+
+Nota: PIN tidak digunakan dalam frontend mock mode. Untuk live mode, validation PIN atau authentication lebih kuat mesti dibuat di GAS backend.
 
 ## Tab: OUTING_REQUESTS
 
-Tab paling penting untuk menyimpan rekod outing.
+Menyimpan semua rekod permohonan outing.
 
-| Column | Keterangan |
-|---|---|
-| request_id | ID unik permohonan |
-| tarikh | Tarikh outing |
-| hari | Hari outing |
-| student_id | ID pelajar |
-| nama | Nama pelajar ketika permohonan dibuat |
-| kelas | Kelas pelajar ketika permohonan dibuat |
-| tujuan | Tujuan outing |
-| lokasi | Lokasi outing |
-| no_telefon | No telefon jika diperlukan |
-| masa_mohon | Timestamp permohonan |
-| status | Status semasa permohonan |
-| warden_approve_by | Nama/ID warden yang luluskan |
-| masa_approve | Timestamp kelulusan |
-| reject_reason | Sebab ditolak jika ada |
-| masa_keluar | Timestamp keluar sebenar |
-| guard_keluar_by | Nama/ID guard yang sahkan keluar |
-| masa_masuk | Timestamp masuk sebenar |
-| guard_masuk_by | Nama/ID guard yang sahkan masuk |
-| lewat | Ya / Tidak |
-| selfie_whatsapp | Ya / Tidak |
-| catatan | Catatan warden / guard |
-| created_at | Timestamp rekod dibuat |
-| updated_at | Timestamp rekod dikemaskini |
+Header V1:
+
+```text
+request_id | tarikh | hari | jenis_permohonan | student_id | no_matrik | nama | student_email | kelas | tujuan | lokasi | jenis_kenderaan | butiran_kenderaan | sebab_kecemasan | telefon_waris | hubungan_waris | catatan_kecemasan | masa_mohon | status | warden_approve_by | masa_approve | masa_keluar | guard_keluar_by | masa_masuk | guard_masuk_by | lewat | selfie_whatsapp | catatan
+```
+
+Jenis permohonan:
+
+- `OUTING_BIASA`
+- `KECEMASAN`
+
+Status utama:
+
+- `Menunggu Kelulusan`
+- `Diluluskan Warden`
+- `Ditolak Warden`
+- `Sedang Keluar`
+- `Sudah Pulang`
 
 ## Tab: AUDIT_LOG
 
-Menyimpan rekod tindakan penting untuk rujukan.
+Menyimpan rekod tindakan penting untuk rujukan dan semakan.
 
-| Column | Keterangan |
-|---|---|
-| timestamp | Masa tindakan berlaku |
-| action | Jenis tindakan |
-| request_id | ID permohonan berkaitan |
-| user_role | Pelajar / Warden / Guard / System |
-| user_name | Nama pengguna |
-| details | Butiran tindakan |
+Header V1:
+
+```text
+timestamp | action | request_id | user_role | user_name | details
+```
 
 Contoh action:
 
 ```text
-CREATE_REQUEST
+SUBMIT_REQUEST
 APPROVE_REQUEST
 REJECT_REQUEST
-CHECK_OUT
-CHECK_IN
-MARK_SELFIE_RECEIVED
+CONFIRM_OUT
+CONFIRM_IN
 AUTO_MARK_LATE
-CANCEL_REQUEST
 ```
 
-## Tab: SETTINGS
+## Nota Penting
 
-Menyimpan tetapan sistem.
-
-| key | value | description |
-|---|---|---|
-| allowed_days | Tuesday,Wednesday | Hari outing dibenarkan |
-| outing_start_time | 17:00 | Masa mula outing |
-| outing_end_time | 22:00 | Masa akhir pulang |
-| institute_name | Institut Teknologi Unggas | Nama institusi |
-
-## Nota penting
-
-- Jangan simpan password atau secret API dalam GitHub.
-- PIN tidak digalakkan disimpan sebagai plain text.
-- Spreadsheet ID dan Web App URL boleh disimpan dalam Apps Script properties atau config yang tidak mendedahkan secret kritikal.
-- Data pelajar perlu dijaga sebagai data dalaman institut.
+- Jangan simpan password, token, secret, API key atau deployment credential dalam repo.
+- Frontend mock data hanya untuk UI testing.
+- GAS backend V1 mesti validate identity, role, dan status sebelum menulis ke Spreadsheet.
+- `GAS_WEB_APP_URL` di frontend kekal kosong sehingga GAS Web App siap deploy.

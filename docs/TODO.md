@@ -2,83 +2,67 @@
 
 Senarai kerja pembangunan sistem eOuting ITU.
 
-## Phase 1: Dokumentasi dan struktur awal
+## Completed
 
-- [x] Tetapkan nama sistem.
-- [x] Tetapkan flow manual semasa.
-- [x] Tetapkan flow digital cadangan.
-- [x] Tetapkan role pelajar, warden dan guard.
-- [x] Tetapkan struktur database Google Sheets.
-- [ ] Sediakan Google Spreadsheet database.
-- [ ] Sediakan Google Apps Script project.
-- [ ] Clone repo ke laptop untuk local development.
+- [x] Initial documentation.
+- [x] Mock role-based frontend.
+- [x] Pelajar login name + `no_matrik`.
+- [x] Warden select name mock access.
+- [x] Guard select name mock access.
+- [x] Outing Biasa / Kecemasan frontend flow.
+- [x] Emergency request fields.
+- [x] Vehicle fields.
+- [x] Warden approve/reject mock flow.
+- [x] Guard confirm keluar/masuk mock flow.
+- [x] Dashboard summary including Belum Masuk and Kecemasan.
+- [x] Branded header.
+- [x] Basic PWA setup.
+- [x] GitHub Pages live at `https://itumelaka.github.io/eouting`.
+- [x] Main database schema prepared.
+- [x] Google Spreadsheet database prepared.
+- [x] Apps Script project prepared.
 
-## Phase 2: Frontend GitHub Pages
+## Next: GAS Backend V1
 
-- [ ] Bina `index.html` asas.
-- [ ] Bina paparan pelajar untuk mohon outing.
-- [ ] Bina paparan status permohonan.
-- [ ] Bina dashboard warden.
-- [ ] Bina dashboard guard.
-- [ ] Tambah responsive mobile layout.
-- [ ] Tambah loading state dan error message.
-- [ ] Draft mock access: pelajar guna nama + `no_matrik`.
-- [ ] Draft mock access: warden pilih nama warden sahaja.
-- [ ] Draft mock access: guard pilih nama guard sahaja.
-- [ ] Pastikan tiada PIN diperlukan untuk Warden/Guard semasa frontend mock testing.
+- [ ] Build GAS backend V1.
+- [ ] Implement `doGet(e)`.
+- [ ] Implement `doPost(e)`.
+- [ ] Implement `getStudents()`.
+- [ ] Implement `getWardens()`.
+- [ ] Implement `getGuards()`.
+- [ ] Implement `submitRequest(payload)`.
+- [ ] Implement `approveRequest(payload)`.
+- [ ] Implement `rejectRequest(payload)`.
+- [ ] Implement `confirmOut(payload)`.
+- [ ] Implement `confirmIn(payload)`.
+- [ ] Implement `getTodayRecords()`.
+- [ ] Implement `appendAuditLog(action, requestId, userRole, userName, details)`.
+- [ ] Implement `jsonResponse(data)`.
+- [ ] Implement `errorResponse(message)`.
 
-## Phase 3: Backend Google Apps Script
+## Testing
 
-- [ ] Setup `doGet` dan `doPost`.
-- [ ] Bina helper baca/tulis Google Sheets.
-- [ ] Bina API `getStudents`.
-- [ ] Bina API `createOutingRequest`.
-- [ ] Bina API `getTodayRequests`.
-- [ ] Bina API `approveRequest`.
-- [ ] Bina API `rejectRequest`.
-- [ ] Bina API `checkOutStudent`.
-- [ ] Bina API `checkInStudent`.
-- [ ] Bina API `markSelfieReceived`.
-- [ ] Bina audit log.
-- [ ] Bina backend validation wajib untuk setiap role/action.
+- [ ] Test GAS functions with sample payloads.
+- [ ] Test student status rule: `Aktif` can request, `Tidak Aktif` cannot.
+- [ ] Test Outing Biasa Tuesday/Wednesday after 5:00 PM rule.
+- [ ] Test Kecemasan can submit anytime.
+- [ ] Test warden approve/reject.
+- [ ] Test guard confirm keluar/masuk.
+- [ ] Test dashboard records.
+- [ ] Test late / belum masuk cases.
 
-## Phase 4: Rules dan validation
+## Frontend Live Connection
 
-- [ ] Block permohonan selain Selasa/Rabu.
-- [ ] Block permohonan sebelum 5:00 petang.
-- [ ] Auto flag lewat selepas 10:00 malam.
-- [ ] Prevent duplicate outing aktif.
-- [ ] Guard tidak boleh sahkan keluar tanpa kelulusan warden.
-- [ ] Pelajar tidak boleh edit timestamp.
-- [ ] Live mode: validate pelajar melalui `student_id`, `no_matrik`, dan `status = Aktif` dari `STUDENTS`.
-- [ ] Live mode: validate warden melalui `warden_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
-- [ ] Live mode: validate guard melalui `guard_id`, PIN atau authentication lebih kuat, dan `status = Aktif`.
-- [ ] Pastikan frontend hiding tidak dianggap sebagai security sebenar.
-- [ ] Kemas kini schema `STUDENTS`: `student_id`, `no_matrik`, `nama`, `kelas`, `jantina`, `status`.
+- [ ] Deploy GAS Web App.
+- [ ] Connect frontend to `GAS_WEB_APP_URL`.
+- [ ] Replace mock data with live Spreadsheet data.
+- [ ] Keep no real secret, token, password, API key or PIN in frontend.
 
-## Phase 5: Testing
+## V2 Cadangan
 
-- [ ] Test dengan data dummy pelajar.
-- [ ] Test flow pelajar mohon.
-- [ ] Test flow warden approve/reject.
-- [ ] Test flow guard check-out/check-in.
-- [ ] Test kes pelajar lewat.
-- [ ] Test kes pelajar belum masuk selepas 10:00 malam.
-- [ ] Test paparan mobile.
-
-## Phase 6: Deployment
-
-- [ ] Enable GitHub Pages.
-- [ ] Deploy Apps Script sebagai Web App.
-- [ ] Sambungkan frontend dengan GAS Web App URL.
-- [ ] Uji live URL.
-- [ ] Latih warden/guard guna sistem.
-
-## Phase 7: V2 cadangan
-
+- [ ] PIN or stronger authentication for warden/guard.
 - [ ] QR code outing pass.
-- [ ] Upload selfie ke Google Drive.
-- [ ] Telegram alert kepada warden.
-- [ ] Laporan mingguan/bulanan.
+- [ ] Upload selfie to Google Drive.
+- [ ] Telegram/WhatsApp alert for late or not returned cases.
+- [ ] Weekly/monthly report.
 - [ ] Export CSV/PDF.
-- [ ] Login Google Account untuk warden.
