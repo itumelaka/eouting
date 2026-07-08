@@ -339,7 +339,8 @@ p {
   padding: 12px;
 }
 
-.emergency-fields {
+.emergency-fields,
+.overnight-fields {
   background: #fff5f5;
   border: 1px solid rgba(215, 25, 32, 0.34);
   border-radius: 8px;
@@ -349,14 +350,25 @@ p {
   padding: 14px;
 }
 
-.emergency-fields.active {
+.emergency-fields.active,
+.overnight-fields.active {
   display: grid;
 }
 
-.emergency-fields h3 {
+.emergency-fields h3,
+.overnight-fields h3 {
   color: var(--danger);
   font-size: 1rem;
   margin-bottom: 0;
+}
+
+.overnight-fields {
+  background: #f1f7ff;
+  border-color: rgba(22, 90, 159, 0.34);
+}
+
+.overnight-fields h3 {
+  color: var(--info);
 }
 
 label {
@@ -718,6 +730,11 @@ textarea {
   padding: 14px;
 }
 
+.record-card.overnight-card {
+  border-top-color: var(--info);
+  box-shadow: 0 12px 30px rgba(22, 90, 159, 0.14);
+}
+
 .record-top {
   align-items: flex-start;
   display: flex;
@@ -806,6 +823,11 @@ textarea {
 
 .badge-emergency {
   background: var(--danger);
+  color: #ffffff;
+}
+
+.badge-overnight {
+  background: var(--info);
   color: #ffffff;
 }
 

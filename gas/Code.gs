@@ -40,7 +40,10 @@ const HEADERS = {
     "guard_masuk_by",
     "lewat",
     "selfie_whatsapp",
-    "catatan"
+    "catatan",
+    "tarikh_balik",
+    "hari_balik",
+    "masa_balik_dijangka"
   ],
   AUDIT_LOG: ["timestamp", "action", "request_id", "user_role", "user_name", "details"]
 };
@@ -55,7 +58,8 @@ const STATUS = {
 
 const REQUEST_TYPE = {
   normal: "OUTING_BIASA",
-  emergency: "KECEMASAN"
+  emergency: "KECEMASAN",
+  overnight: "PULANG_BERMALAM"
 };
 
 function doGet(e) {
@@ -228,7 +232,7 @@ function submitRequest(payload) {
     throw new Error("student_id dan no_matrik diperlukan.");
   }
 
-  if (requestType !== REQUEST_TYPE.normal && requestType !== REQUEST_TYPE.emergency) {
+  if (requestType !== REQUEST_TYPE.normal && requestType !== REQUEST_TYPE.emergency && requestType !== REQUEST_TYPE.overnight) {
     throw new Error("Jenis permohonan tidak sah.");
   }
 
@@ -238,6 +242,10 @@ function submitRequest(payload) {
 
   if (requestType === REQUEST_TYPE.emergency && !normalizeText_(payload.sebab_kecemasan)) {
     throw new Error("Sebab kecemasan diperlukan.");
+  }
+
+  if (requestType === REQUEST_TYPE.overnight) {
+    validateOvernightRequest_(payload, now);
   }
 
   const student = findStudentByIdAndMatric_(studentId, noMatrik);
@@ -275,7 +283,10 @@ function submitRequest(payload) {
     guard_masuk_by: "",
     lewat: "",
     selfie_whatsapp: "",
-    catatan: payload.catatan || ""
+    catatan: payload.catatan || "",
+    tarikh_balik: payload.tarikh_balik || "",
+    hari_balik: payload.hari_balik || getDayNameFromDateKey_(payload.tarikh_balik),
+    masa_balik_dijangka: payload.masa_balik_dijangka || ""
   };
 
   appendObjectRow_(getSheet_(SHEETS.requests), HEADERS.OUTING_REQUESTS, record);
@@ -317,7 +328,7 @@ function approveRequest(payload) {
 
   appendAuditLog("APPROVE_REQUEST", requestId, "Warden", warden.nama_warden, "");
   const updatedRecord = findRowByRequestId_(requestId).record;
-  sendTelegramMessage_(buildTelegramStatusMessage_("✅ Permohonan Diluluskan Warden", updatedRecord));
+  sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("✅", "Permohonan Diluluskan Warden", updatedRecord), updatedRecord));
   return updatedRecord;
 }
 
@@ -352,7 +363,7 @@ function rejectRequest(payload) {
 
   appendAuditLog("REJECT_REQUEST", requestId, "Warden", warden.nama_warden, payload.catatan || "");
   const updatedRecord = findRowByRequestId_(requestId).record;
-  sendTelegramMessage_(buildTelegramStatusMessage_("❌ Permohonan Ditolak Warden", updatedRecord));
+  sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("❌", "Permohonan Ditolak Warden", updatedRecord), updatedRecord));
   return updatedRecord;
 }
 
@@ -374,6 +385,13 @@ function confirmOut(payload) {
     throw new Error("Permohonan tidak dijumpai.");
   }
 
+  if (hasCellValue_(found.record.masa_keluar)) {
+    return {
+      ...found.record,
+      message: "Rekod sudah disahkan keluar."
+    };
+  }
+
   if (found.record.status !== STATUS.approved) {
     throw new Error("Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan.");
   }
@@ -386,7 +404,7 @@ function confirmOut(payload) {
 
   appendAuditLog("CONFIRM_OUT", requestId, "Guard", guard.nama_guard, "");
   const updatedRecord = findRowByRequestId_(requestId).record;
-  sendTelegramMessage_(buildTelegramStatusMessage_("🚪 Pelajar Disahkan Keluar", updatedRecord));
+  sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("🚪", "Pelajar Disahkan Keluar", updatedRecord), updatedRecord));
   return updatedRecord;
 }
 
@@ -409,11 +427,20 @@ function confirmIn(payload) {
     throw new Error("Permohonan tidak dijumpai.");
   }
 
+  if (hasCellValue_(found.record.masa_masuk)) {
+    return {
+      ...found.record,
+      message: "Rekod sudah disahkan masuk."
+    };
+  }
+
   if (found.record.status !== STATUS.out) {
     throw new Error("Hanya permohonan status KELUAR boleh disahkan masuk.");
   }
 
-  const late = isLate_(now) ? "Ya" : "Tidak";
+  const late = found.record.jenis_permohonan === REQUEST_TYPE.overnight
+    ? (isOvernightLate_(now, found.record) ? "Ya" : "Tidak")
+    : (isLate_(now) ? "Ya" : "Tidak");
 
   updateRowByHeaders_(found.sheet, found.rowNumber, {
     status: STATUS.done,
@@ -427,7 +454,7 @@ function confirmIn(payload) {
   }));
   const updatedRecord = findRowByRequestId_(requestId).record;
   sendTelegramMessage_(buildTelegramStatusMessage_(
-    late === "Ya" ? "⚠️ Pelajar Masuk Lewat" : "🏁 Pelajar Selesai Outing",
+    telegramTitle_(late === "Ya" ? "⚠️" : "🏁", late === "Ya" ? "Pelajar Masuk Lewat" : "Pelajar Selesai Outing", updatedRecord),
     updatedRecord
   ));
   return updatedRecord;
@@ -438,7 +465,11 @@ function getTodayRecords() {
   return getRowsAsObjects_(getSheet_(SHEETS.requests))
     .filter((row) => {
       const rowDateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
-      return rowDateKey === todayKey;
+      const returnDateKey = normalizeDateKey_(row.tarikh_balik);
+      const overnightReturningToday = row.jenis_permohonan === REQUEST_TYPE.overnight &&
+        row.status === STATUS.out &&
+        returnDateKey === todayKey;
+      return rowDateKey === todayKey || overnightReturningToday;
     });
 }
 
@@ -692,10 +723,57 @@ function formatTelegramDateTime_(value) {
   return text;
 }
 
+function formatTelegramDate_(value) {
+  const dateKey = normalizeDateKey_(value);
+  if (!dateKey) {
+    return "-";
+  }
+
+  const date = new Date(dateKey + "T00:00:00+08:00");
+  return isNaN(date.getTime()) ? dateKey : Utilities.formatDate(date, "Asia/Kuala_Lumpur", "dd/MM/yyyy");
+}
+
+function formatTelegramTime_(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "-";
+  }
+
+  if (/^\d{2}:\d{2}/.test(text)) {
+    const date = new Date("2000-01-01T" + text.slice(0, 5) + ":00+08:00");
+    if (!isNaN(date.getTime())) {
+      return Utilities.formatDate(date, "Asia/Kuala_Lumpur", "HH:mm");
+    }
+  }
+
+  return text;
+}
+
+function formatTelegramExpectedReturn_(record) {
+  const dateText = formatTelegramDate_(record.tarikh_balik);
+  const timeText = formatTelegramTime_(record.masa_balik_dijangka);
+  if (dateText === "-" && timeText === "-") {
+    return "-";
+  }
+
+  return dateText + " " + timeText;
+}
+
+function telegramTitle_(icon, text, record) {
+  const prefix = record && record.jenis_permohonan === REQUEST_TYPE.overnight
+    ? "Pulang Bermalam - "
+    : "";
+  return icon + " " + prefix + text;
+}
+
 function buildTelegramSubmitMessage_(record) {
-  const title = record.jenis_permohonan === REQUEST_TYPE.emergency
-    ? "🚨 Permohonan Kecemasan Baru"
-    : "📌 Permohonan Outing Baru";
+  let title = "📌 Permohonan Outing Baru";
+  if (record.jenis_permohonan === REQUEST_TYPE.emergency) {
+    title = "🚨 Permohonan Kecemasan Baru";
+  }
+  if (record.jenis_permohonan === REQUEST_TYPE.overnight) {
+    title = "🏠 Permohonan Pulang Bermalam Baru";
+  }
 
   return buildTelegramStatusMessage_(title, record);
 }
@@ -721,6 +799,14 @@ function buildTelegramStatusMessage_(title, record) {
 
   if (record.jenis_permohonan === REQUEST_TYPE.emergency) {
     lines.push("Sebab Kecemasan: " + (record.sebab_kecemasan || "-"));
+    lines.push("Telefon Waris: " + (record.telefon_waris || "-"));
+    lines.push("Hubungan Waris: " + (record.hubungan_waris || "-"));
+  }
+
+  if (record.jenis_permohonan === REQUEST_TYPE.overnight) {
+    lines.push("Tarikh Balik: " + formatTelegramDate_(record.tarikh_balik));
+    lines.push("Masa Balik Dijangka: " + formatTelegramTime_(record.masa_balik_dijangka));
+    lines.push("Jangkaan Balik: " + formatTelegramExpectedReturn_(record));
     lines.push("Telefon Waris: " + (record.telefon_waris || "-"));
     lines.push("Hubungan Waris: " + (record.hubungan_waris || "-"));
   }
@@ -753,6 +839,7 @@ function buildTelegramStatusMessage_(title, record) {
 function requestTypeLabel_(requestType) {
   if (requestType === REQUEST_TYPE.normal) return "Outing Biasa";
   if (requestType === REQUEST_TYPE.emergency) return "Kecemasan";
+  if (requestType === REQUEST_TYPE.overnight) return "Pulang Bermalam";
   return requestType || "-";
 }
 
@@ -857,6 +944,10 @@ function normalizeText_(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function hasCellValue_(value) {
+  return value !== null && value !== undefined && String(value).trim() !== "";
+}
+
 function now_() {
   return Utilities.formatDate(new Date(), "Asia/Kuala_Lumpur", "yyyy-MM-dd HH:mm:ss");
 }
@@ -901,10 +992,55 @@ function isOutingBiasaOpen_(date) {
   return isTuesdayOrWednesday && hour >= 17;
 }
 
+function validateOvernightRequest_(payload, keluarDate) {
+  const returnDateKey = normalizeDateKey_(payload.tarikh_balik);
+  const expectedReturnTime = String(payload.masa_balik_dijangka || "").trim();
+  const keluarDateKey = formatDate_(keluarDate);
+
+  if (!returnDateKey || !expectedReturnTime) {
+    throw new Error("Tarikh balik dan masa balik dijangka diperlukan untuk Pulang Bermalam.");
+  }
+
+  if (returnDateKey < keluarDateKey) {
+    throw new Error("Tarikh balik tidak boleh lebih awal daripada tarikh keluar.");
+  }
+
+  if (!/^\d{2}:\d{2}/.test(expectedReturnTime)) {
+    throw new Error("Masa balik dijangka tidak sah.");
+  }
+
+  const day = keluarDate.getDay();
+  const hour = Number(Utilities.formatDate(keluarDate, "Asia/Kuala_Lumpur", "H"));
+  const minute = Number(Utilities.formatDate(keluarDate, "Asia/Kuala_Lumpur", "m"));
+  if (day === 5 && (hour < 17 || (hour === 17 && minute === 0))) {
+    throw new Error("Pulang Bermalam pada hari Jumaat hanya boleh bermula selepas 5:00 PM.");
+  }
+}
+
 function isLate_(date) {
   const hour = Number(Utilities.formatDate(date, "Asia/Kuala_Lumpur", "H"));
   const minute = Number(Utilities.formatDate(date, "Asia/Kuala_Lumpur", "m"));
   return hour > 22 || (hour === 22 && minute > 0);
+}
+
+function isOvernightLate_(date, record) {
+  const returnDateKey = normalizeDateKey_(record.tarikh_balik);
+  const expectedReturnTime = String(record.masa_balik_dijangka || "").trim();
+  if (!returnDateKey || !expectedReturnTime) {
+    return false;
+  }
+
+  const expectedReturn = new Date(returnDateKey + "T" + expectedReturnTime.slice(0, 5) + ":00+08:00");
+  return !isNaN(expectedReturn.getTime()) && date.getTime() > expectedReturn.getTime();
+}
+
+function getDayNameFromDateKey_(dateKey) {
+  const normalizedDateKey = normalizeDateKey_(dateKey);
+  if (!normalizedDateKey) {
+    return "";
+  }
+
+  return getDayName_(new Date(normalizedDateKey + "T00:00:00+08:00"));
 }
 
 function ensureHeaders_(sheet, headers) {

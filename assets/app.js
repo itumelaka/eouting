@@ -1,4 +1,4 @@
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.4.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -30,12 +30,14 @@ const STATUS = {
 
 const REQUEST_TYPE = {
   normal: "OUTING_BIASA",
-  emergency: "KECEMASAN"
+  emergency: "KECEMASAN",
+  overnight: "PULANG_BERMALAM"
 };
 
 const REQUEST_TYPE_LABEL = {
   OUTING_BIASA: "Outing Biasa",
-  KECEMASAN: "Kecemasan"
+  KECEMASAN: "Kecemasan",
+  PULANG_BERMALAM: "Pulang Bermalam"
 };
 
 const SESSION_STORAGE_KEY = "eouting_session_v1";
@@ -70,6 +72,7 @@ let studentLastUpdatedAt = null;
 let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
 let toastTimerId = null;
+const guardActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 
 const els = {
@@ -103,9 +106,12 @@ const els = {
   loggedStudentMeta: document.querySelector("#loggedStudentMeta"),
   requestTypeSelect: document.querySelector("#requestTypeSelect"),
   emergencyFields: document.querySelector("#emergencyFields"),
+  overnightFields: document.querySelector("#overnightFields"),
   requestForm: document.querySelector("#requestForm"),
   purposeInput: document.querySelector("#purposeInput"),
   locationInput: document.querySelector("#locationInput"),
+  returnDateInput: document.querySelector("#returnDateInput"),
+  expectedReturnTimeInput: document.querySelector("#expectedReturnTimeInput"),
   vehicleTypeSelect: document.querySelector("#vehicleTypeSelect"),
   vehicleDetailInput: document.querySelector("#vehicleDetailInput"),
   emergencyReasonInput: document.querySelector("#emergencyReasonInput"),
@@ -2510,7 +2516,7 @@ function renderDashboard() {
   els.countReturned.textContent = countByStatus(STATUS.returned);
   els.countLate.textContent = outingRecords.filter((record) => record.lewat).length;
   els.countNotReturned.textContent = outingRecords.filter((record) => (
-    record.status === STATUS.out && isAfterReturnLimit(now)
+    record.status === STATUS.out && isAfterReturnLimit(now, record)
   )).length;
   els.countEmergency.textContent = outingRecords.filter((record) => (
     record.jenis_permohonan === REQUEST_TYPE.emergency
@@ -2577,40 +2583,53 @@ async function confirmOut(id) {
     return;
   }
 
+  if (isGuardActionPending(id)) {
+    return;
+  }
+
+  const previousRecord = cloneRecord(findRecordById(id));
+  if (!previousRecord) {
+    return;
+  }
+
+  if (previousRecord.outAt || previousRecord.masa_keluar || previousRecord.status !== STATUS.approved) {
+    showWarning("Rekod ini sudah tidak memerlukan pengesahan keluar.");
+    return;
+  }
+
+  const now = new Date();
+  setGuardActionPending(id, "out");
+  updateLocalRecord(id, (record) => ({
+    ...record,
+    status: STATUS.out,
+    outAt: now,
+    masa_keluar: record.masa_keluar || now,
+    guardOutBy: currentSession.user.name,
+    guard_keluar_by: currentSession.user.name,
+    _guardActionPending: "out"
+  }));
+
   if (isLiveMode) {
     try {
-      await apiPost("confirmOut", {
+      const updatedRecord = await apiPost("confirmOut", {
         request_id: id,
         nama_guard: currentSession.user.name,
         pin: currentSession.user.pin || ""
       });
-      await loadTodayRecords();
+      mergeGuardActionSuccess(id, updatedRecord);
       showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
     } catch (error) {
+      restoreGuardActionFailure(id, previousRecord);
       showModeNotice(`Live API error: ${error.message}`);
-      showError(error.message, "Tindakan Gagal");
+      showError("Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
+    } finally {
+      clearGuardActionPending(id);
     }
     return;
   }
 
-  outingRecords = outingRecords.map((record) => {
-    if (record.id !== id) {
-      return record;
-    }
-
-    if (record.status !== STATUS.approved) {
-      showWarning("Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan.");
-      return record;
-    }
-
-    return {
-      ...record,
-      status: STATUS.out,
-      outAt: new Date(),
-      guardOutBy: currentSession.user.name
-    };
-  });
-  render();
+  updateLocalRecord(id, (record) => removeGuardPendingState(record));
+  clearGuardActionPending(id);
   showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
 }
 
@@ -2619,38 +2638,110 @@ async function confirmIn(id) {
     return;
   }
 
-  if (isLiveMode) {
-    try {
-      await apiPost("confirmIn", {
-        request_id: id,
-        nama_guard: currentSession.user.name,
-        pin: currentSession.user.pin || ""
-      });
-      await loadTodayRecords();
-      showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
-    } catch (error) {
-      showModeNotice(`Live API error: ${error.message}`);
-      showError(error.message, "Tindakan Gagal");
-    }
+  if (isGuardActionPending(id)) {
+    return;
+  }
+
+  const previousRecord = cloneRecord(findRecordById(id));
+  if (!previousRecord) {
+    return;
+  }
+
+  if (!(previousRecord.outAt || previousRecord.masa_keluar) || previousRecord.returnedAt || previousRecord.masa_masuk || previousRecord.status !== STATUS.out) {
+    showWarning("Rekod ini sudah tidak memerlukan pengesahan masuk.");
     return;
   }
 
   const now = new Date();
+  setGuardActionPending(id, "in");
+  updateLocalRecord(id, (record) => ({
+    ...record,
+    status: STATUS.returned,
+    lewat: isAfterReturnLimit(now, record),
+    returnedAt: now,
+    masa_masuk: record.masa_masuk || now,
+    guardInBy: currentSession.user.name,
+    guard_masuk_by: currentSession.user.name,
+    _guardActionPending: "in"
+  }));
+
+  if (isLiveMode) {
+    try {
+      const updatedRecord = await apiPost("confirmIn", {
+        request_id: id,
+        nama_guard: currentSession.user.name,
+        pin: currentSession.user.pin || ""
+      });
+      mergeGuardActionSuccess(id, updatedRecord);
+      showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
+    } catch (error) {
+      restoreGuardActionFailure(id, previousRecord);
+      showModeNotice(`Live API error: ${error.message}`);
+      showError("Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
+    } finally {
+      clearGuardActionPending(id);
+    }
+    return;
+  }
+
+  updateLocalRecord(id, (record) => removeGuardPendingState(record));
+  clearGuardActionPending(id);
+  showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
+}
+
+function isGuardActionPending(id) {
+  return Boolean(guardActionLocks[id]);
+}
+
+function setGuardActionPending(id, action) {
+  guardActionLocks[id] = action || true;
+}
+
+function clearGuardActionPending(id) {
+  delete guardActionLocks[id];
+}
+
+function findRecordById(id) {
+  return outingRecords.find((record) => record.id === id || record.request_id === id);
+}
+
+function cloneRecord(record) {
+  return record ? { ...record } : null;
+}
+
+function updateLocalRecord(id, updater) {
   outingRecords = outingRecords.map((record) => {
-    if (record.id !== id) {
+    if (record.id !== id && record.request_id !== id) {
       return record;
     }
 
-    return {
-      ...record,
-      status: STATUS.returned,
-      lewat: isAfterReturnLimit(now),
-      returnedAt: now,
-      guardInBy: currentSession.user.name
-    };
+    return updater(record);
   });
   render();
-  showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
+}
+
+function restoreGuardActionFailure(id, previousRecord) {
+  outingRecords = outingRecords.map((record) => (
+    record.id === id || record.request_id === id
+      ? { ...previousRecord, _guardActionFailed: true }
+      : record
+  ));
+  render();
+}
+
+function mergeGuardActionSuccess(id, updatedRecord) {
+  const mappedRecord = updatedRecord ? mapLiveRecord(updatedRecord) : null;
+  updateLocalRecord(id, (record) => removeGuardPendingState({
+    ...record,
+    ...(mappedRecord || {})
+  }));
+}
+
+function removeGuardPendingState(record) {
+  const cleaned = { ...record };
+  delete cleaned._guardActionPending;
+  delete cleaned._guardActionFailed;
+  return cleaned;
 }
 
 function recordCard(record, mode) {
@@ -2658,16 +2749,21 @@ function recordCard(record, mode) {
   const emergencyBadge = record.jenis_permohonan === REQUEST_TYPE.emergency
     ? `<span class="badge badge-emergency">Kecemasan</span>`
     : "";
+  const overnightBadge = record.jenis_permohonan === REQUEST_TYPE.overnight
+    ? `<span class="badge badge-overnight">Pulang Bermalam</span>`
+    : "";
   const lateBadge = record.lewat ? `<span class="badge badge-late">Lewat</span>` : "";
-  const notReturnedBadge = record.status === STATUS.out && isAfterReturnLimit(new Date())
+  const notReturnedBadge = record.status === STATUS.out && isAfterReturnLimit(new Date(), record)
     ? `<span class="badge badge-not-returned">Belum Masuk</span>`
     : "";
   const vehicleDetail = record.butiran_kenderaan || "Tiada butiran";
   const emergencyDetail = emergencyDetailHtml(record);
+  const overnightDetail = overnightDetailHtml(record, mode);
   const actorDetail = actorDetailHtml(record);
+  const cardClass = record.jenis_permohonan === REQUEST_TYPE.overnight ? "record-card overnight-card" : "record-card";
 
   return `
-    <article class="record-card">
+    <article class="${cardClass}">
       <div class="record-top">
         <div>
           <h3>${escapeHtml(record.studentName)}</h3>
@@ -2675,6 +2771,7 @@ function recordCard(record, mode) {
         </div>
         <div class="badge-stack">
           ${emergencyBadge}
+          ${overnightBadge}
           ${lateBadge}
           ${notReturnedBadge}
           <span class="badge ${badgeClass(record.status)}">${escapeHtml(record.status)}</span>
@@ -2687,6 +2784,7 @@ function recordCard(record, mode) {
         <strong>Kenderaan:</strong> ${escapeHtml(record.jenis_kenderaan)}<br>
         <strong>Butiran Kenderaan:</strong> ${escapeHtml(vehicleDetail)}
         ${emergencyDetail}
+        ${overnightDetail}
         ${actorDetail}
       </div>
       <div class="record-times">
@@ -2734,11 +2832,63 @@ function emergencyDetailHtml(record) {
         <strong>Catatan Kecemasan:</strong> ${escapeHtml(record.catatan_kecemasan || "-")}`;
 }
 
+function overnightDetailHtml(record, mode) {
+  if (record.jenis_permohonan !== REQUEST_TYPE.overnight) {
+    return "";
+  }
+
+  const expectedReturn = expectedReturnDisplay(record);
+  const guardLine = mode === "guard-out" || mode === "guard-in"
+    ? `<br><strong>Jangkaan Balik:</strong> ${escapeHtml(expectedReturn)}`
+    : "";
+
+  return `<br>
+        <strong>Tarikh Keluar:</strong> ${escapeHtml(formatDisplayDate(record.tarikh || record.requestedAt || record.masa_mohon))}<br>
+        <strong>Tarikh Balik:</strong> ${escapeHtml(formatDisplayDate(record.tarikh_balik || record.returnDate))}<br>
+        <strong>Masa Balik Dijangka:</strong> ${escapeHtml(formatExpectedReturnTime(record.masa_balik_dijangka || record.expectedReturnTime))}<br>
+        <strong>Destinasi Bermalam:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
+        <strong>Tujuan Pulang Bermalam:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
+        <strong>No. Telefon Waris / Penjaga:</strong> ${escapeDisplayPhone(record.telefon_waris)}
+        ${guardLine}`;
+}
+
+function expectedReturnDisplay(record) {
+  const dateText = formatDisplayDate(record.tarikh_balik || record.returnDate);
+  const timeText = formatExpectedReturnTime(record.masa_balik_dijangka || record.expectedReturnTime);
+  if (dateText === "-" && timeText === "-") {
+    return "-";
+  }
+  return `${dateText} ${timeText}`.trim();
+}
+
+function formatExpectedReturnTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const text = String(value).trim();
+  if (/^\d{2}:\d{2}/.test(text)) {
+    const date = parseFlexibleDate(`2000-01-01 ${text.slice(0, 5)}`);
+    return formatDisplayTime(date);
+  }
+
+  return formatDisplayTime(value) || text;
+}
+
 function requestTypeLabel(requestType) {
   return REQUEST_TYPE_LABEL[requestType] || requestType;
 }
 
 function actionButtons(record, mode) {
+  if (record._guardActionPending) {
+    const label = record._guardActionPending === "out" ? "Menyimpan Keluar..." : "Menyimpan Masuk...";
+    return `
+      <div class="record-actions">
+        <button class="action-button" type="button" disabled>${label}</button>
+      </div>
+    `;
+  }
+
   if (mode === "warden") {
     return `
       <div class="record-actions">
@@ -2748,7 +2898,7 @@ function actionButtons(record, mode) {
     `;
   }
 
-  if (mode === "guard-out") {
+  if (mode === "guard-out" && record.status === STATUS.approved && !record.outAt && !record.masa_keluar) {
     return `
       <div class="record-actions">
         <button class="action-button out-button" type="button" data-out="${record.id}">Sahkan Keluar</button>
@@ -2756,7 +2906,7 @@ function actionButtons(record, mode) {
     `;
   }
 
-  if (mode === "guard-in") {
+  if (mode === "guard-in" && record.status === STATUS.out && (record.outAt || record.masa_keluar) && !record.returnedAt && !record.masa_masuk) {
     return `
       <div class="record-actions">
         <button class="action-button in-button" type="button" data-in="${record.id}">Sahkan Masuk</button>
@@ -2922,12 +3072,217 @@ function updateClock() {
   }).format(now);
 }
 
+function updatePulangBermalamFields() {
+  const isOvernight = els.requestTypeSelect && els.requestTypeSelect.value === REQUEST_TYPE.overnight;
+  const isEmergency = els.requestTypeSelect && els.requestTypeSelect.value === REQUEST_TYPE.emergency;
+  if (!els.overnightFields) {
+    return;
+  }
+
+  els.overnightFields.classList.toggle("active", isOvernight);
+  els.emergencyFields.classList.toggle("active", isOvernight || isEmergency);
+  els.returnDateInput.required = isOvernight;
+  els.expectedReturnTimeInput.required = isOvernight;
+  els.guardianPhoneInput.required = isOvernight || isEmergency;
+  els.guardianRelationSelect.required = isOvernight || isEmergency;
+
+  const emergencyTitle = els.emergencyFields ? els.emergencyFields.querySelector("h3") : null;
+  if (emergencyTitle) {
+    emergencyTitle.textContent = isOvernight ? "Maklumat Waris" : "Maklumat Kecemasan";
+  }
+
+  [els.emergencyReasonInput, els.emergencyNoteInput].forEach((field) => {
+    if (!field) {
+      return;
+    }
+    field.hidden = isOvernight;
+    if (field.previousElementSibling) {
+      field.previousElementSibling.hidden = isOvernight;
+    }
+  });
+
+  if (els.purposeInput && els.purposeInput.previousElementSibling) {
+    els.purposeInput.previousElementSibling.textContent = isOvernight ? "Tujuan Pulang Bermalam" : "Tujuan Outing";
+  }
+
+  if (els.locationInput && els.locationInput.previousElementSibling) {
+    els.locationInput.previousElementSibling.textContent = isOvernight ? "Alamat / Destinasi Bermalam" : "Lokasi Outing";
+  }
+}
+
+if (els.requestTypeSelect) {
+  els.requestTypeSelect.addEventListener("change", updatePulangBermalamFields);
+}
+
+function getTodayDateInputValue() {
+  const parts = getKualaLumpurParts(new Date());
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function validatePulangBermalamRequest() {
+  if (!els.requestTypeSelect || els.requestTypeSelect.value !== REQUEST_TYPE.overnight) {
+    return "";
+  }
+
+  const now = new Date();
+  const parts = getKualaLumpurParts(now);
+  const todayKey = `${parts.year}-${parts.month}-${parts.day}`;
+  const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
+  const expectedReturnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
+
+  if (!returnDate || !expectedReturnTime) {
+    return "Tarikh balik dan masa balik dijangka diperlukan untuk Pulang Bermalam.";
+  }
+
+  if (returnDate < todayKey) {
+    return "Tarikh balik tidak boleh lebih awal daripada tarikh keluar.";
+  }
+
+  const day = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(now);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(now);
+
+  if (day === "Fri" && time <= "17:00") {
+    return "Pulang Bermalam pada hari Jumaat hanya boleh bermula selepas 5:00 PM.";
+  }
+
+  return "";
+}
+
+if (els.requestForm) {
+  els.requestForm.addEventListener("submit", (event) => {
+    const message = validatePulangBermalamRequest();
+    if (!message) {
+      if (!isLiveMode && els.requestTypeSelect && els.requestTypeSelect.value === REQUEST_TYPE.overnight) {
+        window.setTimeout(syncMockPulangBermalamRecord, 0);
+      }
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    els.studentMessage.textContent = message;
+    showError(message, "Permohonan Tidak Sah");
+  }, true);
+}
+
+function syncMockPulangBermalamRecord() {
+  const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
+  const expectedReturnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
+  const target = outingRecords
+    .filter((record) => record.jenis_permohonan === REQUEST_TYPE.overnight && !record.tarikh_balik)
+    .sort((a, b) => {
+      const dateA = parseFlexibleDate(a.requestedAt || a.masa_mohon || a.tarikh);
+      const dateB = parseFlexibleDate(b.requestedAt || b.masa_mohon || b.tarikh);
+      return (dateB ? dateB.getTime() : 0) - (dateA ? dateA.getTime() : 0);
+    })[0];
+
+  if (!target) {
+    return;
+  }
+
+  target.tarikh = target.tarikh || getTodayDateInputValue();
+  target.hari = target.hari || getDayNameFromDateInput(target.tarikh);
+  target.tarikh_balik = returnDate;
+  target.hari_balik = getDayNameFromDateInput(returnDate);
+  target.masa_balik_dijangka = expectedReturnTime;
+  render();
+}
+
+const apiPostWithoutPulangBermalamFields = apiPost;
+apiPost = async function apiPostWithPulangBermalamFields(action, payload) {
+  if (action === "submitRequest" && payload && payload.jenis_permohonan === REQUEST_TYPE.overnight) {
+    payload = {
+      ...payload,
+      tarikh_balik: els.returnDateInput ? els.returnDateInput.value : "",
+      hari_balik: getDayNameFromDateInput(els.returnDateInput ? els.returnDateInput.value : ""),
+      masa_balik_dijangka: els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : ""
+    };
+  }
+
+  return apiPostWithoutPulangBermalamFields(action, payload);
+};
+
+const mapLiveRecordWithoutPulangBermalamFields = mapLiveRecord;
+mapLiveRecord = function mapLiveRecordWithPulangBermalamFields(record) {
+  const mapped = mapLiveRecordWithoutPulangBermalamFields(record);
+  return {
+    ...mapped,
+    tarikh: record.tarikh || mapped.tarikh || "",
+    hari: record.hari || mapped.hari || "",
+    tarikh_balik: record.tarikh_balik || mapped.tarikh_balik || "",
+    hari_balik: record.hari_balik || mapped.hari_balik || "",
+    masa_balik_dijangka: record.masa_balik_dijangka || mapped.masa_balik_dijangka || "",
+    masa_keluar: record.masa_keluar || mapped.masa_keluar || "",
+    masa_masuk: record.masa_masuk || mapped.masa_masuk || "",
+    guard_keluar_by: record.guard_keluar_by || mapped.guard_keluar_by || "",
+    guard_masuk_by: record.guard_masuk_by || mapped.guard_masuk_by || "",
+    telefon_waris: record.telefon_waris || mapped.telefon_waris || "",
+    hubungan_waris: record.hubungan_waris || mapped.hubungan_waris || "",
+    tujuan: record.tujuan || mapped.tujuan || mapped.purpose || "",
+    lokasi: record.lokasi || mapped.lokasi || mapped.location || ""
+  };
+};
+
+function getDayNameFromDateInput(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = parseFlexibleDate(value);
+  if (!date) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ms-MY", {
+    weekday: "long",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(date);
+}
+
+function isAfterReturnLimit(date, record) {
+  if (record && record.jenis_permohonan === REQUEST_TYPE.overnight) {
+    const expectedReturn = getExpectedReturnDate(record);
+    return expectedReturn ? date.getTime() > expectedReturn.getTime() : false;
+  }
+
+  const hour = Number(new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(date));
+  const minute = Number(new Intl.DateTimeFormat("en-GB", {
+    minute: "2-digit",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(date));
+
+  return hour > 22 || (hour === 22 && minute > 0);
+}
+
+function getExpectedReturnDate(record) {
+  const returnDate = record.tarikh_balik || record.returnDate;
+  const returnTime = record.masa_balik_dijangka || record.expectedReturnTime;
+  if (!returnDate || !returnTime) {
+    return null;
+  }
+
+  return parseFlexibleDate(`${returnDate} ${String(returnTime).slice(0, 5)}`);
+}
+
 async function initApp() {
   setupAppVersionUi();
   setupServiceWorkerUpdates();
   setupAccessEnhancements();
   setupFeedbackMessageObservers();
   updateEmergencyFields();
+  updatePulangBermalamFields();
   updateClock();
   if (ALLOW_MOCK_MODE) {
     setMockMode("");
