@@ -1,18 +1,18 @@
-const GAS_WEB_APP_URL = "";
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 
-const students = [
+let students = [
   { id: "S001", no_matrik: "M001", name: "Ahmad Hakimi", className: "SKM 1", gender: "Lelaki", status: "Aktif" },
   { id: "S002", no_matrik: "M002", name: "Nur Aisyah", className: "SKM 1", gender: "Perempuan", status: "Aktif" },
   { id: "S003", no_matrik: "M003", name: "Muhammad Amir", className: "SKM 2", gender: "Lelaki", status: "Aktif" }
 ];
 
-const wardens = [
+let wardens = [
   "Abang Wal Haffalrais Bin Abang Sabaki",
   "Siti Aishah Binti Ismail",
   "Sheikh Bukhori Bin Sheikh Ghadzi"
 ];
 
-const guards = [
+let guards = [
   "Pos Guard Utama",
   "Guard Bertugas 2"
 ];
@@ -38,11 +38,17 @@ const REQUEST_TYPE_LABEL = {
 let outingRecords = [];
 let nextRequestNumber = 1;
 let currentSession = null;
+let isLiveMode = false;
+let dataModeMessage = "";
+let studentRefreshIntervalId = null;
+let studentLastUpdatedAt = null;
+const DEBUG_STUDENT_RECORDS = false;
 
 const els = {
   todayDate: document.querySelector("#todayDate"),
   todayDay: document.querySelector("#todayDay"),
   currentTime: document.querySelector("#currentTime"),
+  appShell: document.querySelector(".app-shell"),
   accessScreen: document.querySelector("#accessScreen"),
   appWorkspace: document.querySelector("#appWorkspace"),
   studentLoginPanel: document.querySelector("#studentLoginPanel"),
@@ -72,6 +78,8 @@ const els = {
   emergencyNoteInput: document.querySelector("#emergencyNoteInput"),
   studentMessage: document.querySelector("#studentMessage"),
   studentRecordsList: document.querySelector("#studentRecordsList"),
+  studentRefreshButton: null,
+  studentLastUpdated: null,
   wardenList: document.querySelector("#wardenList"),
   wardenApprovedList: document.querySelector("#wardenApprovedList"),
   guardApprovedList: document.querySelector("#guardApprovedList"),
@@ -83,24 +91,38 @@ const els = {
   countReturned: document.querySelector("#countReturned"),
   countLate: document.querySelector("#countLate"),
   countNotReturned: document.querySelector("#countNotReturned"),
-  countEmergency: document.querySelector("#countEmergency")
+  countEmergency: document.querySelector("#countEmergency"),
+  dataModeIndicator: null
 };
 
 document.querySelectorAll("[data-role-choice]").forEach((button) => {
   button.addEventListener("click", () => showLoginPanel(button.dataset.roleChoice));
 });
 
-els.studentLoginPanel.addEventListener("submit", (event) => {
+els.studentLoginPanel.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const student = students.find((item) => item.id === els.studentLoginSelect.value);
+  const selectedStudent = students.find((item) => item.id === els.studentLoginSelect.value);
   const enteredMatric = els.matricInput.value.trim().toUpperCase();
 
-  if (!student || student.no_matrik !== enteredMatric) {
+  if (isLiveMode) {
+    try {
+      const student = await apiPost("loginStudent", {
+        nama: selectedStudent ? selectedStudent.name : "",
+        no_matrik: enteredMatric
+      });
+      startSession("student", mapLiveStudent(student));
+    } catch (error) {
+      els.studentLoginMessage.textContent = error.message;
+    }
+    return;
+  }
+
+  if (!selectedStudent || selectedStudent.no_matrik !== enteredMatric) {
     els.studentLoginMessage.textContent = "Nama pelajar dan nombor matrik tidak sepadan.";
     return;
   }
 
-  startSession("student", student);
+  startSession("student", selectedStudent);
 });
 
 els.wardenLoginPanel.addEventListener("submit", (event) => {
@@ -114,6 +136,7 @@ els.guardLoginPanel.addEventListener("submit", (event) => {
 });
 
 els.logoutButton.addEventListener("click", () => {
+  stopStudentAutoRefresh();
   currentSession = null;
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
@@ -134,14 +157,289 @@ document.querySelectorAll(".tab-button").forEach((button) => {
   });
 });
 
+async function apiGet(action) {
+  const response = await fetch(`${GAS_WEB_APP_URL}?action=${encodeURIComponent(action)}`);
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || `API GET failed: ${action}`);
+  }
+
+  return result.data;
+}
+
+async function apiPost(action, payload) {
+  const response = await fetch(GAS_WEB_APP_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify({
+      action,
+      ...payload
+    })
+  });
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || `API POST failed: ${action}`);
+  }
+
+  return result.data;
+}
+
+async function loadLiveMasters() {
+  if (!GAS_WEB_APP_URL) {
+    setMockMode("");
+    return;
+  }
+
+  try {
+    const [liveStudents, liveWardens, liveGuards] = await Promise.all([
+      apiGet("getStudents"),
+      apiGet("getWardens"),
+      apiGet("getGuards")
+    ]);
+
+    students = liveStudents.map(mapLiveStudent);
+    wardens = liveWardens.map((warden) => warden.nama_warden || warden.name).filter(Boolean);
+    guards = liveGuards.map((guard) => guard.nama_guard || guard.name).filter(Boolean);
+    isLiveMode = true;
+    dataModeMessage = "";
+    populateStudents();
+    populateStaff();
+    await loadTodayRecords();
+    updateDataModeIndicator();
+  } catch (error) {
+    setMockMode(`Live API unavailable. Using mock data. ${error.message}`);
+  }
+}
+
+async function loadTodayRecords() {
+  if (!isLiveMode) {
+    render();
+    return;
+  }
+
+  try {
+    const records = await apiGet("getTodayRecords");
+    outingRecords = records.map(mapLiveRecord);
+    if (currentSession && currentSession.role === "student") {
+      studentLastUpdatedAt = new Date();
+      updateStudentLastUpdated();
+    }
+    render();
+  } catch (error) {
+    showModeNotice(`Live records unavailable: ${error.message}`);
+    render();
+  }
+}
+
+function mapLiveStudent(student) {
+  return {
+    id: student.student_id || student.id || "",
+    student_id: student.student_id || student.id || "",
+    studentId: student.student_id || student.id || "",
+    no_matrik: student.no_matrik || "",
+    noMatrik: student.no_matrik || "",
+    name: student.nama || student.name || "",
+    nama: student.nama || student.name || "",
+    email: student.email || student.student_email || "",
+    phone: student.no_tel || "",
+    className: student.kelas || student.className || "",
+    kelas: student.kelas || student.className || "",
+    gender: student.jantina || student.gender || "",
+    jantina: student.jantina || student.gender || "",
+    status: student.status || ""
+  };
+}
+
+function mapLiveRecord(record) {
+  return {
+    raw: record,
+    id: record.request_id || "",
+    request_id: record.request_id || "",
+    studentId: record.student_id || "",
+    student_id: record.student_id || "",
+    no_matrik: record.no_matrik || "",
+    noMatrik: record.no_matrik || "",
+    studentName: record.nama || "",
+    nama: record.nama || "",
+    name: record.nama || "",
+    className: record.kelas || "",
+    kelas: record.kelas || "",
+    gender: record.jantina || "",
+    jenis_permohonan: record.jenis_permohonan || REQUEST_TYPE.normal,
+    purpose: record.tujuan || "",
+    tujuan: record.tujuan || "",
+    location: record.lokasi || "",
+    lokasi: record.lokasi || "",
+    jenis_kenderaan: record.jenis_kenderaan || "",
+    butiran_kenderaan: record.butiran_kenderaan || "",
+    sebab_kecemasan: record.sebab_kecemasan || "",
+    telefon_waris: record.telefon_waris || "",
+    hubungan_waris: record.hubungan_waris || "",
+    catatan_kecemasan: record.catatan_kecemasan || "",
+    rawStatus: record.status || "",
+    status: mapLiveStatus(record.status),
+    lewat: record.lewat === "Ya",
+    lewatText: record.lewat || "",
+    requestedAt: parseDateValue(record.masa_mohon),
+    masa_mohon: record.masa_mohon || "",
+    approvedAt: parseDateValue(record.masa_approve),
+    masa_approve: record.masa_approve || "",
+    rejectedAt: record.status === "DITOLAK_WARDEN" ? parseDateValue(record.masa_approve) : null,
+    outAt: parseDateValue(record.masa_keluar),
+    masa_keluar: record.masa_keluar || "",
+    returnedAt: parseDateValue(record.masa_masuk),
+    masa_masuk: record.masa_masuk || "",
+    approvedBy: record.status === "DILULUSKAN_WARDEN" || record.status === "KELUAR" || record.status === "SELESAI"
+      ? record.warden_approve_by || ""
+      : "",
+    warden_approve_by: record.warden_approve_by || "",
+    rejectedBy: record.status === "DITOLAK_WARDEN" ? record.warden_approve_by || "" : "",
+    guardOutBy: record.guard_keluar_by || "",
+    guard_keluar_by: record.guard_keluar_by || "",
+    guardInBy: record.guard_masuk_by || "",
+    guard_masuk_by: record.guard_masuk_by || "",
+    catatan: record.catatan || ""
+  };
+}
+
+function mapLiveStatus(status) {
+  const statusMap = {
+    MENUNGGU_KELULUSAN: STATUS.pending,
+    DILULUSKAN_WARDEN: STATUS.approved,
+    DITOLAK_WARDEN: STATUS.rejected,
+    KELUAR: STATUS.out,
+    SELESAI: STATUS.returned
+  };
+
+  return statusMap[status] || status || STATUS.pending;
+}
+
+function parseDateValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const date = new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function setMockMode(message) {
+  isLiveMode = false;
+  dataModeMessage = message || "";
+  updateDataModeIndicator();
+  populateStudents();
+  populateStaff();
+  render();
+}
+
+function updateDataModeIndicator() {
+  if (!els.dataModeIndicator) {
+    els.dataModeIndicator = document.createElement("p");
+    els.dataModeIndicator.setAttribute("aria-live", "polite");
+    els.dataModeIndicator.style.margin = "0 0 12px";
+    els.dataModeIndicator.style.fontWeight = "700";
+    els.dataModeIndicator.style.color = isLiveMode ? "#15573b" : "#684200";
+    els.appShell.insertBefore(els.dataModeIndicator, els.appShell.firstElementChild);
+  }
+
+  els.dataModeIndicator.style.color = isLiveMode ? "#15573b" : "#684200";
+  els.dataModeIndicator.textContent = isLiveMode
+    ? "Live Mode: Google Sheets"
+    : `Mock Mode${dataModeMessage ? ` - ${dataModeMessage}` : ""}`;
+}
+
+function showModeNotice(message) {
+  dataModeMessage = message;
+  updateDataModeIndicator();
+}
+
+function ensureStudentRefreshControls() {
+  if (els.studentRefreshButton) {
+    return;
+  }
+
+  const controls = document.createElement("div");
+  controls.style.display = "grid";
+  controls.style.gap = "6px";
+  controls.style.margin = "10px 0";
+
+  els.studentRefreshButton = document.createElement("button");
+  els.studentRefreshButton.className = "secondary-action";
+  els.studentRefreshButton.type = "button";
+  els.studentRefreshButton.textContent = "Refresh Status";
+  els.studentRefreshButton.addEventListener("click", async () => {
+    await refreshStudentLiveRecords();
+  });
+
+  els.studentLastUpdated = document.createElement("small");
+  els.studentLastUpdated.style.color = "#5b6678";
+
+  controls.appendChild(els.studentRefreshButton);
+  controls.appendChild(els.studentLastUpdated);
+  els.studentRecordsList.parentNode.insertBefore(controls, els.studentRecordsList);
+}
+
+async function refreshStudentLiveRecords() {
+  if (!currentSession || currentSession.role !== "student") {
+    stopStudentAutoRefresh();
+    return;
+  }
+
+  if (isLiveMode) {
+    await loadTodayRecords();
+  } else {
+    renderStudent();
+  }
+
+  studentLastUpdatedAt = new Date();
+  updateStudentLastUpdated();
+}
+
+function startStudentAutoRefresh() {
+  stopStudentAutoRefresh();
+
+  if (!isLiveMode || !currentSession || currentSession.role !== "student") {
+    return;
+  }
+
+  studentRefreshIntervalId = window.setInterval(() => {
+    refreshStudentLiveRecords();
+  }, 30000);
+}
+
+function stopStudentAutoRefresh() {
+  if (studentRefreshIntervalId) {
+    window.clearInterval(studentRefreshIntervalId);
+    studentRefreshIntervalId = null;
+  }
+}
+
+function updateStudentLastUpdated() {
+  if (!els.studentLastUpdated) {
+    return;
+  }
+
+  els.studentLastUpdated.textContent = studentLastUpdatedAt
+    ? `Dikemaskini: ${studentLastUpdatedAt.toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+    : "";
+}
+
 els.requestTypeSelect.addEventListener("change", updateEmergencyFields);
 
-els.requestForm.addEventListener("submit", (event) => {
+els.requestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const requestType = els.requestTypeSelect.value;
 
-  if (!canSubmitRequest(requestType, new Date())) {
+  if (!isLiveMode && !canSubmitRequest(requestType, new Date())) {
     els.studentMessage.textContent = "Outing Biasa hanya dibuka pada Selasa/Rabu selepas 5:00 PM. Hanya permohonan Kecemasan boleh dihantar sekarang.";
     return;
   }
@@ -155,6 +453,43 @@ els.requestForm.addEventListener("submit", (event) => {
 
   if (!student) {
     els.studentMessage.textContent = "Sila masuk sebagai Pelajar dahulu.";
+    return;
+  }
+
+  if (outingRecords.some((record) => isRecordForCurrentStudent(record) && isActiveStudentRequest(record))) {
+    els.studentMessage.textContent = "Anda sudah mempunyai permohonan aktif hari ini. Sila semak status di bawah.";
+    renderStudent();
+    return;
+  }
+
+  if (isLiveMode) {
+    try {
+      const payload = {
+        student_id: student.id,
+        no_matrik: student.no_matrik,
+        nama: student.name,
+        student_email: student.email || "",
+        email: student.email || "",
+        kelas: student.className,
+        jenis_permohonan: requestType,
+        tujuan: els.purposeInput.value.trim(),
+        lokasi: els.locationInput.value.trim(),
+        jenis_kenderaan: els.vehicleTypeSelect.value,
+        butiran_kenderaan: els.vehicleDetailInput.value.trim(),
+        sebab_kecemasan: els.emergencyReasonInput.value.trim(),
+        telefon_waris: els.guardianPhoneInput.value.trim(),
+        hubungan_waris: els.guardianRelationSelect.value,
+        catatan_kecemasan: els.emergencyNoteInput.value.trim()
+      };
+      const savedRecord = await apiPost("submitRequest", payload);
+      els.requestForm.reset();
+      updateEmergencyFields();
+      els.studentMessage.textContent = `Permohonan ${savedRecord.request_id || savedRecord.id} telah dihantar dan sedang menunggu kelulusan warden.`;
+      await loadTodayRecords();
+      renderStudent();
+    } catch (error) {
+      els.studentMessage.textContent = error.message;
+    }
     return;
   }
 
@@ -222,6 +557,7 @@ function hideLoginPanels() {
 
 function startSession(role, user) {
   // Mock frontend access only. Real GAS backend must validate role and identity later.
+  stopStudentAutoRefresh();
   currentSession = { role, user };
   els.accessScreen.classList.add("hidden");
   els.appWorkspace.classList.add("active");
@@ -229,6 +565,10 @@ function startSession(role, user) {
   els.sessionName.textContent = user.name;
   applyRoleView();
   render();
+  if (role === "student") {
+    refreshStudentLiveRecords();
+    startStudentAutoRefresh();
+  }
 }
 
 function applyRoleView() {
@@ -358,10 +698,242 @@ function renderStudent() {
     return;
   }
 
-  const studentRecords = outingRecords.filter((record) => record.studentId === currentSession.user.id);
+  ensureStudentRefreshControls();
+  updateStudentLastUpdated();
+  updateStudentSubmitAvailability();
+
+  const studentRecords = outingRecords.filter(isRecordForCurrentStudent);
+  debugStudentRecords(studentRecords);
   els.studentRecordsList.innerHTML = studentRecords.length
-    ? studentRecords.map((record) => recordCard(record, "student")).join("")
+    ? studentRecords.map((record) => studentStatusCard(record)).join("")
     : emptyState("Belum ada rekod permohonan untuk pelajar ini.");
+}
+
+function updateStudentSubmitAvailability() {
+  if (!currentSession || currentSession.role !== "student") {
+    return;
+  }
+
+  const hasActiveRequest = outingRecords.some((record) => (
+    isRecordForCurrentStudent(record) && isActiveStudentRequest(record)
+  ));
+  const submitButton = els.requestForm.querySelector('button[type="submit"]');
+
+  if (submitButton) {
+    submitButton.disabled = hasActiveRequest;
+  }
+
+  if (hasActiveRequest && (!els.studentMessage.textContent || els.studentMessage.textContent === "Anda sudah mempunyai permohonan aktif hari ini. Sila semak status di bawah.")) {
+    els.studentMessage.textContent = "Anda sudah mempunyai permohonan aktif hari ini. Sila semak status di bawah.";
+  } else if (els.studentMessage.textContent === "Anda sudah mempunyai permohonan aktif hari ini. Sila semak status di bawah.") {
+    els.studentMessage.textContent = "";
+  }
+}
+
+function isActiveStudentRequest(record) {
+  const status = record.rawStatus || reverseDisplayStatus(record.status);
+  return ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "KELUAR"].includes(status);
+}
+
+function getRecordId(record) {
+  return record ? record.request_id || record.id || "" : "";
+}
+
+function getRecordStudentId(record) {
+  return record ? record.student_id || record.studentId || (record.student && record.student.student_id) || "" : "";
+}
+
+function getRecordNoMatrik(record) {
+  return record ? record.no_matrik || record.noMatrik || (record.student && record.student.no_matrik) || "" : "";
+}
+
+function getRecordName(record) {
+  return record ? record.nama || record.name || record.studentName || (record.student && record.student.nama) || "" : "";
+}
+
+function getCurrentStudent() {
+  return currentSession && currentSession.role === "student" ? currentSession.user : null;
+}
+
+function getCurrentStudentId() {
+  const currentStudent = getCurrentStudent();
+  return currentStudent ? currentStudent.student_id || currentStudent.studentId || currentStudent.id || "" : "";
+}
+
+function getCurrentStudentNoMatrik() {
+  const currentStudent = getCurrentStudent();
+  return currentStudent ? currentStudent.no_matrik || currentStudent.noMatrik || "" : "";
+}
+
+function getCurrentStudentName() {
+  const currentStudent = getCurrentStudent();
+  return currentStudent ? currentStudent.nama || currentStudent.name || "" : "";
+}
+
+function isRecordForCurrentStudent(record) {
+  const recordStudentId = normalizeValue(getRecordStudentId(record));
+  const recordNoMatrik = normalizeValue(getRecordNoMatrik(record));
+  const recordName = normalizeValue(getRecordName(record));
+  const currentStudentId = normalizeValue(getCurrentStudentId());
+  const currentNoMatrik = normalizeValue(getCurrentStudentNoMatrik());
+  const currentName = normalizeValue(getCurrentStudentName());
+
+  return Boolean(
+    (recordStudentId && currentStudentId && recordStudentId === currentStudentId) ||
+    (recordNoMatrik && currentNoMatrik && recordNoMatrik === currentNoMatrik) ||
+    (recordName && currentName && recordName === currentName)
+  );
+}
+
+function debugStudentRecords(studentRecords) {
+  if (!DEBUG_STUDENT_RECORDS) {
+    return;
+  }
+
+  console.debug("currentStudent", getCurrentStudent());
+  console.debug("todayRecords", outingRecords);
+  console.debug("studentRecords", studentRecords);
+}
+
+function isRecordForStudent(record, student) {
+  if (!record || !student) {
+    return false;
+  }
+
+  const recordStudentId = getRecordStudentId(record);
+  const recordMatric = getRecordNoMatrik(record);
+  const recordName = getRecordName(record);
+  const studentId = student.student_id || student.studentId || student.id || "";
+  const studentMatric = student.no_matrik || student.noMatrik || "";
+  const studentName = student.nama || student.name || "";
+
+  return (
+    (recordStudentId && studentId && normalizeValue(recordStudentId) === normalizeValue(studentId)) ||
+    (recordMatric && studentMatric && normalizeValue(recordMatric) === normalizeValue(studentMatric)) ||
+    (recordName && studentName && normalizeValue(recordName) === normalizeValue(studentName))
+  );
+}
+
+function studentStatusCard(record) {
+  const statusInfo = studentStatusInfo(record);
+  const emergencyDetail = emergencyDetailHtml(record);
+  const wardenDetail = record.warden_approve_by || record.approvedBy
+    ? `<br><strong>Warden:</strong> ${escapeHtml(record.warden_approve_by || record.approvedBy)}`
+    : "";
+  const approvalTime = record.masa_approve || record.approvedAt
+    ? `<br><strong>Masa Kelulusan:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_approve || record.approvedAt))}`
+    : "";
+  const outDetail = record.guard_keluar_by || record.guardOutBy
+    ? `<br><strong>Guard Keluar:</strong> ${escapeHtml(record.guard_keluar_by || record.guardOutBy)}`
+    : "";
+  const outTime = record.masa_keluar || record.outAt
+    ? `<br><strong>Masa Keluar:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_keluar || record.outAt))}`
+    : "";
+  const inDetail = record.guard_masuk_by || record.guardInBy
+    ? `<br><strong>Guard Masuk:</strong> ${escapeHtml(record.guard_masuk_by || record.guardInBy)}`
+    : "";
+  const inTime = record.masa_masuk || record.returnedAt
+    ? `<br><strong>Masa Masuk:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_masuk || record.returnedAt))}`
+    : "";
+  const noteDetail = record.catatan
+    ? `<br><strong>Catatan:</strong> ${escapeHtml(record.catatan)}`
+    : "";
+  const vehicleDetail = record.butiran_kenderaan
+    ? `<br><strong>Butiran Kenderaan:</strong> ${escapeHtml(record.butiran_kenderaan)}`
+    : "";
+
+  return `
+    <article class="record-card">
+      <div class="record-top">
+        <div>
+          <h3>${escapeHtml(getRecordId(record))}</h3>
+          <div class="record-meta">${escapeHtml(requestTypeLabel(record.jenis_permohonan))} | ${escapeHtml(record.className || record.kelas || "-")}</div>
+        </div>
+        <div class="badge-stack">
+          <span class="badge ${statusInfo.badgeClass}">${escapeHtml(statusInfo.badge)}</span>
+        </div>
+      </div>
+      <p class="record-detail"><strong>Status Semasa:</strong> ${escapeHtml(statusInfo.message)}</p>
+      <div class="record-detail">
+        <strong>Tujuan:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
+        <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
+        <strong>Kenderaan:</strong> ${escapeHtml(record.jenis_kenderaan || "-")}
+        ${vehicleDetail}
+        ${emergencyDetail}
+        ${wardenDetail}
+        ${approvalTime}
+        ${outDetail}
+        ${outTime}
+        ${inDetail}
+        ${inTime}
+        ${noteDetail}
+      </div>
+      <div class="record-times">
+        <span>Mohon: ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}</span>
+        <span>Status: ${escapeHtml(statusInfo.badge)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function studentStatusInfo(record) {
+  const status = record.rawStatus || reverseDisplayStatus(record.status);
+
+  if (status === "MENUNGGU_KELULUSAN") {
+    return {
+      badge: "Menunggu Kelulusan Warden",
+      badgeClass: "badge-pending",
+      message: "Permohonan anda telah dihantar. Sila tunggu kelulusan warden sebelum bergerak ke pos guard."
+    };
+  }
+
+  if (status === "DILULUSKAN_WARDEN") {
+    return {
+      badge: "Diluluskan Warden",
+      badgeClass: "badge-approved",
+      message: "Permohonan telah diluluskan. Sila ke pos guard untuk pengesahan keluar."
+    };
+  }
+
+  if (status === "DITOLAK_WARDEN") {
+    return {
+      badge: "Ditolak Warden",
+      badgeClass: "badge-rejected",
+      message: "Permohonan tidak diluluskan. Sila rujuk warden bertugas."
+    };
+  }
+
+  if (status === "KELUAR") {
+    return {
+      badge: "Sedang Outing",
+      badgeClass: "badge-out",
+      message: "Anda sedang outing. Sila pulang sebelum atau pada 10:00 PM."
+    };
+  }
+
+  if (status === "SELESAI") {
+    const isLate = record.lewat === true || record.lewatText === "Ya";
+    return {
+      badge: isLate ? "Selesai - Lewat" : "Selesai",
+      badgeClass: isLate ? "badge-late" : "badge-returned",
+      message: isLate ? "Permohonan selesai, tetapi rekod masuk ditanda lewat." : "Permohonan selesai."
+    };
+  }
+
+  return {
+    badge: record.status || "Status Tidak Diketahui",
+    badgeClass: badgeClass(record.status),
+    message: "Sila semak status permohonan anda."
+  };
+}
+
+function reverseDisplayStatus(status) {
+  if (status === STATUS.pending) return "MENUNGGU_KELULUSAN";
+  if (status === STATUS.approved) return "DILULUSKAN_WARDEN";
+  if (status === STATUS.rejected) return "DITOLAK_WARDEN";
+  if (status === STATUS.out) return "KELUAR";
+  if (status === STATUS.returned) return "SELESAI";
+  return status || "";
 }
 
 function renderWarden() {
@@ -429,8 +1001,23 @@ function countByStatus(status) {
   return outingRecords.filter((record) => record.status === status).length;
 }
 
-function updateStatus(id, status) {
+async function updateStatus(id, status) {
   if (!currentSession || currentSession.role !== "warden") {
+    return;
+  }
+
+  if (isLiveMode) {
+    try {
+      const action = status === STATUS.approved ? "approveRequest" : "rejectRequest";
+      await apiPost(action, {
+        request_id: id,
+        nama_warden: currentSession.user.name,
+        catatan: status === STATUS.rejected ? "Ditolak oleh warden." : ""
+      });
+      await loadTodayRecords();
+    } catch (error) {
+      showModeNotice(`Live API error: ${error.message}`);
+    }
     return;
   }
 
@@ -451,8 +1038,21 @@ function updateStatus(id, status) {
   render();
 }
 
-function confirmOut(id) {
+async function confirmOut(id) {
   if (!currentSession || currentSession.role !== "guard") {
+    return;
+  }
+
+  if (isLiveMode) {
+    try {
+      await apiPost("confirmOut", {
+        request_id: id,
+        nama_guard: currentSession.user.name
+      });
+      await loadTodayRecords();
+    } catch (error) {
+      showModeNotice(`Live API error: ${error.message}`);
+    }
     return;
   }
 
@@ -476,8 +1076,21 @@ function confirmOut(id) {
   render();
 }
 
-function confirmIn(id) {
+async function confirmIn(id) {
   if (!currentSession || currentSession.role !== "guard") {
+    return;
+  }
+
+  if (isLiveMode) {
+    try {
+      await apiPost("confirmIn", {
+        request_id: id,
+        nama_guard: currentSession.user.name
+      });
+      await loadTodayRecords();
+    } catch (error) {
+      showModeNotice(`Live API error: ${error.message}`);
+    }
     return;
   }
 
@@ -632,6 +1245,33 @@ function formatTime(value) {
   });
 }
 
+function formatDisplayDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString("ms-MY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function normalizeValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function emptyState(message) {
   return `<div class="empty-state">${message}</div>`;
 }
@@ -645,8 +1285,14 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-populateStudents();
-populateStaff();
-updateEmergencyFields();
-updateClock();
+async function initApp() {
+  populateStudents();
+  populateStaff();
+  updateEmergencyFields();
+  updateClock();
+  setMockMode("");
+  await loadLiveMasters();
+}
+
+initApp();
 setInterval(updateClock, 1000);

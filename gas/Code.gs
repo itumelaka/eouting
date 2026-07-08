@@ -373,9 +373,16 @@ function confirmIn(payload) {
 }
 
 function getTodayRecords() {
-  const today = formatDate_(new Date());
+  const todayKey = formatDate_(new Date());
   return getRowsAsObjects_(getSheet_(SHEETS.requests))
-    .filter((row) => String(row.tarikh) === today);
+    .filter((row) => {
+      const rowDateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
+      return rowDateKey === todayKey;
+    });
+}
+
+function debugGetAllRequests() {
+  return getRowsAsObjects_(getSheet_(SHEETS.requests));
 }
 
 function appendAuditLog(action, requestId, userRole, userName, details) {
@@ -495,6 +502,30 @@ function now_() {
 
 function formatDate_(date) {
   return Utilities.formatDate(date, "Asia/Kuala_Lumpur", "yyyy-MM-dd");
+}
+
+function normalizeDateKey_(value) {
+  if (!value) {
+    return "";
+  }
+
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return formatDate_(value);
+  }
+
+  const text = String(value).trim();
+  const isoDateMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+
+  if (isoDateMatch) {
+    return isoDateMatch[1];
+  }
+
+  const parsedDate = new Date(text);
+  if (!isNaN(parsedDate.getTime())) {
+    return formatDate_(parsedDate);
+  }
+
+  return "";
 }
 
 function getDayName_(date) {
