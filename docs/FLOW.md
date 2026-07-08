@@ -10,6 +10,7 @@ Status semasa:
 - Student `Rekod Aktif` / `Sejarah Hari Ini`.
 - Warden/Guard PIN login.
 - Pemantauan Semasa read-only.
+- Statistik Outing bulanan read-only.
 - Telegram Bot notification berfungsi.
 - Audit log asas dalam `AUDIT_LOG`.
 
@@ -179,9 +180,23 @@ Dashboard Hari Ini memaparkan:
 
 `Pemantauan Semasa` ialah paparan read-only untuk melihat rekod hari ini tanpa mengubah status.
 
+## Statistik Outing
+
+`Statistik` ialah paparan read-only untuk ringkasan bulanan outing.
+
+Paparan ini menunjukkan:
+
+- Jumlah permohonan bulanan.
+- Jumlah selesai, kecemasan, lewat, dan pelajar terlibat.
+- `Juara Outing Bulanan` / ranking kekerapan outing.
+- Ringkasan mengikut kelas.
+- Pecahan status permohonan.
+
+V1.3.0 tidak memerlukan PIN untuk Statistik, sama seperti Pemantauan Semasa. Versi akan datang boleh hadkan akses Statistik kepada Warden/HEP sahaja.
+
 ## Prinsip Penting
 
 - Frontend role hiding bukan security sebenar.
 - Semua validation penting dibuat dalam GAS backend.
 - Semua action penting direkod dalam `AUDIT_LOG`.
-- Live V1.2 ialah pilot-ready untuk ujian operasi sebenar, bukan final production security.
+- Live V1.3.0 ialah pilot-ready untuk ujian operasi sebenar, bukan final production security.

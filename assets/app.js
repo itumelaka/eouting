@@ -1,4 +1,4 @@
-const APP_VERSION = "1.2.2";
+const APP_VERSION = "1.3.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 
@@ -140,6 +140,7 @@ function setupAccessEnhancements() {
   setupClayRoleNav();
   setupStaffPinFields();
   setupMonitoringPanel();
+  setupStatisticsPanel();
 }
 
 function setupClayRoleNav() {
@@ -168,6 +169,16 @@ function setupClayRoleNav() {
     monitorButton.innerHTML = "<strong>Pemantauan Semasa</strong>";
     monitorButton.addEventListener("click", openMonitoringPage);
     els.roleGrid.appendChild(monitorButton);
+  }
+
+  if (!els.roleGrid.querySelector('[data-role-choice="stats"]')) {
+    const statsButton = document.createElement("button");
+    statsButton.className = "role-card clay-role-button";
+    statsButton.type = "button";
+    statsButton.dataset.roleChoice = "stats";
+    statsButton.innerHTML = "<strong>Statistik</strong>";
+    statsButton.addEventListener("click", openStatisticsPage);
+    els.roleGrid.appendChild(statsButton);
   }
 }
 
@@ -268,6 +279,77 @@ function setupMonitoringPanel() {
   els.monitorRecordsList = panel.querySelector("#monitorRecordsList");
   els.monitorBackButton.addEventListener("click", closeMonitoringPage);
   els.monitorRefreshButton.addEventListener("click", refreshMonitoringRecords);
+}
+
+function setupStatisticsPanel() {
+  if (document.querySelector("#statsWorkspace")) {
+    return;
+  }
+
+  // Future version can restrict Statistik to Warden/HEP only.
+  const panel = document.createElement("section");
+  panel.className = "app-workspace stats-workspace";
+  panel.id = "statsWorkspace";
+  panel.innerHTML = `
+    <div class="session-bar">
+      <div>
+        <span>Paparan</span>
+        <strong>Statistik Outing</strong>
+      </div>
+      <button class="secondary-action" id="statsBackButton" type="button">Tukar Peranan</button>
+    </div>
+    <section class="tab-panel active" id="stats">
+      <div class="section-heading">
+        <h2>Statistik Outing</h2>
+        <p>Ringkasan bulanan kekerapan outing pelajar</p>
+      </div>
+      <div class="stats-filter-card">
+        <label for="statsMonthSelect">Bulan</label>
+        <select id="statsMonthSelect"></select>
+        <label for="statsYearSelect">Tahun</label>
+        <select id="statsYearSelect"></select>
+        <label for="statsClassSelect">Kelas</label>
+        <select id="statsClassSelect"></select>
+        <button class="primary-action" id="statsGenerateButton" type="button">Jana Statistik</button>
+        <button class="secondary-action" id="statsRefreshButton" type="button">Refresh</button>
+      </div>
+      <div class="summary-grid stats-summary" id="statsSummary"></div>
+      <section class="stats-section">
+        <div class="student-record-heading">
+          <h3>🏆 Juara Outing Bulanan</h3>
+          <p>Ranking berdasarkan jumlah permohonan outing bulan ini.</p>
+        </div>
+        <div class="stats-list" id="statsLeaderboard"></div>
+      </section>
+      <section class="stats-section">
+        <div class="student-record-heading">
+          <h3>Ringkasan Mengikut Kelas</h3>
+        </div>
+        <div class="stats-list" id="statsClassSummary"></div>
+      </section>
+      <section class="stats-section">
+        <div class="student-record-heading">
+          <h3>Pecahan Status</h3>
+        </div>
+        <div class="status-pill-grid" id="statsStatusSummary"></div>
+      </section>
+    </section>
+  `;
+  els.appShell.appendChild(panel);
+  els.statsWorkspace = panel;
+  els.statsBackButton = panel.querySelector("#statsBackButton");
+  els.statsMonthSelect = panel.querySelector("#statsMonthSelect");
+  els.statsYearSelect = panel.querySelector("#statsYearSelect");
+  els.statsClassSelect = panel.querySelector("#statsClassSelect");
+  els.statsGenerateButton = panel.querySelector("#statsGenerateButton");
+  els.statsRefreshButton = panel.querySelector("#statsRefreshButton");
+  els.statsSummary = panel.querySelector("#statsSummary");
+  els.statsLeaderboard = panel.querySelector("#statsLeaderboard");
+  els.statsClassSummary = panel.querySelector("#statsClassSummary");
+  els.statsStatusSummary = panel.querySelector("#statsStatusSummary");
+  els.statsBackButton.addEventListener("click", closeStatisticsPage);
+  els.statsGenerateButton.addEventListener("click", loadStatistics);
+  els.statsRefreshButton.addEventListener("click", loadStatistics);
 }
 
 els.studentLoginPanel.addEventListener("submit", async (event) => {
@@ -413,6 +495,27 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 
 async function apiGet(action) {
   const response = await fetch(`${GAS_WEB_APP_URL}?action=${encodeURIComponent(action)}`);
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || `API GET failed: ${action}`);
+  }
+
+  return result.data;
+}
+
+async function apiGetWithParams(action, params = {}) {
+  const searchParams = new URLSearchParams({
+    action
+  });
+
+  Object.keys(params).forEach((key) => {
+    if (params[key] !== undefined && params[key] !== null && params[key] !== "") {
+      searchParams.set(key, params[key]);
+    }
+  });
+
+  const response = await fetch(`${GAS_WEB_APP_URL}?${searchParams.toString()}`);
   const result = await response.json();
 
   if (!response.ok || !result.ok) {
@@ -1927,6 +2030,281 @@ function bindStudentHistoryToggles() {
       button.textContent = willShow ? "Sembunyi Butiran" : "Lihat Butiran";
     });
   });
+}
+
+function openStatisticsPage() {
+  stopStudentAutoRefresh();
+  stopMonitoringAutoRefresh();
+  currentSession = null;
+  els.accessScreen.classList.add("hidden");
+  els.appWorkspace.classList.remove("active");
+  if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
+  els.statsWorkspace.classList.add("active");
+  setupStatsFilters();
+  loadStatistics();
+}
+
+function closeStatisticsPage() {
+  els.statsWorkspace.classList.remove("active");
+  els.accessScreen.classList.remove("hidden");
+  hideLoginPanels();
+}
+
+function setupStatsFilters() {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const monthNames = [
+    "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+    "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+  ];
+
+  if (!els.statsMonthSelect.dataset.ready) {
+    els.statsMonthSelect.innerHTML = monthNames
+      .map((month, index) => `<option value="${index + 1}">${month}</option>`)
+      .join("");
+    els.statsMonthSelect.dataset.ready = "true";
+  }
+
+  if (!els.statsYearSelect.dataset.ready) {
+    const years = [];
+    for (let year = currentYear - 2; year <= currentYear + 1; year += 1) {
+      years.push(year);
+    }
+    els.statsYearSelect.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join("");
+    els.statsYearSelect.dataset.ready = "true";
+  }
+
+  els.statsMonthSelect.value = els.statsMonthSelect.value || String(currentMonth);
+  els.statsYearSelect.value = els.statsYearSelect.value || String(currentYear);
+  populateStatsClassFilter();
+}
+
+function populateStatsClassFilter() {
+  const selectedValue = els.statsClassSelect.value;
+  const classNames = Array.from(new Set(
+    students.map((student) => student.kelas || student.className).filter(Boolean)
+  )).sort();
+
+  els.statsClassSelect.innerHTML = `<option value="">Semua Kelas</option>${classNames
+    .map((kelas) => `<option value="${escapeHtml(kelas)}">${escapeHtml(kelas)}</option>`)
+    .join("")}`;
+  els.statsClassSelect.value = classNames.includes(selectedValue) ? selectedValue : "";
+}
+
+async function loadStatistics() {
+  const params = {
+    month: els.statsMonthSelect.value,
+    year: els.statsYearSelect.value,
+    kelas: els.statsClassSelect.value
+  };
+
+  try {
+    const stats = isLiveMode
+      ? await apiGetWithParams("getOutingStats", params)
+      : buildMockOutingStats(params);
+    renderStatistics(stats);
+  } catch (error) {
+    showError(error.message || "Statistik gagal dimuat.", "Statistik Gagal");
+    renderStatistics(emptyStats(params));
+  }
+}
+
+function buildMockOutingStats(params) {
+  const month = Number(params.month);
+  const year = Number(params.year);
+  const kelasFilter = normalizeValue(params.kelas);
+  const records = outingRecords.filter((record) => {
+    const date = parseFlexibleDate(record.masa_mohon || record.requestedAt);
+    if (!date) return false;
+    const isSameMonth = date.getMonth() + 1 === month && date.getFullYear() === year;
+    const isSameClass = !kelasFilter || normalizeValue(record.kelas || record.className) === kelasFilter;
+    return isSameMonth && isSameClass;
+  });
+  return computeStatsFromRecords(records, month, year);
+}
+
+function computeStatsFromRecords(records, month, year) {
+  const totals = {
+    total_requests: records.length,
+    total_completed: 0,
+    total_pending: 0,
+    total_approved: 0,
+    total_out: 0,
+    total_rejected: 0,
+    total_emergency: 0,
+    total_normal: 0,
+    total_late: 0,
+    total_students: 0
+  };
+  const studentMap = {};
+  const classMap = {};
+  const statusMap = {};
+
+  records.forEach((record) => {
+    const status = record.rawStatus || reverseDisplayStatus(record.status);
+    const studentKey = getRecordStudentId(record) || getRecordNoMatrik(record) || getRecordName(record) || "UNKNOWN";
+    const kelas = record.kelas || record.className || "Tidak Dinyatakan";
+    const late = record.lewat === true || record.lewatText === "Ya";
+    const requestType = record.jenis_permohonan;
+    const completed = status === "SELESAI";
+
+    if (status === "SELESAI") totals.total_completed += 1;
+    if (status === "MENUNGGU_KELULUSAN") totals.total_pending += 1;
+    if (status === "DILULUSKAN_WARDEN") totals.total_approved += 1;
+    if (status === "KELUAR") totals.total_out += 1;
+    if (status === "DITOLAK_WARDEN") totals.total_rejected += 1;
+    if (requestType === REQUEST_TYPE.emergency) totals.total_emergency += 1;
+    if (requestType === REQUEST_TYPE.normal) totals.total_normal += 1;
+    if (late) totals.total_late += 1;
+    statusMap[status] = (statusMap[status] || 0) + 1;
+
+    if (!studentMap[studentKey]) {
+      studentMap[studentKey] = {
+        student_id: getRecordStudentId(record),
+        no_matrik: getRecordNoMatrik(record),
+        nama: getRecordName(record),
+        kelas,
+        total_requests: 0,
+        completed: 0,
+        emergency: 0,
+        normal: 0,
+        late: 0,
+        last_request_at: ""
+      };
+    }
+
+    studentMap[studentKey].total_requests += 1;
+    if (completed) studentMap[studentKey].completed += 1;
+    if (requestType === REQUEST_TYPE.emergency) studentMap[studentKey].emergency += 1;
+    if (requestType === REQUEST_TYPE.normal) studentMap[studentKey].normal += 1;
+    if (late) studentMap[studentKey].late += 1;
+    studentMap[studentKey].last_request_at = record.masa_mohon || record.requestedAt || studentMap[studentKey].last_request_at;
+
+    if (!classMap[kelas]) {
+      classMap[kelas] = { kelas, total_requests: 0, completed: 0, emergency: 0, late: 0, studentKeys: {} };
+    }
+    classMap[kelas].total_requests += 1;
+    if (completed) classMap[kelas].completed += 1;
+    if (requestType === REQUEST_TYPE.emergency) classMap[kelas].emergency += 1;
+    if (late) classMap[kelas].late += 1;
+    classMap[kelas].studentKeys[studentKey] = true;
+  });
+
+  totals.total_students = Object.keys(studentMap).length;
+
+  return {
+    month,
+    year,
+    generated_at: new Date().toISOString(),
+    totals,
+    leaderboard: Object.values(studentMap)
+      .sort((a, b) => (
+        b.total_requests - a.total_requests ||
+        b.completed - a.completed ||
+        b.late - a.late ||
+        String(a.nama).localeCompare(String(b.nama))
+      ))
+      .map((student, index) => ({ rank: index + 1, ...student })),
+    class_summary: Object.values(classMap).map((item) => ({
+      kelas: item.kelas,
+      total_requests: item.total_requests,
+      completed: item.completed,
+      emergency: item.emergency,
+      late: item.late,
+      total_students: Object.keys(item.studentKeys).length
+    })),
+    status_summary: Object.keys(statusMap).sort().map((status) => ({ status, count: statusMap[status] }))
+  };
+}
+
+function emptyStats(params) {
+  return {
+    month: Number(params.month),
+    year: Number(params.year),
+    generated_at: "",
+    totals: {
+      total_requests: 0,
+      total_completed: 0,
+      total_pending: 0,
+      total_approved: 0,
+      total_out: 0,
+      total_rejected: 0,
+      total_emergency: 0,
+      total_normal: 0,
+      total_late: 0,
+      total_students: 0
+    },
+    leaderboard: [],
+    class_summary: [],
+    status_summary: []
+  };
+}
+
+function renderStatistics(stats) {
+  const totals = stats.totals || emptyStats(stats).totals;
+  els.statsSummary.innerHTML = [
+    ["Jumlah Permohonan", totals.total_requests],
+    ["Selesai", totals.total_completed],
+    ["Kecemasan", totals.total_emergency],
+    ["Lewat", totals.total_late],
+    ["Pelajar Terlibat", totals.total_students]
+  ].map(([label, value]) => `
+    <article class="summary-card stats-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${Number(value || 0)}</strong>
+    </article>
+  `).join("");
+
+  els.statsLeaderboard.innerHTML = stats.leaderboard && stats.leaderboard.length
+    ? stats.leaderboard.slice(0, 10).map(leaderboardCard).join("")
+    : emptyState("Belum ada rekod outing untuk bulan ini.");
+
+  els.statsClassSummary.innerHTML = stats.class_summary && stats.class_summary.length
+    ? stats.class_summary.map(classSummaryCard).join("")
+    : emptyState("Belum ada ringkasan kelas untuk bulan ini.");
+
+  const statusOrder = ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "DITOLAK_WARDEN", "KELUAR", "SELESAI"];
+  const statusMap = {};
+  (stats.status_summary || []).forEach((item) => {
+    statusMap[item.status] = item.count;
+  });
+  els.statsStatusSummary.innerHTML = statusOrder.map((status) => `
+    <span class="status-pill ${badgeClass(mapLiveStatus(status))}">${escapeHtml(status)} <strong>${Number(statusMap[status] || 0)}</strong></span>
+  `).join("");
+}
+
+function leaderboardCard(item) {
+  const topClass = item.rank <= 3 ? ` leaderboard-top-${item.rank}` : "";
+  return `
+    <article class="leaderboard-card${topClass}">
+      <div class="leaderboard-rank">#${Number(item.rank || 0)}</div>
+      <div>
+        <h4>${escapeHtml(item.nama || "-")}</h4>
+        <p>Ranking Kekerapan Outing • ${escapeHtml(item.kelas || "-")}</p>
+      </div>
+      <div class="leaderboard-metrics">
+        <span>Jumlah <strong>${Number(item.total_requests || 0)}</strong></span>
+        <span>Selesai <strong>${Number(item.completed || 0)}</strong></span>
+        <span>Kecemasan <strong>${Number(item.emergency || 0)}</strong></span>
+        <span>Lewat <strong>${Number(item.late || 0)}</strong></span>
+      </div>
+      <small>Terakhir Mohon: ${escapeHtml(formatDisplayDateTime(item.last_request_at))}</small>
+    </article>
+  `;
+}
+
+function classSummaryCard(item) {
+  return `
+    <article class="class-summary-card">
+      <strong>${escapeHtml(item.kelas || "-")}</strong>
+      <span>Jumlah: ${Number(item.total_requests || 0)}</span>
+      <span>Selesai: ${Number(item.completed || 0)}</span>
+      <span>Kecemasan: ${Number(item.emergency || 0)}</span>
+      <span>Lewat: ${Number(item.late || 0)}</span>
+      <span>Pelajar: ${Number(item.total_students || 0)}</span>
+    </article>
+  `;
 }
 
 function renderWarden() {

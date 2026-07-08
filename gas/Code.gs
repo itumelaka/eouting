@@ -74,6 +74,7 @@ function doGet(e) {
     if (action === "getWardens") return jsonResponse(getWardens());
     if (action === "getGuards") return jsonResponse(getGuards());
     if (action === "getTodayRecords") return jsonResponse(getTodayRecords());
+    if (action === "getOutingStats") return jsonResponse(getOutingStats(e.parameter || {}));
 
     return errorResponse("Unknown action.");
   } catch (error) {
@@ -439,6 +440,181 @@ function getTodayRecords() {
       const rowDateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
       return rowDateKey === todayKey;
     });
+}
+
+function getOutingStats(payload) {
+  const now = new Date();
+  const month = Number(payload.month || Utilities.formatDate(now, "Asia/Kuala_Lumpur", "M"));
+  const year = Number(payload.year || Utilities.formatDate(now, "Asia/Kuala_Lumpur", "yyyy"));
+  const kelasFilter = normalizeText_(payload.kelas || "");
+  const rows = getRowsAsObjects_(getSheet_(SHEETS.requests))
+    .filter((row) => isStatsRecordInMonth_(row, month, year))
+    .filter((row) => !kelasFilter || normalizeText_(row.kelas) === kelasFilter)
+    .filter((row) => normalizeText_(row.status) !== "" && normalizeText_(row.status) !== "cancelled");
+
+  const totals = {
+    total_requests: rows.length,
+    total_completed: 0,
+    total_pending: 0,
+    total_approved: 0,
+    total_out: 0,
+    total_rejected: 0,
+    total_emergency: 0,
+    total_normal: 0,
+    total_late: 0,
+    total_students: 0
+  };
+  const studentsMap = {};
+  const classMap = {};
+  const statusMap = {};
+
+  rows.forEach((row) => {
+    const status = String(row.status || "");
+    const requestType = String(row.jenis_permohonan || "");
+    const studentKey = String(row.student_id || row.no_matrik || row.nama || "").trim() || "UNKNOWN";
+    const kelas = String(row.kelas || "Tidak Dinyatakan").trim() || "Tidak Dinyatakan";
+    const late = String(row.lewat || "").toLowerCase() === "ya";
+    const completed = status === STATUS.done;
+    const emergency = requestType === REQUEST_TYPE.emergency;
+    const normal = requestType === REQUEST_TYPE.normal;
+    const requestAt = row.masa_mohon || row.tarikh || "";
+
+    if (status === STATUS.done) totals.total_completed += 1;
+    if (status === STATUS.pending) totals.total_pending += 1;
+    if (status === STATUS.approved) totals.total_approved += 1;
+    if (status === STATUS.out) totals.total_out += 1;
+    if (status === STATUS.rejected) totals.total_rejected += 1;
+    if (emergency) totals.total_emergency += 1;
+    if (normal) totals.total_normal += 1;
+    if (late) totals.total_late += 1;
+
+    statusMap[status] = (statusMap[status] || 0) + 1;
+
+    if (!studentsMap[studentKey]) {
+      studentsMap[studentKey] = {
+        student_id: String(row.student_id || ""),
+        no_matrik: String(row.no_matrik || ""),
+        nama: String(row.nama || ""),
+        kelas: kelas,
+        total_requests: 0,
+        completed: 0,
+        emergency: 0,
+        normal: 0,
+        late: 0,
+        last_request_at: ""
+      };
+    }
+
+    studentsMap[studentKey].total_requests += 1;
+    if (completed) studentsMap[studentKey].completed += 1;
+    if (emergency) studentsMap[studentKey].emergency += 1;
+    if (normal) studentsMap[studentKey].normal += 1;
+    if (late) studentsMap[studentKey].late += 1;
+    studentsMap[studentKey].last_request_at = laterDateValue_(studentsMap[studentKey].last_request_at, requestAt);
+
+    if (!classMap[kelas]) {
+      classMap[kelas] = {
+        kelas: kelas,
+        total_requests: 0,
+        completed: 0,
+        emergency: 0,
+        late: 0,
+        studentKeys: {}
+      };
+    }
+
+    classMap[kelas].total_requests += 1;
+    if (completed) classMap[kelas].completed += 1;
+    if (emergency) classMap[kelas].emergency += 1;
+    if (late) classMap[kelas].late += 1;
+    classMap[kelas].studentKeys[studentKey] = true;
+  });
+
+  const leaderboard = Object.keys(studentsMap)
+    .map((key) => studentsMap[key])
+    .sort((a, b) => (
+      b.total_requests - a.total_requests ||
+      b.completed - a.completed ||
+      b.late - a.late ||
+      String(a.nama).localeCompare(String(b.nama))
+    ))
+    .map((student, index) => ({
+      rank: index + 1,
+      student_id: student.student_id,
+      no_matrik: student.no_matrik,
+      nama: student.nama,
+      kelas: student.kelas,
+      total_requests: student.total_requests,
+      completed: student.completed,
+      emergency: student.emergency,
+      normal: student.normal,
+      late: student.late,
+      last_request_at: student.last_request_at
+    }));
+
+  const classSummary = Object.keys(classMap)
+    .sort()
+    .map((kelas) => ({
+      kelas: classMap[kelas].kelas,
+      total_requests: classMap[kelas].total_requests,
+      completed: classMap[kelas].completed,
+      emergency: classMap[kelas].emergency,
+      late: classMap[kelas].late,
+      total_students: Object.keys(classMap[kelas].studentKeys).length
+    }));
+
+  totals.total_students = Object.keys(studentsMap).length;
+
+  return {
+    month: month,
+    year: year,
+    generated_at: now_(),
+    totals: totals,
+    leaderboard: leaderboard,
+    class_summary: classSummary,
+    status_summary: Object.keys(statusMap).sort().map((status) => ({
+      status: status,
+      count: statusMap[status]
+    }))
+  };
+}
+
+function isStatsRecordInMonth_(row, month, year) {
+  const dateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
+  if (!dateKey) {
+    return false;
+  }
+
+  const parts = dateKey.split("-");
+  return Number(parts[0]) === Number(year) && Number(parts[1]) === Number(month);
+}
+
+function laterDateValue_(currentValue, nextValue) {
+  if (!currentValue) {
+    return nextValue || "";
+  }
+
+  if (!nextValue) {
+    return currentValue;
+  }
+
+  const currentDate = parseDateForSort_(currentValue);
+  const nextDate = parseDateForSort_(nextValue);
+  return nextDate && currentDate && nextDate.getTime() > currentDate.getTime() ? nextValue : currentValue;
+}
+
+function parseDateForSort_(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return value;
+  }
+
+  const text = String(value || "").trim();
+  if (!text) {
+    return null;
+  }
+
+  const parsed = new Date(text.replace(" ", "T"));
+  return isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function debugGetAllRequests() {

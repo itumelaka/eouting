@@ -49,6 +49,10 @@ Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 - [x] PWA cache/update behaviour improved.
 - [x] Manual `Muat Semula Sistem` helper.
 - [x] Visible app version footer.
+- [x] Statistik Outing V1.3.0.
+- [x] Monthly outing totals.
+- [x] Juara Outing Bulanan leaderboard.
+- [x] Class summary and status summary.
 - [x] Live V1.2 pilot-ready milestone.
 
 ## Pilot Checklist
@@ -81,6 +85,7 @@ Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 - [ ] Review GAS Web App deployment permission.
 - [ ] Decide SOP for changing Warden/Guard PIN.
 - [ ] Review role-based access hardening.
+- [ ] Restrict Statistik to Warden/HEP if required.
 
 ## Optional Future Enhancements
 
