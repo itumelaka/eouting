@@ -38,12 +38,22 @@ textarea {
   font: inherit;
 }
 
-.site-header {
-  background: var(--deep-navy);
-  color: #ffffff;
-  display: grid;
+.app-header {
+  background: #061b49;
+  height: auto;
+  margin: 0;
+  min-height: 0;
+  padding: 12px 22px;
+}
+
+.app-header-inner {
+  align-items: center;
+  display: flex;
   gap: 18px;
-  padding: 22px 18px;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 1180px;
+  width: 100%;
 }
 
 h1,
@@ -53,22 +63,17 @@ p {
   margin-top: 0;
 }
 
-.brand-panel {
-  align-items: center;
-  display: flex;
-  min-width: 0;
-}
-
 .header-logo {
   display: block;
   height: auto;
-  max-height: 190px;
-  max-width: min(100%, 860px);
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
   object-fit: contain;
-  width: 100%;
+  width: clamp(420px, 42vw, 680px);
 }
 
-.clock-panel {
+.time-card {
   align-items: flex-start;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(255, 210, 31, 0.75);
@@ -77,22 +82,27 @@ p {
   color: var(--deep-navy);
   display: flex;
   flex-direction: column;
+  flex: 0 0 auto;
   gap: 2px;
-  padding: 14px;
+  margin: 0;
+  max-width: 100%;
+  min-width: 190px;
+  padding: 10px 12px;
 }
 
-.clock-panel strong {
+.time-card strong {
   font-size: 1.25rem;
 }
 
-.clock-panel span {
+.time-card span {
   color: #41506a;
 }
 
 .app-shell {
-  margin: 0 auto;
-  max-width: 1080px;
-  padding: 16px;
+  margin: 12px auto 0;
+  max-width: 1200px;
+  padding: 0 clamp(14px, 2vw, 24px) clamp(14px, 2vw, 24px);
+  width: min(96vw, 1200px);
 }
 
 .app-workspace {
@@ -566,19 +576,16 @@ textarea {
 }
 
 @media (min-width: 720px) {
-  .site-header {
+  .app-header-inner {
     align-items: center;
-    grid-template-columns: minmax(0, 1fr) 220px;
-    padding: 28px 32px;
   }
 
-  .clock-panel {
-    justify-self: end;
-    min-width: 200px;
+  .time-card {
+    min-width: 190px;
   }
 
   .app-shell {
-    padding: 24px;
+    padding-block: 0 24px;
   }
 
   .tabs {
@@ -600,5 +607,44 @@ textarea {
 
   .summary-grid {
     grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .time-card {
+    align-self: center;
+  }
+}
+
+@media (max-width: 719px) {
+  .app-header {
+    padding: 10px 14px;
+  }
+
+  .app-header-inner {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .header-logo {
+    margin: 0 auto;
+    max-width: 520px;
+    width: 100%;
+  }
+
+  .access-logo {
+    height: 52px;
+    width: 52px;
+  }
+
+  .time-card {
+    width: min(100%, 420px);
+  }
+}
+
+@media (max-width: 420px) {
+  .app-header {
+    padding: 12px 10px;
   }
 }
