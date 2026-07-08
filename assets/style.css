@@ -577,6 +577,49 @@ textarea {
   gap: 12px;
 }
 
+.student-record-section {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.student-record-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.student-record-heading h3 {
+  color: var(--deep-navy);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.student-record-heading p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.student-history-section {
+  margin-top: 8px;
+}
+
+.student-history-list {
+  gap: 8px;
+}
+
+.student-history-card {
+  background: #fbfcff;
+  border-top-color: #aab6c7;
+  box-shadow: 0 8px 18px rgba(3, 18, 47, 0.07);
+  opacity: 0.88;
+}
+
+.student-history-card .record-detail,
+.student-history-card .record-times {
+  font-size: 0.9rem;
+}
+
 .record-card {
   border-top: 4px solid var(--primary);
   padding: 14px;

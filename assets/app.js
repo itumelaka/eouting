@@ -1391,6 +1391,67 @@ function reverseDisplayStatus(status) {
   return status || "";
 }
 
+function renderStudent() {
+  if (!currentSession || currentSession.role !== "student") {
+    return;
+  }
+
+  const student = currentSession.user;
+  ensureStudentRefreshControls();
+  els.loggedStudentName.textContent = student.name || student.nama || "-";
+  els.loggedStudentMeta.textContent = `${student.className || student.kelas || "-"} | ${student.no_matrik || student.noMatrik || "-"}`;
+  els.ruleNotice.className = canSubmitNormalOuting() ? "notice ok" : "notice";
+  els.ruleNotice.textContent = canSubmitNormalOuting()
+    ? "Outing Biasa dibuka. Permohonan kecemasan juga boleh dihantar jika perlu."
+    : "Outing Biasa hanya dibuka pada Selasa/Rabu selepas 5:00 petang. Permohonan kecemasan boleh dihantar bila-bila masa.";
+
+  const studentRecords = outingRecords.filter(isRecordForCurrentStudent);
+  debugStudentRecords(studentRecords);
+  els.studentRecordsList.innerHTML = renderStudentRecordSections(studentRecords);
+  updateStudentSubmitState();
+}
+
+function renderStudentRecordSections(studentRecords) {
+  const activeRecords = studentRecords.filter(isActiveStudentRecord);
+  const historyRecords = studentRecords.filter(isStudentHistoryRecord);
+  const activeHtml = activeRecords.length
+    ? activeRecords.map(studentStatusCard).join("")
+    : emptyState("Tiada permohonan aktif.");
+  const historyHtml = historyRecords.length
+    ? historyRecords.map(studentHistoryCard).join("")
+    : "";
+
+  return `
+    <section class="student-record-section">
+      <div class="student-record-heading">
+        <h3>Rekod Aktif</h3>
+      </div>
+      <div class="record-list">${activeHtml}</div>
+    </section>
+    <section class="student-record-section student-history-section">
+      <div class="student-record-heading">
+        <h3>Sejarah Hari Ini</h3>
+        <p>Rekod selesai atau ditolak untuk rujukan hari ini.</p>
+      </div>
+      ${historyHtml ? `<div class="record-list student-history-list">${historyHtml}</div>` : ""}
+    </section>
+  `;
+}
+
+function isActiveStudentRecord(record) {
+  const status = record.rawStatus || reverseDisplayStatus(record.status);
+  return status === "MENUNGGU_KELULUSAN" || status === "DILULUSKAN_WARDEN" || status === "KELUAR";
+}
+
+function isStudentHistoryRecord(record) {
+  const status = record.rawStatus || reverseDisplayStatus(record.status);
+  return status === "SELESAI" || status === "DITOLAK_WARDEN";
+}
+
+function studentHistoryCard(record) {
+  return studentStatusCard(record).replace('<article class="record-card">', '<article class="record-card student-history-card">');
+}
+
 function renderWarden() {
   const pendingRecords = outingRecords.filter((record) => record.status === STATUS.pending);
   const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
