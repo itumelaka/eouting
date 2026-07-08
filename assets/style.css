@@ -1,16 +1,20 @@
 :root {
-  --ink: #17212b;
-  --muted: #5d6b78;
-  --line: #d9e1e8;
+  --ink: #142033;
+  --muted: #5b6678;
+  --line: #d8e0ec;
   --paper: #ffffff;
-  --wash: #f3f6f8;
-  --primary: #0f6b57;
-  --primary-dark: #0a4f40;
-  --danger: #b42318;
-  --warning: #9a5b00;
+  --wash: #f4f7fb;
+  --navy: #061b49;
+  --navy-2: #08245c;
+  --deep-navy: #03122f;
+  --primary: #08245c;
+  --primary-dark: #03122f;
+  --danger: #d71920;
+  --warning: #ffd21f;
+  --warning-ink: #614b00;
   --success: #167247;
-  --info: #255f99;
-  --shadow: 0 10px 28px rgba(17, 35, 51, 0.08);
+  --info: #165a9f;
+  --shadow: 0 12px 30px rgba(3, 18, 47, 0.1);
 }
 
 * {
@@ -19,7 +23,9 @@
 
 body {
   margin: 0;
-  background: var(--wash);
+  background:
+    linear-gradient(180deg, rgba(6, 27, 73, 0.06), rgba(244, 247, 251, 0) 260px),
+    var(--wash);
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
   line-height: 1.5;
@@ -33,20 +39,11 @@ textarea {
 }
 
 .site-header {
-  background: #12382f;
+  background: var(--deep-navy);
   color: #ffffff;
   display: grid;
   gap: 18px;
   padding: 22px 18px;
-}
-
-.eyebrow {
-  color: #b8d9cf;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  margin: 0 0 4px;
-  text-transform: uppercase;
 }
 
 h1,
@@ -56,22 +53,28 @@ p {
   margin-top: 0;
 }
 
-h1 {
-  font-size: 2rem;
-  line-height: 1.1;
-  margin-bottom: 6px;
+.brand-panel {
+  align-items: center;
+  display: flex;
+  min-width: 0;
 }
 
-.subtitle {
-  color: #d9eee8;
-  margin-bottom: 0;
+.header-logo {
+  display: block;
+  height: auto;
+  max-height: 190px;
+  max-width: min(100%, 860px);
+  object-fit: contain;
+  width: 100%;
 }
 
 .clock-panel {
   align-items: flex-start;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 210, 31, 0.75);
   border-radius: 8px;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.18);
+  color: var(--deep-navy);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -80,6 +83,10 @@ h1 {
 
 .clock-panel strong {
   font-size: 1.25rem;
+}
+
+.clock-panel span {
+  color: #41506a;
 }
 
 .app-shell {
@@ -130,6 +137,11 @@ h1 {
   text-align: left;
 }
 
+.role-card:hover {
+  border-color: rgba(8, 36, 92, 0.42);
+  transform: translateY(-1px);
+}
+
 .role-card strong {
   color: var(--primary-dark);
   font-size: 1.2rem;
@@ -175,7 +187,7 @@ h1 {
 }
 
 .secondary-action {
-  background: #334155;
+  background: var(--deep-navy);
   border: 0;
   border-radius: 6px;
   color: #ffffff;
@@ -202,7 +214,7 @@ h1 {
 }
 
 .tab-button {
-  background: #edf3f1;
+  background: #eef3fb;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--primary-dark);
@@ -217,10 +229,10 @@ h1 {
 }
 
 .notice {
-  background: #fff7e6;
-  border: 1px solid #f1c76b;
+  background: #fff9db;
+  border: 1px solid var(--warning);
   border-radius: 8px;
-  color: #684200;
+  color: var(--warning-ink);
   margin-bottom: 14px;
   padding: 12px 14px;
 }
@@ -243,7 +255,26 @@ h1 {
   margin-bottom: 14px;
 }
 
+.access-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.access-logo {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  flex: 0 0 auto;
+  height: 56px;
+  object-fit: contain;
+  padding: 6px;
+  width: 56px;
+}
+
 .section-heading h2 {
+  color: var(--deep-navy);
   font-size: 1.35rem;
   margin-bottom: 4px;
 }
@@ -269,12 +300,13 @@ h1 {
 }
 
 .identity-panel {
+  border-left: 5px solid var(--warning);
   padding: 12px;
 }
 
 .emergency-fields {
-  background: #fff7f7;
-  border: 1px solid #efb0aa;
+  background: #fff5f5;
+  border: 1px solid rgba(215, 25, 32, 0.34);
   border-radius: 8px;
   display: none;
   gap: 10px;
@@ -308,6 +340,14 @@ textarea {
   width: 100%;
 }
 
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(8, 36, 92, 0.14);
+  outline: 0;
+}
+
 textarea {
   resize: vertical;
 }
@@ -328,6 +368,14 @@ textarea {
   margin-top: 4px;
 }
 
+.primary-action:hover,
+.approve-button:hover,
+.out-button:hover,
+.in-button:hover,
+.secondary-action:hover {
+  background: var(--deep-navy);
+}
+
 .primary-action:disabled,
 .action-button:disabled {
   background: #99a6af;
@@ -344,6 +392,10 @@ textarea {
   background: var(--danger);
 }
 
+.reject-button:hover {
+  background: #a90f15;
+}
+
 .form-message {
   color: var(--primary-dark);
   font-weight: 700;
@@ -356,6 +408,7 @@ textarea {
 }
 
 .record-card {
+  border-top: 4px solid var(--primary);
   padding: 14px;
 }
 
@@ -389,7 +442,7 @@ textarea {
 }
 
 .record-detail strong {
-  color: #263744;
+  color: var(--deep-navy);
 }
 
 .record-times {
@@ -416,12 +469,12 @@ textarea {
 }
 
 .badge-pending {
-  background: #fff2cc;
-  color: var(--warning);
+  background: #fff4b8;
+  color: var(--warning-ink);
 }
 
 .badge-approved {
-  background: #e9f3ff;
+  background: #e8f1ff;
   color: var(--info);
 }
 
@@ -431,8 +484,8 @@ textarea {
 }
 
 .badge-out {
-  background: #fff0db;
-  color: var(--warning);
+  background: #fff4b8;
+  color: var(--warning-ink);
 }
 
 .badge-returned {
@@ -446,13 +499,13 @@ textarea {
 }
 
 .badge-emergency {
-  background: #b42318;
+  background: var(--danger);
   color: #ffffff;
 }
 
 .badge-not-returned {
-  background: #fff2cc;
-  color: var(--warning);
+  background: #fff4b8;
+  color: var(--warning-ink);
 }
 
 .empty-state {
@@ -477,6 +530,7 @@ textarea {
 }
 
 .summary-card {
+  border-top: 4px solid var(--primary);
   padding: 14px;
 }
 
@@ -493,6 +547,16 @@ textarea {
   margin-top: 6px;
 }
 
+.summary-card:nth-child(1),
+.summary-card:nth-child(3),
+.summary-card:nth-child(6) {
+  border-top-color: var(--warning);
+}
+
+.summary-card:nth-child(7) {
+  border-top-color: var(--danger);
+}
+
 .alert-card strong {
   color: var(--danger);
 }
@@ -504,8 +568,13 @@ textarea {
 @media (min-width: 720px) {
   .site-header {
     align-items: center;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) 220px;
     padding: 28px 32px;
+  }
+
+  .clock-panel {
+    justify-self: end;
+    min-width: 200px;
   }
 
   .app-shell {

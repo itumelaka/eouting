@@ -4,14 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>eOuting ITU</title>
+    <link rel="icon" href="assets/pwa-logo.png">
     <link rel="stylesheet" href="assets/style.css">
   </head>
   <body>
     <header class="site-header">
-      <div>
-        <p class="eyebrow">Institut Teknologi Unggas</p>
-        <h1>eOuting ITU</h1>
-        <p class="subtitle">Sistem Digital Kebenaran Outing Pelajar</p>
+      <div class="brand-panel">
+        <img class="header-logo" src="assets/eouting-header-logo.png" alt="eOuting ITU SKM OLP">
       </div>
       <div class="clock-panel" aria-live="polite">
         <span id="todayDate">-</span>
@@ -22,9 +21,12 @@
 
     <main class="app-shell">
       <section class="access-screen" id="accessScreen">
-        <div class="section-heading">
-          <h2>Masuk Sistem</h2>
-          <p>Sila pilih peranan anda.</p>
+        <div class="section-heading access-heading">
+          <img class="access-logo" src="assets/pwa-logo.png" alt="" aria-hidden="true">
+          <div>
+            <h2>Masuk Sistem</h2>
+            <p>Sila pilih peranan anda.</p>
+          </div>
         </div>
 
         <div class="role-grid" id="roleGrid">
