@@ -1,78 +1,84 @@
 # eOuting ITU
 
-**eOuting ITU** ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas bagi urusan outing selepas waktu pejabat.
+**eOuting ITU** ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas bagi urusan outing.
 
-Sistem ini dicadangkan menggantikan sebahagian proses manual seperti kad outing, tandatangan warden, buku outing di pos guard, dan semakan bukti pulang melalui WhatsApp.
+Status semasa: **Live V1 proof-of-concept siap dan berfungsi end-to-end**.
+
+Live frontend:
+
+```text
+https://itumelaka.github.io/eouting
+```
+
+Milestone semasa:
+
+```text
+Live V1 POC completed: submit -> approve/reject -> guard keluar/masuk -> student status -> monitoring.
+```
 
 ## Objektif
 
-- Memudahkan warden mengesan pelajar yang keluar outing.
-- Merekod masa permohonan, kelulusan, keluar dan masuk secara automatik.
-- Memastikan outing hanya berlaku pada hari dan masa yang dibenarkan.
-- Membantu guard menyemak pelajar yang telah mendapat kebenaran warden.
-- Memberi dashboard ringkas kepada warden untuk melihat status semasa.
-- Menyediakan rekod digital untuk rujukan disiplin dan laporan.
+- Memudahkan pelajar membuat permohonan outing secara digital.
+- Membantu warden meluluskan atau menolak permohonan dengan rekod masa.
+- Membantu guard mengesahkan keluar dan masuk di pos guard.
+- Memberi status semasa kepada pelajar melalui `Rekod Saya`.
+- Menyediakan dashboard dan pemantauan ringkas untuk operasi harian.
+- Menyimpan rekod dalam Google Sheets untuk rujukan disiplin dan laporan.
 
-## Waktu operasi outing
+## Stack Semasa
 
-Outing hanya terpakai selepas waktu pejabat:
+- **Frontend:** GitHub Pages
+- **UI:** Vanilla HTML/CSS/JS
+- **Backend/API:** Google Apps Script Web App
+- **Database:** Google Sheets
+- **PWA:** Basic install support
+- **GAS sync:** `clasp`
 
-- Hari: **Selasa dan Rabu sahaja**
-- Masa mula keluar: **5:00 petang**
-- Masa akhir pulang: **sebelum atau pada 10:00 malam**
-
-Sebarang rekod masuk selepas 10:00 malam akan ditanda sebagai **lewat**.
-
-## Flow utama sistem
-
-```text
-Pelajar mohon outing
-   ↓
-Warden semak dan beri kebenaran
-   ↓
-Guard sahkan pelajar keluar di pos guard
-   ↓
-Pelajar pulang sebelum / pada 10:00 malam
-   ↓
-Guard sahkan pelajar masuk
-   ↓
-Warden semak status akhir dan bukti WhatsApp/selfie
-```
-
-## Peranan pengguna
+## Role Flow Semasa
 
 ### Pelajar
 
-- Membuat permohonan outing.
-- Menyemak status permohonan.
-- Menunjukkan outing pass digital kepada guard selepas diluluskan.
+- Login guna nama + `no_matrik`.
+- Hanya pelajar `Aktif` boleh login dan mohon outing.
+- Submit `Outing Biasa` atau `Kecemasan`.
+- Semak status melalui `Rekod Saya / Status Semasa`.
+- Sistem block duplicate active request untuk hari yang sama.
 
 ### Warden
 
-- Meluluskan atau menolak permohonan outing.
-- Melihat senarai pelajar yang sedang keluar.
-- Melihat senarai pelajar yang belum pulang.
-- Menanda bukti WhatsApp/selfie telah diterima.
-- Menambah catatan jika perlu.
+- Login guna `nama_warden` + PIN.
+- Luluskan atau tolak permohonan.
+- Action disahkan semula oleh GAS backend.
 
 ### Guard
 
-- Menyemak pelajar yang telah diluluskan oleh warden.
-- Mengesahkan masa keluar.
-- Mengesahkan masa masuk.
+- Login guna `nama_guard` + PIN.
+- Sahkan pelajar keluar.
+- Sahkan pelajar masuk.
+- Action disahkan semula oleh GAS backend.
 
-## Cadangan teknologi
+### Pemantauan Semasa
 
-- **Frontend:** GitHub Pages
-- **Database:** Google Sheets
-- **Backend/API:** Google Apps Script Web App
+- Paparan read-only untuk melihat rekod hari ini.
+- Sesuai untuk semakan operasi harian.
 
-## Cadangan URL
+## Waktu Operasi Outing Biasa
 
-```text
-https://itumelaka.github.io/eouting/
-```
+Outing Biasa:
 
-## Status projek
+- Hari: **Selasa dan Rabu sahaja**
+- Masa: **selepas 5:00 petang**
+- Pulang: **sebelum atau pada 10:00 malam**
 
-Projek ini berada pada peringkat perancangan dan dokumentasi awal.
+`Kecemasan` boleh dihantar di luar waktu outing biasa, tetapi masih perlu kelulusan warden.
+
+## Live URLs / IDs
+
+- GitHub repo: `https://github.com/itumelaka/eouting`
+- GitHub Pages: `https://itumelaka.github.io/eouting`
+- Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
+- GAS Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
+
+## Nota Status
+
+Live V1 ini sesuai sebagai proof-of-concept / pilot-ready untuk ujian dalaman. Ia belum perlu dianggap production-grade security sehingga PIN unik, kawalan akses lebih kuat, SOP operasi, dan semakan audit diperkemaskan.

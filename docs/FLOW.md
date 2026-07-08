@@ -1,33 +1,41 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow V1 untuk sistem eOuting ITU.
+Dokumen ini menerangkan flow **Live V1 proof-of-concept** untuk eOuting ITU.
 
 Status semasa:
 
-- Frontend mock role-based access: siap
-- Basic PWA setup: siap
-- GitHub Pages live: `https://itumelaka.github.io/eouting`
-- Main Google Spreadsheet database: disediakan
-- GAS backend: belum dibina
+- GitHub Pages frontend live: `https://itumelaka.github.io/eouting`
+- PWA install: siap
+- Google Sheets live backend melalui GAS Web App: siap
+- Student status tracking: siap
+- Warden/Guard PIN login: siap
+- Pemantauan Semasa read-only: siap
+- Audit log asas: siap
 
 ## Flow Digital V1
 
 ```text
-Pelajar login
+Pelajar login nama + no_matrik
    ↓
 Pelajar submit Outing Biasa / Kecemasan
    ↓
-Menunggu Kelulusan Warden
+Status: MENUNGGU_KELULUSAN
+   ↓
+Warden login nama + PIN
    ↓
 Warden luluskan / tolak
    ↓
-Jika diluluskan, Guard sahkan keluar
+Jika diluluskan, Guard login nama + PIN
    ↓
-Pelajar keluar outing
+Guard sahkan keluar
+   ↓
+Status: KELUAR
    ↓
 Guard sahkan masuk
    ↓
-Dashboard papar status, lewat, belum masuk, dan kecemasan
+Status: SELESAI
+   ↓
+Pelajar, dashboard, dan Pemantauan Semasa papar status terkini
 ```
 
 ## 1. Student Login
@@ -37,9 +45,9 @@ Pelajar login menggunakan:
 - Nama pelajar
 - `no_matrik`
 
-Live mode nanti mesti semak pelajar dalam tab `STUDENTS`.
+GAS backend menyemak data dalam tab `STUDENTS`.
 
-Syarat wajib:
+Syarat:
 
 - `status = Aktif` boleh login dan mohon outing.
 - `status = Tidak Aktif` tidak boleh login dan tidak boleh mohon outing.
@@ -51,7 +59,7 @@ Pelajar boleh submit:
 - `Outing Biasa`
 - `Kecemasan`
 
-Maklumat outing:
+Maklumat asas:
 
 - Tujuan
 - Lokasi
@@ -65,43 +73,90 @@ Untuk `Kecemasan`, maklumat tambahan:
 - Hubungan waris
 - Catatan kecemasan
 
-## 3. Rule Masa Permohonan
+Selepas submit berjaya, status awal ialah `MENUNGGU_KELULUSAN`. Pelajar boleh lihat status di `Rekod Saya`.
+
+## 3. Rule Masa
 
 Outing Biasa:
 
 - Hanya Selasa / Rabu
 - Hanya selepas 5:00 PM
+- Perlu pulang sebelum atau pada 10:00 PM
 
 Kecemasan:
 
 - Boleh dihantar bila-bila masa
 - Masih perlu kelulusan warden
 
-## 4. Warden Approval
+## 4. Duplicate Active Request
 
-Warden pilih nama dalam mock mode.
+Sistem block permohonan baru jika pelajar sudah ada active request hari ini.
+
+Active status:
+
+- `MENUNGGU_KELULUSAN`
+- `DILULUSKAN_WARDEN`
+- `KELUAR`
+
+Jika status `DITOLAK_WARDEN` atau `SELESAI`, pelajar boleh membuat permohonan baru buat masa ini.
+
+## 5. Warden Approval / Rejection
+
+Warden login menggunakan:
+
+- `nama_warden`
+- PIN
 
 Tindakan:
 
-- Luluskan
-- Tolak
+- Luluskan permohonan
+- Tolak permohonan
 
-Live mode nanti GAS backend mesti validate identity warden dan status warden sebelum update rekod.
+Status selepas tindakan:
 
-## 5. Guard Confirmation
+- Lulus: `DILULUSKAN_WARDEN`
+- Tolak: `DITOLAK_WARDEN`
 
-Guard pilih nama dalam mock mode.
+Backend validate PIN, status warden, dan action sebelum update rekod.
 
-Tindakan:
+## 6. Guard Confirm Keluar
 
-- Confirm keluar
-- Confirm masuk
+Guard login menggunakan:
 
-Guard hanya boleh confirm keluar selepas permohonan diluluskan warden.
+- `nama_guard`
+- PIN
 
-## 6. Dashboard
+Guard hanya boleh confirm keluar selepas status `DILULUSKAN_WARDEN`.
 
-Dashboard perlu papar ringkasan:
+Status selepas confirm keluar:
+
+- `KELUAR`
+
+## 7. Guard Confirm Masuk
+
+Guard sahkan masuk apabila pelajar pulang.
+
+Status selepas confirm masuk:
+
+- `SELESAI`
+
+Jika masa masuk selepas had pulang, rekod ditanda `lewat = Ya`.
+
+## 8. Student Status Tracking
+
+Pelajar boleh lihat `Rekod Saya / Status Semasa`.
+
+Paparan status mesra pengguna termasuk:
+
+- Menunggu Kelulusan Warden
+- Diluluskan Warden
+- Ditolak Warden
+- Sedang Outing
+- Selesai / Selesai - Lewat
+
+## 9. Dashboard Hari Ini
+
+Dashboard memaparkan ringkasan:
 
 - Menunggu Kelulusan
 - Diluluskan
@@ -111,9 +166,15 @@ Dashboard perlu papar ringkasan:
 - Belum Masuk
 - Kecemasan
 
+## 10. Pemantauan Semasa
+
+`Pemantauan Semasa` ialah paparan read-only untuk melihat rekod hari ini.
+
+Ia membantu semakan operasi tanpa mengubah status rekod.
+
 ## Prinsip Penting
 
 - Frontend role hiding bukan security sebenar.
-- Semua validation sebenar mesti dibuat dalam GAS backend.
-- Semua action penting perlu masuk `AUDIT_LOG`.
-- Mock records kekal dalam memory semasa role switching untuk tujuan UI testing sahaja.
+- Semua validation penting dibuat dalam GAS backend.
+- Semua action penting direkod dalam `AUDIT_LOG`.
+- Live V1 ialah proof-of-concept / pilot-ready, bukan security production-grade.

@@ -7,8 +7,8 @@ Status semasa:
 - Spreadsheet title: `eOuting ITU Database`
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - GitHub Pages frontend: `https://itumelaka.github.io/eouting`
+- GAS backend Live V1: siap
 - Basic PWA setup: siap
-- GAS backend: belum dibina
 
 Setiap tab dalam Google Sheets mewakili satu jadual data.
 
@@ -27,6 +27,11 @@ Peraturan status pelajar:
 - `Aktif` = boleh login dan mohon outing.
 - `Tidak Aktif` = tidak boleh login dan tidak boleh mohon outing.
 
+Nota format:
+
+- `no_matrik` perlu diformat sebagai **Plain text**.
+- `no_tel` perlu diformat sebagai **Plain text** supaya nombor bermula dengan `0` tidak hilang.
+
 ## Tab: WARDENS
 
 Menyimpan senarai warden yang boleh meluluskan atau menolak permohonan.
@@ -37,7 +42,12 @@ Header V1:
 warden_id | nama_warden | email | no_tel | pin | status | catatan
 ```
 
-Nota: PIN tidak digunakan dalam frontend mock mode. Untuk live mode, validation PIN atau authentication lebih kuat mesti dibuat di GAS backend.
+Nota V1:
+
+- `pin` digunakan untuk basic access control live mode.
+- PIN perlu divalidasi di GAS backend.
+- PIN tidak boleh didedahkan melalui GET responses.
+- `no_tel` perlu diformat sebagai **Plain text**.
 
 ## Tab: GUARDS
 
@@ -49,7 +59,12 @@ Header V1:
 guard_id | nama_guard | email | no_tel | pin | status | catatan
 ```
 
-Nota: PIN tidak digunakan dalam frontend mock mode. Untuk live mode, validation PIN atau authentication lebih kuat mesti dibuat di GAS backend.
+Nota V1:
+
+- `pin` digunakan untuk basic access control live mode.
+- PIN perlu divalidasi di GAS backend.
+- PIN tidak boleh didedahkan melalui GET responses.
+- `no_tel` perlu diformat sebagai **Plain text**.
 
 ## Tab: OUTING_REQUESTS
 
@@ -66,13 +81,19 @@ Jenis permohonan:
 - `OUTING_BIASA`
 - `KECEMASAN`
 
-Status utama:
+Status lifecycle V1:
 
-- `Menunggu Kelulusan`
-- `Diluluskan Warden`
-- `Ditolak Warden`
-- `Sedang Keluar`
-- `Sudah Pulang`
+- `MENUNGGU_KELULUSAN`
+- `DILULUSKAN_WARDEN`
+- `DITOLAK_WARDEN`
+- `KELUAR`
+- `SELESAI`
+
+Nota format:
+
+- `no_matrik` perlu diformat sebagai **Plain text**.
+- `telefon_waris` perlu diformat sebagai **Plain text**.
+- Masa dan tarikh boleh disimpan sebagai Date/DateTime atau string yang konsisten; frontend dan backend V1 sudah menyokong paparan BM friendly.
 
 ## Tab: AUDIT_LOG
 
@@ -92,12 +113,14 @@ APPROVE_REQUEST
 REJECT_REQUEST
 CONFIRM_OUT
 CONFIRM_IN
-AUTO_MARK_LATE
+LOGIN_STUDENT
+LOGIN_WARDEN
+LOGIN_GUARD
 ```
 
 ## Nota Penting
 
-- Jangan simpan password, token, secret, API key atau deployment credential dalam repo.
-- Frontend mock data hanya untuk UI testing.
-- GAS backend V1 mesti validate identity, role, dan status sebelum menulis ke Spreadsheet.
-- `GAS_WEB_APP_URL` di frontend kekal kosong sehingga GAS Web App siap deploy.
+- Jangan simpan token, secret, API key, atau deployment credential dalam repo.
+- PIN V1 ialah basic access control, bukan security production-grade.
+- Spreadsheet perlu kekal private dan hanya dikongsi kepada akaun yang perlu.
+- Backend mesti validate identity, role, status, PIN, dan action permission sebelum menulis ke Spreadsheet.

@@ -1,60 +1,94 @@
 # Local Development eOuting ITU
 
-Dokumen ini menerangkan keperluan local repo di laptop untuk pembangunan eOuting ITU.
+Dokumen ini menerangkan workflow local untuk pembangunan dan testing eOuting ITU.
 
-## Perlu ada local repo dalam laptop ke?
-
-Jawapan ringkas: **Ya, sangat digalakkan.**
-
-Boleh edit terus di GitHub web UI, tetapi untuk projek sistem seperti eOuting ITU, local repo lebih selamat dan lebih kemas.
-
-## Kenapa local repo penting?
-
-Local repo membantu untuk:
-
-- Edit banyak fail dengan lebih selesa.
-- Semak perubahan menggunakan `git diff`.
-- Test frontend sebelum push.
-- Simpan sejarah kerja melalui commit.
-- Elak tersalah edit terus di production.
-- Senang kerja dengan ChatGPT, Claude atau Codex.
-
-## Cadangan lokasi folder
-
-Contoh lokasi di laptop:
+Local repo path semasa:
 
 ```powershell
 C:\Users\burnk\OneDrive\Documents-assets\eouting
 ```
 
-## Clone repo
-
-```powershell
-cd C:\Users\burnk\OneDrive\Documents-assets
-git clone https://github.com/itumelaka/eouting.git
-cd eouting
-```
-
-## Struktur folder cadangan
+GitHub repo:
 
 ```text
-eouting/
-├─ README.md
-├─ index.html
-├─ assets/
-│  ├─ app.js
-│  └─ style.css
-├─ docs/
-│  ├─ FLOW.md
-│  ├─ DATABASE.md
-│  ├─ GAS_SETUP.md
-│  ├─ LOCAL_DEV.md
-│  ├─ SECURITY.md
-│  └─ TODO.md
-└─ .gitignore
+https://github.com/itumelaka/eouting
 ```
 
-## Git workflow asas
+## Keperluan
+
+- Git
+- Browser
+- VS Code atau editor pilihan
+- Python untuk local static server
+- Node.js untuk syntax check
+- `clasp` untuk sync Google Apps Script
+
+## Jalankan Frontend Secara Local
+
+Dari folder repo:
+
+```powershell
+python -m http.server 8080
+```
+
+Buka:
+
+```text
+http://localhost:8080/
+```
+
+Gunakan local server, bukan buka `index.html` terus, supaya PWA/service worker dan path statik lebih hampir dengan GitHub Pages.
+
+## Testing Workflow Live Mode
+
+Semak flow asas:
+
+1. Buka `http://localhost:8080/`.
+2. Pastikan mode indicator menunjukkan live mode jika backend boleh dicapai.
+3. Login Pelajar guna nama + `no_matrik`.
+4. Submit permohonan `Outing Biasa` atau `Kecemasan`.
+5. Semak `Rekod Saya / Status Semasa`.
+6. Login Warden dengan wrong PIN dan pastikan ditolak.
+7. Login Warden dengan PIN testing V1 `949494`.
+8. Luluskan atau tolak permohonan.
+9. Login Guard dengan wrong PIN dan pastikan ditolak.
+10. Login Guard dengan PIN testing V1 `949494`.
+11. Sahkan keluar.
+12. Sahkan masuk.
+13. Semak Dashboard Hari Ini.
+14. Semak Pemantauan Semasa.
+
+## Mobile / PWA Testing
+
+Semak di telefon atau responsive browser tools:
+
+- Header dan layout mobile.
+- Install PWA.
+- App boleh dibuka sebagai standalone.
+- Rekod status masih boleh refresh.
+- Toast/popup feedback tidak menutup form secara mengganggu.
+
+## Syntax Checks
+
+Frontend:
+
+```powershell
+node --check assets\app.js
+```
+
+Service worker:
+
+```powershell
+node --check service-worker.js
+```
+
+GAS parser check local:
+
+```powershell
+Get-Content -Raw gas\Code.gs | node --check -
+```
+
+## Git Workflow Asas
 
 Sebelum mula kerja:
 
@@ -66,35 +100,14 @@ Selepas edit fail:
 
 ```powershell
 git status --short
-git add README.md docs/
-git commit -m "docs: add initial eOuting planning documents"
-git push
+git diff
 ```
 
-## Nota akaun
+Commit hanya bila perubahan sudah diuji dan memang mahu disimpan ke repo.
 
-Pastikan GitHub account yang digunakan ada write access kepada organisasi/repo:
+## Nota Operasi
 
-```text
-itumelaka/eouting
-```
-
-## Perlu install apa?
-
-Untuk dokumentasi awal, cukup ada:
-
-- Git
-- VS Code
-- Browser
-
-Untuk frontend statik, boleh test terus buka `index.html`. Bila sudah ada JavaScript module atau API call, elok guna local server seperti:
-
-```powershell
-python -m http.server 5500
-```
-
-Kemudian buka:
-
-```text
-http://localhost:5500
-```
+- Jangan commit data sensitif.
+- Jangan masukkan token, secret, API key, password, atau deployment credential.
+- PIN `949494` ialah temporary testing value untuk Live V1, bukan PIN production.
+- Untuk backend live, `clasp push` perlu diikuti deployment version baru jika mahu web app users menerima perubahan.

@@ -1,6 +1,6 @@
 # Setup Google Apps Script untuk eOuting ITU
 
-Google Apps Script akan digunakan sebagai backend/API antara GitHub Pages dan Google Sheets.
+Google Apps Script digunakan sebagai backend/API antara GitHub Pages dan Google Sheets.
 
 Status semasa:
 
@@ -8,21 +8,23 @@ Status semasa:
 - Spreadsheet title: `eOuting ITU Database`
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - Apps Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
-- GAS backend code: belum dibina
-- `GAS_WEB_APP_URL` di frontend: kekal kosong sehingga deploy
+- GAS backend Live V1: siap
+- `clasp` workflow: configured
 
 ## Tujuan GAS Backend
 
-GAS backend V1 perlu:
+GAS backend V1:
 
 - Membaca data `STUDENTS`, `WARDENS`, dan `GUARDS`.
+- Login student menggunakan nama + `no_matrik`.
+- Login Warden/Guard menggunakan nama + PIN.
 - Menulis permohonan ke `OUTING_REQUESTS`.
 - Mengemaskini status approve/reject/keluar/masuk.
-- Membina dashboard data daripada Spreadsheet.
-- Menulis semua tindakan penting ke `AUDIT_LOG`.
-- Validate identity, role, dan status.
+- Mengambil rekod hari ini untuk student status, dashboard, dan monitoring.
+- Menulis tindakan penting ke `AUDIT_LOG`.
+- Validate identity, role, status, PIN, dan action permission.
 
-## Functions Yang Akan Dibina
+## Functions V1
 
 ```text
 doGet(e)
@@ -41,34 +43,60 @@ jsonResponse(data)
 errorResponse(message)
 ```
 
-## Deployment Apps Script
+## clasp Workflow
 
-Apps Script perlu dideploy sebagai Web App selepas backend siap.
+Install clasp jika belum ada:
 
-Cadangan setting awal:
+```powershell
+npm install -g @google/clasp
+```
+
+Login Google account:
+
+```powershell
+clasp login
+```
+
+Pastikan guna Google account yang ada akses kepada Apps Script project.
+
+Project ini menggunakan `.clasp.json` dengan `rootDir` ke folder `gas`.
+
+Contoh semakan:
+
+```powershell
+clasp status
+```
+
+Push perubahan Apps Script:
+
+```powershell
+clasp push
+```
+
+Nota penting:
+
+- `clasp push` hanya update fail Apps Script dalam project.
+- Web app users tidak semestinya dapat backend terbaru selepas `clasp push`.
+- Untuk live web app, buat deployment version baru.
+
+## Deploy Web App Version Baru
+
+Dalam Apps Script editor:
+
+```text
+Deploy -> Manage deployments -> Edit -> New version -> Deploy
+```
+
+Cadangan setting V1:
 
 ```text
 Execute as: Me
 Who has access: Anyone with the link
 ```
 
-Nota: Jika Web App boleh dipanggil oleh sesiapa dengan link, backend validation menjadi wajib. Jangan bergantung pada frontend role hiding.
+Jika Web App boleh dipanggil oleh sesiapa dengan link, backend validation wajib ketat. Jangan bergantung kepada frontend role hiding.
 
-## Rule Validation Wajib
-
-GAS perlu semak:
-
-- Student login guna nama + `no_matrik`.
-- Student mesti `status = Aktif`.
-- `Outing Biasa` hanya Selasa/Rabu selepas 5:00 PM.
-- `Kecemasan` boleh dihantar bila-bila masa tetapi tetap perlu kelulusan warden.
-- Warden mesti valid sebelum approve/reject.
-- Guard mesti valid sebelum confirm keluar/masuk.
-- Guard tidak boleh confirm keluar jika belum diluluskan warden.
-- Masa masuk selepas had pulang perlu ditanda `lewat`.
-- Semua action penting perlu ditulis ke `AUDIT_LOG`.
-
-## Response Format Cadangan
+## Response Format
 
 Success:
 
@@ -84,12 +112,12 @@ Error:
 ```json
 {
   "ok": false,
-  "message": "Ralat ringkas untuk frontend."
+  "error": "Ralat ringkas untuk frontend."
 }
 ```
 
 ## Nota Pelaksanaan
 
-- Untuk V1, semua code boleh bermula dalam `Code.gs`.
-- Jangan commit deployment URL, token, secret, password, API key atau PIN sebenar.
-- Selepas deploy, frontend baru boleh disambungkan kepada `GAS_WEB_APP_URL`.
+- Jangan commit token, secret, password, API key, atau deployment credential.
+- PIN V1 hanya untuk pilot/basic access control dan perlu ditukar kepada PIN unik sebelum penggunaan sebenar.
+- Setiap deployment backend perlu diuji semula dengan frontend live.
