@@ -41,22 +41,42 @@ Gunakan local server, bukan buka `index.html` terus, supaya PWA/service worker d
 
 ## Testing Workflow Live Mode
 
-Semak flow asas:
+Semak flow asas browser/local:
 
 1. Buka `http://localhost:8080/`.
 2. Pastikan mode indicator menunjukkan live mode jika backend boleh dicapai.
 3. Login Pelajar guna nama + `no_matrik`.
-4. Submit permohonan `Outing Biasa` atau `Kecemasan`.
-5. Semak `Rekod Saya / Status Semasa`.
-6. Login Warden dengan wrong PIN dan pastikan ditolak.
-7. Login Warden dengan PIN testing V1 `949494`.
-8. Luluskan atau tolak permohonan.
-9. Login Guard dengan wrong PIN dan pastikan ditolak.
-10. Login Guard dengan PIN testing V1 `949494`.
-11. Sahkan keluar.
-12. Sahkan masuk.
-13. Semak Dashboard Hari Ini.
-14. Semak Pemantauan Semasa.
+4. Submit permohonan `Kecemasan` untuk test di luar waktu outing biasa.
+5. Submit `Outing Biasa` hanya semasa rule masa membenarkan.
+6. Semak `Rekod Aktif`.
+7. Semak `Sejarah Hari Ini`.
+8. Pastikan rekod `SELESAI` / `DITOLAK_WARDEN` compact dan tidak block request baru.
+9. Login Warden dengan wrong PIN dan pastikan ditolak.
+10. Login Warden dengan PIN testing semasa.
+11. Luluskan atau tolak permohonan.
+12. Pastikan Telegram alert approve/reject diterima.
+13. Login Guard dengan wrong PIN dan pastikan ditolak.
+14. Login Guard dengan PIN testing semasa.
+15. Sahkan keluar.
+16. Sahkan masuk.
+17. Pastikan Telegram alert keluar/masuk diterima.
+18. Semak Dashboard Hari Ini.
+19. Semak Pemantauan Semasa.
+
+## GitHub Pages Testing
+
+Selepas push frontend:
+
+- Buka `https://itumelaka.github.io/eouting`.
+- Semak browser console untuk error.
+- Test student login, warden, guard, dashboard, dan monitoring.
+- Jika GitHub Pages masih papar code lama, guna cache-busting URL:
+
+```text
+https://itumelaka.github.io/eouting/?v=YYYYMMDD-HHMM
+```
+
+Jika PWA masih papar versi lama, clear PWA/browser cache atau uninstall/reinstall PWA sementara testing.
 
 ## Mobile / PWA Testing
 
@@ -67,6 +87,7 @@ Semak di telefon atau responsive browser tools:
 - App boleh dibuka sebagai standalone.
 - Rekod status masih boleh refresh.
 - Toast/popup feedback tidak menutup form secara mengganggu.
+- `Rekod Aktif` dan `Sejarah Hari Ini` masih kemas di skrin kecil.
 
 ## Syntax Checks
 
@@ -109,5 +130,6 @@ Commit hanya bila perubahan sudah diuji dan memang mahu disimpan ke repo.
 
 - Jangan commit data sensitif.
 - Jangan masukkan token, secret, API key, password, atau deployment credential.
-- PIN `949494` ialah temporary testing value untuk Live V1, bukan PIN production.
+- PIN testing ialah temporary value untuk Live V1.2, bukan PIN production.
 - Untuk backend live, `clasp push` perlu diikuti deployment version baru jika mahu web app users menerima perubahan.
+- Pastikan Telegram group menerima alert semasa test live.

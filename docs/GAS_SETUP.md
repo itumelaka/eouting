@@ -8,8 +8,9 @@ Status semasa:
 - Spreadsheet title: `eOuting ITU Database`
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - Apps Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
-- GAS backend Live V1: siap
+- GAS backend Live V1.2: siap
 - `clasp` workflow: configured
+- Telegram Bot notification: siap
 
 ## Tujuan GAS Backend
 
@@ -43,7 +44,7 @@ jsonResponse(data)
 errorResponse(message)
 ```
 
-## clasp Workflow
+## clasp Workflow Operasi
 
 Install clasp jika belum ada:
 
@@ -79,6 +80,20 @@ Nota penting:
 - Web app users tidak semestinya dapat backend terbaru selepas `clasp push`.
 - Untuk live web app, buat deployment version baru.
 
+Workflow ringkas:
+
+```text
+edit gas/Code.gs locally
+   ↓
+Get-Content -Raw gas\Code.gs | node --check -
+   ↓
+clasp push
+   ↓
+Deploy -> Manage deployments -> Edit -> New version -> Deploy
+   ↓
+test live frontend dan Telegram
+```
+
 ## Deploy Web App Version Baru
 
 Dalam Apps Script editor:
@@ -107,6 +122,16 @@ Backend boleh hantar notifikasi Telegram untuk action penting:
 - Guard sahkan keluar.
 - Guard sahkan masuk.
 - Pelajar masuk lewat.
+
+Setup ringkas:
+
+1. Cipta bot melalui BotFather.
+2. Add bot ke Telegram group operasi.
+3. Disable group privacy jika bot perlu baca group updates untuk dapatkan chat ID.
+4. Dapatkan group chat ID menggunakan Telegram `getUpdates`.
+5. Simpan config dalam Apps Script Script Properties.
+6. Run `testTelegramNotification()`.
+7. Test submit, approve/reject, keluar, masuk, dan lewat.
 
 Token bot dan chat ID **mesti** disimpan dalam Apps Script Script Properties, bukan dalam code repo.
 
@@ -150,6 +175,7 @@ Nota keselamatan:
 - Jangan print token dalam logs.
 - Jika Telegram gagal, action utama eOuting masih perlu berjaya.
 - Selepas `clasp push`, deploy version baru supaya Web App menggunakan backend terbaru.
+- Jangan masukkan real token, secret, atau chat ID ke dokumentasi atau repo.
 
 ## Response Format
 

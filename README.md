@@ -2,7 +2,7 @@
 
 **eOuting ITU** ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas bagi urusan outing.
 
-Status semasa: **Live V1 proof-of-concept siap dan berfungsi end-to-end**.
+Status semasa: **Pilot-ready Live V1.2** untuk ujian operasi sebenar bersama pelajar. Sistem sudah berfungsi end-to-end, tetapi belum dianggap final production atau bank-grade security.
 
 Live frontend:
 
@@ -10,29 +10,42 @@ Live frontend:
 https://itumelaka.github.io/eouting
 ```
 
-Milestone semasa:
-
-```text
-Live V1 POC completed: submit -> approve/reject -> guard keluar/masuk -> student status -> monitoring.
-```
-
-## Objektif
-
-- Memudahkan pelajar membuat permohonan outing secara digital.
-- Membantu warden meluluskan atau menolak permohonan dengan rekod masa.
-- Membantu guard mengesahkan keluar dan masuk di pos guard.
-- Memberi status semasa kepada pelajar melalui `Rekod Saya`.
-- Menyediakan dashboard dan pemantauan ringkas untuk operasi harian.
-- Menyimpan rekod dalam Google Sheets untuk rujukan disiplin dan laporan.
-
-## Stack Semasa
+## Current Status
 
 - **Frontend:** GitHub Pages
-- **UI:** Vanilla HTML/CSS/JS
-- **Backend/API:** Google Apps Script Web App
+- **Backend:** Google Apps Script Web App
 - **Database:** Google Sheets
-- **PWA:** Basic install support
-- **GAS sync:** `clasp`
+- **Notification:** Telegram Bot
+- **Deployment helper:** `clasp`
+- **PWA:** supported
+
+## Milestone Live V1.2
+
+Flow utama sudah berjalan:
+
+```text
+student submit -> warden approve/reject -> guard keluar/masuk -> student status -> monitoring -> Telegram alert
+```
+
+Fungsi terkini:
+
+- Live GitHub Pages frontend.
+- Google Apps Script backend.
+- Google Sheets database.
+- PWA install support.
+- Student login guna nama + `no_matrik`.
+- Warden login guna nama + PIN.
+- Guard login guna nama + PIN.
+- Student submit `Outing Biasa` atau `Kecemasan`.
+- Warden approve / reject.
+- Guard confirm keluar / masuk.
+- `Rekod Saya` memisahkan `Rekod Aktif` dan `Sejarah Hari Ini`.
+- Rekod selesai/ditolak kekal sebagai sejarah compact dan tidak block permohonan baru.
+- Active record masih block duplicate request.
+- Pemantauan Semasa read-only.
+- BM date/time formatting dan phone display formatting.
+- 3D clay role navigation dan toast popup.
+- Telegram Bot notification berfungsi.
 
 ## Role Flow Semasa
 
@@ -41,26 +54,26 @@ Live V1 POC completed: submit -> approve/reject -> guard keluar/masuk -> student
 - Login guna nama + `no_matrik`.
 - Hanya pelajar `Aktif` boleh login dan mohon outing.
 - Submit `Outing Biasa` atau `Kecemasan`.
-- Semak status melalui `Rekod Saya / Status Semasa`.
-- Sistem block duplicate active request untuk hari yang sama.
+- Semak `Rekod Aktif` untuk permohonan sedang berjalan.
+- Semak `Sejarah Hari Ini` untuk rekod selesai atau ditolak.
 
 ### Warden
 
-- Login guna `nama_warden` + PIN.
+- Login guna nama + PIN.
 - Luluskan atau tolak permohonan.
-- Action disahkan semula oleh GAS backend.
+- Telegram alert dihantar selepas action berjaya.
 
 ### Guard
 
-- Login guna `nama_guard` + PIN.
+- Login guna nama + PIN.
 - Sahkan pelajar keluar.
 - Sahkan pelajar masuk.
-- Action disahkan semula oleh GAS backend.
+- Telegram alert dihantar selepas action berjaya, termasuk kes lewat jika berlaku.
 
 ### Pemantauan Semasa
 
-- Paparan read-only untuk melihat rekod hari ini.
-- Sesuai untuk semakan operasi harian.
+- Paparan read-only untuk rekod hari ini.
+- Sesuai untuk semakan operasi harian oleh pihak berkaitan.
 
 ## Waktu Operasi Outing Biasa
 
@@ -79,6 +92,6 @@ Outing Biasa:
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - GAS Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
 
-## Nota Status
+## Nota Operasi
 
-Live V1 ini sesuai sebagai proof-of-concept / pilot-ready untuk ujian dalaman. Ia belum perlu dianggap production-grade security sehingga PIN unik, kawalan akses lebih kuat, SOP operasi, dan semakan audit diperkemaskan.
+Live V1.2 ini sesuai untuk pilot / ujian operasi sebenar. Sebelum rollout lebih luas, tetapkan PIN unik, semak sharing Spreadsheet, kawal Telegram group membership, dan sediakan SOP untuk HEP/warden/guard.

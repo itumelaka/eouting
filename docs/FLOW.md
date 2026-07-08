@@ -1,18 +1,31 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow **Live V1 proof-of-concept** untuk eOuting ITU.
+Dokumen ini menerangkan flow **Pilot-ready Live V1.2** untuk eOuting ITU.
 
 Status semasa:
 
 - GitHub Pages frontend live: `https://itumelaka.github.io/eouting`
-- PWA install: siap
-- Google Sheets live backend melalui GAS Web App: siap
-- Student status tracking: siap
-- Warden/Guard PIN login: siap
-- Pemantauan Semasa read-only: siap
-- Audit log asas: siap
+- Google Sheets live backend melalui GAS Web App.
+- PWA install support.
+- Student `Rekod Aktif` / `Sejarah Hari Ini`.
+- Warden/Guard PIN login.
+- Pemantauan Semasa read-only.
+- Telegram Bot notification berfungsi.
+- Audit log asas dalam `AUDIT_LOG`.
 
-## Flow Digital V1
+## Record Lifecycle
+
+Status lifecycle dalam `OUTING_REQUESTS`:
+
+```text
+MENUNGGU_KELULUSAN
+DILULUSKAN_WARDEN
+DITOLAK_WARDEN
+KELUAR
+SELESAI
+```
+
+## Flow Digital V1.2
 
 ```text
 Pelajar login nama + no_matrik
@@ -21,24 +34,28 @@ Pelajar submit Outing Biasa / Kecemasan
    ↓
 Status: MENUNGGU_KELULUSAN
    ↓
+Telegram alert permohonan baru
+   ↓
 Warden login nama + PIN
    ↓
 Warden luluskan / tolak
+   ↓
+Telegram alert approve/reject
    ↓
 Jika diluluskan, Guard login nama + PIN
    ↓
 Guard sahkan keluar
    ↓
-Status: KELUAR
+Status: KELUAR + Telegram alert keluar
    ↓
 Guard sahkan masuk
    ↓
-Status: SELESAI
+Status: SELESAI + Telegram alert masuk / lewat jika berkaitan
    ↓
 Pelajar, dashboard, dan Pemantauan Semasa papar status terkini
 ```
 
-## 1. Student Login
+## Pelajar
 
 Pelajar login menggunakan:
 
@@ -51,8 +68,6 @@ Syarat:
 
 - `status = Aktif` boleh login dan mohon outing.
 - `status = Tidak Aktif` tidak boleh login dan tidak boleh mohon outing.
-
-## 2. Student Submit Request
 
 Pelajar boleh submit:
 
@@ -73,38 +88,47 @@ Untuk `Kecemasan`, maklumat tambahan:
 - Hubungan waris
 - Catatan kecemasan
 
-Selepas submit berjaya, status awal ialah `MENUNGGU_KELULUSAN`. Pelajar boleh lihat status di `Rekod Saya`.
+## Rekod Saya
 
-## 3. Rule Masa
+`Rekod Saya` dibahagikan kepada dua bahagian:
+
+### Rekod Aktif
+
+Mengandungi status:
+
+- `MENUNGGU_KELULUSAN`
+- `DILULUSKAN_WARDEN`
+- `KELUAR`
+
+Jika ada rekod aktif, sistem block duplicate request untuk hari tersebut.
+
+### Sejarah Hari Ini
+
+Mengandungi status:
+
+- `SELESAI`
+- `DITOLAK_WARDEN`
+
+Sejarah hari ini dikekalkan untuk rujukan. Rekod tidak dipadam dan tidak disembunyikan secara kekal. Rekod selesai/ditolak dipaparkan secara compact dan tidak block permohonan baru.
+
+## Rule Masa
 
 Outing Biasa:
 
 - Hanya Selasa / Rabu
-- Hanya selepas 5:00 PM
-- Perlu pulang sebelum atau pada 10:00 PM
+- Selepas 5:00 PM
+- Sebelum atau pada 10:00 PM untuk pulang
 
 Kecemasan:
 
 - Boleh dihantar bila-bila masa
 - Masih perlu kelulusan warden
 
-## 4. Duplicate Active Request
-
-Sistem block permohonan baru jika pelajar sudah ada active request hari ini.
-
-Active status:
-
-- `MENUNGGU_KELULUSAN`
-- `DILULUSKAN_WARDEN`
-- `KELUAR`
-
-Jika status `DITOLAK_WARDEN` atau `SELESAI`, pelajar boleh membuat permohonan baru buat masa ini.
-
-## 5. Warden Approval / Rejection
+## Warden
 
 Warden login menggunakan:
 
-- `nama_warden`
+- Nama warden
 - PIN
 
 Tindakan:
@@ -117,46 +141,33 @@ Status selepas tindakan:
 - Lulus: `DILULUSKAN_WARDEN`
 - Tolak: `DITOLAK_WARDEN`
 
-Backend validate PIN, status warden, dan action sebelum update rekod.
+Telegram alert dihantar selepas approve/reject berjaya.
 
-## 6. Guard Confirm Keluar
+## Guard
 
 Guard login menggunakan:
 
-- `nama_guard`
+- Nama guard
 - PIN
 
-Guard hanya boleh confirm keluar selepas status `DILULUSKAN_WARDEN`.
+Tindakan:
+
+- Confirm keluar selepas status `DILULUSKAN_WARDEN`
+- Confirm masuk selepas status `KELUAR`
 
 Status selepas confirm keluar:
 
 - `KELUAR`
 
-## 7. Guard Confirm Masuk
-
-Guard sahkan masuk apabila pelajar pulang.
-
 Status selepas confirm masuk:
 
 - `SELESAI`
 
-Jika masa masuk selepas had pulang, rekod ditanda `lewat = Ya`.
+Jika masa masuk selepas had pulang, rekod ditanda `lewat = Ya` dan Telegram alert lewat dihantar.
 
-## 8. Student Status Tracking
+## Dashboard Dan Pemantauan
 
-Pelajar boleh lihat `Rekod Saya / Status Semasa`.
-
-Paparan status mesra pengguna termasuk:
-
-- Menunggu Kelulusan Warden
-- Diluluskan Warden
-- Ditolak Warden
-- Sedang Outing
-- Selesai / Selesai - Lewat
-
-## 9. Dashboard Hari Ini
-
-Dashboard memaparkan ringkasan:
+Dashboard Hari Ini memaparkan:
 
 - Menunggu Kelulusan
 - Diluluskan
@@ -166,15 +177,11 @@ Dashboard memaparkan ringkasan:
 - Belum Masuk
 - Kecemasan
 
-## 10. Pemantauan Semasa
-
-`Pemantauan Semasa` ialah paparan read-only untuk melihat rekod hari ini.
-
-Ia membantu semakan operasi tanpa mengubah status rekod.
+`Pemantauan Semasa` ialah paparan read-only untuk melihat rekod hari ini tanpa mengubah status.
 
 ## Prinsip Penting
 
 - Frontend role hiding bukan security sebenar.
 - Semua validation penting dibuat dalam GAS backend.
 - Semua action penting direkod dalam `AUDIT_LOG`.
-- Live V1 ialah proof-of-concept / pilot-ready, bukan security production-grade.
+- Live V1.2 ialah pilot-ready untuk ujian operasi sebenar, bukan final production security.

@@ -7,8 +7,9 @@ Status semasa:
 - Spreadsheet title: `eOuting ITU Database`
 - Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
 - GitHub Pages frontend: `https://itumelaka.github.io/eouting`
-- GAS backend Live V1: siap
+- GAS backend Live V1.2: siap
 - Basic PWA setup: siap
+- Telegram Bot notification: siap, config melalui Script Properties
 
 Setiap tab dalam Google Sheets mewakili satu jadual data.
 
@@ -68,7 +69,7 @@ Nota V1:
 
 ## Tab: OUTING_REQUESTS
 
-Menyimpan semua rekod permohonan outing.
+Menyimpan semua rekod permohonan outing. Tab ini ialah **source of truth** untuk lifecycle permohonan.
 
 Header V1:
 
@@ -124,3 +125,8 @@ LOGIN_GUARD
 - PIN V1 ialah basic access control, bukan security production-grade.
 - Spreadsheet perlu kekal private dan hanya dikongsi kepada akaun yang perlu.
 - Backend mesti validate identity, role, status, PIN, dan action permission sebelum menulis ke Spreadsheet.
+- Telegram token dan chat ID tidak disimpan dalam sheet atau repo.
+- Telegram config disimpan dalam Apps Script Script Properties:
+  - `TELEGRAM_ENABLED`
+  - `TELEGRAM_BOT_TOKEN`
+  - `TELEGRAM_CHAT_ID`

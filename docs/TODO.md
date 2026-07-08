@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja pembangunan sistem eOuting ITU selepas milestone **Live V1 proof-of-concept**.
+Senarai kerja selepas milestone **Pilot-ready Live V1.2**.
 
 ## Done / Completed
 
@@ -34,23 +34,38 @@ Senarai kerja pembangunan sistem eOuting ITU selepas milestone **Live V1 proof-o
 - [x] 3D clay popup/toast feedback.
 - [x] Basic audit log in `AUDIT_LOG`.
 - [x] `clasp` workflow configured.
+- [x] Telegram Bot notification V1.2.
+- [x] Telegram Script Properties config.
+- [x] Telegram alerts for new outing request.
+- [x] Telegram alerts for new emergency request.
+- [x] Telegram alerts for warden approval/rejection.
+- [x] Telegram alerts for guard confirm keluar/masuk.
+- [x] Telegram late-return alert if applicable.
+- [x] `Rekod Aktif` / `Sejarah Hari Ini`.
+- [x] Compact history records.
+- [x] Completed/rejected records do not block new request.
+- [x] False `Paparan Rekod` popup fix.
+- [x] Normal outing availability check fix.
+- [x] Live V1.2 pilot-ready milestone.
 
-## Next Before Pilot
+## Pilot Checklist
 
-- [ ] Configure Telegram Script Properties for V1.2 notifications.
-- [ ] Run `testTelegramNotification()` from Apps Script.
-- [ ] Test Telegram notification for submit, approve/reject, keluar, masuk, and late masuk.
-- [ ] Test more student names and edge cases.
+- [ ] Test with real students during actual outing.
+- [ ] Verify Telegram alerts in real operation.
+- [ ] Check warden response flow during live outing.
+- [ ] Check guard keluar/masuk flow at pos guard.
+- [ ] Confirm `Rekod Aktif` updates clearly for students.
+- [ ] Confirm `Sejarah Hari Ini` keeps completed/rejected records compact.
 - [ ] Test inactive student login/request block.
 - [ ] Test duplicate active request cases.
-- [ ] Test Outing Biasa Selasa/Rabu selepas 5:00 PM rule.
 - [ ] Test Kecemasan outside normal outing window.
 - [ ] Test late / belum masuk cases.
-- [ ] Clean test data before pilot.
+- [ ] Clean test data before official use.
 - [ ] Assign unique PINs to Warden/Guard.
-- [ ] Prepare simple user guide for Warden/Guard.
-- [ ] Prepare simple user guide for Pelajar.
-- [ ] Decide production SOP for emergency outings.
+- [ ] Prepare Canva/manual guide for Pelajar.
+- [ ] Prepare Canva/manual guide for Warden/Guard.
+- [ ] Prepare SOP for HEP/warden/guard.
+- [ ] Confirm Telegram group membership for operations.
 - [ ] Backup spreadsheet/template.
 - [ ] Confirm who can access Spreadsheet and Apps Script.
 
@@ -62,14 +77,15 @@ Senarai kerja pembangunan sistem eOuting ITU selepas milestone **Live V1 proof-o
 - [ ] Review audit log format and retention.
 - [ ] Review GAS Web App deployment permission.
 - [ ] Decide SOP for changing Warden/Guard PIN.
+- [ ] Review role-based access hardening.
 
 ## Optional Future Enhancements
 
-- [ ] Telegram notification V1.2 polish after pilot feedback.
+- [ ] Daily report/export.
+- [ ] Late-return escalation notification.
 - [ ] Optional WhatsApp notification later if required.
 - [ ] QR code outing pass.
 - [ ] Upload selfie to Google Drive.
-- [ ] Telegram/WhatsApp alert for late or not returned cases.
 - [ ] Weekly/monthly report.
 - [ ] Export CSV/PDF.
 - [ ] Admin page for managing master data.

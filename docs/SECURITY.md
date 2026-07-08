@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan realiti keselamatan untuk **Live V1 proof-of-concept** eOuting ITU.
+Dokumen ini menerangkan realiti keselamatan untuk **Pilot-ready Live V1.2** eOuting ITU.
 
 Status semasa:
 
@@ -8,6 +8,7 @@ Status semasa:
 - Basic PWA setup: siap
 - Google Sheets live backend melalui GAS: siap
 - Warden/Guard PIN login: siap
+- Telegram Bot notification: siap
 - Audit log asas: siap
 
 ## Prinsip Utama
@@ -24,9 +25,9 @@ Jangan anggap perkara berikut sebagai security sebenar:
 
 Security sebenar mesti dibuat di GAS backend dan kawalan akses Google/Spreadsheet.
 
-## V1 PIN Reality
+## V1.2 PIN Reality
 
-Live V1 menggunakan PIN sebagai basic access control untuk Warden dan Guard.
+Live V1.2 menggunakan PIN sebagai basic internal access control untuk Warden dan Guard.
 
 PIN testing sementara:
 
@@ -37,7 +38,7 @@ PIN testing sementara:
 Nota penting:
 
 - Ini bukan bank-grade security.
-- PIN testing perlu ditukar sebelum pilot sebenar.
+- PIN testing perlu ditukar sebelum rollout lebih luas.
 - Setiap Warden/Guard patut diberi PIN unik.
 - PIN tidak boleh didedahkan melalui frontend logs atau GET endpoints.
 - PIN tidak boleh hardcode di frontend.
@@ -52,6 +53,8 @@ Jangan simpan perkara berikut dalam GitHub repo:
 - API key.
 - Deployment credential.
 - PIN sebenar production.
+- Telegram bot token.
+- Telegram chat ID jika dianggap sensitif untuk operasi.
 - Data pelajar penuh yang tidak perlu didedahkan.
 
 ## Spreadsheet Access
@@ -64,6 +67,19 @@ Amalan wajib:
 - Beri akses hanya kepada akaun yang perlu.
 - Semak akses owner/editor secara berkala.
 - Jangan publish Spreadsheet kepada public.
+
+## Telegram Security
+
+Telegram notification menggunakan bot token dan chat ID dari Apps Script Script Properties.
+
+Amalan wajib:
+
+- Jangan commit Telegram bot token.
+- Jangan hardcode token atau chat ID dalam repo.
+- Jangan print token dalam logs.
+- Kawal membership Telegram group operasi.
+- Remove ahli group yang tidak lagi perlu akses.
+- Jika token terdedah, revoke token melalui BotFather dan set token baru.
 
 ## Backend Validation
 
@@ -118,13 +134,14 @@ Audit log digunakan untuk:
 - Hash PIN, bukan simpan plain text.
 - Google Account login / domain-restricted access.
 - Audit review berkala.
+- Role-based access hardening.
 - Deployment permissions lebih ketat.
 - SOP siapa boleh akses Pemantauan Semasa.
 - Backup dan retention policy untuk Spreadsheet.
 
-## Had Sistem V1
+## Had Sistem V1.2
 
-- Live V1 ialah proof-of-concept / pilot-ready, bukan final production security.
+- Live V1.2 ialah pilot-ready untuk ujian operasi sebenar, bukan final production security.
 - Link GitHub Pages boleh dibuka oleh sesiapa yang ada URL.
 - Jika GAS Web App dibuka kepada anyone with link, backend validation mesti ketat.
 - PWA cache menyimpan fail frontend statik sahaja.
