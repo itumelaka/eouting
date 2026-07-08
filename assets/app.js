@@ -247,7 +247,7 @@ els.studentLoginPanel.addEventListener("submit", async (event) => {
         nama: selectedStudent ? selectedStudent.name : "",
         no_matrik: enteredMatric
       });
-      startSession("student", mapLiveStudent(student));
+      startStudentSession(mapLiveStudent(student));
     } catch (error) {
       els.studentLoginMessage.textContent = error.message;
       showError(error.message, "Log Masuk Gagal");
@@ -262,7 +262,7 @@ els.studentLoginPanel.addEventListener("submit", async (event) => {
     return;
   }
 
-  startSession("student", selectedStudent);
+  startStudentSession(selectedStudent);
 });
 
 els.wardenLoginPanel.addEventListener("submit", async (event) => {
@@ -641,6 +641,15 @@ function showWarning(message, title = "Perhatian") {
 
 function showInfo(message, title = "Makluman") {
   showToast(message, "info", title);
+}
+
+function startStudentSession(student) {
+  try {
+    startSession("student", student);
+  } catch (error) {
+    console.error("Student view render failed:", error);
+    showError("Paparan rekod gagal dimuat. Sila tekan Refresh Status.", "Paparan Rekod");
+  }
 }
 
 function setupFeedbackMessageObservers() {
@@ -1389,6 +1398,58 @@ function reverseDisplayStatus(status) {
   if (status === STATUS.out) return "KELUAR";
   if (status === STATUS.returned) return "SELESAI";
   return status || "";
+}
+
+function canSubmitNormalOuting(date = new Date()) {
+  const parts = getKualaLumpurDateTimeParts(date);
+  const day = Number(parts.weekday);
+  const hour = Number(parts.hour);
+  const minute = Number(parts.minute);
+  const isTuesdayOrWednesday = day === 2 || day === 3;
+  const isAfterOpening = hour > 17 || (hour === 17 && minute >= 0);
+  const isBeforeOrAtReturnLimit = hour < 22 || (hour === 22 && minute === 0);
+
+  return isTuesdayOrWednesday && isAfterOpening && isBeforeOrAtReturnLimit;
+}
+
+function getKualaLumpurDateTimeParts(date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).formatToParts(date);
+  const result = {
+    weekday: "0",
+    hour: "0",
+    minute: "0"
+  };
+  const weekdayMap = {
+    Sun: "0",
+    Mon: "1",
+    Tue: "2",
+    Wed: "3",
+    Thu: "4",
+    Fri: "5",
+    Sat: "6"
+  };
+
+  parts.forEach((part) => {
+    if (part.type === "weekday") {
+      result.weekday = weekdayMap[part.value] || "0";
+    }
+
+    if (part.type === "hour") {
+      result.hour = part.value;
+    }
+
+    if (part.type === "minute") {
+      result.minute = part.value;
+    }
+  });
+
+  return result;
 }
 
 function renderStudent() {
