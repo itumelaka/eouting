@@ -1,91 +1,50 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas milestone **Pilot-running Live v1.3.1**.
+Senarai kerja selepas milestone **Live stable v1.6.7**.
 
 ## Done / Completed
 
-- [x] Initial documentation.
-- [x] Mock role-based frontend.
-- [x] Pelajar login name + `no_matrik`.
-- [x] Warden select name mock access.
-- [x] Guard select name mock access.
-- [x] Outing Biasa / Kecemasan frontend flow.
-- [x] Emergency request fields.
-- [x] Vehicle fields.
-- [x] Warden approve/reject mock flow.
-- [x] Guard confirm keluar/masuk mock flow.
-- [x] Dashboard summary including Belum Masuk and Kecemasan.
-- [x] Branded header.
-- [x] Basic PWA setup.
-- [x] GitHub Pages live at `https://itumelaka.github.io/eouting`.
-- [x] Main database schema prepared.
-- [x] Google Spreadsheet database prepared.
-- [x] Apps Script project prepared.
-- [x] GAS backend V1.
+- [x] GitHub Pages frontend live.
+- [x] Google Apps Script backend deployed.
 - [x] Google Sheets live backend connection.
-- [x] Student live status / `Rekod Saya`.
-- [x] Duplicate active request blocking.
+- [x] Live Mode: Google Sheets active.
+- [x] Pelajar login using name + `no_matrik`.
 - [x] Warden/Guard PIN login.
-- [x] Backend PIN validation for Warden/Guard actions.
-- [x] Pemantauan Semasa read-only page.
-- [x] Date/time BM friendly formatting.
-- [x] Phone display formatting.
-- [x] 3D clay role navigation.
-- [x] 3D clay popup/toast feedback.
-- [x] Basic audit log in `AUDIT_LOG`.
-- [x] `clasp` workflow configured.
-- [x] Telegram Bot notification V1.2.
-- [x] Telegram Script Properties config.
-- [x] Telegram alerts for new outing request.
-- [x] Telegram alerts for new emergency request.
-- [x] Telegram alerts for warden approval/rejection.
-- [x] Telegram alerts for guard confirm keluar/masuk.
-- [x] Telegram late-return alert if applicable.
-- [x] `Rekod Aktif` / `Sejarah Hari Ini`.
-- [x] Compact history records.
-- [x] Completed/rejected records do not block new request.
-- [x] False `Paparan Rekod` popup fix.
-- [x] Normal outing availability check fix.
-- [x] PWA cache/update behaviour improved.
-- [x] Manual `Muat Semula Sistem` helper.
-- [x] Visible app version footer.
-- [x] Remember-device session.
-- [x] Mock Mode restricted to `?mock=1`.
-- [x] Header clock 24-hour format.
-- [x] Statistik Outing v1.3.0.
-- [x] Monthly outing totals.
-- [x] Juara Outing Bulanan leaderboard.
-- [x] Class summary and status summary.
-- [x] Statistik filter polish.
-- [x] Statistik year range 2026-2030.
-- [x] API hardening v1.3.1.
-- [x] GET retry/cache-busting.
-- [x] User-friendly live connection error.
-- [x] `Cuba Lagi` button.
-- [x] Live v1.3.1 pilot-running milestone.
-- [x] Ujian operasi sebenar awal berjaya.
+- [x] Outing Biasa request flow.
+- [x] Kecemasan request flow.
+- [x] Pulang Bermalam request flow.
+- [x] Cuti Semester request flow.
+- [x] Cuti Semester uses existing `OUTING_REQUESTS` columns.
+- [x] Warden can see active/future-dated pending Cuti Semester records.
+- [x] Guard can process approved Cuti Semester records.
+- [x] Pemantauan keeps active records visible until selesai.
+- [x] Telegram notifications working.
+- [x] Audit log uses existing `AUDIT_LOG` headers.
+- [x] CSV export for reports.
+- [x] Footer utility/report buttons visible only on Warden screen.
+- [x] Cuti Semester return time display fixed.
+- [x] Student refresh remains on student page.
+- [x] Warden/Guard/Pemantauan/Statistik refresh behavior restored.
 
-## Pilot Checklist
+## Operations Checklist
 
-- [ ] Continue real pilot monitoring.
-- [ ] Verify Statistik after more outing records.
-- [ ] Verify Telegram alerts in real operation.
-- [ ] Check warden response flow during live outing.
-- [ ] Check guard keluar/masuk flow at pos guard.
-- [ ] Confirm `Rekod Aktif` updates clearly for students.
-- [ ] Confirm `Sejarah Hari Ini` keeps completed/rejected records compact.
-- [ ] Test inactive student login/request block.
-- [ ] Test duplicate active request cases.
-- [ ] Test Kecemasan outside normal outing window.
-- [ ] Test late / belum masuk cases.
-- [ ] Clean test data before official use.
-- [ ] Assign unique PINs to Warden/Guard before wider rollout.
-- [ ] Prepare Canva/manual guide for Pelajar.
-- [ ] Prepare Canva/manual guide for Warden/Guard.
-- [ ] Prepare SOP for HEP/warden/guard.
+- [ ] Continue live monitoring after v1.6.7.
+- [ ] Verify Cuti Semester approval and guard flow in real operation.
+- [ ] Verify Pemantauan Semasa active records during Cuti Semester.
+- [ ] Verify CSV reports after more Cuti Semester records.
 - [ ] Confirm Telegram group membership for operations.
-- [ ] Backup spreadsheet/template.
+- [ ] Clean test data before official reporting if needed.
+- [ ] Assign/rotate unique PINs for Warden/Guard when needed.
+- [ ] Prepare user guide for Pelajar.
+- [ ] Prepare SOP for Warden/Guard/HEP.
+- [ ] Backup spreadsheet/template regularly.
 - [ ] Confirm who can access Spreadsheet and Apps Script.
+
+## Near TODO
+
+- [ ] Telegram inline button/link to open Warden/Guard/Pemantauan page.
+- [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Sistem`.
+- [ ] Optional `request_id` deep link/highlight later.
 
 ## Security / Access Improvements
 
@@ -98,14 +57,13 @@ Senarai kerja selepas milestone **Pilot-running Live v1.3.1**.
 - [ ] Review role-based access hardening.
 - [ ] Restrict Statistik to Warden/HEP if required.
 
-## Optional Future Enhancements
+## Future Enhancements
 
+- [ ] Supabase migration can remain future TODO only; not a current requirement.
 - [ ] Automated version injection/build step.
 - [ ] Daily report / Copy WhatsApp summary.
-- [ ] Belum Pulang view.
 - [ ] Late-return escalation notification.
 - [ ] Optional WhatsApp notification later if required.
 - [ ] Upload selfie to Google Drive.
 - [ ] Weekly/monthly report.
-- [ ] Export CSV/PDF.
 - [ ] Admin page for managing master data.
