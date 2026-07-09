@@ -653,6 +653,12 @@ textarea {
   text-align: right;
 }
 
+.semester-checklist-summary {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .semester-checklist-list {
   display: grid;
   gap: 7px;
@@ -679,12 +685,29 @@ textarea {
   outline: 0;
 }
 
-.semester-checkmark {
+.semester-status-icon {
   background: #ffffff;
   border: 2px solid var(--primary);
   border-radius: 4px;
   height: 18px;
   width: 18px;
+}
+
+.semester-status-icon.semester-status-approved,
+.semester-status-icon.semester-status-returned {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.semester-status-icon.semester-status-rejected,
+.semester-status-icon.semester-status-late {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.semester-status-icon.semester-status-out {
+  background: var(--warning);
+  border-color: var(--warning);
 }
 
 .semester-checklist-main,
@@ -711,6 +734,40 @@ textarea {
 .semester-checklist-meta {
   justify-items: end;
   text-align: right;
+}
+
+.semester-status-badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-weight: 800;
+  justify-self: end;
+  padding: 2px 7px;
+}
+
+.semester-status-badge.semester-status-pending {
+  background: #fff4b8;
+  color: var(--warning-ink);
+}
+
+.semester-status-badge.semester-status-approved {
+  background: #e8f1ff;
+  color: var(--info);
+}
+
+.semester-status-badge.semester-status-out {
+  background: #fff4b8;
+  color: var(--warning-ink);
+}
+
+.semester-status-badge.semester-status-returned {
+  background: #e9f7ef;
+  color: var(--success);
+}
+
+.semester-status-badge.semester-status-rejected,
+.semester-status-badge.semester-status-late {
+  background: #fde8e8;
+  color: var(--danger);
 }
 
 .semester-checklist-empty {
@@ -1023,6 +1080,28 @@ textarea {
 
 .monitor-actions small {
   color: var(--muted);
+}
+
+.guard-refresh-panel {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px;
+}
+
+.guard-refresh-button {
+  min-width: 150px;
+}
+
+.guard-last-updated {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .monitor-workspace.active {

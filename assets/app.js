@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.7";
+const APP_VERSION = "1.6.8";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -132,6 +132,7 @@ const els = {
   wardenApprovedList: document.querySelector("#wardenApprovedList"),
   wardenSemesterChecklist: null,
   wardenSemesterCount: null,
+  wardenSemesterSummary: null,
   wardenSemesterList: null,
   guardApprovedList: document.querySelector("#guardApprovedList"),
   guardOutList: document.querySelector("#guardOutList"),
@@ -1491,21 +1492,27 @@ function ensureGuardRefreshControls() {
 
   if (!els.guardRefreshButton) {
     const controls = document.createElement("div");
-    controls.className = "monitor-actions";
+    controls.className = "guard-refresh-panel";
     controls.id = "guardRefreshControls";
 
     els.guardRefreshButton = document.createElement("button");
-    els.guardRefreshButton.className = "secondary-action";
+    els.guardRefreshButton.className = "secondary-action guard-refresh-button";
     els.guardRefreshButton.id = "guardRefreshButton";
     els.guardRefreshButton.type = "button";
     els.guardRefreshButton.textContent = "Refresh Status";
 
     els.guardLastUpdated = document.createElement("small");
+    els.guardLastUpdated.className = "guard-last-updated";
     els.guardLastUpdated.id = "guardLastUpdated";
 
     controls.appendChild(els.guardRefreshButton);
     controls.appendChild(els.guardLastUpdated);
-    els.guardApprovedList.parentNode.insertBefore(controls, els.guardApprovedList);
+    const approvedTitle = els.guardApprovedList.previousElementSibling &&
+      els.guardApprovedList.previousElementSibling.classList &&
+      els.guardApprovedList.previousElementSibling.classList.contains("list-title")
+      ? els.guardApprovedList.previousElementSibling
+      : els.guardApprovedList;
+    els.guardApprovedList.parentNode.insertBefore(controls, approvedTitle);
   }
 
   if (els.guardRefreshButton.dataset.guardRefreshReady !== "1") {
@@ -2587,7 +2594,7 @@ function renderWarden() {
   const pendingRecords = outingRecords.filter((record) => record.status === STATUS.pending);
   const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
 
-  renderWardenSemesterChecklist(pendingRecords);
+  renderWardenSemesterChecklist(outingRecords);
 
   els.wardenList.innerHTML = pendingRecords.length
     ? pendingRecords.map((record) => recordCard(record, "warden")).join("")
@@ -5215,6 +5222,122 @@ updateEmergencyFields = function updateEmergencyFieldsRequestTypeBridgeV164() {
 updatePulangBermalamFields = function updatePulangBermalamFieldsRequestTypeBridgeV164() {
   updateRequestTypeFields();
 };
+
+function ensureWardenSemesterChecklist() {
+  if (!els.wardenList || els.wardenSemesterChecklist) {
+    return;
+  }
+
+  const panel = document.createElement("section");
+  panel.className = "semester-checklist-panel";
+  panel.id = "wardenSemesterChecklist";
+  panel.innerHTML = `
+    <div class="semester-checklist-heading">
+      <h3>Checklist Cuti Semester</h3>
+      <span id="wardenSemesterCount"></span>
+    </div>
+    <div class="semester-checklist-summary" id="wardenSemesterSummary"></div>
+    <div class="semester-checklist-list" id="wardenSemesterList"></div>
+  `;
+  els.wardenList.parentNode.insertBefore(panel, els.wardenList);
+  els.wardenSemesterChecklist = panel;
+  els.wardenSemesterCount = panel.querySelector("#wardenSemesterCount");
+  els.wardenSemesterSummary = panel.querySelector("#wardenSemesterSummary");
+  els.wardenSemesterList = panel.querySelector("#wardenSemesterList");
+}
+
+function renderWardenSemesterChecklist(records) {
+  ensureWardenSemesterChecklist();
+  if (!els.wardenSemesterList) {
+    return;
+  }
+
+  const semesterRecords = records.filter((record) => record.jenis_permohonan === REQUEST_TYPE.semester);
+  if (els.wardenSemesterCount) {
+    els.wardenSemesterCount.textContent = `Cuti Semester: ${semesterRecords.length} permohonan`;
+  }
+  if (els.wardenSemesterSummary) {
+    els.wardenSemesterSummary.textContent = semesterChecklistSummary(semesterRecords);
+  }
+
+  if (!semesterRecords.length) {
+    els.wardenSemesterList.innerHTML = emptyState("Tiada permohonan Cuti Semester.");
+    return;
+  }
+
+  els.wardenSemesterList.innerHTML = semesterRecords.map(semesterChecklistItem).join("");
+  els.wardenSemesterList.querySelectorAll("[data-semester-record-id]").forEach((button) => {
+    if (button.dataset.semesterChecklistReady === "1") {
+      return;
+    }
+    button.dataset.semesterChecklistReady = "1";
+    button.addEventListener("click", () => scrollToRecordCard(button.dataset.semesterRecordId));
+  });
+}
+
+function semesterChecklistItem(record) {
+  const recordId = getRecordId(record);
+  const status = semesterChecklistStatus(record);
+  return `
+    <button class="semester-checklist-item" type="button" data-semester-record-id="${escapeHtml(recordId)}">
+      <span class="semester-status-icon semester-status-${status.key}" aria-hidden="true"></span>
+      <span class="semester-checklist-main">
+        <strong>${escapeHtml(record.studentName || record.nama || "-")}</strong>
+        <small>${escapeHtml(record.className || record.kelas || "-")}</small>
+      </span>
+      <span class="semester-checklist-meta">
+        <span>${escapeHtml(formatExpectedReturnV160(record))}</span>
+        <small class="semester-status-badge semester-status-${status.key}">${escapeHtml(status.label)}</small>
+      </span>
+    </button>
+  `;
+}
+
+function semesterChecklistSummary(records) {
+  if (!records.length) {
+    return "Tiada permohonan.";
+  }
+
+  const counts = records.reduce((acc, record) => {
+    const status = semesterChecklistStatus(record);
+    acc[status.key] = (acc[status.key] || 0) + 1;
+    return acc;
+  }, {});
+  const parts = [
+    ["pending", "Menunggu"],
+    ["approved", "Diluluskan"],
+    ["out", "Sedang Keluar"],
+    ["returned", "Selesai"],
+    ["rejected", "Ditolak"],
+    ["late", "Lewat"]
+  ];
+
+  return parts
+    .filter(([key]) => counts[key])
+    .map(([key, label]) => `${label}: ${counts[key]}`)
+    .join(" · ") || "Tiada status aktif.";
+}
+
+function semesterChecklistStatus(record) {
+  if (isSemesterChecklistLate(record)) {
+    return { key: "late", label: record.status === STATUS.returned ? "Selesai Lewat" : "Lewat" };
+  }
+  if (record.status === STATUS.pending) return { key: "pending", label: "Menunggu" };
+  if (record.status === STATUS.approved) return { key: "approved", label: "Diluluskan" };
+  if (record.status === STATUS.out) return { key: "out", label: "Sedang Keluar" };
+  if (record.status === STATUS.returned) return { key: "returned", label: "Selesai" };
+  if (record.status === STATUS.rejected) return { key: "rejected", label: "Ditolak" };
+  return { key: "unknown", label: record.status || "-" };
+}
+
+function isSemesterChecklistLate(record) {
+  return Boolean(record && (
+    record.lewat === true ||
+    String(record.lewat || "").trim().toLowerCase() === "ya" ||
+    String(record.lewatText || "").trim().toLowerCase() === "ya" ||
+    isHostelReturnLateV160(record)
+  ));
+}
 
 async function initApp() {
   setupAppVersionUi();
