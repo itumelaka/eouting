@@ -1,4 +1,4 @@
-const APP_VERSION = "1.4.4";
+const APP_VERSION = "1.5.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -2652,6 +2652,7 @@ async function confirmIn(id) {
     return;
   }
 
+  const guardReturnNote = window.prompt("Catatan semasa masuk (optional)", "") || "";
   const now = new Date();
   setGuardActionPending(id, "in");
   updateLocalRecord(id, (record) => ({
@@ -2662,6 +2663,7 @@ async function confirmIn(id) {
     masa_masuk: record.masa_masuk || now,
     guardInBy: currentSession.user.name,
     guard_masuk_by: currentSession.user.name,
+    catatan: guardReturnNote.trim() || record.catatan || "",
     _guardActionPending: "in"
   }));
 
@@ -2670,7 +2672,8 @@ async function confirmIn(id) {
       const updatedRecord = await apiPost("confirmIn", {
         request_id: id,
         nama_guard: currentSession.user.name,
-        pin: currentSession.user.pin || ""
+        pin: currentSession.user.pin || "",
+        catatan: guardReturnNote.trim()
       });
       mergeGuardActionSuccess(id, updatedRecord);
       showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
@@ -2761,9 +2764,10 @@ function recordCard(record, mode) {
   const overnightDetail = overnightDetailHtml(record, mode);
   const actorDetail = actorDetailHtml(record);
   const cardClass = record.jenis_permohonan === REQUEST_TYPE.overnight ? "record-card overnight-card" : "record-card";
+  const cardAttrs = recordDataAttributes(record);
 
   return `
-    <article class="${cardClass}">
+    <article class="${cardClass}" ${cardAttrs}>
       <div class="record-top">
         <div>
           <h3>${escapeHtml(record.studentName)}</h3>
@@ -2798,6 +2802,29 @@ function recordCard(record, mode) {
   `;
 }
 
+function recordDataAttributes(record) {
+  const status = record.status || "";
+  const requestType = record.jenis_permohonan || "";
+  const isOvernight = requestType === REQUEST_TYPE.overnight;
+  const isNormal = requestType === REQUEST_TYPE.normal;
+  const isOut = status === STATUS.out;
+  const isDone = status === STATUS.returned || status === "SELESAI";
+  const isPending = status === STATUS.pending;
+  const isLate = Boolean(record.lewat) || (isOut && isAfterReturnLimit(new Date(), record));
+
+  return [
+    `data-record-card="1"`,
+    `data-request-type="${escapeHtml(requestType)}"`,
+    `data-record-status="${escapeHtml(status)}"`,
+    `data-filter-normal="${isNormal ? "1" : "0"}"`,
+    `data-filter-overnight="${isOvernight ? "1" : "0"}"`,
+    `data-filter-pending="${isPending ? "1" : "0"}"`,
+    `data-filter-out="${isOut ? "1" : "0"}"`,
+    `data-filter-late="${isLate ? "1" : "0"}"`,
+    `data-filter-done="${isDone ? "1" : "0"}"`
+  ].join(" ");
+}
+
 function actorDetailHtml(record) {
   const lines = [];
 
@@ -2828,7 +2855,8 @@ function emergencyDetailHtml(record) {
   return `<br>
         <strong>Sebab Kecemasan:</strong> ${escapeHtml(record.sebab_kecemasan || "-")}<br>
         <strong>No. Telefon Waris / Penjaga:</strong> ${escapeDisplayPhone(record.telefon_waris)}<br>
-        <strong>Hubungan Waris:</strong> ${escapeHtml(record.hubungan_waris || "-")}<br>
+        <strong>Hubungan Waris:</strong> ${escapeHtml(record.hubungan_waris || "-")}
+        ${guardianContactHtml(record.telefon_waris)}<br>
         <strong>Catatan Kecemasan:</strong> ${escapeHtml(record.catatan_kecemasan || "-")}`;
 }
 
@@ -2838,6 +2866,9 @@ function overnightDetailHtml(record, mode) {
   }
 
   const expectedReturn = expectedReturnDisplay(record);
+  const lateReturnLine = isAfterReturnLimit(new Date(), record)
+    ? `<br><strong class="late-return-warning">Lewat Pulang Ke Asrama</strong>`
+    : "";
   const guardLine = mode === "guard-out" || mode === "guard-in"
     ? `<br><strong>Pulang ke asrama dijangka:</strong> ${escapeHtml(expectedReturn)}`
     : "";
@@ -2849,7 +2880,21 @@ function overnightDetailHtml(record, mode) {
         <strong>Destinasi Bermalam:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
         <strong>Tujuan Pulang Bermalam:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
         <strong>No. Telefon Waris / Penjaga:</strong> ${escapeDisplayPhone(record.telefon_waris)}
+        ${guardianContactHtml(record.telefon_waris)}
+        ${lateReturnLine}
         ${guardLine}`;
+}
+
+function guardianContactHtml(phone) {
+  const displayPhone = formatPhoneDisplay(phone);
+  if (!displayPhone || displayPhone === "-") {
+    return "";
+  }
+
+  const hrefPhone = String(displayPhone).replace(/[^\d+]/g, "");
+  return hrefPhone
+    ? `<br><a class="guardian-call-link" href="tel:${escapeHtml(hrefPhone)}">Hubungi Waris</a>`
+    : "";
 }
 
 function expectedReturnDisplay(record) {
@@ -3632,6 +3677,270 @@ function showStaffDashboardTab(role) {
   document.querySelectorAll(".tab-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.id === targetTab);
   });
+}
+
+const renderOriginalV15 = render;
+render = function renderWithOperationalMonitoring() {
+  renderOriginalV15();
+  enhanceOperationalMonitoringV15();
+};
+
+const refreshMonitoringRecordsOriginalV15 = typeof refreshMonitoringRecords === "function" ? refreshMonitoringRecords : null;
+if (refreshMonitoringRecordsOriginalV15) {
+  refreshMonitoringRecords = async function refreshMonitoringRecordsWithOperationalMonitoring() {
+    await refreshMonitoringRecordsOriginalV15();
+    enhanceOperationalMonitoringV15();
+  };
+}
+
+function enhanceOperationalMonitoringV15() {
+  ensureQuickFiltersV15();
+  ensureOvernightMonitoringSectionsV15();
+  renderOvernightNotReturnedSectionsV15();
+  ensureCsvExportButtonsV15();
+  ensureReleaseNotesV15();
+}
+
+const QUICK_FILTERS_V15 = [
+  ["all", "Semua"],
+  ["normal", "Outing Harian"],
+  ["overnight", "Pulang Bermalam"],
+  ["pending", "Menunggu Kelulusan"],
+  ["out", "Sedang Keluar"],
+  ["late", "Lewat"],
+  ["done", "Selesai Hari Ini"]
+];
+
+function ensureQuickFiltersV15() {
+  ensureQuickFilterGroupV15("warden", [els.wardenList, els.wardenApprovedList], els.wardenList, "Tiada permohonan menunggu tindakan.");
+  ensureQuickFilterGroupV15("guard", [els.guardApprovedList, els.guardOutList], els.guardApprovedList, "Tiada rekod keluar masuk aktif.");
+  if (els.monitorRecordsList) {
+    ensureQuickFilterGroupV15("monitor", [els.monitorRecordsList], els.monitorRecordsList, "Tiada rekod untuk filter ini.");
+  }
+}
+
+function ensureQuickFilterGroupV15(scope, containers, anchor, emptyMessage) {
+  if (!anchor) {
+    return;
+  }
+
+  const existingGroup = document.querySelector(`[data-filter-scope="${scope}"]`);
+  if (existingGroup) {
+    const activeButton = existingGroup.querySelector(".quick-filter-button.active");
+    applyQuickFilterV15(containers, activeButton ? activeButton.dataset.filterValue : "all", emptyMessage);
+    return;
+  }
+
+  const group = document.createElement("div");
+  group.className = "quick-filter-bar";
+  group.dataset.filterScope = scope;
+  group.innerHTML = QUICK_FILTERS_V15.map(([value, label], index) => (
+    `<button class="quick-filter-button${index === 0 ? " active" : ""}" type="button" data-filter-value="${value}">${label}</button>`
+  )).join("");
+  anchor.parentNode.insertBefore(group, anchor);
+  group.querySelectorAll("[data-filter-value]").forEach((button) => {
+    button.addEventListener("click", () => {
+      group.querySelectorAll("[data-filter-value]").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      applyQuickFilterV15(containers, button.dataset.filterValue, emptyMessage);
+    });
+  });
+}
+
+function applyQuickFilterV15(containers, filterValue, emptyMessage) {
+  containers.filter(Boolean).forEach((container) => {
+    const cards = Array.from(container.querySelectorAll('[data-record-card="1"]'));
+    const generatedEmpty = container.querySelector("[data-filter-empty='1']");
+    if (generatedEmpty) generatedEmpty.remove();
+    if (!cards.length) return;
+
+    let visibleCount = 0;
+    cards.forEach((card) => {
+      const key = `filter${capitalizeFilterKeyV15(filterValue)}`;
+      const visible = filterValue === "all" || card.dataset[key] === "1";
+      card.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+
+    if (visibleCount === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.dataset.filterEmpty = "1";
+      empty.textContent = emptyMessage || "Tiada rekod untuk filter ini.";
+      container.appendChild(empty);
+    }
+  });
+}
+
+function capitalizeFilterKeyV15(value) {
+  return String(value || "").charAt(0).toUpperCase() + String(value || "").slice(1);
+}
+
+function ensureOvernightMonitoringSectionsV15() {
+  ensureOvernightSectionV15("guardOvernightNotReturnedSection", "Pulang Bermalam - Belum Pulang", els.guardOutList);
+  if (els.monitorRecordsList) {
+    ensureOvernightSectionV15("monitorOvernightNotReturnedSection", "Pulang Bermalam - Belum Pulang", els.monitorRecordsList);
+  }
+}
+
+function ensureOvernightSectionV15(id, title, anchor) {
+  if (!anchor || document.querySelector(`#${id}`)) return;
+  const section = document.createElement("section");
+  section.className = "operational-section";
+  section.id = id;
+  section.innerHTML = `
+    <h3 class="list-title">${escapeHtml(title)}</h3>
+    <div class="record-list" data-overnight-not-returned-list="1"></div>
+  `;
+  anchor.parentNode.insertBefore(section, anchor);
+}
+
+function renderOvernightNotReturnedSectionsV15() {
+  renderOvernightListV15("#guardOvernightNotReturnedSection [data-overnight-not-returned-list]", "guard-in");
+  renderOvernightListV15("#monitorOvernightNotReturnedSection [data-overnight-not-returned-list]", "dashboard");
+}
+
+function renderOvernightListV15(selector, mode) {
+  const list = document.querySelector(selector);
+  if (!list) return;
+  const records = outingRecords.filter(isOvernightNotReturnedV15);
+  list.innerHTML = records.length
+    ? records.map((record) => recordCard(record, mode)).join("")
+    : emptyState("Tiada rekod Pulang Bermalam yang belum pulang.");
+  list.querySelectorAll("[data-in]").forEach((button) => {
+    button.addEventListener("click", () => confirmIn(button.dataset.in));
+  });
+}
+
+function isOvernightNotReturnedV15(record) {
+  return record &&
+    record.jenis_permohonan === REQUEST_TYPE.overnight &&
+    Boolean(record.outAt || record.masa_keluar) &&
+    !record.returnedAt &&
+    !record.masa_masuk;
+}
+
+function ensureCsvExportButtonsV15() {
+  const footer = document.querySelector(".app-footer");
+  if (!footer || document.querySelector("#exportTodayCsvButton")) return;
+  const todayButton = document.createElement("button");
+  todayButton.id = "exportTodayCsvButton";
+  todayButton.className = "system-refresh-button";
+  todayButton.type = "button";
+  todayButton.textContent = "Muat Turun Laporan Hari Ini";
+  todayButton.addEventListener("click", () => exportRecordsCsvV15("today"));
+  const monthButton = document.createElement("button");
+  monthButton.id = "exportMonthCsvButton";
+  monthButton.className = "system-refresh-button";
+  monthButton.type = "button";
+  monthButton.textContent = "Muat Turun Laporan Bulanan";
+  monthButton.addEventListener("click", () => exportRecordsCsvV15("month"));
+  footer.insertBefore(todayButton, els.systemRefreshButton || null);
+  footer.insertBefore(monthButton, els.systemRefreshButton || null);
+}
+
+function exportRecordsCsvV15(scope) {
+  try {
+    const now = new Date();
+    const parts = getKualaLumpurParts(now);
+    const todayKey = `${parts.year}-${parts.month}-${parts.day}`;
+    const monthKey = `${parts.year}-${parts.month}`;
+    const records = outingRecords.filter((record) => {
+      const recordDate = normalizeRecordDateKeyV15(record.tarikh || record.requestedAt || record.masa_mohon);
+      return scope === "month" ? recordDate.indexOf(monthKey) === 0 : recordDate === todayKey;
+    });
+    if (!records.length) {
+      showWarning("Tiada rekod untuk dimuat turun.");
+      return;
+    }
+    downloadCsvV15(recordsToCsvV15(records), `eouting-${scope}-${scope === "month" ? monthKey : todayKey}.csv`);
+  } catch (error) {
+    console.error("CSV export gagal.", error);
+    showError("Laporan CSV gagal dimuat turun.", "Export Gagal");
+  }
+}
+
+function normalizeRecordDateKeyV15(value) {
+  const date = parseFlexibleDate(value);
+  if (!date) return "";
+  const parts = getKualaLumpurParts(date);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function recordsToCsvV15(records) {
+  const columns = ["request_id", "tarikh", "hari", "jenis_permohonan", "no_matrik", "nama", "kelas", "tujuan", "lokasi", "telefon_waris", "status", "masa_mohon", "masa_approve", "masa_keluar", "masa_masuk", "lewat", "tarikh_balik", "hari_balik", "masa_balik_dijangka", "catatan"];
+  const rows = records.map((record) => columns.map((column) => csvEscapeV15(recordCsvValueV15(record, column))).join(","));
+  return [columns.join(","), ...rows].join("\r\n");
+}
+
+function recordCsvValueV15(record, column) {
+  const aliases = {
+    request_id: record.request_id || record.id,
+    nama: record.nama || record.studentName,
+    kelas: record.kelas || record.className,
+    tujuan: record.tujuan || record.purpose,
+    lokasi: record.lokasi || record.location,
+    masa_mohon: record.masa_mohon || record.requestedAt,
+    masa_approve: record.masa_approve || record.approvedAt || record.rejectedAt,
+    masa_keluar: record.masa_keluar || record.outAt,
+    masa_masuk: record.masa_masuk || record.returnedAt
+  };
+  return aliases[column] !== undefined ? aliases[column] : record[column];
+}
+
+function csvEscapeV15(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadCsvV15(csv, filename) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function ensureReleaseNotesV15() {
+  const footer = document.querySelector(".app-footer");
+  if (!footer || document.querySelector("#releaseNotesButton")) return;
+  const button = document.createElement("button");
+  button.id = "releaseNotesButton";
+  button.className = "system-refresh-button";
+  button.type = "button";
+  button.textContent = "Apa yang baharu v1.5.0";
+  button.addEventListener("click", toggleReleaseNotesV15);
+  footer.appendChild(button);
+}
+
+function toggleReleaseNotesV15() {
+  let panel = document.querySelector("#releaseNotesPanel");
+  if (!panel) {
+    panel = document.createElement("section");
+    panel.id = "releaseNotesPanel";
+    panel.className = "release-notes-panel";
+    panel.innerHTML = `
+      <h3>Apa yang baharu v1.5.0</h3>
+      <ul>
+        <li>Pulang Bermalam monitoring</li>
+        <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
+        <li>Quick filters</li>
+        <li>Catatan Guard semasa masuk</li>
+        <li>Export CSV</li>
+        <li>Audit log</li>
+        <li>Hubungi Waris</li>
+        <li>Loading and refresh improvements from v1.4.x</li>
+      </ul>
+    `;
+    const footer = document.querySelector(".app-footer");
+    footer.parentNode.insertBefore(panel, footer);
+    panel.hidden = true;
+  }
+  panel.hidden = !panel.hidden;
 }
 
 async function initApp() {

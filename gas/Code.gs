@@ -291,6 +291,8 @@ function submitRequest(payload) {
 
   appendObjectRow_(getSheet_(SHEETS.requests), HEADERS.OUTING_REQUESTS, record);
   appendAuditLog("SUBMIT_REQUEST", requestId, "Student", student.nama, JSON.stringify({
+    student_name: student.nama || "",
+    no_matrik: String(student.no_matrik || ""),
     jenis_permohonan: requestType
   }));
   sendTelegramMessage_(buildTelegramSubmitMessage_(record));
@@ -326,7 +328,11 @@ function approveRequest(payload) {
     masa_approve: now_()
   });
 
-  appendAuditLog("APPROVE_REQUEST", requestId, "Warden", warden.nama_warden, "");
+  appendAuditLog("APPROVE_REQUEST", requestId, "Warden", warden.nama_warden, JSON.stringify({
+    student_name: found.record.nama || "",
+    no_matrik: found.record.no_matrik || "",
+    jenis_permohonan: found.record.jenis_permohonan || ""
+  }));
   const updatedRecord = findRowByRequestId_(requestId).record;
   sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("✅", "Permohonan Diluluskan Warden", updatedRecord), updatedRecord));
   return updatedRecord;
@@ -361,7 +367,12 @@ function rejectRequest(payload) {
     catatan: payload.catatan || found.record.catatan || ""
   });
 
-  appendAuditLog("REJECT_REQUEST", requestId, "Warden", warden.nama_warden, payload.catatan || "");
+  appendAuditLog("REJECT_REQUEST", requestId, "Warden", warden.nama_warden, JSON.stringify({
+    student_name: found.record.nama || "",
+    no_matrik: found.record.no_matrik || "",
+    jenis_permohonan: found.record.jenis_permohonan || "",
+    catatan: payload.catatan || ""
+  }));
   const updatedRecord = findRowByRequestId_(requestId).record;
   sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("❌", "Permohonan Ditolak Warden", updatedRecord), updatedRecord));
   return updatedRecord;
@@ -402,7 +413,11 @@ function confirmOut(payload) {
     guard_keluar_by: guard.nama_guard
   });
 
-  appendAuditLog("CONFIRM_OUT", requestId, "Guard", guard.nama_guard, "");
+  appendAuditLog("CONFIRM_OUT", requestId, "Guard", guard.nama_guard, JSON.stringify({
+    student_name: found.record.nama || "",
+    no_matrik: found.record.no_matrik || "",
+    jenis_permohonan: found.record.jenis_permohonan || ""
+  }));
   const updatedRecord = findRowByRequestId_(requestId).record;
   sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("🚪", "Pelajar Disahkan Keluar", updatedRecord), updatedRecord));
   return updatedRecord;
@@ -441,16 +456,22 @@ function confirmIn(payload) {
   const late = found.record.jenis_permohonan === REQUEST_TYPE.overnight
     ? (isOvernightLate_(now, found.record) ? "Ya" : "Tidak")
     : (isLate_(now) ? "Ya" : "Tidak");
+  const guardReturnNote = String(payload.catatan || payload.catatan_masuk || "").trim();
 
   updateRowByHeaders_(found.sheet, found.rowNumber, {
     status: STATUS.done,
     masa_masuk: now_(),
     guard_masuk_by: guard.nama_guard,
-    lewat: late
+    lewat: late,
+    catatan: guardReturnNote || found.record.catatan || ""
   });
 
   appendAuditLog("CONFIRM_IN", requestId, "Guard", guard.nama_guard, JSON.stringify({
-    lewat: late
+    student_name: found.record.nama || "",
+    no_matrik: found.record.no_matrik || "",
+    jenis_permohonan: found.record.jenis_permohonan || "",
+    lewat: late,
+    catatan_masuk: guardReturnNote
   }));
   const updatedRecord = findRowByRequestId_(requestId).record;
   sendTelegramMessage_(buildTelegramStatusMessage_(
@@ -653,17 +674,21 @@ function debugGetAllRequests() {
 }
 
 function appendAuditLog(action, requestId, userRole, userName, details) {
-  const record = {
-    timestamp: now_(),
-    action: action || "",
-    request_id: requestId || "",
-    user_role: userRole || "",
-    user_name: userName || "",
-    details: details || ""
-  };
+  try {
+    const record = {
+      timestamp: now_(),
+      action: action || "",
+      request_id: requestId || "",
+      user_role: userRole || "",
+      user_name: userName || "",
+      details: details || ""
+    };
 
-  appendObjectRow_(getSheet_(SHEETS.audit), HEADERS.AUDIT_LOG, record);
-  return record;
+    appendObjectRow_(getSheet_(SHEETS.audit), HEADERS.AUDIT_LOG, record);
+    return record;
+  } catch (error) {
+    return false;
+  }
 }
 
 function getTelegramConfig_() {

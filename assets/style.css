@@ -1232,3 +1232,62 @@ textarea {
   opacity: 0.65;
   transform: none;
 }
+
+.quick-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.quick-filter-button {
+  background: #eef3fb;
+  border: 1px solid rgba(8, 36, 92, 0.14);
+  border-radius: 999px;
+  color: var(--deep-navy);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 0.84rem;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 7px 12px;
+}
+
+.quick-filter-button.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.guardian-call-link {
+  color: var(--info);
+  display: inline-block;
+  font-weight: 800;
+  margin-top: 4px;
+  text-decoration: none;
+}
+
+.late-return-warning {
+  color: var(--danger);
+}
+
+.release-notes-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin: 16px auto 0;
+  max-width: 720px;
+  padding: 14px 16px;
+}
+
+.release-notes-panel h3 {
+  color: var(--deep-navy);
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.release-notes-panel ul {
+  margin: 0;
+  padding-left: 20px;
+}
