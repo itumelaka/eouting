@@ -178,8 +178,8 @@ function loginStudent(payload) {
 }
 
 function loginWarden(payload) {
-  const wardenName = payload.nama_warden || payload.warden_name || payload.name;
-  const pin = payload.pin;
+  const wardenName = String(payload.nama_warden || payload.warden_name || payload.name || "").trim();
+  const pin = String(payload.pin === undefined || payload.pin === null ? "" : payload.pin).trim();
 
   if (!wardenName || !pin) {
     throw new Error("Nama warden atau PIN tidak sah.");
@@ -201,8 +201,8 @@ function loginWarden(payload) {
 }
 
 function loginGuard(payload) {
-  const guardName = payload.nama_guard || payload.guard_name || payload.name;
-  const pin = payload.pin;
+  const guardName = String(payload.nama_guard || payload.guard_name || payload.name || "").trim();
+  const pin = String(payload.pin === undefined || payload.pin === null ? "" : payload.pin).trim();
 
   if (!guardName || !pin) {
     throw new Error("Nama guard atau PIN tidak sah.");
@@ -259,6 +259,10 @@ function submitRequest(payload) {
     throw new Error("Pelajar tidak dijumpai atau tidak aktif.");
   }
 
+  if (hasActiveRequestForStudent_(student)) {
+    throw new Error("Anda masih mempunyai permohonan aktif. Sila selesaikan permohonan sedia ada dahulu.");
+  }
+
   const requestId = createRequestId_(now);
   const requestDate = requestType === REQUEST_TYPE.semester
     ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
@@ -309,14 +313,15 @@ function submitRequest(payload) {
 }
 
 function approveRequest(payload) {
-  const requestId = payload.request_id;
-  const wardenName = payload.warden_name || payload.nama_warden || payload.user_name;
+  const requestId = String(payload.request_id || "").trim();
+  const wardenName = String(payload.warden_name || payload.nama_warden || payload.user_name || "").trim();
+  const pin = String(payload.pin === undefined || payload.pin === null ? "" : payload.pin).trim();
 
-  if (!requestId || !wardenName) {
-    throw new Error("request_id dan nama warden diperlukan.");
+  if (!requestId || !wardenName || !pin) {
+    throw new Error("request_id, nama warden dan PIN diperlukan.");
   }
 
-  const warden = findActiveWarden_(wardenName, payload.pin);
+  const warden = findActiveWarden_(wardenName, pin);
   if (!warden) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
@@ -347,14 +352,15 @@ function approveRequest(payload) {
 }
 
 function rejectRequest(payload) {
-  const requestId = payload.request_id;
-  const wardenName = payload.warden_name || payload.nama_warden || payload.user_name;
+  const requestId = String(payload.request_id || "").trim();
+  const wardenName = String(payload.warden_name || payload.nama_warden || payload.user_name || "").trim();
+  const pin = String(payload.pin === undefined || payload.pin === null ? "" : payload.pin).trim();
 
-  if (!requestId || !wardenName) {
-    throw new Error("request_id dan nama warden diperlukan.");
+  if (!requestId || !wardenName || !pin) {
+    throw new Error("request_id, nama warden dan PIN diperlukan.");
   }
 
-  const warden = findActiveWarden_(wardenName, payload.pin);
+  const warden = findActiveWarden_(wardenName, pin);
   if (!warden) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
@@ -387,14 +393,15 @@ function rejectRequest(payload) {
 }
 
 function confirmOut(payload) {
-  const requestId = payload.request_id;
-  const guardName = payload.guard_name || payload.nama_guard || payload.user_name;
+  const requestId = String(payload.request_id || "").trim();
+  const guardName = String(payload.guard_name || payload.nama_guard || payload.user_name || "").trim();
+  const pin = String(payload.pin === undefined || payload.pin === null ? "" : payload.pin).trim();
 
-  if (!requestId || !guardName) {
-    throw new Error("request_id dan nama guard diperlukan.");
+  if (!requestId || !guardName || !pin) {
+    throw new Error("request_id, nama guard dan PIN diperlukan.");
   }
 
-  const guard = findActiveGuard_(guardName, payload.pin);
+  const guard = findActiveGuard_(guardName, pin);
   if (!guard) {
     throw new Error("Guard tidak dijumpai atau tidak aktif.");
   }
@@ -432,15 +439,16 @@ function confirmOut(payload) {
 }
 
 function confirmIn(payload) {
-  const requestId = payload.request_id;
-  const guardName = payload.guard_name || payload.nama_guard || payload.user_name;
+  const requestId = String(payload.request_id || "").trim();
+  const guardName = String(payload.guard_name || payload.nama_guard || payload.user_name || "").trim();
+  const pin = String(payload.pin === undefined || payload.pin === null ? "" : payload.pin).trim();
   const now = new Date();
 
-  if (!requestId || !guardName) {
-    throw new Error("request_id dan nama guard diperlukan.");
+  if (!requestId || !guardName || !pin) {
+    throw new Error("request_id, nama guard dan PIN diperlukan.");
   }
 
-  const guard = findActiveGuard_(guardName, payload.pin);
+  const guard = findActiveGuard_(guardName, pin);
   if (!guard) {
     throw new Error("Guard tidak dijumpai atau tidak aktif.");
   }
@@ -511,6 +519,23 @@ function getTodayRecords() {
 function isActiveRequestStatus_(status) {
   const text = String(status || "");
   return text === STATUS.pending || text === STATUS.approved || text === STATUS.out;
+}
+
+function hasActiveRequestForStudent_(student) {
+  const studentId = normalizeText_(student && student.student_id);
+  const noMatrik = normalizeText_(student && student.no_matrik);
+
+  if (!studentId && !noMatrik) {
+    return false;
+  }
+
+  return getRowsAsObjects_(getSheet_(SHEETS.requests)).some((row) => (
+    isActiveRequestStatus_(row.status) &&
+    (
+      (studentId && normalizeText_(row.student_id) === studentId) ||
+      (noMatrik && normalizeText_(row.no_matrik) === noMatrik)
+    )
+  ));
 }
 
 function isOpenHostelReturnStatus_(status) {
@@ -1184,18 +1209,32 @@ function findStudentByIdAndMatric_(studentId, noMatrik) {
 }
 
 function findActiveWarden_(wardenName, pin) {
+  const normalizedName = normalizeText_(wardenName);
+  const normalizedPin = String(pin === undefined || pin === null ? "" : pin).trim();
+
+  if (!normalizedName || !normalizedPin) {
+    return null;
+  }
+
   return getRowsAsObjects_(getSheet_(SHEETS.wardens)).find((warden) => (
-    normalizeText_(warden.nama_warden) === normalizeText_(wardenName) &&
+    normalizeText_(warden.nama_warden) === normalizedName &&
     isActive_(warden.status) &&
-    (pin === undefined || pin === null || pin === "" || String(warden.pin) === String(pin))
+    String(warden.pin === undefined || warden.pin === null ? "" : warden.pin).trim() === normalizedPin
   ));
 }
 
 function findActiveGuard_(guardName, pin) {
+  const normalizedName = normalizeText_(guardName);
+  const normalizedPin = String(pin === undefined || pin === null ? "" : pin).trim();
+
+  if (!normalizedName || !normalizedPin) {
+    return null;
+  }
+
   return getRowsAsObjects_(getSheet_(SHEETS.guards)).find((guard) => (
-    normalizeText_(guard.nama_guard) === normalizeText_(guardName) &&
+    normalizeText_(guard.nama_guard) === normalizedName &&
     isActive_(guard.status) &&
-    (pin === undefined || pin === null || pin === "" || String(guard.pin) === String(pin))
+    String(guard.pin === undefined || guard.pin === null ? "" : guard.pin).trim() === normalizedPin
   ));
 }
 
