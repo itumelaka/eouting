@@ -1,5 +1,5 @@
 {
-  "version": "1.6.9",
+  "version": "1.6.10",
   "releasedAt": "2026-07-09",
-  "notes": "Expand warden checklist to include all outing request types."
+  "notes": "Add copy name list for active warden requests."
 }

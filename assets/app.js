@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.9";
+const APP_VERSION = "1.6.10";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -77,6 +77,8 @@ let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
 let toastTimerId = null;
 let activeRefreshPage = "access";
+let wardenChecklistTypeFilter = "all";
+let wardenChecklistRecords = [];
 const guardActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 
@@ -134,6 +136,8 @@ const els = {
   wardenSemesterCount: null,
   wardenSemesterSummary: null,
   wardenSemesterList: null,
+  wardenChecklistFilterButtons: null,
+  wardenCopyNamesButton: null,
   guardApprovedList: document.querySelector("#guardApprovedList"),
   guardOutList: document.querySelector("#guardOutList"),
   guardRefreshButton: null,
@@ -5236,6 +5240,16 @@ function ensureWardenSemesterChecklist() {
       <h3>Checklist Permohonan</h3>
       <span id="wardenSemesterCount"></span>
     </div>
+    <div class="checklist-copy-controls">
+      <div class="checklist-filter-pills" id="wardenChecklistFilterButtons" aria-label="Filter jenis permohonan">
+        <button class="checklist-filter-pill active" type="button" data-checklist-type="all">Semua</button>
+        <button class="checklist-filter-pill" type="button" data-checklist-type="OUTING_BIASA">Outing</button>
+        <button class="checklist-filter-pill" type="button" data-checklist-type="PULANG_BERMALAM">Bermalam</button>
+        <button class="checklist-filter-pill" type="button" data-checklist-type="CUTI_SEMESTER">Cuti Semester</button>
+        <button class="checklist-filter-pill" type="button" data-checklist-type="KECEMASAN">Kecemasan</button>
+      </div>
+      <button class="secondary-action checklist-copy-button" id="wardenCopyNamesButton" type="button">Copy Senarai Nama</button>
+    </div>
     <div class="semester-checklist-summary" id="wardenSemesterSummary"></div>
     <div class="semester-checklist-list" id="wardenSemesterList"></div>
   `;
@@ -5244,6 +5258,9 @@ function ensureWardenSemesterChecklist() {
   els.wardenSemesterCount = panel.querySelector("#wardenSemesterCount");
   els.wardenSemesterSummary = panel.querySelector("#wardenSemesterSummary");
   els.wardenSemesterList = panel.querySelector("#wardenSemesterList");
+  els.wardenChecklistFilterButtons = panel.querySelector("#wardenChecklistFilterButtons");
+  els.wardenCopyNamesButton = panel.querySelector("#wardenCopyNamesButton");
+  setupWardenChecklistCopyControls();
 }
 
 function renderWardenSemesterChecklist(records) {
@@ -5252,7 +5269,8 @@ function renderWardenSemesterChecklist(records) {
     return;
   }
 
-  const semesterRecords = records.filter((record) => Object.values(REQUEST_TYPE).includes(record.jenis_permohonan));
+  wardenChecklistRecords = records.filter((record) => Object.values(REQUEST_TYPE).includes(record.jenis_permohonan));
+  const semesterRecords = filterWardenChecklistRecords(wardenChecklistRecords);
   if (els.wardenSemesterCount) {
     els.wardenSemesterCount.textContent = `Checklist Permohonan: ${semesterRecords.length} rekod`;
   }
@@ -5277,6 +5295,127 @@ function renderWardenSemesterChecklist(records) {
       }
     });
   });
+}
+
+function setupWardenChecklistCopyControls() {
+  if (els.wardenChecklistFilterButtons && els.wardenChecklistFilterButtons.dataset.ready !== "1") {
+    els.wardenChecklistFilterButtons.dataset.ready = "1";
+    els.wardenChecklistFilterButtons.querySelectorAll("[data-checklist-type]").forEach((button) => {
+      button.addEventListener("click", () => {
+        wardenChecklistTypeFilter = button.dataset.checklistType || "all";
+        updateWardenChecklistFilterButtons();
+        renderWardenSemesterChecklist(wardenChecklistRecords);
+      });
+    });
+  }
+
+  if (els.wardenCopyNamesButton && els.wardenCopyNamesButton.dataset.ready !== "1") {
+    els.wardenCopyNamesButton.dataset.ready = "1";
+    els.wardenCopyNamesButton.addEventListener("click", copyWardenChecklistNames);
+  }
+
+  updateWardenChecklistFilterButtons();
+}
+
+function updateWardenChecklistFilterButtons() {
+  if (!els.wardenChecklistFilterButtons) {
+    return;
+  }
+
+  els.wardenChecklistFilterButtons.querySelectorAll("[data-checklist-type]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.checklistType === wardenChecklistTypeFilter);
+  });
+}
+
+function filterWardenChecklistRecords(records) {
+  if (wardenChecklistTypeFilter === "all") {
+    return records;
+  }
+  return records.filter((record) => record.jenis_permohonan === wardenChecklistTypeFilter);
+}
+
+async function copyWardenChecklistNames() {
+  const activeRecords = filterWardenChecklistRecords(wardenChecklistRecords)
+    .filter(isWardenChecklistCopyActiveRecord);
+
+  if (!activeRecords.length) {
+    showError("Tiada senarai aktif untuk disalin.", "Tiada Rekod Aktif");
+    return;
+  }
+
+  const text = buildWardenChecklistCopyText(activeRecords);
+  const button = els.wardenCopyNamesButton;
+  const originalText = button ? button.textContent : "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Menyalin...";
+  }
+
+  try {
+    await copyTextToClipboard(text);
+    showSuccess("Senarai nama telah disalin.", "Senarai Disalin");
+  } catch (error) {
+    console.error("Copy senarai nama gagal.", error);
+    showError("Senarai nama gagal disalin. Sila cuba semula.", "Copy Gagal");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || "Copy Senarai Nama";
+    }
+  }
+}
+
+function isWardenChecklistCopyActiveRecord(record) {
+  return Boolean(record && (
+    record.status === STATUS.pending ||
+    record.status === STATUS.approved ||
+    record.status === STATUS.out
+  ));
+}
+
+function buildWardenChecklistCopyText(records) {
+  const header = getWardenChecklistCopyHeader();
+  const names = records.map((record, index) => {
+    const name = record.studentName || record.nama || record.name || "-";
+    return `${index + 1}. ${name}`;
+  });
+  return [header, "", ...names].join("\n");
+}
+
+function getWardenChecklistCopyHeader() {
+  const headers = {
+    all: "SENARAI NAMA PERMOHONAN eOUTING",
+    OUTING_BIASA: "SENARAI NAMA PERMOHONAN OUTING BIASA",
+    PULANG_BERMALAM: "SENARAI NAMA PERMOHONAN PULANG BERMALAM",
+    CUTI_SEMESTER: "SENARAI NAMA PERMOHONAN CUTI SEMESTER",
+    KECEMASAN: "SENARAI NAMA PERMOHONAN KECEMASAN"
+  };
+  return headers[wardenChecklistTypeFilter] || headers.all;
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("execCommand copy returned false");
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
 }
 
 function semesterChecklistItem(record) {

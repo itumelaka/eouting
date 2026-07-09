@@ -653,6 +653,40 @@ textarea {
   text-align: right;
 }
 
+.checklist-copy-controls {
+  display: grid;
+  gap: 9px;
+}
+
+.checklist-filter-pills {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.checklist-filter-pill {
+  background: #eef3fb;
+  border: 1px solid rgba(8, 36, 92, 0.14);
+  border-radius: 999px;
+  color: var(--deep-navy);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 0.84rem;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 7px 11px;
+}
+
+.checklist-filter-pill.active {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.checklist-copy-button {
+  justify-self: start;
+}
+
 .semester-checklist-summary {
   color: var(--muted);
   font-size: 0.86rem;
