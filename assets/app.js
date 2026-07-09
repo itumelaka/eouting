@@ -1,4 +1,4 @@
-const APP_VERSION = "1.4.2";
+const APP_VERSION = "1.4.4";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -3525,6 +3525,10 @@ function setupSystemRefreshHardReload() {
 }
 
 async function hardReloadAppShell() {
+  if (await refreshActiveStaffDashboard()) {
+    return;
+  }
+
   if (els.systemRefreshButton) {
     els.systemRefreshButton.disabled = true;
     els.systemRefreshButton.textContent = "Memuat semula...";
@@ -3554,6 +3558,80 @@ async function hardReloadAppShell() {
   const url = new URL(window.location.href);
   url.searchParams.set("_reload", String(Date.now()));
   window.location.replace(url.toString());
+}
+
+async function refreshActiveStaffDashboard() {
+  if (!currentSession || (currentSession.role !== "warden" && currentSession.role !== "guard")) {
+    return false;
+  }
+
+  if (!currentSession.user || !currentSession.user.name) {
+    clearSavedSession();
+    return false;
+  }
+
+  const role = currentSession.role;
+  const originalText = els.systemRefreshButton ? els.systemRefreshButton.textContent : "";
+  if (els.systemRefreshButton) {
+    els.systemRefreshButton.disabled = true;
+    els.systemRefreshButton.textContent = "Memuat semula...";
+  }
+
+  showStaffDashboardLoading(role);
+
+  try {
+    await loadTodayRecords();
+    showStaffDashboardTab(role);
+    showSuccess("Data telah dimuat semula.", "Muat Semula Sistem");
+  } catch (error) {
+    console.error("Gagal memuat semula data staf.", error);
+    showStaffDashboardTab(role);
+    showError("Gagal memuat semula data. Sila tekan Cuba Lagi atau Muat Semula Sistem.", "Muat Semula Gagal");
+  } finally {
+    if (els.systemRefreshButton) {
+      els.systemRefreshButton.disabled = false;
+      els.systemRefreshButton.textContent = originalText || "Muat Semula Sistem";
+    }
+  }
+
+  return true;
+}
+
+function showStaffDashboardLoading(role) {
+  showStaffDashboardTab(role);
+
+  if (role === "warden") {
+    const message = "Memuatkan senarai permohonan...";
+    if (els.wardenList) els.wardenList.innerHTML = emptyState(message);
+    if (els.wardenApprovedList) els.wardenApprovedList.innerHTML = emptyState(message);
+    return;
+  }
+
+  if (role === "guard") {
+    const message = "Memuatkan rekod keluar masuk...";
+    if (els.guardApprovedList) els.guardApprovedList.innerHTML = emptyState(message);
+    if (els.guardOutList) els.guardOutList.innerHTML = emptyState(message);
+  }
+}
+
+function showStaffDashboardTab(role) {
+  const targetTab = role === "guard" ? "guard" : "warden";
+
+  if (els.accessScreen) {
+    els.accessScreen.classList.add("hidden");
+  }
+
+  if (els.appWorkspace) {
+    els.appWorkspace.classList.add("active");
+  }
+
+  document.querySelectorAll(".tab-button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === targetTab);
+  });
+
+  document.querySelectorAll(".tab-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.id === targetTab);
+  });
 }
 
 async function initApp() {
