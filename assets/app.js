@@ -1,4 +1,4 @@
-const APP_VERSION = "1.4.1";
+const APP_VERSION = "1.4.2";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -2839,13 +2839,13 @@ function overnightDetailHtml(record, mode) {
 
   const expectedReturn = expectedReturnDisplay(record);
   const guardLine = mode === "guard-out" || mode === "guard-in"
-    ? `<br><strong>Jangkaan Balik:</strong> ${escapeHtml(expectedReturn)}`
+    ? `<br><strong>Pulang ke asrama dijangka:</strong> ${escapeHtml(expectedReturn)}`
     : "";
 
   return `<br>
         <strong>Tarikh Keluar:</strong> ${escapeHtml(formatDisplayDate(record.tarikh || record.requestedAt || record.masa_mohon))}<br>
-        <strong>Tarikh Balik:</strong> ${escapeHtml(formatDisplayDate(record.tarikh_balik || record.returnDate))}<br>
-        <strong>Masa Balik Dijangka:</strong> ${escapeHtml(formatExpectedReturnTime(record.masa_balik_dijangka || record.expectedReturnTime))}<br>
+        <strong>Tarikh Pulang Ke Asrama:</strong> ${escapeHtml(formatDisplayDate(record.tarikh_balik || record.returnDate))}<br>
+        <strong>Masa Dijangka Pulang Ke Asrama:</strong> ${escapeHtml(formatExpectedReturnTime(record.masa_balik_dijangka || record.expectedReturnTime))}<br>
         <strong>Destinasi Bermalam:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
         <strong>Tujuan Pulang Bermalam:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
         <strong>No. Telefon Waris / Penjaga:</strong> ${escapeDisplayPhone(record.telefon_waris)}
@@ -3131,11 +3131,11 @@ function validatePulangBermalamRequest() {
   const expectedReturnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
 
   if (!returnDate || !expectedReturnTime) {
-    return "Tarikh balik dan masa balik dijangka diperlukan untuk Pulang Bermalam.";
+    return "Tarikh Pulang Ke Asrama dan Masa Dijangka Pulang Ke Asrama diperlukan untuk Pulang Bermalam.";
   }
 
   if (returnDate < todayKey) {
-    return "Tarikh balik tidak boleh lebih awal daripada tarikh keluar.";
+    return "Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.";
   }
 
   const day = new Intl.DateTimeFormat("en-US", {
