@@ -622,6 +622,107 @@ textarea {
   gap: 12px;
 }
 
+.semester-checklist-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px;
+}
+
+.semester-checklist-heading {
+  align-items: start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.semester-checklist-heading h3 {
+  color: var(--deep-navy);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.semester-checklist-heading span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.semester-checklist-list {
+  display: grid;
+  gap: 7px;
+}
+
+.semester-checklist-item {
+  align-items: center;
+  background: #f7f9fd;
+  border: 1px solid rgba(8, 36, 92, 0.1);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.semester-checklist-item:hover,
+.semester-checklist-item:focus {
+  border-color: rgba(8, 36, 92, 0.35);
+  outline: 0;
+}
+
+.semester-checkmark {
+  background: #ffffff;
+  border: 2px solid var(--primary);
+  border-radius: 4px;
+  height: 18px;
+  width: 18px;
+}
+
+.semester-checklist-main,
+.semester-checklist-meta {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.semester-checklist-main strong {
+  color: var(--deep-navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.semester-checklist-main small,
+.semester-checklist-meta small,
+.semester-checklist-meta span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.semester-checklist-meta {
+  justify-items: end;
+  text-align: right;
+}
+
+.semester-checklist-empty {
+  box-shadow: none;
+  padding: 12px;
+}
+
+.record-card-focus {
+  border-color: var(--warning);
+  box-shadow: 0 0 0 3px rgba(255, 210, 31, 0.42), var(--shadow);
+}
+
 .student-record-section {
   display: grid;
   gap: 10px;

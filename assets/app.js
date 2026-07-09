@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.6";
+const APP_VERSION = "1.6.7";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -130,6 +130,9 @@ const els = {
   studentLastUpdated: null,
   wardenList: document.querySelector("#wardenList"),
   wardenApprovedList: document.querySelector("#wardenApprovedList"),
+  wardenSemesterChecklist: null,
+  wardenSemesterCount: null,
+  wardenSemesterList: null,
   guardApprovedList: document.querySelector("#guardApprovedList"),
   guardOutList: document.querySelector("#guardOutList"),
   guardRefreshButton: null,
@@ -2584,6 +2587,8 @@ function renderWarden() {
   const pendingRecords = outingRecords.filter((record) => record.status === STATUS.pending);
   const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
 
+  renderWardenSemesterChecklist(pendingRecords);
+
   els.wardenList.innerHTML = pendingRecords.length
     ? pendingRecords.map((record) => recordCard(record, "warden")).join("")
     : emptyState("Tiada permohonan menunggu kelulusan.");
@@ -2599,6 +2604,77 @@ function renderWarden() {
   els.wardenList.querySelectorAll("[data-reject]").forEach((button) => {
     button.addEventListener("click", () => updateStatus(button.dataset.reject, STATUS.rejected));
   });
+}
+
+function ensureWardenSemesterChecklist() {
+  if (!els.wardenList || els.wardenSemesterChecklist) {
+    return;
+  }
+
+  const panel = document.createElement("section");
+  panel.className = "semester-checklist-panel";
+  panel.innerHTML = `
+    <div class="semester-checklist-heading">
+      <h3>Cuti Semester</h3>
+      <span id="wardenSemesterCount">Cuti Semester: 0 permohonan menunggu</span>
+    </div>
+    <div class="semester-checklist-list" id="wardenSemesterList"></div>
+  `;
+
+  els.wardenList.parentNode.insertBefore(panel, els.wardenList);
+  els.wardenSemesterChecklist = panel;
+  els.wardenSemesterCount = panel.querySelector("#wardenSemesterCount");
+  els.wardenSemesterList = panel.querySelector("#wardenSemesterList");
+}
+
+function renderWardenSemesterChecklist(pendingRecords) {
+  ensureWardenSemesterChecklist();
+
+  if (!els.wardenSemesterList || !els.wardenSemesterCount) {
+    return;
+  }
+
+  const semesterRecords = (pendingRecords || []).filter((record) => record.jenis_permohonan === REQUEST_TYPE.semester);
+  els.wardenSemesterCount.textContent = `Cuti Semester: ${semesterRecords.length} permohonan menunggu`;
+
+  els.wardenSemesterList.innerHTML = semesterRecords.length
+    ? semesterRecords.map(semesterChecklistItem).join("")
+    : `<div class="empty-state semester-checklist-empty">Tiada permohonan Cuti Semester menunggu kelulusan.</div>`;
+
+  els.wardenSemesterList.querySelectorAll("[data-semester-jump]").forEach((button) => {
+    button.addEventListener("click", () => scrollToRecordCard(button.dataset.semesterJump));
+  });
+}
+
+function semesterChecklistItem(record) {
+  const recordId = getRecordId(record);
+  const returnDate = formatDisplayDateV160(record.tarikh_balik || record.returnDate);
+  const statusText = record.status || "-";
+
+  return `
+    <button class="semester-checklist-item" type="button" data-semester-jump="${escapeHtml(recordId)}">
+      <span class="semester-checkmark" aria-hidden="true"></span>
+      <span class="semester-checklist-main">
+        <strong>${escapeHtml(record.studentName || record.nama || "-")}</strong>
+        <small>${escapeHtml(record.className || record.kelas || "-")}</small>
+      </span>
+      <span class="semester-checklist-meta">
+        <span>${escapeHtml(returnDate)}</span>
+        <small>${escapeHtml(statusText)}</small>
+      </span>
+    </button>
+  `;
+}
+
+function scrollToRecordCard(recordId) {
+  const card = document.querySelector(`#${recordDomId(recordId)}`);
+  if (!card) {
+    return;
+  }
+
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.add("record-card-focus");
+  window.setTimeout(() => card.classList.remove("record-card-focus"), 1400);
 }
 
 function renderGuard() {
@@ -2928,6 +3004,7 @@ function recordDataAttributes(record) {
   const isLate = Boolean(record.lewat) || (isOut && isAfterReturnLimit(new Date(), record));
 
   return [
+    `id="${recordDomId(getRecordId(record))}"`,
     `data-record-card="1"`,
     `data-request-type="${escapeHtml(requestType)}"`,
     `data-record-status="${escapeHtml(status)}"`,
@@ -2938,6 +3015,12 @@ function recordDataAttributes(record) {
     `data-filter-late="${isLate ? "1" : "0"}"`,
     `data-filter-done="${isDone ? "1" : "0"}"`
   ].join(" ");
+}
+
+function recordDomId(recordOrId) {
+  const rawId = typeof recordOrId === "object" ? getRecordId(recordOrId) : recordOrId;
+  const safeId = String(rawId || "record").replace(/[^a-z0-9_-]/gi, "-");
+  return `record-card-${safeId}`;
 }
 
 function actorDetailHtml(record) {
@@ -4327,7 +4410,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.6.6";
+  button.textContent = "Apa yang baharu v1.6.7";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
   updateFooterActionsVisibility();
@@ -4340,7 +4423,13 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.6.6</h3>
+      <h3>Apa yang baharu v1.6.7</h3>
+      <ul>
+        <li>Tambah Refresh Status pada dashboard Guard</li>
+        <li>Tambah auto-refresh Guard semasa sesi aktif</li>
+        <li>Kukuhkan validasi backend untuk PIN staf dan permohonan aktif</li>
+      </ul>
+      <h3>Sejarah v1.6.6</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>

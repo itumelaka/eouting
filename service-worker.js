@@ -1,16 +1,17 @@
-const CACHE_NAME = "eouting-cache-v1.6.6";
+const CACHE_NAME = "eouting-cache-v1.6.7";
 
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/style.css?v=1.6.6",
-  "./assets/app.js?v=1.6.6",
+  "./assets/style.css?v=1.6.7",
+  "./assets/app.js?v=1.6.7",
   "./assets/pwa-logo.png",
   "./assets/eouting-header-logo.png",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/maskable-512.png",
-  "./manifest.json"
+  "./manifest.json",
+  "./version.json"
 ];
 
 self.addEventListener("install", (event) => {
@@ -60,7 +61,8 @@ function isFreshAsset_(url) {
     url.pathname.endsWith("/assets/app.js") ||
     url.pathname.endsWith("/assets/style.css") ||
     url.pathname.endsWith("/service-worker.js") ||
-    url.pathname.endsWith("/manifest.json")
+    url.pathname.endsWith("/manifest.json") ||
+    url.pathname.endsWith("/version.json")
   );
 }
 
