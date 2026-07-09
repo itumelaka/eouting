@@ -59,7 +59,8 @@ const STATUS = {
 const REQUEST_TYPE = {
   normal: "OUTING_BIASA",
   emergency: "KECEMASAN",
-  overnight: "PULANG_BERMALAM"
+  overnight: "PULANG_BERMALAM",
+  semester: "CUTI_SEMESTER"
 };
 
 function doGet(e) {
@@ -232,7 +233,7 @@ function submitRequest(payload) {
     throw new Error("student_id dan no_matrik diperlukan.");
   }
 
-  if (requestType !== REQUEST_TYPE.normal && requestType !== REQUEST_TYPE.emergency && requestType !== REQUEST_TYPE.overnight) {
+  if (requestType !== REQUEST_TYPE.normal && requestType !== REQUEST_TYPE.emergency && requestType !== REQUEST_TYPE.overnight && requestType !== REQUEST_TYPE.semester) {
     throw new Error("Jenis permohonan tidak sah.");
   }
 
@@ -248,6 +249,10 @@ function submitRequest(payload) {
     validateOvernightRequest_(payload, now);
   }
 
+  if (requestType === REQUEST_TYPE.semester) {
+    validateSemesterRequest_(payload, now);
+  }
+
   const student = findStudentByIdAndMatric_(studentId, noMatrik);
 
   if (!student || !isActive_(student.status)) {
@@ -255,10 +260,13 @@ function submitRequest(payload) {
   }
 
   const requestId = createRequestId_(now);
+  const requestDate = requestType === REQUEST_TYPE.semester
+    ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
+    : formatDate_(now);
   const record = {
     request_id: requestId,
-    tarikh: formatDate_(now),
-    hari: getDayName_(now),
+    tarikh: requestDate,
+    hari: requestType === REQUEST_TYPE.semester ? getDayNameFromDateKey_(requestDate) : getDayName_(now),
     jenis_permohonan: requestType,
     student_id: String(student.student_id || ""),
     no_matrik: String(student.no_matrik || ""),
@@ -453,8 +461,8 @@ function confirmIn(payload) {
     throw new Error("Hanya permohonan status KELUAR boleh disahkan masuk.");
   }
 
-  const late = found.record.jenis_permohonan === REQUEST_TYPE.overnight
-    ? (isOvernightLate_(now, found.record) ? "Ya" : "Tidak")
+  const late = isHostelReturnRequest_(found.record)
+    ? (isHostelReturnLate_(now, found.record) ? "Ya" : "Tidak")
     : (isLate_(now) ? "Ya" : "Tidak");
   const guardReturnNote = String(payload.catatan || payload.catatan_masuk || "").trim();
 
@@ -487,10 +495,10 @@ function getTodayRecords() {
     .filter((row) => {
       const rowDateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
       const returnDateKey = normalizeDateKey_(row.tarikh_balik);
-      const overnightReturningToday = row.jenis_permohonan === REQUEST_TYPE.overnight &&
+      const hostelReturnNotReturned = isHostelReturnRequest_(row) &&
         row.status === STATUS.out &&
-        returnDateKey === todayKey;
-      return rowDateKey === todayKey || overnightReturningToday;
+        !hasCellValue_(row.masa_masuk);
+      return rowDateKey === todayKey || hostelReturnNotReturned || returnDateKey === todayKey;
     });
 }
 
@@ -785,9 +793,13 @@ function formatTelegramExpectedReturn_(record) {
 }
 
 function telegramTitle_(icon, text, record) {
-  const prefix = record && record.jenis_permohonan === REQUEST_TYPE.overnight
-    ? "Pulang Bermalam - "
-    : "";
+  let prefix = "";
+  if (record && record.jenis_permohonan === REQUEST_TYPE.overnight) {
+    prefix = "Pulang Bermalam - ";
+  }
+  if (record && record.jenis_permohonan === REQUEST_TYPE.semester) {
+    prefix = "CUTI SEMESTER - ";
+  }
   return icon + " " + prefix + text;
 }
 
@@ -798,6 +810,9 @@ function buildTelegramSubmitMessage_(record) {
   }
   if (record.jenis_permohonan === REQUEST_TYPE.overnight) {
     title = "🏠 Permohonan Pulang Bermalam Baru";
+  }
+  if (record.jenis_permohonan === REQUEST_TYPE.semester) {
+    title = "🏫 Permohonan CUTI SEMESTER Baru";
   }
 
   return buildTelegramStatusMessage_(title, record);
@@ -828,7 +843,10 @@ function buildTelegramStatusMessage_(title, record) {
     lines.push("Hubungan Waris: " + (record.hubungan_waris || "-"));
   }
 
-  if (record.jenis_permohonan === REQUEST_TYPE.overnight) {
+  if (record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester) {
+    if (record.jenis_permohonan === REQUEST_TYPE.semester) {
+      lines.push("Tarikh Keluar: " + formatTelegramDate_(record.tarikh));
+    }
     lines.push("Tarikh Pulang Ke Asrama: " + formatTelegramDate_(record.tarikh_balik));
     lines.push("Masa Dijangka Pulang Ke Asrama: " + formatTelegramTime_(record.masa_balik_dijangka));
     lines.push("Pulang ke asrama dijangka: " + formatTelegramExpectedReturn_(record));
@@ -865,6 +883,7 @@ function requestTypeLabel_(requestType) {
   if (requestType === REQUEST_TYPE.normal) return "Outing Biasa";
   if (requestType === REQUEST_TYPE.emergency) return "Kecemasan";
   if (requestType === REQUEST_TYPE.overnight) return "Pulang Bermalam";
+  if (requestType === REQUEST_TYPE.semester) return "CUTI SEMESTER";
   return requestType || "-";
 }
 
@@ -1042,13 +1061,48 @@ function validateOvernightRequest_(payload, keluarDate) {
   }
 }
 
+function validateSemesterRequest_(payload, now) {
+  const leaveDateKey = normalizeDateKey_(payload.tarikh) || formatDate_(now);
+  const returnDateKey = normalizeDateKey_(payload.tarikh_balik);
+  const expectedReturnTime = String(payload.masa_balik_dijangka || "").trim();
+
+  if (!returnDateKey) {
+    throw new Error("Tarikh Pulang Ke Asrama diperlukan untuk Cuti Semester.");
+  }
+
+  if (!expectedReturnTime) {
+    throw new Error("Masa Dijangka Pulang Ke Asrama diperlukan untuk Cuti Semester.");
+  }
+
+  if (!/^\d{2}:\d{2}/.test(expectedReturnTime)) {
+    throw new Error("Masa Dijangka Pulang Ke Asrama tidak sah.");
+  }
+
+  if (returnDateKey < leaveDateKey) {
+    throw new Error("Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.");
+  }
+
+  if (!normalizeText_(payload.lokasi || payload.location)) {
+    throw new Error("Alamat / destinasi semasa cuti diperlukan.");
+  }
+
+  if (!normalizeText_(payload.telefon_waris)) {
+    throw new Error("Telefon waris diperlukan untuk Cuti Semester.");
+  }
+}
+
 function isLate_(date) {
   const hour = Number(Utilities.formatDate(date, "Asia/Kuala_Lumpur", "H"));
   const minute = Number(Utilities.formatDate(date, "Asia/Kuala_Lumpur", "m"));
   return hour > 22 || (hour === 22 && minute > 0);
 }
 
-function isOvernightLate_(date, record) {
+function isHostelReturnRequest_(record) {
+  return record &&
+    (record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester);
+}
+
+function isHostelReturnLate_(date, record) {
   const returnDateKey = normalizeDateKey_(record.tarikh_balik);
   const expectedReturnTime = String(record.masa_balik_dijangka || "").trim();
   if (!returnDateKey || !expectedReturnTime) {
@@ -1057,6 +1111,10 @@ function isOvernightLate_(date, record) {
 
   const expectedReturn = new Date(returnDateKey + "T" + expectedReturnTime.slice(0, 5) + ":00+08:00");
   return !isNaN(expectedReturn.getTime()) && date.getTime() > expectedReturn.getTime();
+}
+
+function isOvernightLate_(date, record) {
+  return isHostelReturnLate_(date, record);
 }
 
 function getDayNameFromDateKey_(dateKey) {

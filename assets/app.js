@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.2";
+const APP_VERSION = "1.6.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -31,13 +31,15 @@ const STATUS = {
 const REQUEST_TYPE = {
   normal: "OUTING_BIASA",
   emergency: "KECEMASAN",
-  overnight: "PULANG_BERMALAM"
+  overnight: "PULANG_BERMALAM",
+  semester: "CUTI_SEMESTER"
 };
 
 const REQUEST_TYPE_LABEL = {
   OUTING_BIASA: "Outing Biasa",
   KECEMASAN: "Kecemasan",
-  PULANG_BERMALAM: "Pulang Bermalam"
+  PULANG_BERMALAM: "Pulang Bermalam",
+  CUTI_SEMESTER: "Cuti Semester"
 };
 
 const SESSION_STORAGE_KEY = "eouting_session_v1";
@@ -111,6 +113,7 @@ const els = {
   requestForm: document.querySelector("#requestForm"),
   purposeInput: document.querySelector("#purposeInput"),
   locationInput: document.querySelector("#locationInput"),
+  leaveDateInput: document.querySelector("#leaveDateInput"),
   returnDateInput: document.querySelector("#returnDateInput"),
   expectedReturnTimeInput: document.querySelector("#expectedReturnTimeInput"),
   vehicleTypeSelect: document.querySelector("#vehicleTypeSelect"),
@@ -3993,6 +3996,7 @@ const QUICK_FILTERS_V15 = [
   ["all", "Semua"],
   ["normal", "Outing Harian"],
   ["overnight", "Pulang Bermalam"],
+  ["semester", "Cuti Semester"],
   ["pending", "Menunggu Kelulusan"],
   ["out", "Sedang Keluar"],
   ["late", "Lewat"],
@@ -4065,9 +4069,9 @@ function capitalizeFilterKeyV15(value) {
 }
 
 function ensureOvernightMonitoringSectionsV15() {
-  ensureOvernightSectionV15("guardOvernightNotReturnedSection", "Pulang Bermalam - Belum Pulang", els.guardOutList);
+  ensureOvernightSectionV15("guardOvernightNotReturnedSection", "Belum Pulang Ke Asrama", els.guardOutList);
   if (els.monitorRecordsList) {
-    ensureOvernightSectionV15("monitorOvernightNotReturnedSection", "Pulang Bermalam - Belum Pulang", els.monitorRecordsList);
+    ensureOvernightSectionV15("monitorOvernightNotReturnedSection", "Belum Pulang Ke Asrama", els.monitorRecordsList);
   }
 }
 
@@ -4102,7 +4106,7 @@ function renderOvernightListV15(selector, mode) {
 
 function isOvernightNotReturnedV15(record) {
   return record &&
-    record.jenis_permohonan === REQUEST_TYPE.overnight &&
+    (record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester) &&
     Boolean(record.outAt || record.masa_keluar) &&
     !record.returnedAt &&
     !record.masa_masuk;
@@ -4200,7 +4204,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.5.2";
+  button.textContent = "Apa yang baharu v1.6.0";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
 }
@@ -4212,7 +4216,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.5.2</h3>
+      <h3>Apa yang baharu v1.6.0</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -4223,6 +4227,8 @@ function toggleReleaseNotesV15() {
         <li>Hubungi Waris</li>
         <li>Hotfix Muat Semula Sistem kekal pada paparan aktif</li>
         <li>Hotfix Pelajar, Pemantauan Semasa dan Statistik refresh in-place</li>
+        <li>Sokongan permohonan Cuti Semester</li>
+        <li>Pemantauan Cuti Semester / Belum Pulang Ke Asrama</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
@@ -4233,10 +4239,293 @@ function toggleReleaseNotesV15() {
   panel.hidden = !panel.hidden;
 }
 
+const recordCardOriginalV160 = recordCard;
+recordCard = function recordCardWithSemesterSupport(record, mode) {
+  let html = recordCardOriginalV160(record, mode);
+  if (!record || record.jenis_permohonan !== REQUEST_TYPE.semester) {
+    return html;
+  }
+
+  html = html.replace('data-record-card="1"', 'data-record-card="1" data-filter-semester="1"');
+  const details = `
+    <div class="record-meta semester-return-meta">
+      <span class="status-badge">Cuti Semester</span>
+      <span>Tarikh Keluar: ${escapeHtml(formatDisplayDateV160(record.tarikh || record.requestedAt || record.masa_mohon))}</span>
+      <span>Tarikh Pulang Ke Asrama: ${escapeHtml(formatDisplayDateV160(record.tarikh_balik))}</span>
+      <span>Masa Dijangka Pulang Ke Asrama: ${escapeHtml(record.masa_balik_dijangka || "-")}</span>
+      <span>Pulang ke asrama dijangka: ${escapeHtml(formatExpectedReturnV160(record))}</span>
+      ${record.telefon_waris ? `<span>Hubungi Waris: ${escapeHtml(record.telefon_waris)}</span>` : ""}
+      ${isHostelReturnLateV160(record) ? '<span class="status-badge rejected">Lewat Pulang Ke Asrama</span>' : ""}
+    </div>
+  `;
+  const articleCloseIndex = html.lastIndexOf("</article>");
+  if (articleCloseIndex !== -1) {
+    return html.slice(0, articleCloseIndex) + details + html.slice(articleCloseIndex);
+  }
+
+  const divCloseIndex = html.lastIndexOf("</div>");
+  return divCloseIndex === -1 ? html + details : html.slice(0, divCloseIndex) + details + html.slice(divCloseIndex);
+};
+
+function setupSemesterRequestV160() {
+  ensureSemesterOptionV160();
+  ensureSemesterLeaveDateFieldV160();
+  updateSemesterFieldsV160();
+
+  if (els.requestTypeSelect) {
+    els.requestTypeSelect.addEventListener("change", updateSemesterFieldsV160);
+  }
+
+  if (els.requestForm && els.requestForm.dataset.semesterHandlerV160 !== "1") {
+    els.requestForm.dataset.semesterHandlerV160 = "1";
+    els.requestForm.addEventListener("submit", submitSemesterRequestV160, true);
+  }
+}
+
+function ensureSemesterOptionV160() {
+  if (!els.requestTypeSelect || els.requestTypeSelect.querySelector(`option[value="${REQUEST_TYPE.semester}"]`)) {
+    return;
+  }
+
+  const option = document.createElement("option");
+  option.value = REQUEST_TYPE.semester;
+  option.textContent = "Cuti Semester";
+  els.requestTypeSelect.appendChild(option);
+}
+
+function ensureSemesterLeaveDateFieldV160() {
+  if (els.leaveDateInput || !els.overnightFields || !els.returnDateInput) {
+    return;
+  }
+
+  const label = document.createElement("label");
+  label.setAttribute("for", "leaveDateInput");
+  label.dataset.semesterOnly = "1";
+  label.textContent = "Tarikh Keluar / Tarikh Mula Cuti";
+  const input = document.createElement("input");
+  input.id = "leaveDateInput";
+  input.type = "date";
+  input.dataset.semesterOnly = "1";
+  els.overnightFields.insertBefore(label, els.returnDateInput.previousElementSibling || els.returnDateInput);
+  els.overnightFields.insertBefore(input, els.returnDateInput.previousElementSibling || els.returnDateInput);
+  els.leaveDateInput = input;
+}
+
+function updateSemesterFieldsV160() {
+  const requestType = els.requestTypeSelect ? els.requestTypeSelect.value : "";
+  const isSemester = requestType === REQUEST_TYPE.semester;
+
+  document.querySelectorAll("[data-semester-only]").forEach((element) => {
+    element.hidden = !isSemester;
+  });
+
+  if (els.overnightFields && isSemester) {
+    els.overnightFields.style.display = "";
+    const title = els.overnightFields.querySelector("h3");
+    if (title) title.textContent = "Maklumat Cuti Semester";
+  }
+
+  if (els.emergencyFields && isSemester) {
+    els.emergencyFields.style.display = "";
+  }
+
+  setFieldAndLabelHiddenV160(els.emergencyReasonInput, isSemester);
+  setFieldAndLabelHiddenV160(els.emergencyNoteInput, false);
+
+  if (isSemester) {
+    if (els.purposeInput && !els.purposeInput.value.trim()) {
+      els.purposeInput.value = "Cuti Semester";
+    }
+    if (els.locationInput) {
+      els.locationInput.placeholder = "Alamat / destinasi semasa cuti";
+    }
+    if (els.guardianPhoneInput) {
+      els.guardianPhoneInput.placeholder = "No. telefon waris semasa cuti";
+    }
+    if (els.emergencyNoteInput) {
+      els.emergencyNoteInput.placeholder = "Catatan cuti jika ada";
+    }
+    return;
+  }
+
+  if (els.overnightFields) {
+    const title = els.overnightFields.querySelector("h3");
+    if (title) title.textContent = "Maklumat Pulang Bermalam";
+  }
+  if (els.locationInput) {
+    els.locationInput.placeholder = "Contoh: Pekan Merlimau";
+  }
+  setFieldAndLabelHiddenV160(els.emergencyReasonInput, false);
+}
+
+function setFieldAndLabelHiddenV160(field, hidden) {
+  if (!field) {
+    return;
+  }
+  field.hidden = hidden;
+  const label = document.querySelector(`label[for="${field.id}"]`);
+  if (label) label.hidden = hidden;
+}
+
+async function submitSemesterRequestV160(event) {
+  if (!els.requestTypeSelect || els.requestTypeSelect.value !== REQUEST_TYPE.semester) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  const message = validateSemesterRequestV160();
+  if (message) {
+    if (els.studentMessage) els.studentMessage.textContent = message;
+    showError(message, "Permohonan Tidak Lengkap");
+    return;
+  }
+
+  const student = getCurrentStudentV160();
+  if (!student) {
+    showError("Sesi pelajar tidak sah. Sila log masuk semula.", "Sesi Tamat");
+    return;
+  }
+
+  const submitButton = els.requestForm ? els.requestForm.querySelector('button[type="submit"]') : null;
+  if (submitButton) submitButton.disabled = true;
+  if (els.studentMessage) els.studentMessage.textContent = "Menghantar permohonan Cuti Semester...";
+
+  try {
+    const payload = buildSemesterPayloadV160(student);
+    let savedRecord;
+    if (isLiveMode) {
+      savedRecord = await apiPost("submitRequest", payload);
+      await loadTodayRecords();
+    } else {
+      savedRecord = createMockSemesterRecordV160(payload);
+      outingRecords.unshift(savedRecord);
+    }
+
+    if (typeof render === "function") {
+      render();
+    }
+    if (els.requestForm) {
+      els.requestForm.reset();
+    }
+    if (els.studentMessage) els.studentMessage.textContent = "Permohonan Cuti Semester berjaya dihantar.";
+    showSuccess("Permohonan Cuti Semester berjaya dihantar.", "Permohonan Dihantar");
+    return savedRecord;
+  } catch (error) {
+    console.error("Permohonan Cuti Semester gagal.", error);
+    const errorMessage = error.message || "Permohonan Cuti Semester gagal dihantar.";
+    if (els.studentMessage) els.studentMessage.textContent = errorMessage;
+    showError(errorMessage, "Permohonan Gagal");
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+    updateSemesterFieldsV160();
+  }
+}
+
+function validateSemesterRequestV160() {
+  const leaveDate = els.leaveDateInput ? els.leaveDateInput.value : "";
+  const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
+  const returnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
+  const location = els.locationInput ? els.locationInput.value.trim() : "";
+  const guardianPhone = els.guardianPhoneInput ? els.guardianPhoneInput.value.trim() : "";
+
+  if (!leaveDate) return "Tarikh Keluar / Tarikh Mula Cuti diperlukan.";
+  if (!returnDate) return "Tarikh Pulang Ke Asrama diperlukan.";
+  if (!returnTime) return "Masa Dijangka Pulang Ke Asrama diperlukan.";
+  if (returnDate < leaveDate) return "Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.";
+  if (!location) return "Alamat / destinasi semasa cuti diperlukan.";
+  if (!guardianPhone) return "Telefon waris diperlukan.";
+  return "";
+}
+
+function getCurrentStudentV160() {
+  return currentSession && currentSession.role === "student" ? currentSession.user : null;
+}
+
+function buildSemesterPayloadV160(student) {
+  const leaveDate = els.leaveDateInput.value;
+  return {
+    student_id: student.student_id || student.id || "",
+    no_matrik: student.no_matrik || student.matric || "",
+    jenis_permohonan: REQUEST_TYPE.semester,
+    tarikh: leaveDate,
+    hari: getDayNameFromDateKeyV160(leaveDate),
+    tujuan: (els.purposeInput && els.purposeInput.value.trim()) || "Cuti Semester",
+    lokasi: els.locationInput ? els.locationInput.value.trim() : "",
+    jenis_kenderaan: els.vehicleTypeSelect ? els.vehicleTypeSelect.value : "",
+    butiran_kenderaan: els.vehicleDetailInput ? els.vehicleDetailInput.value.trim() : "",
+    telefon_waris: els.guardianPhoneInput ? els.guardianPhoneInput.value.trim() : "",
+    hubungan_waris: els.guardianRelationSelect ? els.guardianRelationSelect.value : "",
+    catatan: els.emergencyNoteInput ? els.emergencyNoteInput.value.trim() : "",
+    tarikh_balik: els.returnDateInput ? els.returnDateInput.value : "",
+    hari_balik: getDayNameFromDateKeyV160(els.returnDateInput ? els.returnDateInput.value : ""),
+    masa_balik_dijangka: els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : ""
+  };
+}
+
+function createMockSemesterRecordV160(payload) {
+  const student = getCurrentStudentV160() || {};
+  const now = new Date();
+  const requestId = `MOCK-${Date.now()}-${nextRequestNumber++}`;
+  return {
+    ...payload,
+    id: requestId,
+    request_id: requestId,
+    studentName: student.name || student.nama || "",
+    nama: student.name || student.nama || "",
+    className: student.className || student.kelas || "",
+    kelas: student.className || student.kelas || "",
+    requestedAt: now.toISOString(),
+    masa_mohon: now.toISOString(),
+    status: STATUS.pending,
+    masa_keluar: "",
+    masa_masuk: "",
+    lewat: ""
+  };
+}
+
+function getDayNameFromDateKeyV160(dateKey) {
+  if (!dateKey) return "";
+  const date = new Date(`${dateKey}T00:00:00+08:00`);
+  if (isNaN(date.getTime())) return "";
+  const days = ["Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu"];
+  return days[date.getDay()];
+}
+
+function formatDisplayDateV160(value) {
+  const date = parseFlexibleDate(value);
+  if (!date) return value || "-";
+  const parts = getKualaLumpurParts(date);
+  return `${parts.day}/${parts.month}/${parts.year}`;
+}
+
+function formatExpectedReturnV160(record) {
+  const dateText = formatDisplayDateV160(record.tarikh_balik);
+  const timeText = record.masa_balik_dijangka || "-";
+  return dateText === "-" && timeText === "-" ? "-" : `${dateText} ${timeText}`;
+}
+
+function isHostelReturnLateV160(record) {
+  if (!record || (record.jenis_permohonan !== REQUEST_TYPE.overnight && record.jenis_permohonan !== REQUEST_TYPE.semester)) {
+    return false;
+  }
+
+  const returnDate = normalizeRecordDateKeyV15(record.tarikh_balik);
+  const returnTime = String(record.masa_balik_dijangka || "").slice(0, 5);
+  if (!returnDate || !/^\d{2}:\d{2}$/.test(returnTime)) {
+    return false;
+  }
+
+  const expected = new Date(`${returnDate}T${returnTime}:00+08:00`);
+  return !isNaN(expected.getTime()) && Date.now() > expected.getTime() && !record.masa_masuk && !record.returnedAt;
+}
+
 async function initApp() {
   setupAppVersionUi();
   setupServiceWorkerUpdates();
   setupAccessEnhancements();
+  setupSemesterRequestV160();
   setupFeedbackMessageObservers();
   updateEmergencyFields();
   updatePulangBermalamFields();
