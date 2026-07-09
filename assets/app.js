@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.3";
+const APP_VERSION = "1.6.4";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -4204,7 +4204,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.6.3";
+  button.textContent = "Apa yang baharu v1.6.4";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
 }
@@ -4216,7 +4216,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.6.3</h3>
+      <h3>Apa yang baharu v1.6.4</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -4232,6 +4232,7 @@ function toggleReleaseNotesV15() {
         <li>Hotfix butang hantar pelajar tidak lagi gagal semasa render</li>
         <li>Hotfix paparan medan Cuti Semester pada borang pelajar</li>
         <li>Hotfix medan waris dan tarikh Cuti Semester dipaparkan dengan betul</li>
+        <li>Refactor kawalan medan borang mengikut jenis permohonan</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
@@ -4278,12 +4279,13 @@ function setupSemesterRequestV160() {
   setupSemesterUiRepairV162();
 
   if (els.requestTypeSelect) {
+    els.requestTypeSelect.addEventListener("change", handleRequestTypeChangeV164, true);
     els.requestTypeSelect.addEventListener("change", () => {
       window.setTimeout(() => {
-        updateSemesterFieldsV160();
+        updateRequestTypeFields();
         updateStudentSubmitState();
       }, 0);
-      updateSemesterFieldsV160();
+      updateRequestTypeFields();
       updateStudentSubmitState();
     });
   }
@@ -4291,6 +4293,18 @@ function setupSemesterRequestV160() {
   if (els.requestForm && els.requestForm.dataset.semesterHandlerV160 !== "1") {
     els.requestForm.dataset.semesterHandlerV160 = "1";
     els.requestForm.addEventListener("submit", submitSemesterRequestV160, true);
+  }
+}
+
+function handleRequestTypeChangeV164(event) {
+  if (event) {
+    event.stopImmediatePropagation();
+  }
+
+  updateRequestTypeFields();
+  updateStudentSubmitState();
+  if (els.studentMessage) {
+    els.studentMessage.textContent = "";
   }
 }
 
@@ -4349,43 +4363,31 @@ function ensureSemesterLeaveDateFieldV160() {
   els.leaveDateInput = input;
 }
 
-function updateSemesterFieldsV160() {
+function updateRequestTypeFields() {
   const requestType = els.requestTypeSelect ? els.requestTypeSelect.value : "";
+  const isNormal = requestType === REQUEST_TYPE.normal;
+  const isEmergency = requestType === REQUEST_TYPE.emergency;
+  const isOvernight = requestType === REQUEST_TYPE.overnight;
   const isSemester = requestType === REQUEST_TYPE.semester;
   const purposeLabel = els.purposeInput ? document.querySelector(`label[for="${els.purposeInput.id}"]`) : null;
   const locationLabel = els.locationInput ? document.querySelector(`label[for="${els.locationInput.id}"]`) : null;
 
-  document.querySelectorAll("[data-semester-only]").forEach((element) => {
-    element.hidden = !isSemester;
-    element.style.display = isSemester ? "" : "none";
-  });
+  setSectionVisibleV164(els.overnightFields, isOvernight || isSemester);
+  setSectionVisibleV164(els.emergencyFields, isEmergency || isOvernight || isSemester);
+  setFieldAndLabelHiddenV160(els.leaveDateInput, !isSemester);
+  setFieldAndLabelHiddenV160(els.returnDateInput, !(isOvernight || isSemester));
+  setFieldAndLabelHiddenV160(els.expectedReturnTimeInput, !(isOvernight || isSemester));
+  setFieldAndLabelHiddenV160(els.emergencyReasonInput, !isEmergency);
+  setFieldAndLabelHiddenV160(els.guardianPhoneInput, !(isEmergency || isOvernight || isSemester));
+  setFieldAndLabelHiddenV160(els.guardianRelationSelect, !(isEmergency || isOvernight || isSemester));
+  setFieldAndLabelHiddenV160(els.emergencyNoteInput, !(isEmergency || isSemester));
 
-  if (els.overnightFields && isSemester) {
-    els.overnightFields.style.display = "grid";
-    els.overnightFields.hidden = false;
-    els.overnightFields.classList.add("active");
-    els.overnightFields.classList.remove("hidden", "is-hidden", "d-none");
-    const title = els.overnightFields.querySelector("h3");
-    if (title) title.textContent = "Maklumat Cuti Semester";
-    setFieldAndLabelHiddenV160(els.returnDateInput, false);
-    setFieldAndLabelHiddenV160(els.expectedReturnTimeInput, false);
-  }
-
-  if (els.emergencyFields && isSemester) {
-    els.emergencyFields.style.display = "grid";
-    els.emergencyFields.hidden = false;
-    els.emergencyFields.classList.add("active");
-    els.emergencyFields.classList.remove("hidden", "is-hidden", "d-none");
-    const title = els.emergencyFields.querySelector("h3");
-    if (title) title.textContent = "Maklumat Waris / Cuti Semester";
-  }
-
-  setFieldAndLabelHiddenV160(els.emergencyReasonInput, isSemester);
-  setFieldAndLabelHiddenV160(els.guardianPhoneInput, false);
-  setFieldAndLabelHiddenV160(els.guardianRelationSelect, false);
-  setFieldAndLabelHiddenV160(els.emergencyNoteInput, false);
+  const overnightTitle = els.overnightFields ? els.overnightFields.querySelector("h3") : null;
+  const emergencyTitle = els.emergencyFields ? els.emergencyFields.querySelector("h3") : null;
 
   if (isSemester) {
+    if (overnightTitle) overnightTitle.textContent = "Maklumat Cuti Semester";
+    if (emergencyTitle) emergencyTitle.textContent = "Maklumat Waris / Cuti Semester";
     if (purposeLabel) purposeLabel.textContent = "Tujuan Cuti Semester";
     if (locationLabel) locationLabel.textContent = "Alamat / Destinasi Semasa Cuti";
     setLabelTextV163(els.leaveDateInput, "Tarikh Keluar / Tarikh Mula Cuti");
@@ -4409,13 +4411,37 @@ function updateSemesterFieldsV160() {
     return;
   }
 
-  if (els.overnightFields) {
-    const title = els.overnightFields.querySelector("h3");
-    if (title) title.textContent = "Maklumat Pulang Bermalam";
+  if (isOvernight) {
+    if (overnightTitle) overnightTitle.textContent = "Maklumat Pulang Bermalam";
+    if (emergencyTitle) emergencyTitle.textContent = "Maklumat Waris";
+    if (purposeLabel) purposeLabel.textContent = "Tujuan Pulang Bermalam";
+    if (locationLabel) locationLabel.textContent = "Alamat / Destinasi Bermalam";
+    setLabelTextV163(els.returnDateInput, "Tarikh Pulang Ke Asrama");
+    setLabelTextV163(els.expectedReturnTimeInput, "Masa Dijangka Pulang Ke Asrama");
+    setLabelTextV163(els.guardianPhoneInput, "Telefon Waris");
+    setLabelTextV163(els.guardianRelationSelect, "Hubungan Waris");
+    if (els.locationInput) {
+      els.locationInput.placeholder = "Alamat / destinasi bermalam";
+    }
+    return;
   }
-  if (els.emergencyFields) {
-    const title = els.emergencyFields.querySelector("h3");
-    if (title) title.textContent = "Maklumat Kecemasan";
+
+  if (isEmergency) {
+    if (emergencyTitle) emergencyTitle.textContent = "Maklumat Kecemasan";
+    if (purposeLabel) purposeLabel.textContent = "Tujuan Outing";
+    if (locationLabel) locationLabel.textContent = "Lokasi Outing";
+    setLabelTextV163(els.guardianPhoneInput, "No. Telefon Waris / Penjaga");
+    setLabelTextV163(els.guardianRelationSelect, "Hubungan Waris");
+    setLabelTextV163(els.emergencyNoteInput, "Catatan Kecemasan");
+    if (els.locationInput) {
+      els.locationInput.placeholder = "Contoh: Pekan Merlimau";
+    }
+    return;
+  }
+
+  if (isNormal || !requestType) {
+    if (overnightTitle) overnightTitle.textContent = "Maklumat Pulang Bermalam";
+    if (emergencyTitle) emergencyTitle.textContent = "Maklumat Kecemasan";
   }
   if (purposeLabel) purposeLabel.textContent = "Tujuan Outing";
   if (locationLabel) locationLabel.textContent = "Lokasi Outing";
@@ -4425,7 +4451,23 @@ function updateSemesterFieldsV160() {
   if (els.locationInput) {
     els.locationInput.placeholder = "Contoh: Pekan Merlimau";
   }
-  setFieldAndLabelHiddenV160(els.emergencyReasonInput, false);
+}
+
+function updateSemesterFieldsV160() {
+  updateRequestTypeFields();
+}
+
+function setSectionVisibleV164(section, visible) {
+  if (!section) {
+    return;
+  }
+
+  section.hidden = !visible;
+  section.style.display = visible ? "grid" : "none";
+  section.classList.toggle("active", visible);
+  if (visible) {
+    section.classList.remove("hidden", "is-hidden", "d-none");
+  }
 }
 
 function setLabelTextV163(field, text) {
@@ -4620,6 +4662,7 @@ function updateStudentSubmitState() {
 
     const hasStudentSession = Boolean(currentSession && currentSession.role === "student" && currentSession.user);
     const requestType = els.requestTypeSelect ? els.requestTypeSelect.value : "";
+    updateRequestTypeFields();
 
     if (!hasStudentSession || !requestType) {
       submitButton.disabled = true;
@@ -4639,11 +4682,12 @@ function updateStudentSubmitState() {
     if (requestType === REQUEST_TYPE.overnight) {
       const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
       const returnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
-      isReady = isReady && Boolean(returnDate && returnTime);
+      const guardianPhone = els.guardianPhoneInput ? els.guardianPhoneInput.value.trim() : "";
+      const guardianRelation = els.guardianRelationSelect ? els.guardianRelationSelect.value.trim() : "";
+      isReady = isReady && Boolean(returnDate && returnTime && guardianPhone && guardianRelation);
     }
 
     if (requestType === REQUEST_TYPE.semester) {
-      updateSemesterFieldsV160();
       const semesterState = getSemesterSubmitStateV162();
       isReady = semesterState.ready;
       if (!isReady) {
@@ -4869,6 +4913,14 @@ async function runStudentRefreshButtonV161(button, source) {
     button.textContent = originalText || "Refresh Status";
   }
 }
+
+updateEmergencyFields = function updateEmergencyFieldsRequestTypeBridgeV164() {
+  updateRequestTypeFields();
+};
+
+updatePulangBermalamFields = function updatePulangBermalamFieldsRequestTypeBridgeV164() {
+  updateRequestTypeFields();
+};
 
 async function initApp() {
   setupAppVersionUi();
