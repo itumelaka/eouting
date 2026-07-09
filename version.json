@@ -1,5 +1,5 @@
 {
-  "version": "1.6.8",
+  "version": "1.6.9",
   "releasedAt": "2026-07-09",
-  "notes": "Fix guard refresh visibility and improve warden semester leave checklist statuses."
+  "notes": "Expand warden checklist to include all outing request types."
 }

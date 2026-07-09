@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.8";
+const APP_VERSION = "1.6.9";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -4417,7 +4417,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.6.7";
+  button.textContent = `Apa yang baharu v${APP_VERSION}`;
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
   updateFooterActionsVisibility();
@@ -4430,7 +4430,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.6.7</h3>
+      <h3>Apa yang baharu v${APP_VERSION}</h3>
       <ul>
         <li>Tambah Refresh Status pada dashboard Guard</li>
         <li>Tambah auto-refresh Guard semasa sesi aktif</li>
@@ -5233,7 +5233,7 @@ function ensureWardenSemesterChecklist() {
   panel.id = "wardenSemesterChecklist";
   panel.innerHTML = `
     <div class="semester-checklist-heading">
-      <h3>Checklist Cuti Semester</h3>
+      <h3>Checklist Permohonan</h3>
       <span id="wardenSemesterCount"></span>
     </div>
     <div class="semester-checklist-summary" id="wardenSemesterSummary"></div>
@@ -5252,16 +5252,16 @@ function renderWardenSemesterChecklist(records) {
     return;
   }
 
-  const semesterRecords = records.filter((record) => record.jenis_permohonan === REQUEST_TYPE.semester);
+  const semesterRecords = records.filter((record) => Object.values(REQUEST_TYPE).includes(record.jenis_permohonan));
   if (els.wardenSemesterCount) {
-    els.wardenSemesterCount.textContent = `Cuti Semester: ${semesterRecords.length} permohonan`;
+    els.wardenSemesterCount.textContent = `Checklist Permohonan: ${semesterRecords.length} rekod`;
   }
   if (els.wardenSemesterSummary) {
-    els.wardenSemesterSummary.textContent = semesterChecklistSummary(semesterRecords);
+    els.wardenSemesterSummary.textContent = requestChecklistTypeSummary(semesterRecords) + " · " + semesterChecklistSummary(semesterRecords);
   }
 
   if (!semesterRecords.length) {
-    els.wardenSemesterList.innerHTML = emptyState("Tiada permohonan Cuti Semester.");
+    els.wardenSemesterList.innerHTML = emptyState("Tiada permohonan untuk dipaparkan.");
     return;
   }
 
@@ -5271,26 +5271,67 @@ function renderWardenSemesterChecklist(records) {
       return;
     }
     button.dataset.semesterChecklistReady = "1";
-    button.addEventListener("click", () => scrollToRecordCard(button.dataset.semesterRecordId));
+    button.addEventListener("click", () => {
+      if (button.dataset.semesterAction === "focus") {
+        scrollToRecordCard(button.dataset.semesterRecordId);
+      }
+    });
   });
 }
 
 function semesterChecklistItem(record) {
   const recordId = getRecordId(record);
   const status = semesterChecklistStatus(record);
+  const canFocusCard = record.status === STATUS.pending;
   return `
-    <button class="semester-checklist-item" type="button" data-semester-record-id="${escapeHtml(recordId)}">
+    <button class="semester-checklist-item${canFocusCard ? "" : " is-readonly"}" type="button" data-semester-action="${canFocusCard ? "focus" : "readonly"}" data-semester-record-id="${escapeHtml(recordId)}" aria-disabled="${canFocusCard ? "false" : "true"}">
       <span class="semester-status-icon semester-status-${status.key}" aria-hidden="true"></span>
       <span class="semester-checklist-main">
         <strong>${escapeHtml(record.studentName || record.nama || "-")}</strong>
         <small>${escapeHtml(record.className || record.kelas || "-")}</small>
       </span>
       <span class="semester-checklist-meta">
-        <span>${escapeHtml(formatExpectedReturnV160(record))}</span>
+        <span>${escapeHtml(requestChecklistDateTime(record))}</span>
+        <small class="request-type-badge request-type-${escapeHtml(record.jenis_permohonan || "unknown")}">${escapeHtml(requestChecklistTypeLabel(record))}</small>
         <small class="semester-status-badge semester-status-${status.key}">${escapeHtml(status.label)}</small>
       </span>
     </button>
   `;
+}
+
+function requestChecklistDateTime(record) {
+  const requestType = record.jenis_permohonan;
+  if (requestType === REQUEST_TYPE.overnight || requestType === REQUEST_TYPE.semester) {
+    return formatExpectedReturnV160(record);
+  }
+
+  const dateText = formatDisplayDateV160(record.tarikh || record.requestDate || record.requestedAt || record.masa_mohon);
+  const timeText = formatDisplayTimeV165(record.masa_keluar || record.masa_masuk || record.masa_mohon || record.requestedAt);
+  return dateText === "-" && timeText === "-" ? "-" : `${dateText} ${timeText}`;
+}
+
+function requestChecklistTypeLabel(record) {
+  const type = record && record.jenis_permohonan;
+  return REQUEST_TYPE_LABEL[type] || type || "-";
+}
+
+function requestChecklistTypeSummary(records) {
+  if (!records.length) {
+    return "Tiada jenis permohonan.";
+  }
+
+  const counts = records.reduce((acc, record) => {
+    const type = record.jenis_permohonan || "unknown";
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+
+  return [
+    `Outing: ${counts[REQUEST_TYPE.normal] || 0}`,
+    `Bermalam: ${counts[REQUEST_TYPE.overnight] || 0}`,
+    `Cuti Semester: ${counts[REQUEST_TYPE.semester] || 0}`,
+    `Kecemasan: ${counts[REQUEST_TYPE.emergency] || 0}`
+  ].join(" · ");
 }
 
 function semesterChecklistSummary(records) {
@@ -5306,9 +5347,9 @@ function semesterChecklistSummary(records) {
   const parts = [
     ["pending", "Menunggu"],
     ["approved", "Diluluskan"],
+    ["rejected", "Ditolak"],
     ["out", "Sedang Keluar"],
     ["returned", "Selesai"],
-    ["rejected", "Ditolak"],
     ["late", "Lewat"]
   ];
 

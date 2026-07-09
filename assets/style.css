@@ -685,6 +685,15 @@ textarea {
   outline: 0;
 }
 
+.semester-checklist-item.is-readonly {
+  cursor: default;
+}
+
+.semester-checklist-item.is-readonly:hover,
+.semester-checklist-item.is-readonly:focus {
+  border-color: rgba(8, 36, 92, 0.1);
+}
+
 .semester-status-icon {
   background: #ffffff;
   border: 2px solid var(--primary);
@@ -768,6 +777,27 @@ textarea {
 .semester-status-badge.semester-status-late {
   background: #fde8e8;
   color: var(--danger);
+}
+
+.request-type-badge {
+  background: #eef3fb;
+  border-radius: 999px;
+  color: var(--deep-navy);
+  display: inline-block;
+  font-weight: 800;
+  justify-self: end;
+  padding: 2px 7px;
+}
+
+.request-type-badge.request-type-KECEMASAN {
+  background: #fde8e8;
+  color: var(--danger);
+}
+
+.request-type-badge.request-type-PULANG_BERMALAM,
+.request-type-badge.request-type-CUTI_SEMESTER {
+  background: #e8f1ff;
+  color: var(--info);
 }
 
 .semester-checklist-empty {
