@@ -804,9 +804,9 @@ function buildTelegramStatusMessage_(title, record) {
   }
 
   if (record.jenis_permohonan === REQUEST_TYPE.overnight) {
-    lines.push("Tarikh Balik: " + formatTelegramDate_(record.tarikh_balik));
-    lines.push("Masa Balik Dijangka: " + formatTelegramTime_(record.masa_balik_dijangka));
-    lines.push("Jangkaan Balik: " + formatTelegramExpectedReturn_(record));
+    lines.push("Tarikh Pulang Ke Asrama: " + formatTelegramDate_(record.tarikh_balik));
+    lines.push("Masa Dijangka Pulang Ke Asrama: " + formatTelegramTime_(record.masa_balik_dijangka));
+    lines.push("Pulang ke asrama dijangka: " + formatTelegramExpectedReturn_(record));
     lines.push("Telefon Waris: " + (record.telefon_waris || "-"));
     lines.push("Hubungan Waris: " + (record.hubungan_waris || "-"));
   }
@@ -998,15 +998,15 @@ function validateOvernightRequest_(payload, keluarDate) {
   const keluarDateKey = formatDate_(keluarDate);
 
   if (!returnDateKey || !expectedReturnTime) {
-    throw new Error("Tarikh balik dan masa balik dijangka diperlukan untuk Pulang Bermalam.");
+    throw new Error("Tarikh Pulang Ke Asrama dan Masa Dijangka Pulang Ke Asrama diperlukan untuk Pulang Bermalam.");
   }
 
   if (returnDateKey < keluarDateKey) {
-    throw new Error("Tarikh balik tidak boleh lebih awal daripada tarikh keluar.");
+    throw new Error("Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.");
   }
 
   if (!/^\d{2}:\d{2}/.test(expectedReturnTime)) {
-    throw new Error("Masa balik dijangka tidak sah.");
+    throw new Error("Masa Dijangka Pulang Ke Asrama tidak sah.");
   }
 
   const day = keluarDate.getDay();
