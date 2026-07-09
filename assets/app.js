@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.5";
+const APP_VERSION = "1.6.6";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -500,6 +500,7 @@ els.logoutButton.addEventListener("click", () => {
   els.accessScreen.classList.remove("hidden");
   hideLoginPanels();
   els.studentLoginMessage.textContent = "";
+  updateFooterActionsVisibility();
   showInfo("Anda telah log keluar.");
 });
 
@@ -3928,6 +3929,7 @@ function showSignedInTab(tabName) {
     document.querySelectorAll("#appWorkspace .tab-panel").forEach((panel) => {
       panel.classList.toggle("active", panel.id === tabName);
     });
+    updateFooterActionsVisibility();
   } catch (error) {
     console.warn("Paparan semasa tidak dapat dikekalkan sepenuhnya.", error);
   }
@@ -3968,6 +3970,7 @@ function showStaffDashboardTab(role) {
   document.querySelectorAll(".tab-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.id === targetTab);
   });
+  updateFooterActionsVisibility();
 }
 
 const renderOriginalV15 = render;
@@ -3990,6 +3993,7 @@ function enhanceOperationalMonitoringV15() {
   renderOvernightNotReturnedSectionsV15();
   ensureCsvExportButtonsV15();
   ensureReleaseNotesV15();
+  updateFooterActionsVisibility();
 }
 
 const QUICK_FILTERS_V15 = [
@@ -4114,7 +4118,11 @@ function isOvernightNotReturnedV15(record) {
 
 function ensureCsvExportButtonsV15() {
   const footer = document.querySelector(".app-footer");
-  if (!footer || document.querySelector("#exportTodayCsvButton")) return;
+  if (!footer) return;
+  if (document.querySelector("#exportTodayCsvButton")) {
+    updateFooterActionsVisibility();
+    return;
+  }
   const todayButton = document.createElement("button");
   todayButton.id = "exportTodayCsvButton";
   todayButton.className = "system-refresh-button";
@@ -4129,6 +4137,7 @@ function ensureCsvExportButtonsV15() {
   monthButton.addEventListener("click", () => exportRecordsCsvV15("month"));
   footer.insertBefore(todayButton, els.systemRefreshButton || null);
   footer.insertBefore(monthButton, els.systemRefreshButton || null);
+  updateFooterActionsVisibility();
 }
 
 function exportRecordsCsvV15(scope) {
@@ -4199,14 +4208,19 @@ function downloadCsvV15(csv, filename) {
 
 function ensureReleaseNotesV15() {
   const footer = document.querySelector(".app-footer");
-  if (!footer || document.querySelector("#releaseNotesButton")) return;
+  if (!footer) return;
+  if (document.querySelector("#releaseNotesButton")) {
+    updateFooterActionsVisibility();
+    return;
+  }
   const button = document.createElement("button");
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.6.5";
+  button.textContent = "Apa yang baharu v1.6.6";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
+  updateFooterActionsVisibility();
 }
 
 function toggleReleaseNotesV15() {
@@ -4216,7 +4230,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.6.5</h3>
+      <h3>Apa yang baharu v1.6.6</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -4234,6 +4248,7 @@ function toggleReleaseNotesV15() {
         <li>Hotfix medan waris dan tarikh Cuti Semester dipaparkan dengan betul</li>
         <li>Refactor kawalan medan borang mengikut jenis permohonan</li>
         <li>Hotfix format masa pulang Cuti Semester pada kad rekod</li>
+        <li>Kemas paparan butang utiliti bawah untuk Warden sahaja</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
@@ -4283,6 +4298,35 @@ function sanitizeReturnTimeHtmlV165(html, record) {
   return html
     .replaceAll(escapeHtml(rawTime), escapeHtml(displayTime))
     .replaceAll(rawTime, displayTime);
+}
+
+function updateFooterActionsVisibility() {
+  const activeTab = document.querySelector("#appWorkspace .tab-button.active");
+  const isWardenScreen = Boolean(
+    currentSession &&
+    currentSession.role === "warden" &&
+    els.appWorkspace &&
+    els.appWorkspace.classList.contains("active") &&
+    activeTab &&
+    activeTab.dataset.tab === "warden"
+  );
+
+  [
+    els.systemRefreshButton,
+    document.querySelector("#exportTodayCsvButton"),
+    document.querySelector("#exportMonthCsvButton"),
+    document.querySelector("#releaseNotesButton")
+  ].filter(Boolean).forEach((button) => {
+    button.hidden = !isWardenScreen;
+    button.style.display = isWardenScreen ? "" : "none";
+  });
+}
+
+function setupFooterActionsVisibilityV166() {
+  document.addEventListener("click", () => {
+    window.setTimeout(updateFooterActionsVisibility, 0);
+  }, true);
+  updateFooterActionsVisibility();
 }
 
 function setupSemesterRequestV160() {
@@ -4977,6 +5021,7 @@ async function initApp() {
   setupAppVersionUi();
   setupServiceWorkerUpdates();
   setupAccessEnhancements();
+  setupFooterActionsVisibilityV166();
   setupSemesterRequestV160();
   setupSafeStudentRefreshV161();
   setupFeedbackMessageObservers();
@@ -4996,6 +5041,7 @@ async function initApp() {
   if (isLiveMode) {
     await restoreSavedSession();
   }
+  updateFooterActionsVisibility();
 }
 
 initApp();
