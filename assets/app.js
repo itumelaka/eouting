@@ -71,6 +71,8 @@ let isLiveMode = false;
 let dataModeMessage = "";
 let studentRefreshIntervalId = null;
 let studentLastUpdatedAt = null;
+let guardRefreshIntervalId = null;
+let guardLastUpdatedAt = null;
 let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
 let toastTimerId = null;
@@ -130,6 +132,8 @@ const els = {
   wardenApprovedList: document.querySelector("#wardenApprovedList"),
   guardApprovedList: document.querySelector("#guardApprovedList"),
   guardOutList: document.querySelector("#guardOutList"),
+  guardRefreshButton: null,
+  guardLastUpdated: null,
   allRecordsList: document.querySelector("#allRecordsList"),
   countPending: document.querySelector("#countPending"),
   countApproved: document.querySelector("#countApproved"),
@@ -494,6 +498,7 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
 els.logoutButton.addEventListener("click", () => {
   clearSavedSession();
   stopStudentAutoRefresh();
+  stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
   els.appWorkspace.classList.remove("active");
@@ -1476,6 +1481,105 @@ function updateStudentLastUpdated() {
     : "";
 }
 
+function ensureGuardRefreshControls() {
+  if (!els.guardApprovedList) {
+    return;
+  }
+
+  if (!els.guardRefreshButton) {
+    const controls = document.createElement("div");
+    controls.className = "monitor-actions";
+    controls.id = "guardRefreshControls";
+
+    els.guardRefreshButton = document.createElement("button");
+    els.guardRefreshButton.className = "secondary-action";
+    els.guardRefreshButton.id = "guardRefreshButton";
+    els.guardRefreshButton.type = "button";
+    els.guardRefreshButton.textContent = "Refresh Status";
+
+    els.guardLastUpdated = document.createElement("small");
+    els.guardLastUpdated.id = "guardLastUpdated";
+
+    controls.appendChild(els.guardRefreshButton);
+    controls.appendChild(els.guardLastUpdated);
+    els.guardApprovedList.parentNode.insertBefore(controls, els.guardApprovedList);
+  }
+
+  if (els.guardRefreshButton.dataset.guardRefreshReady !== "1") {
+    els.guardRefreshButton.dataset.guardRefreshReady = "1";
+    els.guardRefreshButton.addEventListener("click", () => refreshGuardRecords("button"));
+  }
+}
+
+function updateGuardLastUpdated() {
+  guardLastUpdatedAt = new Date();
+  if (els.guardLastUpdated) {
+    els.guardLastUpdated.textContent = `Dikemaskini: ${guardLastUpdatedAt.toLocaleTimeString("ms-MY", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    })}`;
+  }
+}
+
+async function refreshGuardRecords(source) {
+  if (!currentSession || currentSession.role !== "guard") {
+    return;
+  }
+
+  ensureGuardRefreshControls();
+  const button = els.guardRefreshButton;
+  const originalText = button ? button.textContent : "";
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Memuat semula...";
+  }
+
+  try {
+    if (isLiveMode) {
+      const records = await apiGet("getTodayRecords");
+      outingRecords = records.map(mapLiveRecord);
+      render();
+    } else {
+      renderGuard();
+    }
+    showSignedInTab("guard");
+    updateGuardLastUpdated();
+    if (source === "button") {
+      showSuccess("Status guard telah dimuat semula.", "Refresh Status");
+    }
+  } catch (error) {
+    console.error("Refresh status Guard gagal.", error);
+    showSignedInTab("guard");
+    showError("Status guard gagal dimuat semula. Sila cuba lagi.", "Refresh Gagal");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || "Refresh Status";
+    }
+  }
+}
+
+function startGuardAutoRefresh() {
+  stopGuardAutoRefresh();
+  guardRefreshIntervalId = window.setInterval(() => {
+    if (!currentSession || currentSession.role !== "guard" || !isWorkspaceActive(els.appWorkspace)) {
+      stopGuardAutoRefresh();
+      return;
+    }
+
+    refreshGuardRecords("auto");
+  }, 30000);
+}
+
+function stopGuardAutoRefresh() {
+  if (guardRefreshIntervalId) {
+    window.clearInterval(guardRefreshIntervalId);
+    guardRefreshIntervalId = null;
+  }
+}
+
 els.requestTypeSelect.addEventListener("change", updateEmergencyFields);
 
 els.requestForm.addEventListener("submit", async (event) => {
@@ -1606,6 +1710,7 @@ function hideLoginPanels() {
 function startSession(role, user) {
   // Mock frontend access only. Real GAS backend must validate role and identity later.
   stopStudentAutoRefresh();
+  stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = { role, user };
   if (els.monitorWorkspace) {
@@ -1620,6 +1725,10 @@ function startSession(role, user) {
   if (role === "student") {
     refreshStudentLiveRecords();
     startStudentAutoRefresh();
+  }
+  if (role === "guard") {
+    refreshGuardRecords("login");
+    startGuardAutoRefresh();
   }
 }
 
@@ -2493,6 +2602,7 @@ function renderWarden() {
 }
 
 function renderGuard() {
+  ensureGuardRefreshControls();
   const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
   const outRecords = outingRecords.filter((record) => record.status === STATUS.out);
 
