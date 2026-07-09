@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.5.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -3574,35 +3574,52 @@ async function hardReloadAppShell() {
     return;
   }
 
+  await refreshCurrentAppView();
+}
+
+async function refreshCurrentAppView() {
+  const originalText = els.systemRefreshButton ? els.systemRefreshButton.textContent : "";
+
   if (els.systemRefreshButton) {
     els.systemRefreshButton.disabled = true;
     els.systemRefreshButton.textContent = "Memuat semula...";
   }
 
   try {
-    clearSavedSession();
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    students = [];
-    setStudentDropdownState("loading");
-
-    if ("caches" in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames
-        .filter((name) => name.indexOf("eouting-cache-") === 0)
-        .map((name) => caches.delete(name)));
+    if (isWorkspaceActive(els.monitorWorkspace)) {
+      await refreshMonitoringRecords();
+      showSuccess("Data pemantauan telah dimuat semula.", "Muat Semula Sistem");
+      return;
     }
 
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((registration) => registration.unregister()));
+    if (isWorkspaceActive(els.statsWorkspace)) {
+      await loadStatistics();
+      showSuccess("Statistik telah dimuat semula.", "Muat Semula Sistem");
+      return;
     }
+
+    if (isValidActiveSession()) {
+      if (currentSession.role === "student") {
+        await refreshActiveStudentSession();
+        showSuccess("Rekod pelajar telah dimuat semula.", "Muat Semula Sistem");
+        return;
+      }
+
+      await refreshSignedInWorkspace();
+      showSuccess("Data telah dimuat semula.", "Muat Semula Sistem");
+      return;
+    }
+
+    await refreshAccessScreenMasters();
   } catch (error) {
-    console.warn("Muat Semula Sistem tidak dapat membersihkan cache sepenuhnya.", error);
+    console.error("Muat Semula Sistem gagal.", error);
+    showError("Muat semula gagal. Paparan semasa dikekalkan, sila cuba lagi.", "Muat Semula Gagal");
+  } finally {
+    if (els.systemRefreshButton) {
+      els.systemRefreshButton.disabled = false;
+      els.systemRefreshButton.textContent = originalText || "Muat Semula Sistem";
+    }
   }
-
-  const url = new URL(window.location.href);
-  url.searchParams.set("_reload", String(Date.now()));
-  window.location.replace(url.toString());
 }
 
 async function refreshActiveStaffDashboard() {
@@ -3640,6 +3657,107 @@ async function refreshActiveStaffDashboard() {
   }
 
   return true;
+}
+
+function isWorkspaceActive(workspace) {
+  return Boolean(workspace && workspace.classList && workspace.classList.contains("active"));
+}
+
+function isValidActiveSession() {
+  return Boolean(
+    currentSession &&
+    currentSession.role &&
+    currentSession.user &&
+    (currentSession.user.name || currentSession.user.nama || currentSession.user.nama_warden || currentSession.user.nama_guard)
+  );
+}
+
+async function refreshActiveStudentSession() {
+  showSignedInTab("pelajar");
+
+  try {
+    if (els.studentRecordsList) {
+      els.studentRecordsList.innerHTML = emptyState("Memuatkan rekod pelajar...");
+    }
+  } catch (error) {
+    console.warn("Paparan loading pelajar gagal dikemas kini.", error);
+  }
+
+  const tasks = [loadTodayRecords()];
+  if (isLiveMode) {
+    tasks.push(loadLiveMasters());
+  }
+
+  const results = await Promise.allSettled(tasks);
+  const failed = results.filter((result) => result.status === "rejected");
+  if (failed.length === results.length) {
+    throw failed[0].reason || new Error("Data pelajar gagal dimuat semula.");
+  }
+
+  showSignedInTab("pelajar");
+  if (typeof render === "function") {
+    render();
+  }
+}
+
+async function refreshSignedInWorkspace() {
+  const activeTab = document.querySelector(".tab-button.active");
+  const tabName = activeTab ? activeTab.dataset.tab : (currentSession && currentSession.role) || "dashboard";
+
+  showSignedInTab(tabName);
+  await loadTodayRecords();
+  showSignedInTab(tabName);
+}
+
+async function refreshAccessScreenMasters() {
+  try {
+    setStudentDropdownState("loading");
+  } catch (error) {
+    console.warn("Paparan loading senarai pelajar gagal dikemas kini.", error);
+  }
+
+  try {
+    await loadLiveMasters();
+  } catch (error) {
+    console.error("Gagal memuatkan semula data log masuk.", error);
+    try {
+      setStudentDropdownState("failed");
+      showStudentLoadFailurePanel();
+    } catch (uiError) {
+      console.warn("Paparan gagal muat senarai pelajar tidak dapat dikemas kini.", uiError);
+    }
+    throw error;
+  }
+}
+
+function showSignedInTab(tabName) {
+  try {
+    if (els.accessScreen) {
+      els.accessScreen.classList.add("hidden");
+    }
+
+    if (els.appWorkspace) {
+      els.appWorkspace.classList.add("active");
+    }
+
+    if (els.monitorWorkspace) {
+      els.monitorWorkspace.classList.remove("active");
+    }
+
+    if (els.statsWorkspace) {
+      els.statsWorkspace.classList.remove("active");
+    }
+
+    document.querySelectorAll(".tab-button").forEach((button) => {
+      button.classList.toggle("active", button.dataset.tab === tabName);
+    });
+
+    document.querySelectorAll("#appWorkspace .tab-panel").forEach((panel) => {
+      panel.classList.toggle("active", panel.id === tabName);
+    });
+  } catch (error) {
+    console.warn("Paparan semasa tidak dapat dikekalkan sepenuhnya.", error);
+  }
 }
 
 function showStaffDashboardLoading(role) {
@@ -3912,7 +4030,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.5.0";
+  button.textContent = "Apa yang baharu v1.5.1";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
 }
@@ -3924,7 +4042,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.5.0</h3>
+      <h3>Apa yang baharu v1.5.1</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -3933,6 +4051,7 @@ function toggleReleaseNotesV15() {
         <li>Export CSV</li>
         <li>Audit log</li>
         <li>Hubungi Waris</li>
+        <li>Hotfix Muat Semula Sistem kekal pada paparan aktif</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
