@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.5.2";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -72,6 +72,7 @@ let studentLastUpdatedAt = null;
 let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
 let toastTimerId = null;
+let activeRefreshPage = "access";
 const guardActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 
@@ -3553,6 +3554,7 @@ function ensureStudentRetryButton() {
 const setupAppVersionUiOriginal = setupAppVersionUi;
 setupAppVersionUi = function setupAppVersionUiWithHardRefresh() {
   setupAppVersionUiOriginal();
+  setupRefreshPageTrackingV152();
   setupSystemRefreshHardReload();
 };
 
@@ -3579,6 +3581,7 @@ async function hardReloadAppShell() {
 
 async function refreshCurrentAppView() {
   const originalText = els.systemRefreshButton ? els.systemRefreshButton.textContent : "";
+  const refreshPage = getActiveRefreshPageV152();
 
   if (els.systemRefreshButton) {
     els.systemRefreshButton.disabled = true;
@@ -3586,25 +3589,30 @@ async function refreshCurrentAppView() {
   }
 
   try {
-    if (isWorkspaceActive(els.monitorWorkspace)) {
-      await refreshMonitoringRecords();
+    if (refreshPage === "monitoring") {
+      await refreshActiveMonitoringPageV152();
       showSuccess("Data pemantauan telah dimuat semula.", "Muat Semula Sistem");
       return;
     }
 
-    if (isWorkspaceActive(els.statsWorkspace)) {
-      await loadStatistics();
+    if (refreshPage === "statistics") {
+      await refreshActiveStatisticsPageV152();
       showSuccess("Statistik telah dimuat semula.", "Muat Semula Sistem");
       return;
     }
 
-    if (isValidActiveSession()) {
-      if (currentSession.role === "student") {
+    if (refreshPage === "student") {
+      if (isValidStudentSessionV152()) {
         await refreshActiveStudentSession();
         showSuccess("Rekod pelajar telah dimuat semula.", "Muat Semula Sistem");
         return;
       }
 
+      await refreshStudentLoginStateV152();
+      return;
+    }
+
+    if (isValidActiveSession()) {
       await refreshSignedInWorkspace();
       showSuccess("Data telah dimuat semula.", "Muat Semula Sistem");
       return;
@@ -3619,6 +3627,168 @@ async function refreshCurrentAppView() {
       els.systemRefreshButton.disabled = false;
       els.systemRefreshButton.textContent = originalText || "Muat Semula Sistem";
     }
+  }
+}
+
+function setupRefreshPageTrackingV152() {
+  if (document.body && document.body.dataset.refreshPageTrackingV152 === "1") {
+    return;
+  }
+
+  if (document.body) {
+    document.body.dataset.refreshPageTrackingV152 = "1";
+  }
+
+  document.querySelectorAll("[data-role-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const role = button.dataset.roleChoice;
+      if (role === "monitor") {
+        setActiveRefreshPageV152("monitoring");
+        return;
+      }
+      if (role === "stats") {
+        setActiveRefreshPageV152("statistics");
+        return;
+      }
+      setActiveRefreshPageV152(role === "student" ? "student" : role || "access");
+    });
+  });
+
+  document.querySelectorAll(".tab-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      setActiveRefreshPageV152(button.dataset.tab === "pelajar" ? "student" : button.dataset.tab || "access");
+    });
+  });
+
+  if (els.monitorBackButton) {
+    els.monitorBackButton.addEventListener("click", () => setActiveRefreshPageV152("access"));
+  }
+
+  if (els.statsBackButton) {
+    els.statsBackButton.addEventListener("click", () => setActiveRefreshPageV152("access"));
+  }
+}
+
+function setActiveRefreshPageV152(page) {
+  activeRefreshPage = page || "access";
+  try {
+    if (document.body) {
+      document.body.dataset.activeRefreshPage = activeRefreshPage;
+    }
+  } catch (error) {
+    console.warn("Status halaman aktif tidak dapat disimpan.", error);
+  }
+}
+
+function getActiveRefreshPageV152() {
+  if (isWorkspaceActive(els.monitorWorkspace)) {
+    return "monitoring";
+  }
+
+  if (isWorkspaceActive(els.statsWorkspace)) {
+    return "statistics";
+  }
+
+  if (isWorkspaceActive(els.appWorkspace)) {
+    const activeTab = document.querySelector("#appWorkspace .tab-button.active");
+    if (activeTab && activeTab.dataset.tab) {
+      return activeTab.dataset.tab === "pelajar" ? "student" : activeTab.dataset.tab;
+    }
+
+    if (currentSession && currentSession.role) {
+      return currentSession.role === "student" ? "student" : currentSession.role;
+    }
+  }
+
+  return activeRefreshPage || (document.body && document.body.dataset.activeRefreshPage) || "access";
+}
+
+function isValidStudentSessionV152() {
+  return Boolean(currentSession && currentSession.role === "student" && currentSession.user);
+}
+
+async function refreshActiveMonitoringPageV152() {
+  setActiveRefreshPageV152("monitoring");
+  showMonitoringPageV152();
+
+  try {
+    if (els.monitorRecordsList) {
+      els.monitorRecordsList.innerHTML = emptyState("Memuatkan rekod pemantauan...");
+    }
+    if (els.monitorSummary) {
+      els.monitorSummary.innerHTML = emptyState("Memuatkan ringkasan...");
+    }
+  } catch (error) {
+    console.warn("Paparan loading pemantauan gagal dikemas kini.", error);
+  }
+
+  await refreshMonitoringRecords();
+  showMonitoringPageV152();
+}
+
+async function refreshActiveStatisticsPageV152() {
+  setActiveRefreshPageV152("statistics");
+  showStatisticsPageV152();
+
+  try {
+    if (els.statsSummary) {
+      els.statsSummary.innerHTML = emptyState("Memuatkan statistik...");
+    }
+    if (els.statsLeaderboard) {
+      els.statsLeaderboard.innerHTML = emptyState("Memuatkan ranking...");
+    }
+    if (els.statsClassSummary) {
+      els.statsClassSummary.innerHTML = emptyState("Memuatkan ringkasan kelas...");
+    }
+    if (els.statsStatusSummary) {
+      els.statsStatusSummary.innerHTML = emptyState("Memuatkan pecahan status...");
+    }
+  } catch (error) {
+    console.warn("Paparan loading statistik gagal dikemas kini.", error);
+  }
+
+  await loadStatistics();
+  showStatisticsPageV152();
+}
+
+async function refreshStudentLoginStateV152() {
+  setActiveRefreshPageV152("student");
+  showStudentLoginPageV152();
+  await refreshAccessScreenMasters();
+}
+
+function showMonitoringPageV152() {
+  try {
+    if (els.accessScreen) els.accessScreen.classList.add("hidden");
+    if (els.appWorkspace) els.appWorkspace.classList.remove("active");
+    if (els.statsWorkspace) els.statsWorkspace.classList.remove("active");
+    if (els.monitorWorkspace) els.monitorWorkspace.classList.add("active");
+  } catch (error) {
+    console.warn("Paparan Pemantauan Semasa tidak dapat dikekalkan.", error);
+  }
+}
+
+function showStatisticsPageV152() {
+  try {
+    if (els.accessScreen) els.accessScreen.classList.add("hidden");
+    if (els.appWorkspace) els.appWorkspace.classList.remove("active");
+    if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
+    if (els.statsWorkspace) els.statsWorkspace.classList.add("active");
+  } catch (error) {
+    console.warn("Paparan Statistik tidak dapat dikekalkan.", error);
+  }
+}
+
+function showStudentLoginPageV152() {
+  try {
+    if (els.appWorkspace) els.appWorkspace.classList.remove("active");
+    if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
+    if (els.statsWorkspace) els.statsWorkspace.classList.remove("active");
+    if (els.accessScreen) els.accessScreen.classList.remove("hidden");
+    hideLoginPanels();
+    if (els.studentLoginPanel) els.studentLoginPanel.classList.add("active");
+  } catch (error) {
+    console.warn("Paparan log masuk pelajar tidak dapat dipulihkan.", error);
   }
 }
 
@@ -4030,7 +4200,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.5.1";
+  button.textContent = "Apa yang baharu v1.5.2";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
 }
@@ -4042,7 +4212,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.5.1</h3>
+      <h3>Apa yang baharu v1.5.2</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -4052,6 +4222,7 @@ function toggleReleaseNotesV15() {
         <li>Audit log</li>
         <li>Hubungi Waris</li>
         <li>Hotfix Muat Semula Sistem kekal pada paparan aktif</li>
+        <li>Hotfix Pelajar, Pemantauan Semasa dan Statistik refresh in-place</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
