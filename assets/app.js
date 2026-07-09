@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -4204,7 +4204,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.6.0";
+  button.textContent = "Apa yang baharu v1.6.1";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
 }
@@ -4216,7 +4216,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.6.0</h3>
+      <h3>Apa yang baharu v1.6.1</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -4229,6 +4229,7 @@ function toggleReleaseNotesV15() {
         <li>Hotfix Pelajar, Pemantauan Semasa dan Statistik refresh in-place</li>
         <li>Sokongan permohonan Cuti Semester</li>
         <li>Pemantauan Cuti Semester / Belum Pulang Ke Asrama</li>
+        <li>Hotfix butang hantar pelajar tidak lagi gagal semasa render</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
@@ -4271,15 +4272,29 @@ function setupSemesterRequestV160() {
   ensureSemesterOptionV160();
   ensureSemesterLeaveDateFieldV160();
   updateSemesterFieldsV160();
+  setupStudentSubmitStateHandlersV161();
 
   if (els.requestTypeSelect) {
-    els.requestTypeSelect.addEventListener("change", updateSemesterFieldsV160);
+    els.requestTypeSelect.addEventListener("change", () => {
+      updateSemesterFieldsV160();
+      updateStudentSubmitState();
+    });
   }
 
   if (els.requestForm && els.requestForm.dataset.semesterHandlerV160 !== "1") {
     els.requestForm.dataset.semesterHandlerV160 = "1";
     els.requestForm.addEventListener("submit", submitSemesterRequestV160, true);
   }
+}
+
+function setupStudentSubmitStateHandlersV161() {
+  if (!els.requestForm || els.requestForm.dataset.submitStateV161 === "1") {
+    return;
+  }
+
+  els.requestForm.dataset.submitStateV161 = "1";
+  els.requestForm.addEventListener("input", updateStudentSubmitState);
+  els.requestForm.addEventListener("change", updateStudentSubmitState);
 }
 
 function ensureSemesterOptionV160() {
@@ -4521,11 +4536,241 @@ function isHostelReturnLateV160(record) {
   return !isNaN(expected.getTime()) && Date.now() > expected.getTime() && !record.masa_masuk && !record.returnedAt;
 }
 
+function updateStudentSubmitState() {
+  try {
+    if (!els || !els.requestForm) {
+      return;
+    }
+
+    const submitButton = els.requestForm.querySelector('button[type="submit"]');
+    if (!submitButton) {
+      return;
+    }
+
+    const hasStudentSession = Boolean(currentSession && currentSession.role === "student" && currentSession.user);
+    const requestType = els.requestTypeSelect ? els.requestTypeSelect.value : "";
+
+    if (!hasStudentSession || !requestType) {
+      submitButton.disabled = true;
+      return;
+    }
+
+    const purpose = els.purposeInput ? els.purposeInput.value.trim() : "";
+    const location = els.locationInput ? els.locationInput.value.trim() : "";
+    const vehicleType = els.vehicleTypeSelect ? els.vehicleTypeSelect.value : "";
+    let isReady = Boolean(purpose && location && vehicleType);
+
+    if (requestType === REQUEST_TYPE.emergency) {
+      const emergencyReason = els.emergencyReasonInput ? els.emergencyReasonInput.value.trim() : "";
+      isReady = isReady && Boolean(emergencyReason);
+    }
+
+    if (requestType === REQUEST_TYPE.overnight) {
+      const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
+      const returnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
+      isReady = isReady && Boolean(returnDate && returnTime);
+    }
+
+    if (requestType === REQUEST_TYPE.semester) {
+      isReady = validateSemesterRequestV160() === "";
+    }
+
+    submitButton.disabled = !isReady;
+  } catch (error) {
+    console.warn("Status butang hantar pelajar tidak dapat dikemas kini.", error);
+  }
+}
+
+function resolveCurrentStudentSessionV161() {
+  const candidates = [
+    currentSession && currentSession.student,
+    currentSession && currentSession.user,
+    typeof currentStudent !== "undefined" ? currentStudent : null,
+    typeof selectedStudent !== "undefined" ? selectedStudent : null
+  ];
+
+  const sessionStudent = candidates.find((candidate) => candidate && typeof candidate === "object") || null;
+  const noMatrik = sessionStudent && (sessionStudent.no_matrik || sessionStudent.matric)
+    ? (sessionStudent.no_matrik || sessionStudent.matric)
+    : (currentSession && currentSession.no_matrik) || "";
+
+  if (!sessionStudent && !noMatrik) {
+    return null;
+  }
+
+  return {
+    ...(sessionStudent || {}),
+    id: (sessionStudent && (sessionStudent.id || sessionStudent.student_id)) || (currentSession && currentSession.student_id) || "",
+    student_id: (sessionStudent && (sessionStudent.student_id || sessionStudent.id)) || (currentSession && currentSession.student_id) || "",
+    name: (sessionStudent && (sessionStudent.name || sessionStudent.nama)) || (currentSession && currentSession.name) || "",
+    nama: (sessionStudent && (sessionStudent.nama || sessionStudent.name)) || (currentSession && currentSession.nama) || "",
+    no_matrik: noMatrik
+  };
+}
+
+function isRecordForStudentV161(record, student) {
+  if (!record || !student) {
+    return false;
+  }
+
+  const recordMatric = String(record.no_matrik || record.matric || "").trim().toLowerCase();
+  const studentMatric = String(student.no_matrik || student.matric || "").trim().toLowerCase();
+  const recordId = String(record.student_id || record.studentId || "").trim().toLowerCase();
+  const studentId = String(student.student_id || student.id || "").trim().toLowerCase();
+  const recordName = String(record.nama || record.studentName || record.name || "").trim().toLowerCase();
+  const studentName = String(student.nama || student.name || "").trim().toLowerCase();
+
+  return Boolean(
+    (recordMatric && studentMatric && recordMatric === studentMatric) ||
+    (recordId && studentId && recordId === studentId) ||
+    (recordName && studentName && recordName === studentName)
+  );
+}
+
+function getStudentRecordsV161(student) {
+  if (!Array.isArray(outingRecords) || !student) {
+    return [];
+  }
+
+  return outingRecords.filter((record) => isRecordForStudentV161(record, student));
+}
+
+function ensureStudentRefreshEmptyStateV161(student) {
+  if (!els.studentRecordsList) {
+    return;
+  }
+
+  const records = getStudentRecordsV161(student);
+  if (records.length > 0 || els.studentRecordsList.children.length > 0) {
+    return;
+  }
+
+  els.studentRecordsList.innerHTML = emptyState("Tiada permohonan aktif.");
+}
+
+function updateStudentLastUpdatedV161() {
+  studentLastUpdatedAt = new Date();
+  if (els.studentLastUpdated) {
+    const timeText = typeof formatTime === "function"
+      ? formatTime(studentLastUpdatedAt)
+      : studentLastUpdatedAt.toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" });
+    els.studentLastUpdated.textContent = `Dikemaskini ${timeText}`;
+  }
+}
+
+async function safeRefreshStudentRecordsV161(source) {
+  const student = resolveCurrentStudentSessionV161();
+  if (!student) {
+    console.warn("Refresh pelajar dibatalkan: sesi pelajar tidak ditemui.", { source, currentSession });
+    showSignedInTab("pelajar");
+    ensureStudentRefreshEmptyStateV161(null);
+    updateStudentLastUpdatedV161();
+    return { ok: true, skipped: true };
+  }
+
+  showSignedInTab("pelajar");
+
+  try {
+    if (els.studentRecordsList) {
+      els.studentRecordsList.innerHTML = emptyState("Memuatkan rekod pelajar...");
+    }
+  } catch (error) {
+    console.warn("Refresh pelajar: loading Rekod Saya gagal dipaparkan.", error);
+  }
+
+  try {
+    console.warn("Refresh pelajar: mula reload rekod.", {
+      source,
+      student_id: student.student_id || student.id || "",
+      no_matrik: student.no_matrik || ""
+    });
+
+    if (typeof loadTodayRecords === "function") {
+      await loadTodayRecords();
+    } else {
+      console.warn("Refresh pelajar: loadTodayRecords tidak tersedia, guna data sedia ada.");
+    }
+
+    showSignedInTab("pelajar");
+
+    if (typeof render === "function") {
+      render();
+    } else if (typeof renderStudent === "function") {
+      renderStudent();
+    } else {
+      console.warn("Refresh pelajar: render/renderStudent tidak tersedia.");
+    }
+
+    ensureStudentRefreshEmptyStateV161(student);
+    updateStudentLastUpdatedV161();
+    updateStudentSubmitState();
+    return { ok: true };
+  } catch (error) {
+    console.error("Refresh pelajar gagal pada langkah reload/render.", {
+      source,
+      student,
+      error
+    });
+    showSignedInTab("pelajar");
+    ensureStudentRefreshEmptyStateV161(student);
+    updateStudentLastUpdatedV161();
+    throw error;
+  }
+}
+
+refreshActiveStudentSession = async function refreshActiveStudentSessionV161() {
+  return safeRefreshStudentRecordsV161("system-refresh");
+};
+
+function setupSafeStudentRefreshV161() {
+  if (document.body && document.body.dataset.safeStudentRefreshDelegatedV161 !== "1") {
+    document.body.dataset.safeStudentRefreshDelegatedV161 = "1";
+    document.addEventListener("click", async (event) => {
+      const button = event.target && event.target.closest ? event.target.closest("#studentRefreshButton") : null;
+      if (!button) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      await runStudentRefreshButtonV161(button, "student-refresh-button");
+    }, true);
+  }
+
+  const button = els.studentRefreshButton || document.querySelector("#studentRefreshButton");
+  if (!button || button.dataset.safeStudentRefreshV161 === "1") {
+    return;
+  }
+
+  button.dataset.safeStudentRefreshV161 = "1";
+  button.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    await runStudentRefreshButtonV161(button, "student-refresh-button");
+  }, true);
+}
+
+async function runStudentRefreshButtonV161(button, source) {
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Memuat semula...";
+
+  try {
+    await safeRefreshStudentRecordsV161(source);
+  } catch (error) {
+    showError("Status pelajar gagal dimuat semula. Paparan semasa dikekalkan.", "Muat Semula Gagal");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText || "Refresh Status";
+  }
+}
+
 async function initApp() {
   setupAppVersionUi();
   setupServiceWorkerUpdates();
   setupAccessEnhancements();
   setupSemesterRequestV160();
+  setupSafeStudentRefreshV161();
   setupFeedbackMessageObservers();
   updateEmergencyFields();
   updatePulangBermalamFields();
