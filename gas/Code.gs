@@ -495,11 +495,31 @@ function getTodayRecords() {
     .filter((row) => {
       const rowDateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
       const returnDateKey = normalizeDateKey_(row.tarikh_balik);
-      const hostelReturnNotReturned = isHostelReturnRequest_(row) &&
-        row.status === STATUS.out &&
-        !hasCellValue_(row.masa_masuk);
-      return rowDateKey === todayKey || hostelReturnNotReturned || returnDateKey === todayKey;
+      const isTodayActivity = rowDateKey === todayKey ||
+        returnDateKey === todayKey ||
+        isDateValueToday_(row.masa_mohon, todayKey) ||
+        isDateValueToday_(row.masa_approve, todayKey) ||
+        isDateValueToday_(row.masa_keluar, todayKey) ||
+        isDateValueToday_(row.masa_masuk, todayKey);
+      const activeRecord = isActiveRequestStatus_(row.status);
+      // Active applications must stay visible even when tarikh is a future leave date.
+      const hostelReturnOpen = isHostelReturnRequest_(row) && isOpenHostelReturnStatus_(row.status);
+      return isTodayActivity || activeRecord || hostelReturnOpen;
     });
+}
+
+function isActiveRequestStatus_(status) {
+  const text = String(status || "");
+  return text === STATUS.pending || text === STATUS.approved || text === STATUS.out;
+}
+
+function isOpenHostelReturnStatus_(status) {
+  const text = String(status || "");
+  return text !== STATUS.done && text !== STATUS.rejected;
+}
+
+function isDateValueToday_(value, todayKey) {
+  return normalizeDateKey_(value) === todayKey;
 }
 
 function getOutingStats(payload) {
