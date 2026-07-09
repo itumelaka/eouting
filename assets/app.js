@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.4";
+const APP_VERSION = "1.6.5";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -4204,7 +4204,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.6.4";
+  button.textContent = "Apa yang baharu v1.6.5";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
 }
@@ -4216,7 +4216,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.6.4</h3>
+      <h3>Apa yang baharu v1.6.5</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -4233,6 +4233,7 @@ function toggleReleaseNotesV15() {
         <li>Hotfix paparan medan Cuti Semester pada borang pelajar</li>
         <li>Hotfix medan waris dan tarikh Cuti Semester dipaparkan dengan betul</li>
         <li>Refactor kawalan medan borang mengikut jenis permohonan</li>
+        <li>Hotfix format masa pulang Cuti Semester pada kad rekod</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
@@ -4246,6 +4247,7 @@ function toggleReleaseNotesV15() {
 const recordCardOriginalV160 = recordCard;
 recordCard = function recordCardWithSemesterSupport(record, mode) {
   let html = recordCardOriginalV160(record, mode);
+  html = sanitizeReturnTimeHtmlV165(html, record);
   if (!record || record.jenis_permohonan !== REQUEST_TYPE.semester) {
     return html;
   }
@@ -4256,7 +4258,7 @@ recordCard = function recordCardWithSemesterSupport(record, mode) {
       <span class="status-badge">Cuti Semester</span>
       <span>Tarikh Keluar: ${escapeHtml(formatDisplayDateV160(record.tarikh || record.requestedAt || record.masa_mohon))}</span>
       <span>Tarikh Pulang Ke Asrama: ${escapeHtml(formatDisplayDateV160(record.tarikh_balik))}</span>
-      <span>Masa Dijangka Pulang Ke Asrama: ${escapeHtml(record.masa_balik_dijangka || "-")}</span>
+      <span>Masa Dijangka Pulang Ke Asrama: ${escapeHtml(formatDisplayTimeV165(record.masa_balik_dijangka))}</span>
       <span>Pulang ke asrama dijangka: ${escapeHtml(formatExpectedReturnV160(record))}</span>
       ${record.telefon_waris ? `<span>Hubungi Waris: ${escapeHtml(record.telefon_waris)}</span>` : ""}
       ${isHostelReturnLateV160(record) ? '<span class="status-badge rejected">Lewat Pulang Ke Asrama</span>' : ""}
@@ -4270,6 +4272,18 @@ recordCard = function recordCardWithSemesterSupport(record, mode) {
   const divCloseIndex = html.lastIndexOf("</div>");
   return divCloseIndex === -1 ? html + details : html.slice(0, divCloseIndex) + details + html.slice(divCloseIndex);
 };
+
+function sanitizeReturnTimeHtmlV165(html, record) {
+  if (!html || !record || !record.masa_balik_dijangka) {
+    return html;
+  }
+
+  const rawTime = String(record.masa_balik_dijangka);
+  const displayTime = formatDisplayTimeV165(record.masa_balik_dijangka);
+  return html
+    .replaceAll(escapeHtml(rawTime), escapeHtml(displayTime))
+    .replaceAll(rawTime, displayTime);
+}
 
 function setupSemesterRequestV160() {
   ensureSemesterOptionV160();
@@ -4628,9 +4642,46 @@ function formatDisplayDateV160(value) {
   return `${parts.day}/${parts.month}/${parts.year}`;
 }
 
+function formatDisplayTimeV165(value) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return value.toLocaleTimeString("ms-MY", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Kuala_Lumpur"
+    });
+  }
+
+  const text = String(value).trim();
+  if (!text) {
+    return "-";
+  }
+
+  const timeOnlyMatch = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (timeOnlyMatch) {
+    return `${timeOnlyMatch[1].padStart(2, "0")}:${timeOnlyMatch[2]}`;
+  }
+
+  const parsed = new Date(text);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString("ms-MY", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Kuala_Lumpur"
+    });
+  }
+
+  return text;
+}
+
 function formatExpectedReturnV160(record) {
   const dateText = formatDisplayDateV160(record.tarikh_balik);
-  const timeText = record.masa_balik_dijangka || "-";
+  const timeText = formatDisplayTimeV165(record.masa_balik_dijangka);
   return dateText === "-" && timeText === "-" ? "-" : `${dateText} ${timeText}`;
 }
 
@@ -4640,7 +4691,7 @@ function isHostelReturnLateV160(record) {
   }
 
   const returnDate = normalizeRecordDateKeyV15(record.tarikh_balik);
-  const returnTime = String(record.masa_balik_dijangka || "").slice(0, 5);
+  const returnTime = formatDisplayTimeV165(record.masa_balik_dijangka);
   if (!returnDate || !/^\d{2}:\d{2}$/.test(returnTime)) {
     return false;
   }
