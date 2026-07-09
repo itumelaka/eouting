@@ -272,10 +272,6 @@ p {
   padding: 12px 14px;
 }
 
-.notice[hidden] {
-  display: none;
-}
-
 .notice.ok {
   background: #eaf7f1;
   border-color: #9bd5bc;

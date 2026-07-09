@@ -1,4 +1,4 @@
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.5.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -3699,8 +3699,6 @@ function enhanceOperationalMonitoringV15() {
   renderOvernightNotReturnedSectionsV15();
   ensureCsvExportButtonsV15();
   ensureReleaseNotesV15();
-  updateFooterActionVisibilityV151();
-  updateNoticeVisibilityV151();
 }
 
 const QUICK_FILTERS_V15 = [
@@ -3919,153 +3917,6 @@ function ensureReleaseNotesV15() {
   footer.appendChild(button);
 }
 
-function updateFooterActionVisibilityV151() {
-  const todayButton = document.querySelector("#exportTodayCsvButton");
-  const monthButton = document.querySelector("#exportMonthCsvButton");
-  const releaseButton = document.querySelector("#releaseNotesButton");
-  const activeSurface = getActiveSurfaceV151();
-  const showAdminActions = activeSurface === "warden" || activeSurface === "guard" || activeSurface === "monitor" || activeSurface === "stats";
-  const showMonth = activeSurface === "warden" || activeSurface === "monitor" || activeSurface === "stats";
-
-  if (todayButton) {
-    todayButton.hidden = !showAdminActions;
-  }
-
-  if (monthButton) {
-    monthButton.hidden = !showMonth;
-  }
-
-  if (releaseButton) {
-    releaseButton.hidden = !showAdminActions;
-  }
-
-  const notesPanel = document.querySelector("#releaseNotesPanel");
-  if (notesPanel && !showAdminActions) {
-    notesPanel.hidden = true;
-  }
-}
-
-function getActiveSurfaceV151() {
-  if (els.monitorWorkspace && els.monitorWorkspace.classList.contains("active")) {
-    return "monitor";
-  }
-
-  if (els.statsWorkspace && els.statsWorkspace.classList.contains("active")) {
-    return "stats";
-  }
-
-  return currentSession && currentSession.role ? currentSession.role : "login";
-}
-
-function updateNoticeVisibilityV151() {
-  if (!els.ruleNotice) {
-    return;
-  }
-
-  const hasMessage = Boolean(els.ruleNotice.textContent && els.ruleNotice.textContent.trim());
-  els.ruleNotice.hidden = !hasMessage;
-}
-
-function setupNoticeVisibilityObserverV151() {
-  if (!els.ruleNotice || els.ruleNotice.dataset.visibilityObserverReady === "1") {
-    return;
-  }
-
-  els.ruleNotice.dataset.visibilityObserverReady = "1";
-  const observer = new MutationObserver(updateNoticeVisibilityV151);
-  observer.observe(els.ruleNotice, {
-    attributes: true,
-    childList: true,
-    characterData: true,
-    subtree: true
-  });
-  updateNoticeVisibilityV151();
-}
-
-function setupChromeVisibilityEventsV151() {
-  if (els.logoutButton && els.logoutButton.dataset.visibilityHandlerReady !== "1") {
-    els.logoutButton.dataset.visibilityHandlerReady = "1";
-    els.logoutButton.addEventListener("click", refreshChromeVisibilitySoonV151);
-  }
-
-  document.querySelectorAll(".tab-button").forEach((button) => {
-    if (button.dataset.visibilityHandlerReady === "1") {
-      return;
-    }
-    button.dataset.visibilityHandlerReady = "1";
-    button.addEventListener("click", refreshChromeVisibilitySoonV151);
-  });
-}
-
-const showModeNoticeOriginalV151 = typeof showModeNotice === "function" ? showModeNotice : null;
-if (showModeNoticeOriginalV151) {
-  showModeNotice = function showModeNoticeWithVisibility(message) {
-    showModeNoticeOriginalV151(message);
-    updateNoticeVisibilityV151();
-  };
-}
-
-function refreshChromeVisibilitySoonV151() {
-  window.setTimeout(() => {
-    updateFooterActionVisibilityV151();
-    updateNoticeVisibilityV151();
-  }, 0);
-}
-
-const startSessionOriginalV151 = typeof startSession === "function" ? startSession : null;
-if (startSessionOriginalV151) {
-  startSession = function startSessionWithFooterVisibility(role, user) {
-    const result = startSessionOriginalV151(role, user);
-    refreshChromeVisibilitySoonV151();
-    return result;
-  };
-}
-
-const startStudentSessionOriginalV151 = typeof startStudentSession === "function" ? startStudentSession : null;
-if (startStudentSessionOriginalV151) {
-  startStudentSession = function startStudentSessionWithFooterVisibility(student) {
-    const result = startStudentSessionOriginalV151(student);
-    refreshChromeVisibilitySoonV151();
-    return result;
-  };
-}
-
-const openMonitoringPageOriginalV151 = typeof openMonitoringPage === "function" ? openMonitoringPage : null;
-if (openMonitoringPageOriginalV151) {
-  openMonitoringPage = function openMonitoringPageWithFooterVisibility() {
-    const result = openMonitoringPageOriginalV151();
-    refreshChromeVisibilitySoonV151();
-    return result;
-  };
-}
-
-const openStatisticsPageOriginalV151 = typeof openStatisticsPage === "function" ? openStatisticsPage : null;
-if (openStatisticsPageOriginalV151) {
-  openStatisticsPage = function openStatisticsPageWithFooterVisibility() {
-    const result = openStatisticsPageOriginalV151();
-    refreshChromeVisibilitySoonV151();
-    return result;
-  };
-}
-
-const closeMonitoringPageOriginalV151 = typeof closeMonitoringPage === "function" ? closeMonitoringPage : null;
-if (closeMonitoringPageOriginalV151) {
-  closeMonitoringPage = function closeMonitoringPageWithFooterVisibility() {
-    const result = closeMonitoringPageOriginalV151();
-    refreshChromeVisibilitySoonV151();
-    return result;
-  };
-}
-
-const closeStatisticsPageOriginalV151 = typeof closeStatisticsPage === "function" ? closeStatisticsPage : null;
-if (closeStatisticsPageOriginalV151) {
-  closeStatisticsPage = function closeStatisticsPageWithFooterVisibility() {
-    const result = closeStatisticsPageOriginalV151();
-    refreshChromeVisibilitySoonV151();
-    return result;
-  };
-}
-
 function toggleReleaseNotesV15() {
   let panel = document.querySelector("#releaseNotesPanel");
   if (!panel) {
@@ -4097,9 +3948,6 @@ async function initApp() {
   setupServiceWorkerUpdates();
   setupAccessEnhancements();
   setupFeedbackMessageObservers();
-  setupNoticeVisibilityObserverV151();
-  setupChromeVisibilityEventsV151();
-  updateFooterActionVisibilityV151();
   updateEmergencyFields();
   updatePulangBermalamFields();
   updateClock();
