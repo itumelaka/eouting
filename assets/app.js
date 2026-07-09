@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.1";
+const APP_VERSION = "1.6.2";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -4204,7 +4204,7 @@ function ensureReleaseNotesV15() {
   button.id = "releaseNotesButton";
   button.className = "system-refresh-button";
   button.type = "button";
-  button.textContent = "Apa yang baharu v1.6.1";
+  button.textContent = "Apa yang baharu v1.6.2";
   button.addEventListener("click", toggleReleaseNotesV15);
   footer.appendChild(button);
 }
@@ -4216,7 +4216,7 @@ function toggleReleaseNotesV15() {
     panel.id = "releaseNotesPanel";
     panel.className = "release-notes-panel";
     panel.innerHTML = `
-      <h3>Apa yang baharu v1.6.1</h3>
+      <h3>Apa yang baharu v1.6.2</h3>
       <ul>
         <li>Pulang Bermalam monitoring</li>
         <li>Belum Pulang / Lewat Pulang Ke Asrama</li>
@@ -4230,6 +4230,7 @@ function toggleReleaseNotesV15() {
         <li>Sokongan permohonan Cuti Semester</li>
         <li>Pemantauan Cuti Semester / Belum Pulang Ke Asrama</li>
         <li>Hotfix butang hantar pelajar tidak lagi gagal semasa render</li>
+        <li>Hotfix paparan medan Cuti Semester pada borang pelajar</li>
         <li>Loading and refresh improvements from v1.4.x</li>
       </ul>
     `;
@@ -4273,9 +4274,14 @@ function setupSemesterRequestV160() {
   ensureSemesterLeaveDateFieldV160();
   updateSemesterFieldsV160();
   setupStudentSubmitStateHandlersV161();
+  setupSemesterUiRepairV162();
 
   if (els.requestTypeSelect) {
     els.requestTypeSelect.addEventListener("change", () => {
+      window.setTimeout(() => {
+        updateSemesterFieldsV160();
+        updateStudentSubmitState();
+      }, 0);
       updateSemesterFieldsV160();
       updateStudentSubmitState();
     });
@@ -4285,6 +4291,22 @@ function setupSemesterRequestV160() {
     els.requestForm.dataset.semesterHandlerV160 = "1";
     els.requestForm.addEventListener("submit", submitSemesterRequestV160, true);
   }
+}
+
+function setupSemesterUiRepairV162() {
+  if (!els.requestForm || els.requestForm.dataset.semesterUiRepairV162 === "1") {
+    return;
+  }
+
+  els.requestForm.dataset.semesterUiRepairV162 = "1";
+  els.requestForm.addEventListener("input", () => {
+    updateSemesterFieldsV160();
+    updateStudentSubmitState();
+  });
+  els.requestForm.addEventListener("change", () => {
+    updateSemesterFieldsV160();
+    updateStudentSubmitState();
+  });
 }
 
 function setupStudentSubmitStateHandlersV161() {
@@ -4329,25 +4351,38 @@ function ensureSemesterLeaveDateFieldV160() {
 function updateSemesterFieldsV160() {
   const requestType = els.requestTypeSelect ? els.requestTypeSelect.value : "";
   const isSemester = requestType === REQUEST_TYPE.semester;
+  const purposeLabel = els.purposeInput ? document.querySelector(`label[for="${els.purposeInput.id}"]`) : null;
+  const locationLabel = els.locationInput ? document.querySelector(`label[for="${els.locationInput.id}"]`) : null;
 
   document.querySelectorAll("[data-semester-only]").forEach((element) => {
     element.hidden = !isSemester;
+    element.style.display = isSemester ? "" : "none";
   });
 
   if (els.overnightFields && isSemester) {
     els.overnightFields.style.display = "";
+    els.overnightFields.hidden = false;
+    els.overnightFields.classList.remove("hidden");
     const title = els.overnightFields.querySelector("h3");
     if (title) title.textContent = "Maklumat Cuti Semester";
+    setFieldAndLabelHiddenV160(els.returnDateInput, false);
+    setFieldAndLabelHiddenV160(els.expectedReturnTimeInput, false);
   }
 
   if (els.emergencyFields && isSemester) {
     els.emergencyFields.style.display = "";
+    els.emergencyFields.hidden = false;
+    els.emergencyFields.classList.remove("hidden");
   }
 
   setFieldAndLabelHiddenV160(els.emergencyReasonInput, isSemester);
+  setFieldAndLabelHiddenV160(els.guardianPhoneInput, false);
+  setFieldAndLabelHiddenV160(els.guardianRelationSelect, false);
   setFieldAndLabelHiddenV160(els.emergencyNoteInput, false);
 
   if (isSemester) {
+    if (purposeLabel) purposeLabel.textContent = "Tujuan Cuti Semester";
+    if (locationLabel) locationLabel.textContent = "Alamat / Destinasi Semasa Cuti";
     if (els.purposeInput && !els.purposeInput.value.trim()) {
       els.purposeInput.value = "Cuti Semester";
     }
@@ -4367,6 +4402,8 @@ function updateSemesterFieldsV160() {
     const title = els.overnightFields.querySelector("h3");
     if (title) title.textContent = "Maklumat Pulang Bermalam";
   }
+  if (purposeLabel) purposeLabel.textContent = "Tujuan Outing";
+  if (locationLabel) locationLabel.textContent = "Lokasi Outing";
   if (els.locationInput) {
     els.locationInput.placeholder = "Contoh: Pekan Merlimau";
   }
@@ -4378,8 +4415,12 @@ function setFieldAndLabelHiddenV160(field, hidden) {
     return;
   }
   field.hidden = hidden;
+  field.style.display = hidden ? "none" : "";
   const label = document.querySelector(`label[for="${field.id}"]`);
-  if (label) label.hidden = hidden;
+  if (label) {
+    label.hidden = hidden;
+    label.style.display = hidden ? "none" : "";
+  }
 }
 
 async function submitSemesterRequestV160(event) {
@@ -4444,13 +4485,14 @@ function validateSemesterRequestV160() {
   const returnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
   const location = els.locationInput ? els.locationInput.value.trim() : "";
   const guardianPhone = els.guardianPhoneInput ? els.guardianPhoneInput.value.trim() : "";
+  const guardianRelation = els.guardianRelationSelect ? els.guardianRelationSelect.value.trim() : "";
 
-  if (!leaveDate) return "Tarikh Keluar / Tarikh Mula Cuti diperlukan.";
   if (!returnDate) return "Tarikh Pulang Ke Asrama diperlukan.";
   if (!returnTime) return "Masa Dijangka Pulang Ke Asrama diperlukan.";
-  if (returnDate < leaveDate) return "Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.";
+  if (leaveDate && returnDate < leaveDate) return "Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.";
   if (!location) return "Alamat / destinasi semasa cuti diperlukan.";
   if (!guardianPhone) return "Telefon waris diperlukan.";
+  if (!guardianRelation) return "Hubungan waris diperlukan.";
   return "";
 }
 
@@ -4572,13 +4614,46 @@ function updateStudentSubmitState() {
     }
 
     if (requestType === REQUEST_TYPE.semester) {
-      isReady = validateSemesterRequestV160() === "";
+      const semesterState = getSemesterSubmitStateV162();
+      isReady = semesterState.ready;
+      if (!isReady) {
+        console.warn("Cuti Semester submit disabled.", {
+          requestType,
+          missing: semesterState.missing,
+          reason: semesterState.message
+        });
+      }
     }
 
     submitButton.disabled = !isReady;
   } catch (error) {
     console.warn("Status butang hantar pelajar tidak dapat dikemas kini.", error);
   }
+}
+
+function getSemesterSubmitStateV162() {
+  const purpose = els.purposeInput ? els.purposeInput.value.trim() : "";
+  const location = els.locationInput ? els.locationInput.value.trim() : "";
+  const guardianPhone = els.guardianPhoneInput ? els.guardianPhoneInput.value.trim() : "";
+  const guardianRelation = els.guardianRelationSelect ? els.guardianRelationSelect.value.trim() : "";
+  const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
+  const returnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
+  const leaveDate = els.leaveDateInput ? els.leaveDateInput.value : "";
+  const missing = [];
+
+  if (!purpose) missing.push("tujuan");
+  if (!location) missing.push("lokasi");
+  if (!guardianPhone) missing.push("telefon_waris");
+  if (!guardianRelation) missing.push("hubungan_waris");
+  if (!returnDate) missing.push("tarikh_balik");
+  if (!returnTime) missing.push("masa_balik_dijangka");
+  if (leaveDate && returnDate && returnDate < leaveDate) missing.push("tarikh_balik_sebelum_tarikh_keluar");
+
+  return {
+    ready: missing.length === 0,
+    missing,
+    message: missing.length ? `Medan belum lengkap: ${missing.join(", ")}` : ""
+  };
 }
 
 function resolveCurrentStudentSessionV161() {
