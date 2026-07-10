@@ -1,5 +1,5 @@
 {
-  "version": "1.6.10",
-  "releasedAt": "2026-07-09",
-  "notes": "Add copy name list for active warden requests."
+  "version": "1.6.11",
+  "releasedAt": "2026-07-10",
+  "notes": "Add status icons and legend to copied warden name list."
 }

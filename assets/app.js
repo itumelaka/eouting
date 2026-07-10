@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.10";
+const APP_VERSION = "1.6.11";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -5369,7 +5369,8 @@ function isWardenChecklistCopyActiveRecord(record) {
   return Boolean(record && (
     record.status === STATUS.pending ||
     record.status === STATUS.approved ||
-    record.status === STATUS.out
+    record.status === STATUS.out ||
+    record.status === STATUS.returned
   ));
 }
 
@@ -5377,9 +5378,28 @@ function buildWardenChecklistCopyText(records) {
   const header = getWardenChecklistCopyHeader();
   const names = records.map((record, index) => {
     const name = record.studentName || record.nama || record.name || "-";
-    return `${index + 1}. ${name}`;
+    return `${getWardenChecklistCopyStatusIcon(record)} ${index + 1}. ${name}`;
   });
-  return [header, "", ...names].join("\n");
+  return [
+    header,
+    "",
+    ...names,
+    "",
+    "Petunjuk:",
+    "🟡 Menunggu kelulusan",
+    "🟢 Diluluskan warden",
+    "🚶 Sedang keluar",
+    "✅ Sudah balik ke asrama"
+  ].join("\n");
+}
+
+function getWardenChecklistCopyStatusIcon(record) {
+  if (!record) return "•";
+  if (record.status === STATUS.pending) return "🟡";
+  if (record.status === STATUS.approved) return "🟢";
+  if (record.status === STATUS.out) return "🚶";
+  if (record.status === STATUS.returned) return "✅";
+  return "•";
 }
 
 function getWardenChecklistCopyHeader() {
