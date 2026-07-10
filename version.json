@@ -1,5 +1,5 @@
 {
-  "version": "1.6.17",
+  "version": "1.6.18",
   "releasedAt": "2026-07-10",
-  "notes": "Fix warden refresh error handling and reload messaging."
+  "notes": "Fix warden dashboard refresh regression and simplify utility actions."
 }

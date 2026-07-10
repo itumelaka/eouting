@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.17";
+const APP_VERSION = "1.6.18";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -163,7 +163,6 @@ const els = {
   countNotReturned: document.querySelector("#countNotReturned"),
   countEmergency: document.querySelector("#countEmergency"),
   appVersionText: document.querySelector("#appVersionText"),
-  systemRefreshButton: document.querySelector("#systemRefreshButton"),
   dataModeIndicator: null,
   liveRetryButton: null
 };
@@ -864,7 +863,7 @@ function setLiveUnavailableMode(message) {
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
   showError(
-    "Sistem tidak dapat berhubung dengan Google Sheets buat masa ini. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.",
+    "Sistem tidak dapat berhubung dengan Google Sheets buat masa ini. Sila tekan Cuba Lagi.",
     "Sambungan Live Tidak Stabil"
   );
 }
@@ -1031,10 +1030,6 @@ function showInfo(message, title = "Makluman") {
 function setupAppVersionUi() {
   if (els.appVersionText) {
     els.appVersionText.textContent = `eOuting ITU • v${APP_VERSION}`;
-  }
-
-  if (els.systemRefreshButton) {
-    els.systemRefreshButton.addEventListener("click", refreshSystemCaches);
   }
 }
 
@@ -3614,7 +3609,7 @@ loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
     updateDataModeIndicator();
     setStudentDropdownState("failed");
     showStudentLoadFailurePanel();
-    showModeNotice("Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.");
+    showModeNotice("Gagal memuatkan data dari Google Sheets. Sila tekan Cuba Lagi.");
   }
 };
 
@@ -3754,7 +3749,7 @@ async function retryLoadStudentsOnly() {
 
 function showStudentLoadFailurePanel() {
   if (els.studentLoginMessage) {
-    els.studentLoginMessage.textContent = "Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.";
+    els.studentLoginMessage.textContent = "Gagal memuatkan data dari Google Sheets. Sila tekan Cuba Lagi.";
   }
 
   const button = ensureStudentRetryButton();
@@ -3799,76 +3794,7 @@ const setupAppVersionUiOriginal = setupAppVersionUi;
 setupAppVersionUi = function setupAppVersionUiWithHardRefresh() {
   setupAppVersionUiOriginal();
   setupRefreshPageTrackingV152();
-  setupSystemRefreshHardReload();
 };
-
-function setupSystemRefreshHardReload() {
-  if (!els.systemRefreshButton || els.systemRefreshButton.dataset.hardRefreshReady === "1") {
-    return;
-  }
-
-  els.systemRefreshButton.dataset.hardRefreshReady = "1";
-  els.systemRefreshButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    hardReloadAppShell();
-  }, true);
-}
-
-async function hardReloadAppShell() {
-  await refreshSystemCaches();
-}
-
-async function refreshCurrentAppView() {
-  const originalText = els.systemRefreshButton ? els.systemRefreshButton.textContent : "";
-  const refreshPage = getActiveRefreshPageV152();
-
-  if (els.systemRefreshButton) {
-    els.systemRefreshButton.disabled = true;
-    els.systemRefreshButton.textContent = "Memuat semula...";
-  }
-
-  try {
-    if (refreshPage === "monitoring") {
-      await refreshActiveMonitoringPageV152();
-      showSuccess("Data pemantauan telah dimuat semula.", "Muat Semula Aplikasi");
-      return;
-    }
-
-    if (refreshPage === "statistics") {
-      await refreshActiveStatisticsPageV152();
-      showSuccess("Statistik telah dimuat semula.", "Muat Semula Aplikasi");
-      return;
-    }
-
-    if (refreshPage === "student") {
-      if (isValidStudentSessionV152()) {
-        await refreshActiveStudentSession();
-        showSuccess("Rekod pelajar telah dimuat semula.", "Muat Semula Aplikasi");
-        return;
-      }
-
-      await refreshStudentLoginStateV152();
-      return;
-    }
-
-    if (isValidActiveSession()) {
-      await refreshSignedInWorkspace();
-      showSuccess("Data telah dimuat semula.", "Muat Semula Aplikasi");
-      return;
-    }
-
-    await refreshAccessScreenMasters();
-  } catch (error) {
-    console.error("Muat Semula Aplikasi gagal.", error);
-    showError("Muat semula aplikasi gagal. Paparan semasa dikekalkan, sila cuba lagi.", "Muat Semula Gagal");
-  } finally {
-    if (els.systemRefreshButton) {
-      els.systemRefreshButton.disabled = false;
-      els.systemRefreshButton.textContent = originalText || "Muat Semula Aplikasi";
-    }
-  }
-}
 
 function setupRefreshPageTrackingV152() {
   if (document.body && document.body.dataset.refreshPageTrackingV152 === "1") {
@@ -4030,49 +3956,6 @@ function showStudentLoginPageV152() {
   } catch (error) {
     console.warn("Paparan log masuk pelajar tidak dapat dipulihkan.", error);
   }
-}
-
-async function refreshActiveStaffDashboard() {
-  if (!currentSession || (currentSession.role !== "warden" && currentSession.role !== "guard")) {
-    return false;
-  }
-
-  if (!currentSession.user || !currentSession.user.name) {
-    clearSavedSession();
-    return false;
-  }
-
-  const role = currentSession.role;
-  const originalText = els.systemRefreshButton ? els.systemRefreshButton.textContent : "";
-  if (els.systemRefreshButton) {
-    els.systemRefreshButton.disabled = true;
-    els.systemRefreshButton.textContent = "Memuat semula...";
-  }
-
-  showStaffDashboardLoading(role);
-
-  try {
-    if (role === "warden") {
-      await refreshWardenRecords("system-refresh");
-      showStaffDashboardTab(role);
-      return true;
-    }
-
-    await loadTodayRecords();
-    showStaffDashboardTab(role);
-    showSuccess("Data telah dimuat semula.", "Muat Semula Aplikasi");
-  } catch (error) {
-    console.error("Gagal memuat semula data staf.", error);
-    showStaffDashboardTab(role);
-    showError("Gagal memuat semula data. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.", "Muat Semula Gagal");
-  } finally {
-    if (els.systemRefreshButton) {
-      els.systemRefreshButton.disabled = false;
-      els.systemRefreshButton.textContent = originalText || "Muat Semula Aplikasi";
-    }
-  }
-
-  return true;
 }
 
 function isWorkspaceActive(workspace) {
@@ -4377,8 +4260,8 @@ function ensureCsvExportButtonsV15() {
   monthButton.type = "button";
   monthButton.textContent = "Muat Turun Laporan Bulanan";
   monthButton.addEventListener("click", () => exportRecordsCsvV15("month"));
-  footer.insertBefore(todayButton, els.systemRefreshButton || null);
-  footer.insertBefore(monthButton, els.systemRefreshButton || null);
+  footer.appendChild(todayButton);
+  footer.appendChild(monthButton);
   updateFooterActionsVisibility();
 }
 
@@ -4487,7 +4370,7 @@ function toggleReleaseNotesV15() {
         <li>Export CSV</li>
         <li>Audit log</li>
         <li>Hubungi Waris</li>
-        <li>Hotfix Muat Semula Aplikasi kekal pada paparan aktif</li>
+        <li>Hotfix refresh kekal pada paparan aktif</li>
         <li>Hotfix Pelajar, Pemantauan Semasa dan Statistik refresh in-place</li>
         <li>Sokongan permohonan Cuti Semester</li>
         <li>Pemantauan Cuti Semester / Belum Pulang Ke Asrama</li>
@@ -4560,7 +4443,6 @@ function updateFooterActionsVisibility() {
   );
 
   [
-    els.systemRefreshButton,
     document.querySelector("#exportTodayCsvButton"),
     document.querySelector("#exportMonthCsvButton"),
     document.querySelector("#releaseNotesButton")
@@ -5250,7 +5132,7 @@ async function runStudentRefreshButtonV161(button, source) {
   try {
     await safeRefreshStudentRecordsV161(source);
   } catch (error) {
-    showError("Status pelajar gagal dimuat semula. Paparan semasa dikekalkan.", "Muat Semula Gagal");
+    showError("Status pelajar gagal dimuat semula. Paparan semasa dikekalkan.", "Refresh Gagal");
   } finally {
     button.disabled = false;
     button.textContent = originalText || "Refresh Status";
@@ -5592,14 +5474,6 @@ function moveWardenUtilityButtons() {
   }
 
   Array.from(footer.querySelectorAll("button")).forEach((button) => {
-    if (button.id === "systemRefreshButton") {
-      button.textContent = "Muat Semula Aplikasi";
-      button.classList.add("app-reload-subtle-button");
-      if (els.wardenReloadAction) {
-        els.wardenReloadAction.appendChild(button);
-      }
-      return;
-    }
     els.wardenUtilityActions.appendChild(button);
   });
 }
@@ -5612,7 +5486,8 @@ async function refreshWardenRecords(source) {
   ensureWardenRefreshControls();
   const button = els.wardenRefreshButton;
   const originalText = button ? button.textContent : "";
-  const hasOldData = wardenHasLoadedOnce && Array.isArray(outingRecords) && outingRecords.length > 0;
+  const hasOldData = Array.isArray(outingRecords) && outingRecords.length > 0;
+  const shouldShowToast = source === "button";
 
   setWardenLoadingState(true, !hasOldData);
   if (button) {
@@ -5631,15 +5506,28 @@ async function refreshWardenRecords(source) {
     updateWardenLastUpdated();
   } catch (error) {
     console.error("Permohonan warden gagal dimuat.", { source, error });
-    if (!hasOldData) {
+    if (hasOldData) {
+      if (typeof render === "function") {
+        render();
+      } else if (typeof renderWarden === "function") {
+        renderWarden();
+      }
+      if (shouldShowToast) {
+        showError("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.", "Refresh Permohonan");
+      }
+    } else {
+      if (typeof ensureWardenSemesterChecklist === "function") {
+        ensureWardenSemesterChecklist();
+      }
       if (els.wardenList) {
         els.wardenList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
+      }
+      if (els.wardenApprovedList) {
+        els.wardenApprovedList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
       }
       if (els.wardenSemesterList) {
         els.wardenSemesterList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
       }
-    } else {
-      showError("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.", "Refresh Warden Gagal");
     }
   } finally {
     setWardenLoadingState(false, false);
@@ -5656,6 +5544,9 @@ async function loadWardenRecordsOnly() {
   }
 
   const records = await apiGet("getTodayRecords");
+  if (!Array.isArray(records)) {
+    throw new Error("Format rekod warden tidak sah.");
+  }
   outingRecords = records.map(mapLiveRecord);
 }
 
