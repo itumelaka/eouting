@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.6.16
+
+- Fixed stale Warden/Guard login error toast after successful staff login.
+- Hid empty yellow notice/banner when there is no message.
+- Bumped PWA cache, asset query strings, footer version, and `version.json`.
+
+## v1.6.15
+
+- Refined Warden utility actions so `Refresh Permohonan` remains the primary action.
+- Renamed `Muat Semula Sistem` to `Muat Semula Aplikasi`.
+- Moved app reload into a smaller/subtle action area.
+- Reduced Warden auto-refresh cadence from 30 seconds to 60 seconds.
+- Bumped PWA cache, asset query strings, footer version, and `version.json`.
+
+## v1.6.14
+
+- Added Warden Dashboard auto-refresh.
+- Added `Refresh Permohonan`, Warden loading state, and Warden updated timestamp.
+- Moved Warden utility buttons closer to the Warden Dashboard.
+- Kept footer focused on version text after utility buttons are moved.
+- Bumped PWA cache, asset query strings, footer version, and `version.json`.
+
+## v1.6.13
+
+- Added `Senarai Nama Semasa` to Pemantauan Semasa.
+- Displayed the WhatsApp-style status icon list inside the monitoring page.
+- Added subtle animated status icons for the live name list.
+- Bumped PWA cache, asset query strings, footer version, and `version.json`.
+
 ## v1.6.12
 
 - Added loading state to Pemantauan Semasa while monitoring records are being fetched.

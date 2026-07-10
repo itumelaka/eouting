@@ -1,6 +1,6 @@
 # Deployment
 
-Current version: **v1.6.12**
+Current version: **v1.6.16**
 
 ## Frontend
 
@@ -18,7 +18,7 @@ git commit -m "..."
 git push
 ```
 
-GitHub Pages should update from the pushed branch.
+GitHub Pages should update from the pushed branch. In normal operation, wait about 1-3 minutes before testing the live URL.
 
 ## Google Apps Script
 
@@ -48,7 +48,7 @@ If GitHub Pages appears stuck on an older build:
 4. Try a cache-bust URL:
 
 ```text
-https://itumelaka.github.io/eouting/index.html?v=force
+https://itumelaka.github.io/eouting/index.html?v=1.6.16
 ```
 
 5. If needed, clear browser site data/service worker cache.

@@ -1,16 +1,18 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan realiti keselamatan untuk **Pilot-running Live v1.3.1** eOuting ITU.
+Dokumen ini menerangkan realiti keselamatan untuk **Live/pilot stable v1.6.16** eOuting ITU.
 
-Status semasa:
+## Status Semasa
 
 - Frontend GitHub Pages: `https://itumelaka.github.io/eouting`
-- Basic PWA setup: siap
 - Google Sheets live backend melalui GAS: siap
 - Warden/Guard PIN login: siap
+- Backend staff action PIN hardening: siap
+- Empty/blank PIN rejected by backend: siap
+- Duplicate active request prevention in backend: siap
 - Telegram Bot notification: siap
 - Audit log asas: siap
-- Mock Mode hanya melalui `?mock=1`
+- PWA/version cache update: siap
 
 ## Prinsip Utama
 
@@ -28,19 +30,20 @@ Security sebenar mesti dibuat di GAS backend dan kawalan akses Google/Spreadshee
 
 ## PIN Reality
 
-Live v1.3.1 menggunakan PIN sebagai basic internal access control untuk Warden dan Guard.
+v1.6.16 menggunakan PIN sebagai basic internal access control untuk Warden dan Guard.
 
-PIN testing sementara:
+Backend memastikan:
 
-```text
-949494
-```
+- login Warden/Guard memerlukan nama + PIN.
+- approve/reject memerlukan nama Warden + PIN.
+- confirm keluar/masuk memerlukan nama Guard + PIN.
+- PIN kosong/null/whitespace ditolak.
+- lookup staff mesti match nama + PIN + status aktif.
+- PIN tidak dipulangkan dalam GET master-data response.
 
 Nota penting:
 
-- Ini bukan bank-grade security.
-- Ini bukan final production security.
-- PIN testing perlu ditukar sebelum rollout lebih luas.
+- Ini bukan final production-grade authentication.
 - Setiap Warden/Guard patut diberi PIN unik.
 - PIN tidak boleh didedahkan melalui frontend logs atau GET endpoints.
 - PIN tidak boleh hardcode di frontend.
@@ -58,11 +61,61 @@ Realiti keselamatan:
 - Shared guard PC perlu `Log Keluar` selepas digunakan.
 - Warden/Guard PIN tidak patut disimpan pada public/shared device kecuali diluluskan oleh operasi.
 
-Cadangan production:
+Cadangan future:
 
 - Ganti PIN persistence dengan backend-issued session token.
 - Pertimbang Google login / domain restriction.
-- Elakkan simpan PIN plain text di client untuk rollout lebih luas.
+- Hash PIN instead of storing plain text.
+- Hadkan Pemantauan/Statistik kepada Warden/HEP jika diperlukan.
+
+## Backend Validation
+
+GAS backend validate:
+
+- Student identity: nama + `no_matrik`.
+- Student status: hanya `Aktif` boleh login/request outing.
+- Warden identity, status, dan PIN sebelum approve/reject.
+- Guard identity, status, dan PIN sebelum confirm keluar/masuk.
+- Role/action permission untuk setiap write action.
+- Outing Biasa hanya Selasa/Rabu selepas 5:00 PM.
+- Kecemasan boleh dihantar bila-bila masa tetapi tetap perlu kelulusan warden.
+- Guard tidak boleh confirm keluar jika belum diluluskan warden.
+- Student duplicate active request blocked for active statuses.
+
+## Role Permission
+
+| Action | Role dibenarkan |
+|---|---|
+| `loginStudent` | Student |
+| `loginWarden` | Warden |
+| `loginGuard` | Guard |
+| `submitRequest` | Student |
+| `approveRequest` | Warden |
+| `rejectRequest` | Warden |
+| `confirmOut` | Guard |
+| `confirmIn` | Guard |
+| `getTodayRecords` | Live app / monitoring use |
+| `getOutingStats` | Live app / Statistik read-only |
+
+## Audit Log
+
+Tindakan utama direkod dalam `AUDIT_LOG`.
+
+Header:
+
+```text
+timestamp | action | request_id | user_role | user_name | details
+```
+
+Audit log digunakan untuk:
+
+- Permohonan dihantar.
+- Permohonan diluluskan.
+- Permohonan ditolak.
+- Guard sahkan keluar.
+- Guard sahkan masuk.
+
+Retention policy masih future TODO.
 
 ## Jangan Commit Data Sensitif
 
@@ -88,85 +141,15 @@ Amalan wajib:
 - Beri akses hanya kepada akaun yang perlu.
 - Semak akses owner/editor secara berkala.
 - Jangan publish Spreadsheet kepada public.
-- Spreadsheet sharing mesti kekal restricted kepada akaun yang perlu sahaja.
 
-## Telegram Security
-
-Telegram notification menggunakan bot token dan chat ID dari Apps Script Script Properties.
-
-Amalan wajib:
-
-- Jangan commit Telegram bot token.
-- Jangan hardcode token atau chat ID dalam repo.
-- Jangan print token dalam logs.
-- Kawal membership Telegram group operasi.
-- Remove ahli group yang tidak lagi perlu akses.
-- Jika token terdedah, revoke token melalui BotFather dan set token baru.
-
-## Backend Validation
-
-GAS backend V1 mesti validate:
-
-- Student identity: nama + `no_matrik`.
-- Student status: hanya `Aktif` boleh login/request outing.
-- Warden identity, status, dan PIN sebelum approve/reject.
-- Guard identity, status, dan PIN sebelum confirm keluar/masuk.
-- Role/action permission untuk setiap request.
-- Outing Biasa hanya Selasa/Rabu selepas 5:00 PM.
-- Kecemasan boleh dihantar bila-bila masa tetapi tetap perlu kelulusan warden.
-- Guard tidak boleh confirm keluar jika belum diluluskan warden.
-
-## Role Permission
-
-| Action | Role dibenarkan |
-|---|---|
-| `loginStudent` | Student |
-| `loginWarden` | Warden |
-| `loginGuard` | Guard |
-| `submitRequest` | Student |
-| `approveRequest` | Warden |
-| `rejectRequest` | Warden |
-| `confirmOut` | Guard |
-| `confirmIn` | Guard |
-| `getTodayRecords` | Live app / monitoring use |
-| `getOutingStats` | Live app / Statistik read-only |
-
-## Audit Log
-
-Semua tindakan penting perlu direkod dalam `AUDIT_LOG`.
-
-Header V1:
-
-```text
-timestamp | action | request_id | user_role | user_name | details
-```
-
-Audit log digunakan untuk:
-
-- Login penting.
-- Permohonan dihantar.
-- Permohonan diluluskan.
-- Permohonan ditolak.
-- Guard sahkan keluar.
-- Guard sahkan masuk.
-- Error atau validation penting jika perlu.
-
-## Future Improvements
+## Future Security Improvements
 
 - PIN unik per Warden/Guard.
 - Hash PIN, bukan simpan plain text.
 - Google Account login / domain-restricted access.
 - Backend-issued session token untuk PWA remember-device.
-- Audit review berkala.
+- Audit log retention policy.
 - Role-based access hardening.
 - Deployment permissions lebih ketat.
-- SOP siapa boleh akses Pemantauan Semasa.
+- SOP siapa boleh akses Pemantauan Semasa dan Statistik.
 - Backup dan retention policy untuk Spreadsheet.
-
-## Had Sistem v1.3.1
-
-- Live v1.3.1 ialah pilot-running untuk ujian operasi sebenar, bukan final production security.
-- Link GitHub Pages boleh dibuka oleh sesiapa yang ada URL.
-- Jika GAS Web App dibuka kepada anyone with link, backend validation mesti ketat.
-- PWA cache menyimpan fail frontend statik sahaja.
-- Remember-device session ialah convenience untuk pilot dan bukan pengganti authentication production.

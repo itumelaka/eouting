@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas milestone **Live/pilot v1.6.12**.
+Senarai kerja selepas milestone **Live/pilot stable v1.6.16**.
 
 ## Done / Completed
 
@@ -20,24 +20,33 @@ Senarai kerja selepas milestone **Live/pilot v1.6.12**.
 - [x] Warden can see active/future-dated pending Cuti Semester records.
 - [x] Guard can process approved Cuti Semester records.
 - [x] Guard `Refresh Status` control and Guard auto-refresh.
+- [x] Warden Dashboard auto-refresh every 60 seconds.
+- [x] Warden `Refresh Permohonan`.
+- [x] Warden utility panel moved closer to dashboard.
+- [x] `Muat Semula Aplikasi` kept as smaller/subtle action.
 - [x] Pemantauan keeps active records visible until selesai.
 - [x] Pemantauan Semasa loading state and live status animation.
+- [x] Pemantauan Semasa Senarai Nama Semasa with animated status icons.
 - [x] Warden Checklist Permohonan for all request types.
+- [x] Warden checklist filters: Semua, Outing, Bermalam, Cuti Semester, Kecemasan.
 - [x] Copy Senarai Nama aktif for WhatsApp.
 - [x] Status icon and legend in copied Warden name list.
+- [x] Stale staff login error toast fixed after successful Warden/Guard login.
+- [x] Empty yellow notice/banner hidden when no message exists.
 - [x] Telegram notifications basic flow.
 - [x] Audit log uses existing `AUDIT_LOG` headers.
 - [x] CSV export for reports.
 - [x] Statistik monthly view.
-- [x] Footer utility/report buttons visible only on Warden screen.
+- [x] Footer utility/report buttons visible only on Warden screen when moved into Warden utility panel.
 - [x] Cuti Semester return time display fixed.
 - [x] Student refresh remains on student page.
 - [x] Warden/Guard/Pemantauan/Statistik refresh behavior restored.
 - [x] PWA version/cache update strategy using `APP_VERSION`, asset query strings, `version.json`, and service worker cache name.
+- [x] Update available / `Apa yang baharu` popup.
 
 ## Operations Checklist
 
-- [ ] Continue live monitoring after v1.6.12.
+- [ ] Continue live monitoring after v1.6.16.
 - [ ] Verify Cuti Semester approval and guard flow in real operation.
 - [ ] Verify Pemantauan Semasa active records during Cuti Semester.
 - [ ] Verify CSV reports after more Cuti Semester records.
@@ -52,7 +61,7 @@ Senarai kerja selepas milestone **Live/pilot v1.6.12**.
 ## Near TODO
 
 - [ ] Telegram inline button/link to open Warden/Guard/Pemantauan page.
-- [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Sistem`.
+- [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Aplikasi`, if still required.
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
 
@@ -75,6 +84,6 @@ Senarai kerja selepas milestone **Live/pilot v1.6.12**.
 - [ ] Admin page for managing master data.
 - [ ] Late-return escalation notification.
 - [ ] Optional WhatsApp notification later if required.
-- [ ] Weekly/monthly report automation.
+- [ ] Daily/weekly/monthly report automation.
 - [ ] Automated version injection/build step.
 - [ ] Supabase migration can remain future TODO only; not a current requirement.

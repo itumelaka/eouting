@@ -1,16 +1,17 @@
 # Architecture
 
-Current version: **v1.6.12**
+Current version: **v1.6.16**
 
 ## Overview
 
-eOuting ITU is a static frontend with a Google Apps Script backend and Google Sheets storage.
+eOuting ITU is a static GitHub Pages frontend with a Google Apps Script backend and Google Sheets storage.
 
 ```text
-GitHub Pages frontend
+GitHub Pages static frontend
   -> Google Apps Script Web App
     -> Google Sheets
     -> Telegram Bot notifications
+    -> AUDIT_LOG
 ```
 
 ## Frontend
@@ -28,11 +29,12 @@ Frontend responsibilities:
 - role selection and login screens
 - Pelajar request form
 - Warden approval screen
+- Warden Dashboard refresh and utility actions
 - Warden Checklist Permohonan
 - Warden Copy Senarai Nama
 - Guard keluar/masuk screen
 - Guard Refresh Status
-- Pemantauan Semasa
+- Pemantauan Semasa live board
 - Statistik
 - CSV export controls
 - PWA/service worker cache
@@ -70,6 +72,14 @@ Sheets used:
 
 Cuti Semester did not require new spreadsheet columns.
 
+## Roles
+
+- **Pelajar:** submit request and view personal records.
+- **Warden:** approve/reject, refresh requests, use checklist, copy name list, download reports, and view update notes.
+- **Guard:** confirm keluar/masuk and refresh status.
+- **Pemantauan Semasa:** read-only live monitoring.
+- **Statistik:** read-only monthly statistics.
+
 ## Request Types
 
 - `OUTING_BIASA`
@@ -89,25 +99,6 @@ Backend status values:
 
 Frontend display labels map those backend statuses into user-facing Malay labels.
 
-## Cuti Semester Data Mapping
-
-- `jenis_permohonan = CUTI_SEMESTER`
-- `tarikh = Tarikh Keluar / Tarikh Mula Cuti`
-- `hari = Hari Keluar`
-- `tujuan = Tujuan Cuti Semester`
-- `lokasi = Alamat / Destinasi Semasa Cuti`
-- `telefon_waris`
-- `hubungan_waris`
-- `jenis_kenderaan`
-- `butiran_kenderaan`
-- `tarikh_balik = Tarikh Pulang Ke Asrama`
-- `hari_balik = Hari Pulang Ke Asrama`
-- `masa_balik_dijangka = Masa Dijangka Pulang Ke Asrama`
-- `masa_keluar`
-- `masa_masuk`
-- `lewat`
-- `catatan`
-
 ## Active Record Visibility
 
 `getTodayRecords()` returns records that are relevant for current operations:
@@ -120,6 +111,22 @@ Frontend display labels map those backend statuses into user-facing Malay labels
 - open `PULANG_BERMALAM` / `CUTI_SEMESTER` records
 
 This keeps future-dated active Cuti Semester requests visible to Warden, Guard, and Pemantauan.
+
+## Warden Dashboard
+
+Warden Dashboard includes:
+
+- `Refresh Permohonan`
+- loading state for Warden request data
+- updated timestamp
+- auto-refresh every 60 seconds while Warden session is active
+- Warden utility actions near the dashboard:
+  - Muat Turun Laporan Hari Ini
+  - Muat Turun Laporan Bulanan
+  - Apa yang baharu
+  - Muat Semula Aplikasi as a smaller/subtle action
+
+The Warden refresh path reloads `getTodayRecords()` data only. It does not reload the PWA/app shell.
 
 ## Warden Checklist Permohonan
 
@@ -169,6 +176,18 @@ Excluded status:
 
 The copied text contains a short heading, numbered names with status icons, and a legend.
 
+## Guard Page
+
+Guard page includes:
+
+- `Refresh Status`
+- auto-refresh while Guard session is active
+- `Sedia Untuk Keluar` list for approved requests
+- `Sedang Keluar` list for records already confirmed out
+- confirm keluar and confirm masuk actions
+
+Guard actions still require backend PIN validation.
+
 ## Pemantauan Semasa
 
 Pemantauan Semasa is a read-only operational page.
@@ -179,25 +198,13 @@ It includes:
 - manual refresh
 - timestamp
 - summary cards
-- record list
+- detail record list
+- `Senarai Nama Semasa` with animated status icons
 - active `Sedang Keluar` emphasis
 - subtle live animation for active/late states
 - `prefers-reduced-motion` support
 
 If refresh fails after old data is already visible, the old view is kept and a friendly error is shown.
-
-## Frontend Visibility Rules
-
-Request type form fields are controlled by a central request type UI handler.
-
-Footer utility buttons are visible only on the Warden screen:
-
-- `Muat Turun Laporan Hari Ini`
-- `Muat Turun Laporan Bulanan`
-- `Muat Semula Sistem`
-- `Apa yang baharu v1.x.x`
-
-They are hidden on landing, Pelajar, Guard, Pemantauan Semasa, and Statistik.
 
 ## PWA / Versioning Strategy
 
@@ -211,3 +218,14 @@ Frontend releases are versioned in several places:
 - `version.json`
 
 The service worker uses a versioned cache name and removes older caches during activation.
+
+## Security Boundaries
+
+Frontend role hiding is not real security. Backend validation remains the enforcement point for:
+
+- staff PIN validation
+- action permission
+- duplicate active request prevention
+- request status lifecycle checks
+
+Future security improvements remain tracked in `docs/TODO.md` and `docs/SECURITY.md`.

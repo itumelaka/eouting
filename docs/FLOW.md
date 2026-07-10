@@ -1,19 +1,20 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow **Pilot-running Live v1.3.1** untuk eOuting ITU.
+Dokumen ini menerangkan flow **Live/pilot stable v1.6.16** untuk eOuting ITU.
 
 Status semasa:
 
 - GitHub Pages frontend live: `https://itumelaka.github.io/eouting`
-- Google Sheets live backend melalui GAS Web App.
-- Ujian operasi sebenar telah berjalan dan rekod outing berjaya disimpan.
-- PWA install support.
-- Remember-device session.
-- Student `Rekod Aktif` / `Sejarah Hari Ini`.
-- Warden/Guard PIN login.
-- Pemantauan Semasa read-only.
-- Statistik Outing bulanan read-only.
-- Telegram Bot notification berfungsi.
+- Google Sheets live backend melalui Google Apps Script Web App.
+- PWA install dan version/cache update detection.
+- Login Pelajar, Warden, dan Guard.
+- Warden/Guard PIN validation di backend.
+- Duplicate active request prevention di backend.
+- Warden Dashboard dengan auto-refresh 60 saat dan manual `Refresh Permohonan`.
+- Guard Dashboard dengan `Refresh Status` dan auto-refresh.
+- Pemantauan Semasa read-only dengan loading state, summary cards, filter, dan Senarai Nama Semasa.
+- Statistik Outing read-only.
+- Telegram Bot notification asas.
 - Audit log asas dalam `AUDIT_LOG`.
 
 ## Record Lifecycle
@@ -28,12 +29,16 @@ KELUAR
 SELESAI
 ```
 
-## Flow Digital Live v1.3.1
+Status tambahan paparan seperti `LEWAT` dikira melalui medan `lewat` dan logic UI, bukan status lifecycle utama yang menggantikan status di atas.
+
+## Flow Digital Live v1.6.16
 
 ```text
 Pelajar login nama + no_matrik
    ↓
-Pelajar submit Outing Biasa / Kecemasan
+Pelajar submit OUTING_BIASA / KECEMASAN / PULANG_BERMALAM / CUTI_SEMESTER
+   ↓
+Backend semak duplicate active request
    ↓
 Status: MENUNGGU_KELULUSAN
    ↓
@@ -41,21 +46,27 @@ Telegram alert permohonan baru
    ↓
 Warden login nama + PIN
    ↓
-Warden luluskan / tolak
+Warden semak dashboard / checklist / copy senarai nama jika perlu
    ↓
-Telegram alert approve/reject
+Warden luluskan atau tolak
    ↓
-Jika diluluskan, Guard login nama + PIN
+Jika ditolak: DITOLAK_WARDEN
+   ↓
+Jika diluluskan: DILULUSKAN_WARDEN
+   ↓
+Guard login nama + PIN
+   ↓
+Guard refresh status jika perlu
    ↓
 Guard sahkan keluar
    ↓
-Status: KELUAR + Telegram alert keluar
+Status: KELUAR
    ↓
 Guard sahkan masuk
    ↓
-Status: SELESAI + Telegram alert masuk / lewat jika berkaitan
+Status: SELESAI
    ↓
-Pelajar, dashboard, Pemantauan Semasa, dan Statistik papar rekod terkini
+Pelajar, Warden, Guard, Pemantauan Semasa, Statistik, dan laporan papar rekod terkini
 ```
 
 ## Pelajar
@@ -71,11 +82,14 @@ Syarat:
 
 - `status = Aktif` boleh login dan mohon outing.
 - `status = Tidak Aktif` tidak boleh login dan tidak boleh mohon outing.
+- Pelajar tidak boleh submit request baru jika masih ada active request.
 
-Pelajar boleh submit:
+Jenis permohonan:
 
-- `Outing Biasa`
-- `Kecemasan`
+- `OUTING_BIASA`
+- `KECEMASAN`
+- `PULANG_BERMALAM`
+- `CUTI_SEMESTER`
 
 Maklumat asas:
 
@@ -83,8 +97,9 @@ Maklumat asas:
 - Lokasi
 - Jenis kenderaan
 - Butiran kenderaan
+- Tarikh/masa berkaitan jika jenis permohonan memerlukan maklumat tambahan
 
-Untuk `Kecemasan`, maklumat tambahan:
+Untuk `KECEMASAN`, maklumat tambahan boleh termasuk:
 
 - Sebab kecemasan
 - Telefon waris
@@ -93,70 +108,132 @@ Untuk `Kecemasan`, maklumat tambahan:
 
 ## Rekod Saya
 
-`Rekod Saya` dibahagikan kepada dua bahagian:
+`Rekod Saya` membezakan rekod aktif dan rekod selesai/ditolak.
 
-### Rekod Aktif
-
-Mengandungi status:
+Rekod aktif:
 
 - `MENUNGGU_KELULUSAN`
 - `DILULUSKAN_WARDEN`
 - `KELUAR`
 
-Jika ada rekod aktif, sistem block duplicate request untuk hari tersebut.
+Rekod aktif akan menghalang duplicate request pelajar yang sama di backend.
 
-### Sejarah Hari Ini
-
-Mengandungi status:
+Rekod selesai/ditolak:
 
 - `SELESAI`
 - `DITOLAK_WARDEN`
 
-Sejarah hari ini dikekalkan untuk rujukan. Rekod tidak dipadam dan tidak disembunyikan secara kekal. Rekod selesai/ditolak dipaparkan secara compact dan tidak block permohonan baru.
+Rekod selesai dan ditolak tidak menghalang permohonan baru.
 
 ## Rule Masa
 
 Outing Biasa:
 
-- Hanya Selasa / Rabu
-- Selepas 5:00 PM
-- Sebelum atau pada 10:00 PM untuk pulang
+- Hanya Selasa / Rabu.
+- Masa keluar selepas 5:00 PM.
+- Pelajar perlu balik sebelum atau pada 10:00 PM.
 
 Kecemasan:
 
-- Boleh dihantar bila-bila masa
-- Masih perlu kelulusan warden
+- Boleh dihantar bila-bila masa.
+- Masih perlu kelulusan warden.
+
+Pulang Bermalam dan Cuti Semester:
+
+- Menggunakan flow kelulusan Warden dan pengesahan Guard yang sama.
+- Dipaparkan dalam checklist dan dashboard mengikut status semasa.
 
 ## Warden
 
 Warden login menggunakan:
 
-- Nama warden
+- Nama Warden
 - PIN
 
-Tindakan:
+Backend validate:
 
-- Luluskan permohonan
-- Tolak permohonan
+- Nama Warden.
+- PIN tidak kosong.
+- PIN betul.
+- Status Warden aktif.
+
+Tindakan utama:
+
+- Semak permohonan menunggu.
+- Luluskan permohonan.
+- Tolak permohonan.
+- Manual `Refresh Permohonan`.
+- Auto-refresh dashboard setiap 60 saat semasa berada di halaman Warden.
 
 Status selepas tindakan:
 
 - Lulus: `DILULUSKAN_WARDEN`
 - Tolak: `DITOLAK_WARDEN`
 
-Telegram alert dihantar selepas approve/reject berjaya.
+## Warden Checklist Permohonan
+
+Checklist Warden ialah paparan ringkas/read-only untuk semua jenis permohonan:
+
+- `OUTING_BIASA`
+- `KECEMASAN`
+- `PULANG_BERMALAM`
+- `CUTI_SEMESTER`
+
+Filter checklist:
+
+- Semua
+- Outing
+- Bermalam
+- Cuti Semester
+- Kecemasan
+
+Checklist memaparkan:
+
+- Ikon/checkbox visual status.
+- Nama pelajar.
+- Kelas.
+- Tarikh/masa berkaitan.
+- Badge jenis permohonan.
+- Badge status sebenar.
+
+Klik row status `MENUNGGU_KELULUSAN` boleh membawa Warden kepada kad detail approve/reject sedia ada. Row status lain adalah read-only.
+
+## Copy Senarai Nama
+
+`Copy Senarai Nama` di Warden Checklist menyalin teks ringkas untuk WhatsApp.
+
+Status yang dimasukkan:
+
+- `MENUNGGU_KELULUSAN` = 🟡
+- `DILULUSKAN_WARDEN` = 🟢
+- `KELUAR` = 🚶
+- `SELESAI` = ✅
+
+Status yang dikecualikan:
+
+- `DITOLAK_WARDEN`
+
+Output clipboard mengandungi header mengikut filter semasa, senarai ikon + nombor + nama, dan petunjuk ikon.
 
 ## Guard
 
 Guard login menggunakan:
 
-- Nama guard
+- Nama Guard
 - PIN
+
+Backend validate:
+
+- Nama Guard.
+- PIN tidak kosong.
+- PIN betul.
+- Status Guard aktif.
 
 Tindakan:
 
-- Confirm keluar selepas status `DILULUSKAN_WARDEN`
-- Confirm masuk selepas status `KELUAR`
+- `Refresh Status` untuk memuat semula rekod dari Google Sheets.
+- Confirm keluar selepas status `DILULUSKAN_WARDEN`.
+- Confirm masuk selepas status `KELUAR`.
 
 Status selepas confirm keluar:
 
@@ -166,11 +243,44 @@ Status selepas confirm masuk:
 
 - `SELESAI`
 
-Jika masa masuk selepas had pulang, rekod ditanda `lewat = Ya` dan Telegram alert lewat dihantar.
+Jika masa masuk selepas had pulang, rekod ditanda lewat melalui medan `lewat`.
 
-## Dashboard Dan Pemantauan
+## Pemantauan Semasa
 
-Dashboard Hari Ini memaparkan:
+`Pemantauan Semasa` ialah paparan read-only untuk melihat rekod terkini tanpa mengubah status.
+
+Komponen utama:
+
+- Loading state `Memuatkan rekod pemantauan...`
+- Refresh manual.
+- Timestamp kemas kini.
+- Summary cards.
+- Filter.
+- Senarai rekod detail.
+- Panel `Senarai Nama Semasa`.
+
+Panel `Senarai Nama Semasa` memaparkan format live seperti output WhatsApp:
+
+```text
+SENARAI NAMA PERMOHONAN eOUTING
+
+🟡 1. NAMA PELAJAR
+🟢 2. NAMA PELAJAR
+🚶 3. NAMA PELAJAR
+✅ 4. NAMA PELAJAR
+
+Petunjuk:
+🟡 Menunggu kelulusan
+🟢 Diluluskan warden
+🚶 Sedang keluar
+✅ Sudah balik ke asrama
+```
+
+Status `DITOLAK_WARDEN` tidak dipaparkan dalam senarai nama semasa.
+
+## Dashboard Dan Statistik
+
+Dashboard dan Pemantauan boleh memaparkan:
 
 - Menunggu Kelulusan
 - Diluluskan
@@ -180,10 +290,6 @@ Dashboard Hari Ini memaparkan:
 - Belum Masuk
 - Kecemasan
 
-`Pemantauan Semasa` ialah paparan read-only untuk melihat rekod hari ini tanpa mengubah status.
-
-## Statistik Outing
-
 `Statistik` ialah paparan read-only untuk ringkasan bulanan outing.
 
 Filter tersedia:
@@ -192,22 +298,23 @@ Filter tersedia:
 - Tahun
 - Kelas
 
-Paparan Statistik menunjukkan:
+Paparan Statistik menunjukkan ringkasan permohonan, status, kelas, dan kekerapan pelajar.
 
-- Jumlah permohonan bulanan.
-- Jumlah outing selesai.
-- Jumlah kecemasan.
-- Jumlah lewat.
-- Jumlah pelajar terlibat.
-- `Juara Outing Bulanan` / Ranking Kekerapan Outing.
-- Ringkasan mengikut kelas.
-- Pecahan status permohonan.
+## PWA Dan Update
 
-Statistik sekarang dibuka sebagai read-only, sama seperti Pemantauan Semasa. Versi akan datang boleh hadkan akses Statistik kepada Warden/HEP sahaja jika diperlukan.
+PWA menggunakan:
+
+- `APP_VERSION` dalam frontend.
+- Query string versi untuk asset.
+- `version.json` untuk update detection.
+- Service worker cache version.
+- Update popup / `Apa yang baharu`.
+
+Setiap release frontend perlu menaikkan versi supaya telefon/PWA menerima asset baru.
 
 ## Prinsip Penting
 
 - Frontend role hiding bukan security sebenar.
 - Semua validation penting dibuat dalam GAS backend.
 - Semua action penting direkod dalam `AUDIT_LOG`.
-- Live v1.3.1 ialah pilot-running untuk ujian operasi sebenar, bukan final production security.
+- eOuting v1.6.16 ialah live/pilot stable, bukan final production security.

@@ -2,7 +2,7 @@
 
 Project: **eOuting ITU / eOuting SKM OLP**
 
-Current version: **Live/pilot v1.6.12**
+Current version: **Live/pilot stable v1.6.16**
 
 Live site:
 
@@ -23,24 +23,33 @@ https://github.com/itumelaka/eouting
 - Live Mode: Google Sheets is active.
 - Telegram notifications are implemented for core request/status events.
 - Backend staff PIN validation is hardened for Warden and Guard actions.
+- Empty staff PIN is rejected by backend validation.
 - Backend duplicate active request prevention is implemented.
-- Student Cuti Semester submission works.
-- Warden can see Cuti Semester pending requests even when `tarikh keluar` is future-dated.
-- Guard can process approved Cuti Semester records.
+- Student, Warden, and Guard login flows are available.
+- Request flows are available for `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM`, and `CUTI_SEMESTER`.
+- Warden approve/reject flow is active.
+- Guard confirm keluar/masuk flow is active.
 - Guard dashboard has `Refresh Status` and auto-refresh behavior.
-- Warden has Checklist Permohonan for all request types.
-- Warden can copy active name lists for WhatsApp with status icons and legend.
-- Pemantauan Semasa has loading state, refresh, active summaries, and live status animation.
+- Warden Dashboard has `Refresh Permohonan` and auto-refresh every 60 seconds.
+- Warden utility actions are available near the dashboard:
+  - Muat Turun Laporan Hari Ini
+  - Muat Turun Laporan Bulanan
+  - Apa yang baharu
+  - Muat Semula Aplikasi as a smaller/subtle action
+- Warden Checklist Permohonan covers all request types and includes filters.
+- Warden can copy active/current name lists for WhatsApp with status icons and legend.
+- Pemantauan Semasa is read-only and has loading state, refresh, summary cards, Senarai Nama Semasa, and live animation.
 - Cuti Semester return time display is fixed and no longer shows raw ISO/1899 time values.
-- Footer utility/report buttons are visible only on Warden screen.
+- Stale PIN error toast after successful staff login was fixed in v1.6.16.
+- Empty yellow notice/banner is hidden when no message exists.
 - No spreadsheet header changes were needed for Cuti Semester.
 - PWA version/cache update strategy is active through `APP_VERSION`, asset query strings, `version.json`, and service worker cache name.
 
 ## Roles
 
 - **Pelajar:** request submission and personal record/status view.
-- **Warden:** approval/rejection, Checklist Permohonan, copy name list, report downloads, and utility refresh controls.
-- **Guard:** confirm keluar/masuk.
+- **Warden:** approval/rejection, Checklist Permohonan, copy name list, report downloads, refresh permohonan, and utility controls.
+- **Guard:** confirm keluar/masuk and refresh status.
 - **Pemantauan Semasa:** read-only operational monitoring.
 - **Statistik:** monthly reporting view.
 
@@ -50,18 +59,6 @@ https://github.com/itumelaka/eouting
 - `KECEMASAN` - Kecemasan
 - `PULANG_BERMALAM` - Pulang Bermalam
 - `CUTI_SEMESTER` - Cuti Semester
-
-## Cuti Semester Notes
-
-Cuti Semester reuses existing `OUTING_REQUESTS` columns:
-
-- `jenis_permohonan = CUTI_SEMESTER`
-- `tarikh = Tarikh Keluar / Tarikh Mula Cuti`
-- `tarikh_balik = Tarikh Pulang Ke Asrama`
-- `masa_balik_dijangka = Masa Dijangka Pulang Ke Asrama`
-- `telefon_waris` and `hubungan_waris` are required.
-
-Active Cuti Semester records remain visible to Warden, Guard, and Pemantauan until completed.
 
 ## Backend Notes
 
@@ -79,13 +76,13 @@ Completed/rejected records are kept out of old history floods unless they relate
 ## Frontend Notes
 
 - Request type fields are controlled by one central UI handler.
-- Cuti Semester fields display correctly.
-- Cuti Semester return time formatting is clean (`HH:mm`).
 - Warden Checklist Permohonan covers all request types and includes compact status/type badges.
-- Copy Senarai Nama outputs a short WhatsApp-ready list with status icons.
+- Copy Senarai Nama outputs a WhatsApp-ready list with status icons and a legend.
 - Guard page can manually refresh status and auto-refreshes while active.
+- Warden page can manually refresh request data and auto-refreshes every 60 seconds while active.
 - Pemantauan Semasa has a clear loading state and highlights active `Sedang Keluar` / late records.
-- Footer utility buttons are hidden outside Warden screen.
+- Pemantauan Semasa has a read-only Senarai Nama Semasa with animated status icons.
+- Footer bottom keeps the version text; Warden utility actions are moved near the Warden dashboard.
 
 ## Known Future Work
 
@@ -93,10 +90,13 @@ Completed/rejected records are kept out of old history floods unless they relate
 - Domain-restricted staff access.
 - Hashed PIN storage.
 - Backend-issued session token.
+- Audit log retention policy.
 - QR code.
 - Upload selfie to Google Drive.
 - Admin page for master data.
 - Telegram deep links / inline links.
 - Late-return escalation.
 - Daily WhatsApp summary/report.
-- Report automation.
+- Daily/weekly/monthly report automation.
+- Automated version injection/build step.
+- Supabase migration as future-only.
