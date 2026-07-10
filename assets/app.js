@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.16";
+const APP_VERSION = "1.6.17";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -864,7 +864,7 @@ function setLiveUnavailableMode(message) {
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
   showError(
-    "Sistem tidak dapat berhubung dengan Google Sheets buat masa ini. Sila tekan Cuba Lagi atau Muat Semula Sistem.",
+    "Sistem tidak dapat berhubung dengan Google Sheets buat masa ini. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.",
     "Sambungan Live Tidak Stabil"
   );
 }
@@ -3614,7 +3614,7 @@ loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
     updateDataModeIndicator();
     setStudentDropdownState("failed");
     showStudentLoadFailurePanel();
-    showModeNotice("Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Sistem.");
+    showModeNotice("Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.");
   }
 };
 
@@ -3754,7 +3754,7 @@ async function retryLoadStudentsOnly() {
 
 function showStudentLoadFailurePanel() {
   if (els.studentLoginMessage) {
-    els.studentLoginMessage.textContent = "Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Sistem.";
+    els.studentLoginMessage.textContent = "Gagal memuatkan senarai pelajar dari Google Sheets. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.";
   }
 
   const button = ensureStudentRetryButton();
@@ -3816,11 +3816,7 @@ function setupSystemRefreshHardReload() {
 }
 
 async function hardReloadAppShell() {
-  if (await refreshActiveStaffDashboard()) {
-    return;
-  }
-
-  await refreshCurrentAppView();
+  await refreshSystemCaches();
 }
 
 async function refreshCurrentAppView() {
@@ -3835,20 +3831,20 @@ async function refreshCurrentAppView() {
   try {
     if (refreshPage === "monitoring") {
       await refreshActiveMonitoringPageV152();
-      showSuccess("Data pemantauan telah dimuat semula.", "Muat Semula Sistem");
+      showSuccess("Data pemantauan telah dimuat semula.", "Muat Semula Aplikasi");
       return;
     }
 
     if (refreshPage === "statistics") {
       await refreshActiveStatisticsPageV152();
-      showSuccess("Statistik telah dimuat semula.", "Muat Semula Sistem");
+      showSuccess("Statistik telah dimuat semula.", "Muat Semula Aplikasi");
       return;
     }
 
     if (refreshPage === "student") {
       if (isValidStudentSessionV152()) {
         await refreshActiveStudentSession();
-        showSuccess("Rekod pelajar telah dimuat semula.", "Muat Semula Sistem");
+        showSuccess("Rekod pelajar telah dimuat semula.", "Muat Semula Aplikasi");
         return;
       }
 
@@ -3858,18 +3854,18 @@ async function refreshCurrentAppView() {
 
     if (isValidActiveSession()) {
       await refreshSignedInWorkspace();
-      showSuccess("Data telah dimuat semula.", "Muat Semula Sistem");
+      showSuccess("Data telah dimuat semula.", "Muat Semula Aplikasi");
       return;
     }
 
     await refreshAccessScreenMasters();
   } catch (error) {
-    console.error("Muat Semula Sistem gagal.", error);
-    showError("Muat semula gagal. Paparan semasa dikekalkan, sila cuba lagi.", "Muat Semula Gagal");
+    console.error("Muat Semula Aplikasi gagal.", error);
+    showError("Muat semula aplikasi gagal. Paparan semasa dikekalkan, sila cuba lagi.", "Muat Semula Gagal");
   } finally {
     if (els.systemRefreshButton) {
       els.systemRefreshButton.disabled = false;
-      els.systemRefreshButton.textContent = originalText || "Muat Semula Sistem";
+      els.systemRefreshButton.textContent = originalText || "Muat Semula Aplikasi";
     }
   }
 }
@@ -4056,17 +4052,23 @@ async function refreshActiveStaffDashboard() {
   showStaffDashboardLoading(role);
 
   try {
+    if (role === "warden") {
+      await refreshWardenRecords("system-refresh");
+      showStaffDashboardTab(role);
+      return true;
+    }
+
     await loadTodayRecords();
     showStaffDashboardTab(role);
-    showSuccess("Data telah dimuat semula.", "Muat Semula Sistem");
+    showSuccess("Data telah dimuat semula.", "Muat Semula Aplikasi");
   } catch (error) {
     console.error("Gagal memuat semula data staf.", error);
     showStaffDashboardTab(role);
-    showError("Gagal memuat semula data. Sila tekan Cuba Lagi atau Muat Semula Sistem.", "Muat Semula Gagal");
+    showError("Gagal memuat semula data. Sila tekan Cuba Lagi atau Muat Semula Aplikasi.", "Muat Semula Gagal");
   } finally {
     if (els.systemRefreshButton) {
       els.systemRefreshButton.disabled = false;
-      els.systemRefreshButton.textContent = originalText || "Muat Semula Sistem";
+      els.systemRefreshButton.textContent = originalText || "Muat Semula Aplikasi";
     }
   }
 
@@ -4485,7 +4487,7 @@ function toggleReleaseNotesV15() {
         <li>Export CSV</li>
         <li>Audit log</li>
         <li>Hubungi Waris</li>
-        <li>Hotfix Muat Semula Sistem kekal pada paparan aktif</li>
+        <li>Hotfix Muat Semula Aplikasi kekal pada paparan aktif</li>
         <li>Hotfix Pelajar, Pemantauan Semasa dan Statistik refresh in-place</li>
         <li>Sokongan permohonan Cuti Semester</li>
         <li>Pemantauan Cuti Semester / Belum Pulang Ke Asrama</li>
@@ -5619,9 +5621,7 @@ async function refreshWardenRecords(source) {
   }
 
   try {
-    if (typeof loadTodayRecords === "function") {
-      await loadTodayRecords();
-    }
+    await loadWardenRecordsOnly();
     wardenHasLoadedOnce = true;
     if (typeof render === "function") {
       render();
@@ -5648,6 +5648,15 @@ async function refreshWardenRecords(source) {
       button.textContent = originalText || "Refresh Permohonan";
     }
   }
+}
+
+async function loadWardenRecordsOnly() {
+  if (!isLiveMode) {
+    return;
+  }
+
+  const records = await apiGet("getTodayRecords");
+  outingRecords = records.map(mapLiveRecord);
 }
 
 function setWardenLoadingState(isLoading, clearCurrentView) {

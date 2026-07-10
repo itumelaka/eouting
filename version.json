@@ -1,5 +1,5 @@
 {
-  "version": "1.6.16",
+  "version": "1.6.17",
   "releasedAt": "2026-07-10",
-  "notes": "Fix stale PIN error toast and empty alert after staff login."
+  "notes": "Fix warden refresh error handling and reload messaging."
 }
