@@ -1,5 +1,5 @@
 {
-  "version": "1.6.13",
+  "version": "1.6.14",
   "releasedAt": "2026-07-10",
-  "notes": "Add animated live name list to current monitoring page."
+  "notes": "Add warden auto refresh and move utility buttons closer to dashboard."
 }

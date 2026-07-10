@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.13";
+const APP_VERSION = "1.6.14";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -71,6 +71,10 @@ let isLiveMode = false;
 let dataModeMessage = "";
 let studentRefreshIntervalId = null;
 let studentLastUpdatedAt = null;
+let wardenRefreshIntervalId = null;
+let wardenLastUpdatedAt = null;
+let isWardenLoading = false;
+let wardenHasLoadedOnce = false;
 let guardRefreshIntervalId = null;
 let guardLastUpdatedAt = null;
 let monitoringRefreshIntervalId = null;
@@ -140,6 +144,11 @@ const els = {
   wardenSemesterList: null,
   wardenChecklistFilterButtons: null,
   wardenCopyNamesButton: null,
+  wardenRefreshPanel: null,
+  wardenRefreshButton: null,
+  wardenLastUpdated: null,
+  wardenLoading: null,
+  wardenUtilityActions: null,
   guardApprovedList: document.querySelector("#guardApprovedList"),
   guardOutList: document.querySelector("#guardOutList"),
   guardRefreshButton: null,
@@ -515,6 +524,7 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
 
 els.logoutButton.addEventListener("click", () => {
   clearSavedSession();
+  stopWardenAutoRefresh();
   stopStudentAutoRefresh();
   stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
@@ -5493,7 +5503,185 @@ function updateMonitorLastUpdatedV1612() {
   els.monitorLastUpdated.textContent = `Dikemaskini ${timeText}`;
 }
 
+function ensureWardenRefreshControls() {
+  if (!els.wardenList) {
+    return;
+  }
+
+  const wardenPanel = document.querySelector("#warden");
+  if (!wardenPanel) {
+    return;
+  }
+
+  if (!els.wardenRefreshPanel) {
+    const panel = document.createElement("section");
+    panel.className = "warden-refresh-panel";
+    panel.id = "wardenRefreshPanel";
+    panel.innerHTML = `
+      <div class="warden-refresh-top">
+        <div>
+          <h3>Utiliti Warden</h3>
+          <small id="wardenLastUpdated"></small>
+        </div>
+        <button class="secondary-action warden-refresh-button" id="wardenRefreshButton" type="button">Refresh Permohonan</button>
+      </div>
+      <div class="warden-loading" id="wardenLoading" hidden>Memuatkan permohonan warden...</div>
+      <div class="warden-utility-actions" id="wardenUtilityActions"></div>
+    `;
+
+    const heading = wardenPanel.querySelector(".section-heading");
+    if (heading && heading.nextSibling) {
+      wardenPanel.insertBefore(panel, heading.nextSibling);
+    } else {
+      wardenPanel.insertBefore(panel, wardenPanel.firstChild);
+    }
+
+    els.wardenRefreshPanel = panel;
+    els.wardenRefreshButton = panel.querySelector("#wardenRefreshButton");
+    els.wardenLastUpdated = panel.querySelector("#wardenLastUpdated");
+    els.wardenLoading = panel.querySelector("#wardenLoading");
+    els.wardenUtilityActions = panel.querySelector("#wardenUtilityActions");
+  }
+
+  moveWardenUtilityButtons();
+
+  if (els.wardenRefreshButton && els.wardenRefreshButton.dataset.ready !== "1") {
+    els.wardenRefreshButton.dataset.ready = "1";
+    els.wardenRefreshButton.addEventListener("click", () => refreshWardenRecords("button"));
+  }
+}
+
+function moveWardenUtilityButtons() {
+  if (!els.wardenUtilityActions) {
+    return;
+  }
+
+  const footer = document.querySelector(".app-footer");
+  if (!footer) {
+    return;
+  }
+
+  Array.from(footer.querySelectorAll("button")).forEach((button) => {
+    els.wardenUtilityActions.appendChild(button);
+  });
+}
+
+async function refreshWardenRecords(source) {
+  if (!currentSession || currentSession.role !== "warden") {
+    return;
+  }
+
+  ensureWardenRefreshControls();
+  const button = els.wardenRefreshButton;
+  const originalText = button ? button.textContent : "";
+  const hasOldData = wardenHasLoadedOnce && Array.isArray(outingRecords) && outingRecords.length > 0;
+
+  setWardenLoadingState(true, !hasOldData);
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Memuat...";
+  }
+
+  try {
+    if (typeof loadTodayRecords === "function") {
+      await loadTodayRecords();
+    }
+    wardenHasLoadedOnce = true;
+    if (typeof render === "function") {
+      render();
+    } else if (typeof renderWarden === "function") {
+      renderWarden();
+    }
+    updateWardenLastUpdated();
+  } catch (error) {
+    console.error("Permohonan warden gagal dimuat.", { source, error });
+    if (!hasOldData) {
+      if (els.wardenList) {
+        els.wardenList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
+      }
+      if (els.wardenSemesterList) {
+        els.wardenSemesterList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
+      }
+    } else {
+      showError("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.", "Refresh Warden Gagal");
+    }
+  } finally {
+    setWardenLoadingState(false, false);
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || "Refresh Permohonan";
+    }
+  }
+}
+
+function setWardenLoadingState(isLoading, clearCurrentView) {
+  isWardenLoading = isLoading;
+  if (els.wardenLoading) {
+    els.wardenLoading.hidden = !isLoading;
+  }
+  if (els.wardenList) {
+    els.wardenList.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) {
+      els.wardenList.innerHTML = "";
+    }
+  }
+  if (els.wardenApprovedList) {
+    els.wardenApprovedList.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) {
+      els.wardenApprovedList.innerHTML = "";
+    }
+  }
+  if (els.wardenSemesterList) {
+    els.wardenSemesterList.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) {
+      els.wardenSemesterList.innerHTML = "";
+    }
+  }
+}
+
+function updateWardenLastUpdated() {
+  wardenLastUpdatedAt = new Date();
+  if (!els.wardenLastUpdated) {
+    return;
+  }
+  const timeText = typeof formatTime === "function"
+    ? formatTime(wardenLastUpdatedAt)
+    : wardenLastUpdatedAt.toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" });
+  els.wardenLastUpdated.textContent = `Dikemaskini: ${timeText}`;
+}
+
+function startWardenAutoRefresh() {
+  if (!currentSession || currentSession.role !== "warden") {
+    return;
+  }
+  if (wardenRefreshIntervalId) {
+    return;
+  }
+  wardenRefreshIntervalId = setInterval(() => {
+    if (!currentSession || currentSession.role !== "warden") {
+      stopWardenAutoRefresh();
+      return;
+    }
+    refreshWardenRecords("auto");
+  }, 30000);
+}
+
+function stopWardenAutoRefresh() {
+  if (wardenRefreshIntervalId) {
+    clearInterval(wardenRefreshIntervalId);
+    wardenRefreshIntervalId = null;
+  }
+}
+
 function ensureWardenSemesterChecklist() {
+  ensureWardenRefreshControls();
+  if (currentSession && currentSession.role === "warden") {
+    startWardenAutoRefresh();
+    if (!wardenHasLoadedOnce && !isWardenLoading) {
+      refreshWardenRecords("initial");
+    }
+  }
+
   if (!els.wardenList || els.wardenSemesterChecklist) {
     return;
   }

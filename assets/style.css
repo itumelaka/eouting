@@ -687,6 +687,58 @@ textarea {
   justify-self: start;
 }
 
+.warden-refresh-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px;
+}
+
+.warden-refresh-top {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+}
+
+.warden-refresh-top h3 {
+  color: var(--deep-navy);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.warden-refresh-top small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.warden-refresh-button {
+  justify-self: start;
+}
+
+.warden-loading {
+  background: #ffffff;
+  border: 1px dashed #b8c5cf;
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 800;
+  padding: 12px;
+  text-align: center;
+}
+
+.warden-utility-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.warden-utility-actions button {
+  flex: 1 1 180px;
+}
+
 .semester-checklist-summary {
   color: var(--muted);
   font-size: 0.86rem;
