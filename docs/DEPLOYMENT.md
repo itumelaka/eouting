@@ -1,6 +1,6 @@
 # Deployment
 
-Current stable version: **v1.6.7**
+Current version: **v1.6.12**
 
 ## Frontend
 
@@ -48,7 +48,7 @@ If GitHub Pages appears stuck on an older build:
 4. Try a cache-bust URL:
 
 ```text
-https://itumelaka.github.io/eouting/index.html?v=166-force
+https://itumelaka.github.io/eouting/index.html?v=force
 ```
 
 5. If needed, clear browser site data/service worker cache.
@@ -63,5 +63,6 @@ When bumping frontend version, update:
 - `assets/style.css?v=...` in `index.html`
 - `CACHE_NAME` in `service-worker.js`
 - app shell asset query strings in `service-worker.js`
+- `version.json`
 
 When changing GAS behavior, document whether deployment is needed.

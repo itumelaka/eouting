@@ -2,7 +2,7 @@
 
 Project: **eOuting ITU / eOuting SKM OLP**
 
-Current stable version: **v1.6.7**
+Current version: **Live/pilot v1.6.12**
 
 Live site:
 
@@ -16,22 +16,30 @@ Repo:
 https://github.com/itumelaka/eouting
 ```
 
-## Confirmed Live Status
+## Confirmed Status
 
-- GitHub Pages frontend is working at `v1.6.7`.
+- GitHub Pages frontend is live.
 - Google Apps Script backend is deployed and connected to Google Sheets.
 - Live Mode: Google Sheets is active.
-- Telegram notifications are working.
+- Telegram notifications are implemented for core request/status events.
+- Backend staff PIN validation is hardened for Warden and Guard actions.
+- Backend duplicate active request prevention is implemented.
 - Student Cuti Semester submission works.
 - Warden can see Cuti Semester pending requests even when `tarikh keluar` is future-dated.
+- Guard can process approved Cuti Semester records.
+- Guard dashboard has `Refresh Status` and auto-refresh behavior.
+- Warden has Checklist Permohonan for all request types.
+- Warden can copy active name lists for WhatsApp with status icons and legend.
+- Pemantauan Semasa has loading state, refresh, active summaries, and live status animation.
 - Cuti Semester return time display is fixed and no longer shows raw ISO/1899 time values.
 - Footer utility/report buttons are visible only on Warden screen.
 - No spreadsheet header changes were needed for Cuti Semester.
+- PWA version/cache update strategy is active through `APP_VERSION`, asset query strings, `version.json`, and service worker cache name.
 
 ## Roles
 
 - **Pelajar:** request submission and personal record/status view.
-- **Warden:** approval/rejection, report downloads, and utility refresh controls.
+- **Warden:** approval/rejection, Checklist Permohonan, copy name list, report downloads, and utility refresh controls.
 - **Guard:** confirm keluar/masuk.
 - **Pemantauan Semasa:** read-only operational monitoring.
 - **Statistik:** monthly reporting view.
@@ -73,4 +81,22 @@ Completed/rejected records are kept out of old history floods unless they relate
 - Request type fields are controlled by one central UI handler.
 - Cuti Semester fields display correctly.
 - Cuti Semester return time formatting is clean (`HH:mm`).
+- Warden Checklist Permohonan covers all request types and includes compact status/type badges.
+- Copy Senarai Nama outputs a short WhatsApp-ready list with status icons.
+- Guard page can manually refresh status and auto-refreshes while active.
+- Pemantauan Semasa has a clear loading state and highlights active `Sedang Keluar` / late records.
 - Footer utility buttons are hidden outside Warden screen.
+
+## Known Future Work
+
+- Google login / stronger auth.
+- Domain-restricted staff access.
+- Hashed PIN storage.
+- Backend-issued session token.
+- QR code.
+- Upload selfie to Google Drive.
+- Admin page for master data.
+- Telegram deep links / inline links.
+- Late-return escalation.
+- Daily WhatsApp summary/report.
+- Report automation.

@@ -2,7 +2,7 @@
 
 **eOuting ITU / eOuting SKM OLP** ialah sistem digital untuk merekod, meluluskan, memantau, dan melapor pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Status semasa: **Live stable v1.6.7**.
+Status semasa: **Live/pilot v1.6.12**.
 
 Live frontend:
 
@@ -23,16 +23,16 @@ https://github.com/itumelaka/eouting
 - **Database:** Google Sheets
 - **Notification:** Telegram Bot
 - **Mode:** Live Mode: Google Sheets
-- **PWA:** supported
+- **PWA:** supported with version/cache update strategy
 - **Deployment helper:** `clasp`
-- **Current stable version:** `v1.6.7`
+- **Current version:** `v1.6.12`
 
-Live v1.6.7 is confirmed working with Google Sheets, deployed GAS backend, and Telegram notifications.
+Live/pilot v1.6.12 includes Google Sheets integration, deployed GAS backend, Telegram notifications, staff PIN hardening, duplicate active request prevention, Guard refresh, Warden checklist, copy name list, and improved Pemantauan Semasa loading/live status display.
 
 ## Roles
 
 - **Pelajar:** submit permohonan dan semak `Rekod Saya`.
-- **Warden:** lulus/tolak permohonan, muat turun laporan CSV, dan jalankan utility refresh.
+- **Warden:** lulus/tolak permohonan, semak Checklist Permohonan, copy senarai nama aktif, muat turun laporan CSV, dan jalankan utility refresh.
 - **Guard:** sahkan keluar/masuk pelajar.
 - **Pemantauan Semasa:** read-only monitoring untuk rekod aktif dan rekod hari ini.
 - **Statistik:** ringkasan bulanan, leaderboard, ringkasan kelas, dan pecahan status.
@@ -81,6 +81,10 @@ Rekod selesai/ditolak lama tidak dipulangkan berlebihan kecuali berkaitan aktivi
 
 - Field borang dikawal oleh central request type field handler.
 - Field Cuti Semester dipaparkan dengan betul.
+- Warden Checklist Permohonan memaparkan semua jenis permohonan dan status operasi.
+- Warden boleh copy senarai nama aktif untuk WhatsApp dengan ikon status dan petunjuk.
+- Guard mempunyai `Refresh Status` dan auto-refresh semasa berada di page Guard.
+- Pemantauan Semasa mempunyai loading state, refresh, summary cards, dan live status animation.
 - Footer utility/report buttons hanya dipaparkan pada skrin Warden:
   - `Muat Turun Laporan Hari Ini`
   - `Muat Turun Laporan Bulanan`
@@ -107,16 +111,17 @@ Apps Script > Manage deployments > Edit > New version > Deploy
 Jika GitHub Pages kelihatan tersekat pada versi lama, semak raw GitHub berbanding live Pages dan cuba cache-bust URL seperti:
 
 ```text
-https://itumelaka.github.io/eouting/index.html?v=166-force
+https://itumelaka.github.io/eouting/index.html?v=force
 ```
 
 ## Recent Changelog
 
+- **v1.6.12:** Pemantauan Semasa loading state and live status animations.
+- **v1.6.11:** Status icons and legend in copied Warden name list.
+- **v1.6.10:** Copy Senarai Nama for active Warden requests.
+- **v1.6.9:** Warden checklist expanded to all request types.
+- **v1.6.8:** Guard refresh visibility and Warden checklist status improvements.
 - **v1.6.7:** Guard dashboard refresh controls, PWA cache/version bump, and backend hardening release.
-- **v1.6.3:** Cuti Semester fields visible on student form.
-- **v1.6.4:** Central request type form handling.
-- **v1.6.5:** Cuti Semester return time display fix.
-- **v1.6.6:** Footer utilities visible only on Warden screen.
 
 ## Live URLs / IDs
 
