@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.14";
+const APP_VERSION = "1.6.15";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -149,6 +149,7 @@ const els = {
   wardenLastUpdated: null,
   wardenLoading: null,
   wardenUtilityActions: null,
+  wardenReloadAction: null,
   guardApprovedList: document.querySelector("#guardApprovedList"),
   guardOutList: document.querySelector("#guardOutList"),
   guardRefreshButton: null,
@@ -5527,6 +5528,7 @@ function ensureWardenRefreshControls() {
       </div>
       <div class="warden-loading" id="wardenLoading" hidden>Memuatkan permohonan warden...</div>
       <div class="warden-utility-actions" id="wardenUtilityActions"></div>
+      <div class="warden-reload-action" id="wardenReloadAction"></div>
     `;
 
     const heading = wardenPanel.querySelector(".section-heading");
@@ -5541,6 +5543,7 @@ function ensureWardenRefreshControls() {
     els.wardenLastUpdated = panel.querySelector("#wardenLastUpdated");
     els.wardenLoading = panel.querySelector("#wardenLoading");
     els.wardenUtilityActions = panel.querySelector("#wardenUtilityActions");
+    els.wardenReloadAction = panel.querySelector("#wardenReloadAction");
   }
 
   moveWardenUtilityButtons();
@@ -5562,6 +5565,14 @@ function moveWardenUtilityButtons() {
   }
 
   Array.from(footer.querySelectorAll("button")).forEach((button) => {
+    if (button.id === "systemRefreshButton") {
+      button.textContent = "Muat Semula Aplikasi";
+      button.classList.add("app-reload-subtle-button");
+      if (els.wardenReloadAction) {
+        els.wardenReloadAction.appendChild(button);
+      }
+      return;
+    }
     els.wardenUtilityActions.appendChild(button);
   });
 }
@@ -5663,7 +5674,7 @@ function startWardenAutoRefresh() {
       return;
     }
     refreshWardenRecords("auto");
-  }, 30000);
+  }, 60000);
 }
 
 function stopWardenAutoRefresh() {
