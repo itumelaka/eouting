@@ -1,5 +1,5 @@
 {
-  "version": "1.6.15",
+  "version": "1.6.16",
   "releasedAt": "2026-07-10",
-  "notes": "Refine warden utility actions and reduce auto-refresh frequency."
+  "notes": "Fix stale PIN error toast and empty alert after staff login."
 }

@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.15";
+const APP_VERSION = "1.6.16";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -448,6 +448,7 @@ els.wardenLoginPanel.addEventListener("submit", async (event) => {
   if (isLiveMode) {
     try {
       const warden = await apiPost("loginWarden", { nama_warden: name, pin });
+      clearStaffLoginSuccessFeedback();
       startSession("warden", {
         name: warden.nama_warden || name,
         pin,
@@ -462,6 +463,10 @@ els.wardenLoginPanel.addEventListener("submit", async (event) => {
         phone: warden.no_tel || ""
       }, els.wardenRememberInput);
     } catch (error) {
+      if (currentSession && currentSession.role === "warden") {
+        clearStaffLoginSuccessFeedback();
+        return;
+      }
       const message = "Nama warden atau PIN tidak sah.";
       if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = message;
       showError(message, "PIN Tidak Sah");
@@ -477,6 +482,7 @@ els.wardenLoginPanel.addEventListener("submit", async (event) => {
   }
 
   const mockWarden = { name, nama_warden: name, pin };
+  clearStaffLoginSuccessFeedback();
   rememberSessionIfRequested("warden", mockWarden, els.wardenRememberInput);
   startSession("warden", mockWarden);
 });
@@ -490,6 +496,7 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
   if (isLiveMode) {
     try {
       const guard = await apiPost("loginGuard", { nama_guard: name, pin });
+      clearStaffLoginSuccessFeedback();
       startSession("guard", {
         name: guard.nama_guard || name,
         pin,
@@ -504,6 +511,10 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
         phone: guard.no_tel || ""
       }, els.guardRememberInput);
     } catch (error) {
+      if (currentSession && currentSession.role === "guard") {
+        clearStaffLoginSuccessFeedback();
+        return;
+      }
       const message = "Nama guard atau PIN tidak sah.";
       if (els.guardLoginMessage) els.guardLoginMessage.textContent = message;
       showError(message, "PIN Tidak Sah");
@@ -519,6 +530,7 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
   }
 
   const mockGuard = { name, nama_guard: name, pin };
+  clearStaffLoginSuccessFeedback();
   rememberSessionIfRequested("guard", mockGuard, els.guardRememberInput);
   startSession("guard", mockGuard);
 });
@@ -1743,6 +1755,9 @@ function hideLoginPanels() {
 }
 
 function startSession(role, user) {
+  if (role === "warden" || role === "guard") {
+    clearStaffLoginSuccessFeedback();
+  }
   // Mock frontend access only. Real GAS backend must validate role and identity later.
   stopStudentAutoRefresh();
   stopGuardAutoRefresh();
@@ -5502,6 +5517,16 @@ function updateMonitorLastUpdatedV1612() {
     ? formatTime(monitorLastUpdatedAt)
     : monitorLastUpdatedAt.toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" });
   els.monitorLastUpdated.textContent = `Dikemaskini ${timeText}`;
+}
+
+function clearStaffLoginSuccessFeedback() {
+  if (toastTimerId) {
+    clearTimeout(toastTimerId);
+    toastTimerId = null;
+  }
+  document.querySelectorAll(".toast-card").forEach((toast) => toast.remove());
+  if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = "";
+  if (els.guardLoginMessage) els.guardLoginMessage.textContent = "";
 }
 
 function ensureWardenRefreshControls() {
