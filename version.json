@@ -1,5 +1,5 @@
 {
-  "version": "1.6.18",
+  "version": "1.6.19",
   "releasedAt": "2026-07-10",
-  "notes": "Fix warden dashboard refresh regression and simplify utility actions."
+  "notes": "Add class filter for student login dropdown."
 }

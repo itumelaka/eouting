@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.18";
+const APP_VERSION = "1.6.19";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -83,6 +83,8 @@ let monitorIsLoading = false;
 let monitorHasLoadedOnce = false;
 let toastTimerId = null;
 let activeRefreshPage = "access";
+let selectedStudentLoginClass = "A2";
+let studentLoginClassInitialized = false;
 let wardenChecklistTypeFilter = "all";
 let wardenChecklistRecords = [];
 const guardActionLocks = {};
@@ -100,6 +102,7 @@ const els = {
   guardLoginPanel: document.querySelector("#guardLoginPanel"),
   roleGrid: document.querySelector("#roleGrid"),
   studentLoginSelect: document.querySelector("#studentLoginSelect"),
+  studentClassFilter: document.querySelector("#studentClassFilter"),
   matricInput: document.querySelector("#matricInput"),
   studentRememberInput: document.querySelector("#studentRememberInput"),
   studentLoginMessage: document.querySelector("#studentLoginMessage"),
@@ -174,8 +177,38 @@ document.querySelectorAll("[data-role-choice]").forEach((button) => {
 function setupAccessEnhancements() {
   setupClayRoleNav();
   setupStaffPinFields();
+  setupStudentClassFilter();
   setupMonitoringPanel();
   setupStatisticsPanel();
+}
+
+function setupStudentClassFilter() {
+  if (!els.studentClassFilter || els.studentClassFilter.dataset.ready === "1") {
+    return;
+  }
+
+  els.studentClassFilter.dataset.ready = "1";
+  els.studentClassFilter.querySelectorAll("[data-student-class]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedStudentLoginClass = button.dataset.studentClass || "A2";
+      studentLoginClassInitialized = true;
+      renderStudentLoginClassFilter();
+      populateStudents();
+    });
+  });
+  renderStudentLoginClassFilter();
+}
+
+function renderStudentLoginClassFilter() {
+  if (!els.studentClassFilter) {
+    return;
+  }
+
+  els.studentClassFilter.querySelectorAll("[data-student-class]").forEach((button) => {
+    const isActive = button.dataset.studentClass === selectedStudentLoginClass;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
 }
 
 function setupClayRoleNav() {
@@ -1837,9 +1870,7 @@ function createRequestId() {
 }
 
 function populateStudents() {
-  els.studentLoginSelect.innerHTML = students
-    .map((student) => `<option value="${student.id}">${student.name} - ${student.className}</option>`)
-    .join("");
+  renderStudentDropdownState(students);
 }
 
 function populateStaff() {
@@ -3637,11 +3668,62 @@ function renderStudentDropdownState(liveStudents) {
     return;
   }
 
+  ensureStudentLoginClassSelection(liveStudents);
+  renderStudentLoginClassFilter();
+  const filteredStudents = filterStudentsByLoginClass(liveStudents);
+  if (!filteredStudents.length) {
+    const className = selectedStudentLoginClass || "A2";
+    els.studentLoginSelect.innerHTML = `<option value="">Tiada pelajar ${escapeHtml(className)} ditemui.</option>`;
+    els.studentLoginSelect.disabled = true;
+    setStudentLoginDisabled(true);
+    return;
+  }
+
   els.studentLoginSelect.disabled = false;
   setStudentLoginDisabled(false);
-  els.studentLoginSelect.innerHTML = liveStudents.map((student) => (
+  els.studentLoginSelect.innerHTML = filteredStudents.map((student) => (
     `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)} (${escapeHtml(student.no_matrik)})</option>`
   )).join("");
+}
+
+function ensureStudentLoginClassSelection(studentList) {
+  if (studentLoginClassInitialized) {
+    return;
+  }
+
+  const a2HasStudents = filterStudentsByLoginClass(studentList, "A2").length > 0;
+  const a3HasStudents = filterStudentsByLoginClass(studentList, "A3").length > 0;
+
+  if (a2HasStudents) {
+    selectedStudentLoginClass = "A2";
+    studentLoginClassInitialized = true;
+    return;
+  }
+
+  if (a3HasStudents) {
+    selectedStudentLoginClass = "A3";
+    studentLoginClassInitialized = true;
+  }
+}
+
+function filterStudentsByLoginClass(studentList, className = selectedStudentLoginClass) {
+  const filtered = (studentList || []).filter((student) => getStudentLoginClass(student) === className);
+  if (filtered.length || hasA2OrA3Student(studentList)) {
+    return filtered;
+  }
+  return ALLOW_MOCK_MODE ? studentList : filtered;
+}
+
+function hasA2OrA3Student(studentList) {
+  return (studentList || []).some((student) => ["A2", "A3"].includes(getStudentLoginClass(student)));
+}
+
+function getStudentLoginClass(student) {
+  const rawClass = String((student && (student.kelas || student.className || student.class || student.kelas_pelajar)) || "")
+    .trim()
+    .toUpperCase();
+  const match = rawClass.match(/\bA[23]\b/);
+  return match ? match[0] : rawClass;
 }
 
 function setStudentLoginDisabled(disabled) {
@@ -3760,7 +3842,7 @@ function showStudentLoadFailurePanel() {
 }
 
 function clearStudentLoadFailurePanel() {
-  if (els.studentLoginMessage && els.studentLoginMessage.textContent.indexOf("Gagal memuatkan senarai pelajar") !== -1) {
+  if (els.studentLoginMessage && els.studentLoginMessage.textContent.indexOf("Gagal memuatkan") !== -1) {
     els.studentLoginMessage.textContent = "";
   }
 
