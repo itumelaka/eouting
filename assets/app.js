@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.12";
+const APP_VERSION = "1.6.13";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -293,6 +293,10 @@ function setupMonitoringPanel() {
       </div>
       <div class="monitor-loading" id="monitorLoading" hidden>Memuatkan rekod pemantauan...</div>
       <div class="summary-grid monitor-summary" id="monitorSummary"></div>
+      <section class="monitor-name-panel" id="monitorNamePanel">
+        <h3>Senarai Nama Semasa</h3>
+        <div class="monitor-name-list" id="monitorNameList"></div>
+      </section>
       <h3 class="list-title">Rekod Hari Ini</h3>
       <div class="record-list" id="monitorRecordsList"></div>
     </section>
@@ -304,6 +308,8 @@ function setupMonitoringPanel() {
   els.monitorLastUpdated = panel.querySelector("#monitorLastUpdated");
   els.monitorLoading = panel.querySelector("#monitorLoading");
   els.monitorSummary = panel.querySelector("#monitorSummary");
+  els.monitorNamePanel = panel.querySelector("#monitorNamePanel");
+  els.monitorNameList = panel.querySelector("#monitorNameList");
   els.monitorRecordsList = panel.querySelector("#monitorRecordsList");
   els.monitorBackButton.addEventListener("click", closeMonitoringPage);
   els.monitorRefreshButton.addEventListener("click", refreshMonitoringRecords);
@@ -5342,6 +5348,7 @@ function renderMonitoringPageV1612() {
       monitorSummaryCardV1612("Kecemasan", counts.emergency, "")
     ].join("");
   }
+  renderMonitorNameListV1613(records);
 
   if (!els.monitorRecordsList) {
     return;
@@ -5353,6 +5360,63 @@ function renderMonitoringPageV1612() {
   }
 
   els.monitorRecordsList.innerHTML = records.map(monitorRecordCardV1612).join("");
+}
+
+function renderMonitorNameListV1613(records) {
+  if (!els.monitorNameList) {
+    return;
+  }
+
+  const nameRecords = records.filter(isMonitorNameListRecordV1613);
+  if (!nameRecords.length) {
+    els.monitorNameList.innerHTML = emptyState("Tiada senarai nama semasa.");
+    return;
+  }
+
+  const rows = nameRecords.map((record, index) => {
+    const icon = getWardenChecklistCopyStatusIcon(record);
+    const iconClass = getMonitorNameIconClassV1613(record);
+    const name = record.studentName || record.nama || record.name || "-";
+    return `
+      <div class="monitor-name-row">
+        <span class="monitor-name-icon ${iconClass}" aria-hidden="true">${icon}</span>
+        <span class="monitor-name-number">${index + 1}.</span>
+        <strong>${escapeHtml(name)}</strong>
+      </div>
+    `;
+  }).join("");
+
+  els.monitorNameList.innerHTML = `
+    <div class="monitor-name-copy">
+      <strong>SENARAI NAMA PERMOHONAN eOUTING</strong>
+      <div class="monitor-name-rows">${rows}</div>
+      <div class="monitor-name-legend">
+        <strong>Petunjuk:</strong>
+        <span><span class="monitor-name-icon status-icon-pending" aria-hidden="true">🟡</span> Menunggu kelulusan</span>
+        <span><span class="monitor-name-icon status-icon-approved" aria-hidden="true">🟢</span> Diluluskan warden</span>
+        <span><span class="monitor-name-icon status-icon-out" aria-hidden="true">🚶</span> Sedang keluar</span>
+        <span><span class="monitor-name-icon status-icon-returned" aria-hidden="true">✅</span> Sudah balik ke asrama</span>
+      </div>
+    </div>
+  `;
+}
+
+function isMonitorNameListRecordV1613(record) {
+  return Boolean(record && (
+    record.status === STATUS.pending ||
+    record.status === STATUS.approved ||
+    record.status === STATUS.out ||
+    record.status === STATUS.returned
+  ));
+}
+
+function getMonitorNameIconClassV1613(record) {
+  if (!record) return "";
+  if (record.status === STATUS.pending) return "status-icon-pending";
+  if (record.status === STATUS.approved) return "status-icon-approved";
+  if (record.status === STATUS.out) return "status-icon-out";
+  if (record.status === STATUS.returned) return "status-icon-returned";
+  return "";
 }
 
 function getMonitorCountsV1612(records) {

@@ -1195,6 +1195,86 @@ textarea {
   border-top-color: var(--success);
 }
 
+.monitor-name-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 14px;
+}
+
+.monitor-name-panel h3 {
+  color: var(--deep-navy);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.monitor-name-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.monitor-name-copy > strong {
+  color: var(--deep-navy);
+  font-size: 0.95rem;
+  letter-spacing: 0;
+}
+
+.monitor-name-rows,
+.monitor-name-legend {
+  display: grid;
+  gap: 7px;
+}
+
+.monitor-name-row {
+  align-items: center;
+  background: #f7f9fd;
+  border: 1px solid rgba(8, 36, 92, 0.09);
+  border-radius: 8px;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  min-height: 38px;
+  padding: 7px 9px;
+}
+
+.monitor-name-row strong {
+  color: var(--deep-navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-name-number {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.monitor-name-icon {
+  display: inline-block;
+  line-height: 1;
+}
+
+.monitor-name-legend {
+  border-top: 1px solid rgba(8, 36, 92, 0.1);
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding-top: 10px;
+}
+
+.monitor-name-legend strong {
+  color: var(--deep-navy);
+}
+
+.monitor-name-legend span {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
 .guard-refresh-panel {
   align-items: center;
   background: #ffffff;
@@ -1237,6 +1317,22 @@ textarea {
 
   .status-pulse-red.is-active-count {
     animation: urgentStatusPulse 2s ease-in-out infinite;
+  }
+
+  .monitor-name-icon.status-icon-pending {
+    animation: nameIconPulse 2.4s ease-in-out infinite;
+  }
+
+  .monitor-name-icon.status-icon-approved {
+    animation: nameIconGlow 2.6s ease-in-out infinite;
+  }
+
+  .monitor-name-icon.status-icon-out {
+    animation: liveWalk 1.2s ease-in-out infinite;
+  }
+
+  .monitor-name-icon.status-icon-returned {
+    animation: nameIconPop 2.8s ease-in-out infinite;
   }
 }
 
@@ -1281,6 +1377,43 @@ textarea {
 
   50% {
     box-shadow: 0 12px 30px rgba(215, 25, 32, 0.24), var(--shadow);
+  }
+}
+
+@keyframes nameIconPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes nameIconGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(22, 114, 71, 0));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 5px rgba(22, 114, 71, 0.38));
+  }
+}
+
+@keyframes nameIconPop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  12% {
+    transform: scale(1.14);
+  }
+
+  24% {
+    transform: scale(1);
   }
 }
 
