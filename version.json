@@ -1,5 +1,5 @@
 {
-  "version": "1.6.11",
+  "version": "1.6.12",
   "releasedAt": "2026-07-10",
-  "notes": "Add status icons and legend to copied warden name list."
+  "notes": "Improve live monitoring loading state and active status animations."
 }

@@ -1146,6 +1146,55 @@ textarea {
   color: var(--muted);
 }
 
+.monitor-loading {
+  background: #ffffff;
+  border: 1px dashed #b8c5cf;
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 800;
+  margin-bottom: 14px;
+  padding: 14px;
+  text-align: center;
+}
+
+.monitor-summary.is-loading,
+.record-list.is-loading {
+  opacity: 0.72;
+}
+
+.monitor-status-card {
+  position: relative;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.monitor-status-card span {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.monitor-status-card.is-active-count {
+  border-top-color: var(--warning);
+}
+
+.monitor-out-card.is-active-count {
+  border-top-color: #f08a24;
+  box-shadow: 0 14px 34px rgba(240, 138, 36, 0.22), var(--shadow);
+  transform: translateY(-1px);
+}
+
+.live-walk-icon {
+  display: inline-block;
+}
+
+.status-pulse-red.is-active-count {
+  border-top-color: var(--danger);
+}
+
+.status-pulse-green.is-active-count {
+  border-top-color: var(--success);
+}
+
 .guard-refresh-panel {
   align-items: center;
   background: #ffffff;
@@ -1170,6 +1219,69 @@ textarea {
 
 .monitor-workspace.active {
   display: block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .monitor-out-card.is-active-count {
+    animation: monitorGlow 2.4s ease-in-out infinite;
+  }
+
+  .monitor-out-card.is-active-count .live-walk-icon {
+    animation: liveWalk 1.2s ease-in-out infinite;
+  }
+
+  .status-pulse-yellow.is-active-count,
+  .status-pulse-green.is-active-count {
+    animation: softStatusPulse 2.8s ease-in-out infinite;
+  }
+
+  .status-pulse-red.is-active-count {
+    animation: urgentStatusPulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes liveWalk {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes monitorGlow {
+  0%,
+  100% {
+    box-shadow: 0 14px 34px rgba(240, 138, 36, 0.18), var(--shadow);
+  }
+
+  50% {
+    box-shadow: 0 16px 38px rgba(240, 138, 36, 0.32), var(--shadow);
+  }
+}
+
+@keyframes softStatusPulse {
+  0%,
+  100% {
+    box-shadow: var(--shadow);
+  }
+
+  50% {
+    box-shadow: 0 12px 30px rgba(255, 210, 31, 0.22), var(--shadow);
+  }
+}
+
+@keyframes urgentStatusPulse {
+  0%,
+  100% {
+    box-shadow: var(--shadow);
+  }
+
+  50% {
+    box-shadow: 0 12px 30px rgba(215, 25, 32, 0.24), var(--shadow);
+  }
 }
 
 .stats-workspace.active {

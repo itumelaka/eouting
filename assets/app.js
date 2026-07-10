@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.11";
+const APP_VERSION = "1.6.12";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -75,6 +75,8 @@ let guardRefreshIntervalId = null;
 let guardLastUpdatedAt = null;
 let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
+let monitorIsLoading = false;
+let monitorHasLoadedOnce = false;
 let toastTimerId = null;
 let activeRefreshPage = "access";
 let wardenChecklistTypeFilter = "all";
@@ -289,6 +291,7 @@ function setupMonitoringPanel() {
         <button class="secondary-action" id="monitorRefreshButton" type="button">Refresh</button>
         <small id="monitorLastUpdated"></small>
       </div>
+      <div class="monitor-loading" id="monitorLoading" hidden>Memuatkan rekod pemantauan...</div>
       <div class="summary-grid monitor-summary" id="monitorSummary"></div>
       <h3 class="list-title">Rekod Hari Ini</h3>
       <div class="record-list" id="monitorRecordsList"></div>
@@ -299,6 +302,7 @@ function setupMonitoringPanel() {
   els.monitorBackButton = panel.querySelector("#monitorBackButton");
   els.monitorRefreshButton = panel.querySelector("#monitorRefreshButton");
   els.monitorLastUpdated = panel.querySelector("#monitorLastUpdated");
+  els.monitorLoading = panel.querySelector("#monitorLoading");
   els.monitorSummary = panel.querySelector("#monitorSummary");
   els.monitorRecordsList = panel.querySelector("#monitorRecordsList");
   els.monitorBackButton.addEventListener("click", closeMonitoringPage);
@@ -5226,6 +5230,204 @@ updateEmergencyFields = function updateEmergencyFieldsRequestTypeBridgeV164() {
 updatePulangBermalamFields = function updatePulangBermalamFieldsRequestTypeBridgeV164() {
   updateRequestTypeFields();
 };
+
+async function openMonitoringPage() {
+  activeRefreshPage = "monitor";
+  if (els.accessScreen) {
+    els.accessScreen.classList.add("hidden");
+  }
+  if (els.appWorkspace) {
+    els.appWorkspace.classList.remove("active");
+  }
+  if (els.statsWorkspace) {
+    els.statsWorkspace.classList.remove("active");
+  }
+  if (els.monitorWorkspace) {
+    els.monitorWorkspace.classList.add("active");
+  }
+
+  if (monitoringRefreshIntervalId) {
+    clearInterval(monitoringRefreshIntervalId);
+  }
+  await refreshMonitoringRecords("open");
+  monitoringRefreshIntervalId = setInterval(() => {
+    if (activeRefreshPage === "monitor") {
+      refreshMonitoringRecords("auto");
+    }
+  }, 30000);
+}
+
+function closeMonitoringPage() {
+  activeRefreshPage = "access";
+  if (monitoringRefreshIntervalId) {
+    clearInterval(monitoringRefreshIntervalId);
+    monitoringRefreshIntervalId = null;
+  }
+  if (els.monitorWorkspace) {
+    els.monitorWorkspace.classList.remove("active");
+  }
+  if (els.accessScreen) {
+    els.accessScreen.classList.remove("hidden");
+  }
+  if (typeof updateFooterActionsVisibility === "function") {
+    updateFooterActionsVisibility();
+  }
+}
+
+async function refreshMonitoringRecords(source) {
+  const button = els.monitorRefreshButton;
+  const originalText = button ? button.textContent : "";
+  const hasOldData = monitorHasLoadedOnce && els.monitorRecordsList && els.monitorRecordsList.children.length > 0;
+
+  setMonitorLoadingState(true, !hasOldData);
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Memuat...";
+  }
+
+  try {
+    if (typeof loadTodayRecords === "function") {
+      await loadTodayRecords();
+    }
+    renderMonitoringPageV1612();
+    monitorHasLoadedOnce = true;
+    updateMonitorLastUpdatedV1612();
+  } catch (error) {
+    console.error("Rekod pemantauan gagal dimuat.", { source, error });
+    if (!hasOldData && els.monitorRecordsList) {
+      els.monitorRecordsList.innerHTML = emptyState("Rekod pemantauan gagal dimuat. Sila tekan Refresh.");
+    } else {
+      showError("Rekod pemantauan gagal dimuat. Sila tekan Refresh.", "Pemantauan Gagal");
+    }
+  } finally {
+    setMonitorLoadingState(false, false);
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || "Refresh";
+    }
+  }
+}
+
+function setMonitorLoadingState(isLoading, clearCurrentView) {
+  monitorIsLoading = isLoading;
+  if (els.monitorLoading) {
+    els.monitorLoading.hidden = !isLoading;
+  }
+  if (els.monitorSummary) {
+    els.monitorSummary.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) {
+      els.monitorSummary.innerHTML = "";
+    }
+  }
+  if (els.monitorRecordsList) {
+    els.monitorRecordsList.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) {
+      els.monitorRecordsList.innerHTML = "";
+    }
+  }
+}
+
+function renderMonitoringPageV1612() {
+  const records = Array.isArray(outingRecords) ? outingRecords : [];
+  const counts = getMonitorCountsV1612(records);
+
+  if (els.monitorSummary) {
+    els.monitorSummary.innerHTML = [
+      monitorSummaryCardV1612("Menunggu Kelulusan", counts.pending, "status-pulse-yellow"),
+      monitorSummaryCardV1612("Diluluskan", counts.approved, "status-pulse-green"),
+      monitorSummaryCardV1612("Sedang Keluar", counts.out, "monitor-out-card", "🚶"),
+      monitorSummaryCardV1612("Sudah Pulang", counts.returned, ""),
+      monitorSummaryCardV1612("Lewat", counts.late, "status-pulse-red"),
+      monitorSummaryCardV1612("Belum Masuk", counts.notReturned, ""),
+      monitorSummaryCardV1612("Kecemasan", counts.emergency, "")
+    ].join("");
+  }
+
+  if (!els.monitorRecordsList) {
+    return;
+  }
+
+  if (!records.length) {
+    els.monitorRecordsList.innerHTML = emptyState("Tiada rekod pemantauan hari ini.");
+    return;
+  }
+
+  els.monitorRecordsList.innerHTML = records.map(monitorRecordCardV1612).join("");
+}
+
+function getMonitorCountsV1612(records) {
+  return records.reduce((acc, record) => {
+    if (record.status === STATUS.pending) acc.pending += 1;
+    if (record.status === STATUS.approved) acc.approved += 1;
+    if (record.status === STATUS.out) acc.out += 1;
+    if (record.status === STATUS.returned) acc.returned += 1;
+    if (record.jenis_permohonan === REQUEST_TYPE.emergency) acc.emergency += 1;
+    if (isMonitorLateRecordV1612(record)) acc.late += 1;
+    if (record.status === STATUS.out && !record.masa_masuk && !record.returnedAt) acc.notReturned += 1;
+    return acc;
+  }, {
+    pending: 0,
+    approved: 0,
+    out: 0,
+    returned: 0,
+    late: 0,
+    notReturned: 0,
+    emergency: 0
+  });
+}
+
+function monitorSummaryCardV1612(label, count, className, icon) {
+  const activeClass = count > 0 ? "is-active-count is-live" : "";
+  const iconHtml = icon ? `<span class="live-walk-icon" aria-hidden="true">${icon}</span>` : "";
+  return `
+    <article class="summary-card monitor-status-card ${className || ""} ${activeClass}">
+      <span>${iconHtml}${escapeHtml(label)}</span>
+      <strong>${count}</strong>
+    </article>
+  `;
+}
+
+function monitorRecordCardV1612(record) {
+  const status = semesterChecklistStatus(record);
+  const typeLabel = requestChecklistTypeLabel(record);
+  const studentName = record.studentName || record.nama || record.name || "-";
+  const className = record.className || record.kelas || "-";
+  const dateTime = requestChecklistDateTime(record);
+  return `
+    <article class="record-card monitor-record-card">
+      <div class="record-top">
+        <div>
+          <h3>${escapeHtml(studentName)}</h3>
+          <p class="record-meta">${escapeHtml(className)} · ${escapeHtml(typeLabel)}</p>
+        </div>
+        <div class="badge-stack">
+          <span class="badge badge-${status.key}">${escapeHtml(status.label)}</span>
+        </div>
+      </div>
+      <p class="record-detail"><strong>Masa berkaitan:</strong> ${escapeHtml(dateTime)}</p>
+    </article>
+  `;
+}
+
+function isMonitorLateRecordV1612(record) {
+  return Boolean(record && (
+    record.lewat === true ||
+    String(record.lewat || "").trim().toLowerCase() === "ya" ||
+    String(record.lewatText || "").trim().toLowerCase() === "ya" ||
+    isHostelReturnLateV160(record)
+  ));
+}
+
+function updateMonitorLastUpdatedV1612() {
+  monitorLastUpdatedAt = new Date();
+  if (!els.monitorLastUpdated) {
+    return;
+  }
+  const timeText = typeof formatTime === "function"
+    ? formatTime(monitorLastUpdatedAt)
+    : monitorLastUpdatedAt.toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" });
+  els.monitorLastUpdated.textContent = `Dikemaskini ${timeText}`;
+}
 
 function ensureWardenSemesterChecklist() {
   if (!els.wardenList || els.wardenSemesterChecklist) {
