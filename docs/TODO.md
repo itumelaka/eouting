@@ -1,54 +1,62 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas milestone **Live/pilot stable v1.6.16**.
+Senarai kerja selepas milestone live **v1.6.25**.
 
 ## Done / Completed
 
-- [x] GitHub Pages frontend live.
-- [x] Google Apps Script backend deployed.
-- [x] Google Sheets live backend connection.
-- [x] Live Mode: Google Sheets active.
-- [x] Pelajar login using name + `no_matrik`.
-- [x] Warden/Guard PIN login.
-- [x] Backend staff PIN hardening for Warden/Guard actions.
+### Core System
+
+- [x] GitHub Pages frontend dan PWA live.
+- [x] Google Apps Script backend dideploy dan disambungkan ke Google Sheets.
+- [x] Pelajar, Warden dan Guard login.
+- [x] Flow `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM` dan `CUTI_SEMESTER`.
 - [x] Backend duplicate active request prevention.
-- [x] Outing Biasa request flow.
-- [x] Kecemasan request flow.
-- [x] Pulang Bermalam request flow.
-- [x] Cuti Semester request flow.
-- [x] Cuti Semester uses existing `OUTING_REQUESTS` columns.
-- [x] Warden can see active/future-dated pending Cuti Semester records.
-- [x] Guard can process approved Cuti Semester records.
-- [x] Guard `Refresh Status` control and Guard auto-refresh.
-- [x] Warden Dashboard auto-refresh every 60 seconds.
-- [x] Warden `Refresh Permohonan`.
-- [x] Warden utility panel moved closer to dashboard.
-- [x] `Muat Semula Aplikasi` kept as smaller/subtle action.
-- [x] Pemantauan keeps active records visible until selesai.
-- [x] Pemantauan Semasa loading state and live status animation.
-- [x] Pemantauan Semasa Senarai Nama Semasa with animated status icons.
-- [x] Warden Checklist Permohonan for all request types.
-- [x] Warden checklist filters: Semua, Outing, Bermalam, Cuti Semester, Kecemasan.
-- [x] Copy Senarai Nama aktif for WhatsApp.
-- [x] Status icon and legend in copied Warden name list.
-- [x] Stale staff login error toast fixed after successful Warden/Guard login.
-- [x] Empty yellow notice/banner hidden when no message exists.
-- [x] Telegram notifications basic flow.
-- [x] Audit log uses existing `AUDIT_LOG` headers.
-- [x] CSV export for reports.
-- [x] Statistik monthly view.
-- [x] Footer utility/report buttons visible only on Warden screen when moved into Warden utility panel.
-- [x] Cuti Semester return time display fixed.
-- [x] Student refresh remains on student page.
-- [x] Warden/Guard/Pemantauan/Statistik refresh behavior restored.
-- [x] PWA version/cache update strategy using `APP_VERSION`, asset query strings, `version.json`, and service worker cache name.
-- [x] Update available / `Apa yang baharu` popup.
+- [x] Warden approve/reject dan Guard confirm keluar/masuk.
+- [x] Telegram notification basic flow dan `AUDIT_LOG`.
+- [x] Warden Dashboard refresh, Checklist Permohonan dan Copy Senarai Nama.
+- [x] Guard refresh dan auto-refresh.
+- [x] Statistik aggregated counts dan CSV report controls.
+- [x] PWA version/cache update strategy dan update popup.
+
+### Privacy dan Authenticated Records
+
+- [x] Student list privacy hardening.
+- [x] Public `getStudents` minimum kepada `student_id`, `nama`, `kelas`.
+- [x] Authenticated operational records untuk Pelajar, Warden dan Guard.
+- [x] Tiada fallback authenticated POST kepada public GET.
+- [x] Public Monitoring data minimisation kepada enam field.
+- [x] Statistik individu/leaderboard sensitif dibuang.
+- [x] API/GAS dikecualikan daripada Cache Storage dan cache lama dibersihkan.
+- [x] Staff runtime credential restoration selepas fresh login.
+
+### Status dan Guard UX
+
+- [x] Warden emoji status menggantikan indikator kotak lama.
+- [x] Contextual status labels melalui helper pusat.
+- [x] `Sedang Bercuti`, `Sedang Bermalam` dan `Sedang Keluar` tanpa mengubah status backend.
+- [x] Guard filter cleanup kepada filter yang relevan sahaja.
+- [x] Guard `Kecemasan` filter yang berasingan daripada Outing Harian.
+- [x] Contextual empty-state bagi kedua-dua seksyen Guard.
+
+### Public Monitoring v1.6.25
+
+- [x] Public name display dengan restricted response fields.
+- [x] Public Monitoring one-click loading.
+- [x] Scroll reset ke permulaan `monitorWorkspace`.
+- [x] Dedicated public GET loader.
+- [x] Single-flight guard untuk klik, refresh dan auto-refresh.
+- [x] Duplicate render removal; satu response dirender sekali.
+- [x] Timestamp hanya berubah selepas fetch berjaya.
+- [x] Cached data dikekalkan selepas refresh gagal.
+- [x] Compact Public Monitoring layout.
+- [x] `Rekod Hari Ini`, quick filter monitor dan seksyen `Belum Pulang Ke Asrama` pendua dibuang.
+- [x] `Senarai Status Semasa` memaparkan nama, kelas, jenis, ikon dan label kontekstual.
 
 ## Operations Checklist
 
-- [ ] Continue live monitoring after v1.6.16.
-- [ ] Verify Cuti Semester approval and guard flow in real operation.
-- [ ] Verify Pemantauan Semasa active records during Cuti Semester.
+- [ ] Continue live monitoring after v1.6.25.
+- [ ] Verify Cuti Semester approval and Guard flow in real operation.
+- [ ] Verify Public Monitoring during active Cuti Semester/Pulang Bermalam records.
 - [ ] Verify CSV reports after more Cuti Semester records.
 - [ ] Confirm Telegram group membership for operations.
 - [ ] Clean test data before official reporting if needed.

@@ -1,102 +1,72 @@
-# Project Status
+# Project Status eOuting ITU
 
-Project: **eOuting ITU / eOuting SKM OLP**
+Status semasa: **live v1.6.25**.
 
-Current version: **Live/pilot stable v1.6.16**
+- Frontend v1.6.25 telah commit dan push ke GitHub Pages.
+- Backend GAS v1.6.25 telah `clasp push`, dideploy sebagai version live baharu dan diuji.
+- Google Sheets kekal database/source of truth.
+- Telegram notification untuk flow utama kekal aktif.
+- Automated test baseline: **40/40 lulus**.
 
-Live site:
+## Fungsi Disahkan
+
+- Role Pelajar, Warden, Guard dan Public Monitoring read-only.
+- Jenis `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM`, `CUTI_SEMESTER`.
+- Pelajar login dengan `student_id` dalaman + nombor matrik yang ditaip.
+- Warden approve/reject dan Guard confirm keluar/masuk menggunakan POST authenticated.
+- Runtime credential staff dipulihkan selepas fresh login.
+- Tiada fallback authenticated kepada public records.
+- Warden Checklist menggunakan emoji dan status kontekstual.
+- Guard quick filter dan contextual empty-state berfungsi pada kedua-dua seksyen.
+- Public Monitoring membuka sekali klik, scroll, membuat GET awam khusus, mengelakkan overlap dan merender sekali.
+- Public Monitoring mengekalkan data lama apabila refresh gagal.
+- Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
+- Statistik hanya aggregated counts; leaderboard individu telah dibuang.
+- API/GAS network-only dalam service worker; cache lama dibersihkan.
+- Version, footer, asset query strings dan cache konsisten pada v1.6.25.
+
+## Privacy Boundary
+
+Public `getStudents`:
 
 ```text
-https://itumelaka.github.io/eouting/
+student_id | nama | kelas
 ```
 
-Repo:
+Public GET `getTodayRecords`:
 
 ```text
-https://github.com/itumelaka/eouting
+nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 ```
 
-## Confirmed Status
+Public response tidak mempunyai nombor matrik, internal/request ID, telefon, waris, lokasi, tujuan, kenderaan, credential atau metadata operasi. Nama dibenarkan untuk Public Monitoring v1.6.25.
 
-- GitHub Pages frontend is live.
-- Google Apps Script backend is deployed and connected to Google Sheets.
-- Live Mode: Google Sheets is active.
-- Telegram notifications are implemented for core request/status events.
-- Backend staff PIN validation is hardened for Warden and Guard actions.
-- Empty staff PIN is rejected by backend validation.
-- Backend duplicate active request prevention is implemented.
-- Student, Warden, and Guard login flows are available.
-- Request flows are available for `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM`, and `CUTI_SEMESTER`.
-- Warden approve/reject flow is active.
-- Guard confirm keluar/masuk flow is active.
-- Guard dashboard has `Refresh Status` and auto-refresh behavior.
-- Warden Dashboard has `Refresh Permohonan` and auto-refresh every 60 seconds.
-- Warden utility actions are available near the dashboard:
-  - Muat Turun Laporan Hari Ini
-  - Muat Turun Laporan Bulanan
-  - Apa yang baharu
-  - Muat Semula Aplikasi as a smaller/subtle action
-- Warden Checklist Permohonan covers all request types and includes filters.
-- Warden can copy active/current name lists for WhatsApp with status icons and legend.
-- Pemantauan Semasa is read-only and has loading state, refresh, summary cards, Senarai Nama Semasa, and live animation.
-- Cuti Semester return time display is fixed and no longer shows raw ISO/1899 time values.
-- Stale PIN error toast after successful staff login was fixed in v1.6.16.
-- Empty yellow notice/banner is hidden when no message exists.
-- No spreadsheet header changes were needed for Cuti Semester.
-- PWA version/cache update strategy is active through `APP_VERSION`, asset query strings, `version.json`, and service worker cache name.
+Operational POST kekal berasingan dan memerlukan credential role sebenar.
 
-## Roles
+## Status Kontekstual
 
-- **Pelajar:** request submission and personal record/status view.
-- **Warden:** approval/rejection, Checklist Permohonan, copy name list, report downloads, refresh permohonan, and utility controls.
-- **Guard:** confirm keluar/masuk and refresh status.
-- **Pemantauan Semasa:** read-only operational monitoring.
-- **Statistik:** monthly reporting view.
+- 🟡 Menunggu Kelulusan
+- 🟢 Diluluskan
+- 🚶 Sedang Keluar
+- 🌙 Sedang Bermalam
+- 🏖️ Sedang Bercuti
+- ✅ Sudah Pulang
+- 🔴 Lewat
 
-## Request Types
+Nilai backend `KELUAR` tidak berubah.
 
-- `OUTING_BIASA` - Outing Biasa
-- `KECEMASAN` - Kecemasan
-- `PULANG_BERMALAM` - Pulang Bermalam
-- `CUTI_SEMESTER` - Cuti Semester
+## Deployment Milestone
 
-## Backend Notes
+- **v1.6.24:** frontend-only Guard filter release.
+- **v1.6.25:** frontend + GAS Public Monitoring/privacy release.
 
-`getTodayRecords()` returns:
+## Future Work
 
-- records with today activity
-- active records regardless of `tarikh`:
-  - `MENUNGGU_KELULUSAN`
-  - `DILULUSKAN_WARDEN`
-  - `KELUAR`
-- `PULANG_BERMALAM` / `CUTI_SEMESTER` records that are not completed
-
-Completed/rejected records are kept out of old history floods unless they relate to today activity.
-
-## Frontend Notes
-
-- Request type fields are controlled by one central UI handler.
-- Warden Checklist Permohonan covers all request types and includes compact status/type badges.
-- Copy Senarai Nama outputs a WhatsApp-ready list with status icons and a legend.
-- Guard page can manually refresh status and auto-refreshes while active.
-- Warden page can manually refresh request data and auto-refreshes every 60 seconds while active.
-- Pemantauan Semasa has a clear loading state and highlights active `Sedang Keluar` / late records.
-- Pemantauan Semasa has a read-only Senarai Nama Semasa with animated status icons.
-- Footer bottom keeps the version text; Warden utility actions are moved near the Warden dashboard.
-
-## Known Future Work
-
-- Google login / stronger auth.
-- Domain-restricted staff access.
+- Google/domain login atau stronger auth.
 - Hashed PIN storage.
 - Backend-issued session token.
 - Audit log retention policy.
-- QR code.
-- Upload selfie to Google Drive.
-- Admin page for master data.
-- Telegram deep links / inline links.
+- QR code dan upload selfie.
+- Admin master-data page.
 - Late-return escalation.
-- Daily WhatsApp summary/report.
-- Daily/weekly/monthly report automation.
-- Automated version injection/build step.
-- Supabase migration as future-only.
+- Automated reports dan version injection.

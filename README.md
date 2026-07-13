@@ -1,119 +1,143 @@
 # eOuting ITU
 
-**eOuting ITU / eOuting SKM OLP** ialah sistem digital untuk merekod, meluluskan, memantau, dan melapor pergerakan keluar masuk pelajar Institut Teknologi Unggas.
+eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Status semasa: **Live/pilot stable v1.6.16**.
+Status live semasa: **v1.6.25**.
 
-Live frontend:
+- Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
+- Backend: Google Apps Script (GAS) Web App
+- Database: Google Sheets
+- Notifikasi: Telegram Bot melalui GAS
+- Repo: [itumelaka/eouting](https://github.com/itumelaka/eouting)
 
-```text
-https://itumelaka.github.io/eouting/
-```
-
-Repo:
-
-```text
-https://github.com/itumelaka/eouting
-```
-
-## Current Status
-
-- **Frontend:** GitHub Pages
-- **Backend:** Google Apps Script Web App
-- **Database:** Google Sheets
-- **Notification:** Telegram Bot
-- **Mode:** Live Mode: Google Sheets
-- **PWA:** supported with version/cache update strategy
-- **Deployment helper:** `clasp`
-- **Current version:** `v1.6.16`
-
-Live/pilot stable v1.6.16 includes Google Sheets integration, deployed GAS backend, Telegram notifications, staff PIN hardening, duplicate active request prevention, Guard refresh, Warden auto-refresh, Warden checklist, copy name list, Pemantauan Semasa live board, PWA update detection, and stale staff login error cleanup.
-
-## Roles
-
-- **Pelajar:** submit permohonan dan semak `Rekod Saya`.
-- **Warden:** lulus/tolak permohonan, semak Checklist Permohonan, copy senarai nama aktif, refresh permohonan, muat turun laporan CSV, dan akses utiliti Warden.
-- **Guard:** sahkan keluar/masuk pelajar, dengan manual refresh dan auto-refresh.
-- **Pemantauan Semasa:** read-only monitoring untuk rekod aktif dan rekod hari ini.
-- **Statistik:** ringkasan bulanan, leaderboard, ringkasan kelas, dan pecahan status.
-
-## Request Types
-
-- **Outing Biasa** (`OUTING_BIASA`)
-- **Kecemasan** (`KECEMASAN`)
-- **Pulang Bermalam** (`PULANG_BERMALAM`)
-- **Cuti Semester** (`CUTI_SEMESTER`)
-
-## Key Features
-
-- Backend staff action wajib nama + PIN aktif.
-- Backend duplicate active request prevention untuk status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN`, dan `KELUAR`.
-- Warden Dashboard auto-refresh setiap 60 saat dan manual `Refresh Permohonan`.
-- Guard page ada `Refresh Status` dan auto-refresh.
-- Warden Checklist Permohonan meliputi semua jenis permohonan.
-- Copy Senarai Nama untuk WhatsApp dengan ikon status dan petunjuk.
-- Pemantauan Semasa read-only dengan loading state, summary cards, Senarai Nama Semasa, dan animasi live.
-- PWA versioning melalui `APP_VERSION`, asset query strings, `service-worker.js`, dan `version.json`.
-- Update available / `Apa yang baharu` popup.
-- Audit log dan Telegram notification basic flow.
-- CSV/report download dan Statistik view.
-
-## Cuti Semester
-
-`Cuti Semester` menggunakan header sedia ada dalam `OUTING_REQUESTS`; tiada kolum spreadsheet baru diperlukan.
-
-Mapping utama:
-
-- `jenis_permohonan = CUTI_SEMESTER`
-- `tarikh = Tarikh Keluar / Tarikh Mula Cuti`
-- `tarikh_balik = Tarikh Pulang Ke Asrama`
-- `masa_balik_dijangka = Masa Dijangka Pulang Ke Asrama`
-- `telefon_waris` dan `hubungan_waris` wajib diisi
-
-Behavior:
-
-- Pelajar boleh submit Cuti Semester melalui borang Pelajar.
-- Warden boleh lihat permohonan pending walaupun `tarikh` ialah tarikh masa depan.
-- Guard boleh proses rekod yang telah diluluskan.
-- Pemantauan Semasa mengekalkan rekod aktif sehingga status `SELESAI`.
-
-## Deployment Summary
-
-Frontend-only change:
+## Architecture Ringkas
 
 ```text
-git commit
-git push
+Browser / PWA di GitHub Pages
+  -> Google Apps Script Web App
+    -> Google Sheets
+    -> Telegram Bot
+    -> AUDIT_LOG
 ```
 
-GAS change:
+Frontend mengurus paparan dan interaksi. GAS menguatkuasakan login, permission tindakan dan lifecycle rekod. Google Sheets ialah source of truth. Kegagalan Telegram tidak membatalkan tindakan utama yang sudah berjaya.
+
+## Role
+
+- **Pelajar:** pilih nama, masukkan nombor matrik, hantar permohonan dan lihat rekod sendiri.
+- **Warden:** login nama + PIN, refresh rekod, approve/reject, guna Checklist Permohonan dan salin senarai nama.
+- **Guard:** login nama + PIN, lihat `Sedia Untuk Keluar` dan `Sedang Keluar`, kemudian sahkan keluar/masuk.
+- **Public Monitoring read-only:** lihat ringkasan dan `Senarai Status Semasa` tanpa tindakan operasi.
+
+## Jenis Permohonan
+
+- `OUTING_BIASA`
+- `KECEMASAN`
+- `PULANG_BERMALAM`
+- `CUTI_SEMESTER`
+
+Semua jenis menggunakan aliran utama yang sama:
 
 ```text
-clasp push
-Apps Script > Manage deployments > Edit > New version > Deploy
+Pelajar hantar permohonan
+  -> Warden luluskan atau tolak
+  -> Guard sahkan keluar
+  -> Guard sahkan masuk
 ```
 
-Jika GitHub Pages kelihatan tersekat pada versi lama, semak raw GitHub berbanding live Pages dan cuba cache-bust URL:
+Backend menyimpan nilai status asal seperti `KELUAR`. Frontend memaparkan label kontekstual:
+
+| Keadaan | Paparan UI |
+|---|---|
+| Menunggu kelulusan | 🟡 Menunggu Kelulusan |
+| Diluluskan | 🟢 Diluluskan |
+| `OUTING_BIASA` / `KECEMASAN` + `KELUAR` | 🚶 Sedang Keluar |
+| `PULANG_BERMALAM` + `KELUAR` | 🌙 Sedang Bermalam |
+| `CUTI_SEMESTER` + `KELUAR` | 🏖️ Sedang Bercuti |
+| Sudah pulang | ✅ Sudah Pulang |
+| Lewat | 🔴 Lewat |
+
+Status lewat mempunyai precedence paparan tetapi tidak menggantikan nilai lifecycle backend.
+
+## Public Monitoring v1.6.25
+
+Sekali tekan `Pemantauan Semasa`, frontend:
+
+1. mengaktifkan workspace dan menyembunyikan workspace lain;
+2. scroll ke permulaan workspace;
+3. menunjukkan loading;
+4. membuat satu GET awam `getTodayRecords`;
+5. memetakan response awam dan merender sekali;
+6. mengemas kini timestamp hanya selepas berjaya.
+
+Single-flight guard menghalang klik, refresh manual dan auto-refresh daripada menghasilkan request bertindih. Refresh gagal mengekalkan data lama. Paparan dipadatkan kepada kad ringkasan dan `Senarai Status Semasa`; `Rekod Hari Ini`, quick filter rekod terperinci dan seksyen pendua `Belum Pulang Ke Asrama` telah dibuang.
+
+Setiap baris memaparkan nama sebenar, kelas, jenis permohonan, ikon dan label status kontekstual.
+
+## Boundary Privasi
+
+Public GET `getTodayRecords` hanya mengembalikan enam medan:
 
 ```text
-https://itumelaka.github.io/eouting/index.html?v=1.6.16
+nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 ```
 
-## Recent Changelog
+Ia tidak mengembalikan `student_id`, `no_matrik`, `request_id`, e-mel, telefon, waris, lokasi, tujuan, kenderaan, PIN, credential atau metadata operasi dalaman.
 
-- **v1.6.16:** Fix stale staff login error toast and empty notice/banner.
-- **v1.6.15:** Refine Warden utility actions and reduce Warden auto-refresh to 60 seconds.
-- **v1.6.14:** Add Warden auto-refresh and move utility buttons closer to dashboard.
-- **v1.6.13:** Add animated live name list to Pemantauan Semasa.
-- **v1.6.12:** Improve Pemantauan Semasa loading state and live animations.
-- **v1.6.11:** Status icons and legend in copied Warden name list.
-- **v1.6.10:** Copy Senarai Nama for active Warden requests.
-- **v1.6.9:** Warden checklist expanded to all request types.
-- **v1.6.8:** Guard refresh visibility and Warden checklist status improvements.
+Rekod operasi penuh untuk Pelajar, Warden dan Guard menggunakan POST authenticated yang berasingan. Tiada fallback daripada kegagalan POST operasi kepada data GET awam. Public Monitoring kekal read-only.
 
-## Live URLs / IDs
+Direktori awam `getStudents` pula hanya mengembalikan `student_id`, `nama` dan `kelas`; nombor matrik ditaip berasingan dan disemak terus oleh backend semasa login.
 
-- GitHub repo: `https://github.com/itumelaka/eouting`
-- GitHub Pages: `https://itumelaka.github.io/eouting/`
-- Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
-- Local repo path: `C:\Users\burnk\OneDrive\Documents-assets\eouting`
+## Guard Quick Filter
+
+Dashboard Guard menggunakan satu filter aktif pada satu masa:
+
+- Semua
+- Outing Harian
+- Pulang Bermalam
+- Cuti Semester
+- Kecemasan
+- Lewat
+
+Filter digunakan pada kedua-dua seksyen Guard dengan empty-state kontekstual. `Kecemasan` tidak dicampurkan dengan Outing Harian.
+
+## Development dan Test
+
+Jalankan frontend secara local:
+
+```powershell
+python -m http.server 8080
+```
+
+Jalankan keseluruhan suite:
+
+```powershell
+node --test tests/*.test.js
+```
+
+Baseline v1.6.25 ialah **40/40 lulus**. Syntax checks:
+
+```powershell
+node --check assets/app.js
+node --check service-worker.js
+Get-Content gas/Code.gs -Raw | node --check -
+```
+
+## Deployment Ringkas
+
+Frontend-only:
+
+1. selaraskan `APP_VERSION`, `version.json`, cache service worker, asset query strings dan footer;
+2. jalankan test dan syntax checks;
+3. commit dan push;
+4. tunggu GitHub Pages dan semak versi live.
+
+Backend GAS:
+
+1. jalankan `clasp push`;
+2. Apps Script: `Deploy -> Manage deployments -> Edit -> New version -> Deploy`;
+3. kekalkan deployment URL;
+4. uji `/exec?action=getTodayRecords`;
+5. kemudian commit dan push repo.
+
+Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

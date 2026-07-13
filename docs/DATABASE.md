@@ -1,81 +1,44 @@
 # Struktur Database Google Sheets
 
-Database utama eOuting ITU menggunakan Google Sheets.
+Google Sheets ialah database dan source of truth eOuting ITU v1.6.25. Frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
-Status semasa:
-
-- Spreadsheet title: `eOuting ITU Database`
-- Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
-- GitHub Pages frontend: `https://itumelaka.github.io/eouting`
-- GAS backend: Live/pilot stable v1.6.16
-- PWA/version cache update: siap
-- Telegram Bot notification: siap, config melalui Script Properties
-
-Setiap tab dalam Google Sheets mewakili satu jadual data.
-
-## Tab: STUDENTS
-
-Menyimpan senarai pelajar.
-
-Header:
+## `STUDENTS`
 
 ```text
 student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan
 ```
 
-Peraturan status pelajar:
+- `student_id` ialah identifier dalaman yang digunakan oleh frontend login.
+- Pelajar menaip `no_matrik` secara berasingan.
+- Backend memadankan `student_id` + `no_matrik` terus dengan row penuh Google Sheets.
+- Hanya pelajar `Aktif` boleh login dan membuat permohonan.
+- `no_matrik` dan `no_tel` hendaklah berformat Plain text.
 
-- `Aktif` = boleh login dan mohon outing.
-- `Tidak Aktif` = tidak boleh login dan tidak boleh mohon outing.
+Public `getStudents` hanya mengeluarkan:
 
-Nota format:
+```text
+student_id | nama | kelas
+```
 
-- `no_matrik` perlu diformat sebagai **Plain text**.
-- `no_tel` perlu diformat sebagai **Plain text** supaya nombor bermula dengan `0` tidak hilang.
+Field lain dalam sheet tidak menjadi sebahagian daripada direktori awam.
 
-## Tab: WARDENS
-
-Menyimpan senarai Warden yang boleh meluluskan atau menolak permohonan.
-
-Header:
+## `WARDENS`
 
 ```text
 warden_id | nama_warden | email | no_tel | pin | status | catatan
 ```
 
-Nota:
+Warden login dan tindakan operasi memerlukan nama + PIN yang sepadan dengan row aktif. PIN tidak boleh dipulangkan melalui direktori awam, dimasukkan ke log atau disimpan dalam repo.
 
-- `pin` digunakan untuk basic internal access control.
-- PIN divalidasi di GAS backend.
-- PIN kosong/null/whitespace ditolak oleh backend.
-- Staff action Warden perlu match nama + PIN + status aktif.
-- PIN tidak boleh didedahkan dalam response atau audit details.
-- `no_tel` perlu diformat sebagai **Plain text**.
-
-## Tab: GUARDS
-
-Menyimpan senarai Guard / pengguna pos guard.
-
-Header:
+## `GUARDS`
 
 ```text
 guard_id | nama_guard | email | no_tel | pin | status | catatan
 ```
 
-Nota:
+Guard login dan confirm keluar/masuk memerlukan nama + PIN yang sepadan dengan row aktif. Nombor telefon dan PIN hendaklah berformat Plain text jika perlu mengekalkan digit awal.
 
-- `pin` digunakan untuk basic internal access control.
-- PIN divalidasi di GAS backend.
-- PIN kosong/null/whitespace ditolak oleh backend.
-- Staff action Guard perlu match nama + PIN + status aktif.
-- PIN tidak boleh didedahkan dalam response atau audit details.
-- `no_tel` perlu diformat sebagai **Plain text**.
-
-## Tab: OUTING_REQUESTS
-
-Menyimpan semua rekod permohonan outing. Tab ini ialah **source of truth** untuk lifecycle permohonan.
-
-Header semasa:
+## `OUTING_REQUESTS`
 
 ```text
 request_id | tarikh | hari | jenis_permohonan | student_id | no_matrik | nama | student_email | kelas | tujuan | lokasi | jenis_kenderaan | butiran_kenderaan | sebab_kecemasan | telefon_waris | hubungan_waris | catatan_kecemasan | masa_mohon | status | warden_approve_by | masa_approve | masa_keluar | guard_keluar_by | masa_masuk | guard_masuk_by | lewat | selfie_whatsapp | catatan | tarikh_balik | hari_balik | masa_balik_dijangka
@@ -96,121 +59,37 @@ Status lifecycle:
 - `KELUAR`
 - `SELESAI`
 
-Status aktif untuk duplicate prevention:
+Status aktif yang menghalang duplicate request ialah `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR`. `SELESAI` dan `DITOLAK_WARDEN` tidak menghalang permohonan baharu.
 
-- `MENUNGGU_KELULUSAN`
-- `DILULUSKAN_WARDEN`
-- `KELUAR`
+`lewat` ialah flag operasi dan tidak menggantikan status lifecycle. `tarikh_balik`, `hari_balik` dan `masa_balik_dijangka` digunakan oleh Pulang Bermalam/Cuti Semester. Jenis Cuti Semester menggunakan schema sedia ada; tiada kolum baharu ditambah.
 
-Status yang tidak block permohonan baru:
+## Public Monitoring Projection
 
-- `SELESAI`
-- `DITOLAK_WARDEN`
+Public GET `getTodayRecords` membaca `OUTING_REQUESTS` tetapi memproyeksikan hanya:
 
-Nota medan:
+```text
+nama | kelas | jenis_permohonan | status | lewat | belum_masuk
+```
 
-- `lewat` digunakan untuk tanda pulang lewat.
-- `selfie_whatsapp` wujud sebagai medan data, tetapi upload selfie belum menjadi feature production.
-- `tarikh_balik`, `hari_balik`, dan `masa_balik_dijangka` digunakan untuk jenis permohonan yang memerlukan maklumat balik/pulang.
+Ia tidak mendedahkan `student_id`, `no_matrik`, `request_id`, e-mel, telefon, waris, lokasi, tujuan, kenderaan, nama pegawai, credential atau metadata audit/operasi lain.
 
-Nota format:
+Operational POST `getTodayRecords` kekal berasingan. Selepas credential disahkan, Pelajar menerima rekod sendiri manakala Warden/Guard menerima data operasi yang diperlukan oleh flow mereka. Tiada fallback kepada projection awam.
 
-- `no_matrik` perlu diformat sebagai **Plain text**.
-- `telefon_waris` perlu diformat sebagai **Plain text**.
-- Nombor telefon perlu kekal **Plain text** supaya digit awal tidak hilang.
-- Masa dan tarikh perlu konsisten supaya frontend dan GAS boleh memaparkan data dengan betul.
+## Statistik
 
-## Statistik Outing
+`getOutingStats` mengira statistik daripada `OUTING_REQUESTS` dan memulangkan aggregated counts sahaja. Ia tidak mengeluarkan row mentah, nama pelajar, nombor matrik atau leaderboard individu.
 
-Action `getOutingStats` menggunakan tab `OUTING_REQUESTS` sebagai **source of truth**. Statistik dikira daripada rekod outing yang sudah disimpan, bukan daripada data dummy frontend.
-
-Field utama yang digunakan untuk kiraan statistik:
-
-- `tarikh` atau fallback `masa_mohon`
-- `status`
-- `student_id`
-- `nama`
-- `kelas`
-- `jenis_permohonan`
-- `lewat`
-
-Status yang dikira:
-
-- `MENUNGGU_KELULUSAN`
-- `DILULUSKAN_WARDEN`
-- `DITOLAK_WARDEN`
-- `KELUAR`
-- `SELESAI`
-
-Paparan Statistik boleh filter mengikut bulan, tahun, dan kelas.
-
-## Pemantauan Semasa
-
-`Pemantauan Semasa` membaca rekod semasa melalui backend dan memaparkan:
-
-- Summary cards.
-- Rekod detail.
-- Senarai Nama Semasa.
-- Status icons.
-- Loading/error state.
-
-Paparan ini read-only dan tidak menulis data ke Spreadsheet.
-
-## Warden Checklist Permohonan
-
-Warden Checklist membaca data daripada `OUTING_REQUESTS`.
-
-Checklist merangkumi semua jenis:
-
-- `OUTING_BIASA`
-- `KECEMASAN`
-- `PULANG_BERMALAM`
-- `CUTI_SEMESTER`
-
-Copy Senarai Nama memasukkan status:
-
-- `MENUNGGU_KELULUSAN`
-- `DILULUSKAN_WARDEN`
-- `KELUAR`
-- `SELESAI`
-
-Copy Senarai Nama mengecualikan:
-
-- `DITOLAK_WARDEN`
-
-## Tab: AUDIT_LOG
-
-Menyimpan rekod tindakan penting untuk rujukan dan semakan.
-
-Header:
+## `AUDIT_LOG`
 
 ```text
 timestamp | action | request_id | user_role | user_name | details
 ```
 
-Contoh action:
+Audit log menyimpan tindakan seperti submit, approve, reject, confirm out/in dan login. Jangan letakkan PIN, token Telegram atau PII yang tidak diperlukan dalam `details`. Retention policy kekal kerja masa hadapan.
 
-```text
-SUBMIT_REQUEST
-APPROVE_REQUEST
-REJECT_REQUEST
-CONFIRM_OUT
-CONFIRM_IN
-LOGIN_STUDENT
-LOGIN_WARDEN
-LOGIN_GUARD
-```
+## Kawalan Akses
 
-Audit log asas sudah wujud. Retention policy dan paparan admin audit masih future roadmap.
-
-## Nota Penting
-
-- Jangan simpan token, secret, API key, atau deployment credential dalam repo.
-- PIN sekarang ialah basic internal access control, bukan security production-grade.
-- Spreadsheet perlu kekal private dan hanya dikongsi kepada akaun yang perlu.
-- Backend mesti validate identity, role, status, PIN, dan action permission sebelum menulis ke Spreadsheet.
-- Telegram token dan chat ID tidak disimpan dalam sheet atau repo.
-- Telegram config disimpan dalam Apps Script Script Properties:
-  - `TELEGRAM_ENABLED`
-  - `TELEGRAM_BOT_TOKEN`
-  - `TELEGRAM_CHAT_ID`
+- Spreadsheet mesti private dan hanya dikongsi kepada akaun yang perlu.
+- Jangan publish sheet kepada public.
+- Jangan simpan token, secret, PIN sebenar atau deployment credential dalam repo.
+- Semua identity, status, PIN dan action permission mesti disahkan di GAS, bukan melalui paparan frontend.

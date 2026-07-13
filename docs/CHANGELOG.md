@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.6.25
+
+- Fixed the Public Monitoring lifecycle with one-click workspace activation and scroll-to-workspace.
+- Added a dedicated public GET `getTodayRecords` loader with a single-flight guard and one render per response.
+- Updated timestamps only after successful refresh and retained old data after refresh failure.
+- Displayed real student names using the six-field minimum public response.
+- Compact Public Monitoring now keeps only summary cards and `Senarai Status Semasa`.
+- Removed the duplicate `Rekod Hari Ini`, monitoring quick filter and `Belum Pulang Ke Asrama` section.
+- Bumped frontend, cache, asset and release metadata to v1.6.25.
+
+## v1.6.24
+
+- Limited Guard quick filters to data available in `Sedia Untuk Keluar` and `Sedang Keluar`.
+- Added the dedicated `Kecemasan` filter and kept it separate from Outing Harian.
+- Added contextual empty-state messages per Guard section and active filter.
+- Bumped frontend, cache, asset and release metadata to v1.6.24.
+
+## v1.6.23
+
+- Restored runtime staff credentials after fresh Warden/Guard login responses that do not return PIN.
+- Kept the existing remember-device session architecture working.
+- Added the central contextual status display helper without changing backend status values.
+- Replaced Warden checklist colour boxes with status emoji.
+- Bumped frontend, cache, asset and release metadata to v1.6.23.
+
+## v1.6.22
+
+- Fixed authenticated operational record loading for Pelajar, Warden and Guard.
+- Required valid role credentials for operational POST `getTodayRecords`.
+- Removed silent authenticated fallback to public monitoring records.
+- Bumped frontend, cache, asset and release metadata to v1.6.22.
+
+## v1.6.21
+
+- Anonymised the initial Public Monitoring response.
+- Separated anonymous GET monitoring from authenticated operational POST records.
+- Removed sensitive individual statistics and retained aggregated counts only.
+- Bumped frontend, cache, asset and release metadata to v1.6.21.
+
+## v1.6.20
+
+- Hardened the public student directory to `student_id`, `nama` and `kelas` only.
+- Removed matric numbers and other student PII from public `getStudents`.
+- Made API/GAS requests network-only in the service worker.
+- Added automatic cleanup of old eOuting caches.
+- Bumped frontend, cache, asset and release metadata to v1.6.20.
+
 ## v1.6.16
 
 - Fixed stale Warden/Guard login error toast after successful staff login.

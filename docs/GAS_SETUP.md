@@ -1,214 +1,68 @@
-# Setup Google Apps Script untuk eOuting ITU
+# Setup Google Apps Script eOuting ITU
 
-Google Apps Script digunakan sebagai backend/API antara GitHub Pages dan Google Sheets.
+Google Apps Script ialah backend/API antara frontend GitHub Pages dan Google Sheets. Backend live v1.6.25 telah di-push dengan `clasp`, dideploy sebagai Web App version baharu dan disahkan melalui GET `getTodayRecords`.
 
-Status semasa:
+## Tanggungjawab Backend
 
-- Frontend live: `https://itumelaka.github.io/eouting`
-- Spreadsheet title: `eOuting ITU Database`
-- Spreadsheet ID: `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`
-- Apps Script ID: `1-rLUp8L6ep6jR_-3h_Y-rofpdaaUFUCE92uLQ59gba2wsOunN53s9JZR`
-- GAS backend: Live/pilot stable v1.6.16
-- `clasp` workflow: configured
-- Telegram Bot notification: siap
+- membaca `STUDENTS`, `WARDENS`, `GUARDS` dan `OUTING_REQUESTS`;
+- mengesahkan login Pelajar, Warden dan Guard;
+- menghalang duplicate active request;
+- menguatkuasakan approve/reject dan confirm keluar/masuk;
+- menyediakan projection public minimum dan rekod operasi authenticated;
+- mengira statistik agregat;
+- menulis `AUDIT_LOG`;
+- menghantar notifikasi Telegram.
 
-## Tujuan GAS Backend
+## Router Public GET
 
-GAS backend:
+`doGet(e)` menyokong action sedia ada seperti:
 
-- Membaca data `STUDENTS`, `WARDENS`, dan `GUARDS`.
-- Login Pelajar menggunakan nama + `no_matrik`.
-- Login Warden/Guard menggunakan nama + PIN.
-- Menulis permohonan ke `OUTING_REQUESTS`.
-- Menghalang duplicate active request di backend.
-- Mengemaskini status approve/reject/keluar/masuk.
-- Mengambil rekod hari ini untuk Student, Warden, Guard, dashboard, dan monitoring.
-- Mengira Statistik Outing bulanan melalui `getOutingStats`.
-- Menulis tindakan penting ke `AUDIT_LOG`.
-- Validate identity, role, status, PIN, dan action permission.
-- Menghantar Telegram notification asas.
+- `health`
+- `getStudents`
+- `getWardens`
+- `getGuards`
+- `getTodayRecords`
+- `getOutingStats`
 
-## Functions Live v1.6.16
+Boundary penting:
 
-Fungsi utama yang digunakan oleh frontend:
+- `getStudents` hanya mengembalikan `student_id`, `nama`, `kelas`.
+- `getTodayRecords` hanya mengembalikan `nama`, `kelas`, `jenis_permohonan`, `status`, `lewat`, `belum_masuk`.
+- `getOutingStats` hanya mengembalikan aggregate structures/counts.
 
-```text
-doGet(e)
-doPost(e)
-getStudents()
-getWardens()
-getGuards()
-loginStudent(payload)
-loginWarden(payload)
-loginGuard(payload)
-submitRequest(payload)
-approveRequest(payload)
-rejectRequest(payload)
-confirmOut(payload)
-confirmIn(payload)
-getTodayRecords()
-getOutingStats(params)
-```
+Jangan tambah PII atau metadata operasi kepada response public tanpa security review dan regression test.
 
-Fungsi helper penting:
+## Router Authenticated POST
 
-```text
-findStudent_()
-findActiveWarden_()
-findActiveGuard_()
-appendAuditLog()
-jsonResponse()
-errorResponse()
-testTelegramNotification()
-```
+`doPost(e)` mengendalikan:
 
-Nama helper sebenar perlu disemak dalam `gas/Code.gs` sebelum edit backend kerana helper underscore adalah implementation detail.
+- `loginStudent`
+- `loginWarden`
+- `loginGuard`
+- `getTodayRecords` melalui validation operasi
+- `submitRequest`
+- `approveRequest`
+- `rejectRequest`
+- `confirmOut`
+- `confirmIn`
 
-## Backend Hardening Semasa
+Authenticated `getTodayRecords` mengesahkan:
 
-v1.6.16 mengekalkan beberapa hardening penting:
+- Pelajar: `student_id` + `no_matrik`;
+- Warden: nama Warden + PIN;
+- Guard: nama Guard + PIN.
 
-- Warden approve/reject wajib nama + PIN.
-- Guard confirm keluar/masuk wajib nama + PIN.
-- PIN kosong/null/whitespace ditolak.
-- Staff lookup mesti match nama + PIN + active.
-- PIN tidak dipulangkan dalam response atau audit details.
-- `submitRequest` menghalang duplicate active request untuk pelajar sama.
-- Active statuses ialah `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN`, dan `KELUAR`.
-- Status `SELESAI` dan `DITOLAK_WARDEN` tidak block permohonan baru.
+Pelajar hanya menerima rekod sendiri. Warden dan Guard menerima rekod operasi yang diperlukan. Credential tidak lengkap atau salah mesti menghasilkan error; jangan fallback kepada public GET.
 
-## clasp Workflow Operasi
+## Credential dan Secret
 
-Install clasp jika belum ada:
+- Jangan hardcode atau commit PIN sebenar.
+- Jangan pulangkan PIN melalui response API.
+- Jangan cetak credential atau row sensitif ke log/debug output.
+- Telegram token dan chat ID mesti berada dalam Apps Script Script Properties.
+- Deployment credential kekal di luar repo.
 
-```powershell
-npm install -g @google/clasp
-```
-
-Login Google account:
-
-```powershell
-clasp login
-```
-
-Pastikan guna Google account yang ada akses kepada Apps Script project.
-
-Project ini menggunakan `.clasp.json` dengan `rootDir` ke folder `gas`.
-
-Contoh semakan:
-
-```powershell
-clasp status
-```
-
-Push perubahan Apps Script:
-
-```powershell
-clasp push
-```
-
-Nota penting:
-
-- `clasp push` hanya update fail Apps Script dalam project.
-- Web app users tidak semestinya dapat backend terbaru selepas `clasp push`.
-- Untuk live web app, buat deployment version baru.
-- Selepas tambah atau ubah GAS actions, jalankan `clasp push`.
-- Kemudian update Apps Script Web App melalui `Manage deployments -> Edit -> New version -> Deploy`.
-- Jika `/exec` memulangkan `Unknown action` tetapi code sudah wujud secara local, deployment version kemungkinan masih stale.
-
-Workflow ringkas:
-
-```text
-edit gas/Code.gs locally
-   ↓
-syntax check jika sesuai
-   ↓
-clasp push
-   ↓
-Deploy -> Manage deployments -> Edit -> New version -> Deploy
-   ↓
-test live frontend dan Telegram
-```
-
-## Deploy Web App Version Baru
-
-Dalam Apps Script editor:
-
-```text
-Deploy -> Manage deployments -> Edit -> New version -> Deploy
-```
-
-Cadangan setting pilot semasa:
-
-```text
-Execute as: Me
-Who has access: Anyone with the link
-```
-
-Jika Web App boleh dipanggil oleh sesiapa dengan link, backend validation wajib ketat. Jangan bergantung kepada frontend role hiding.
-
-## API Action Ringkas
-
-Frontend memanggil GAS Web App dengan action seperti:
-
-```text
-loginStudent
-loginWarden
-loginGuard
-submitRequest
-approveRequest
-rejectRequest
-confirmOut
-confirmIn
-getTodayRecords
-getOutingStats
-```
-
-Response success:
-
-```json
-{
-  "ok": true,
-  "data": {}
-}
-```
-
-Response error:
-
-```json
-{
-  "ok": false,
-  "error": "Ralat ringkas untuk frontend."
-}
-```
-
-Frontend mesti treat error message sebagai paparan pengguna, bukan sebagai bukti security. Security sebenar dibuat dalam backend.
-
-## Telegram Notification
-
-Backend boleh hantar notifikasi Telegram untuk action penting:
-
-- Permohonan outing baru.
-- Permohonan kecemasan baru.
-- Warden luluskan permohonan.
-- Warden tolak permohonan.
-- Guard sahkan keluar.
-- Guard sahkan masuk.
-- Pelajar masuk lewat.
-
-Setup ringkas:
-
-1. Cipta bot melalui BotFather.
-2. Add bot ke Telegram group operasi.
-3. Disable group privacy jika bot perlu baca group updates untuk dapatkan chat ID.
-4. Dapatkan group chat ID menggunakan Telegram `getUpdates`.
-5. Simpan config dalam Apps Script Script Properties.
-6. Run `testTelegramNotification()`.
-7. Test submit, approve/reject, keluar, masuk, dan lewat.
-
-Token bot dan chat ID **mesti** disimpan dalam Apps Script Script Properties, bukan dalam code repo.
-
-Script Properties yang digunakan:
+Script Properties Telegram:
 
 ```text
 TELEGRAM_ENABLED
@@ -216,43 +70,49 @@ TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID
 ```
 
-Cadangan nilai:
+Kegagalan Telegram hendaklah non-blocking untuk tindakan utama eOuting.
 
-```text
-TELEGRAM_ENABLED=true
-TELEGRAM_BOT_TOKEN=<token daripada BotFather>
-TELEGRAM_CHAT_ID=<chat id group/channel/user>
+## `clasp` Workflow
+
+Semak project:
+
+```powershell
+clasp status
 ```
 
-Cara set di Apps Script:
+Semak syntax GAS:
 
-```text
-Project Settings -> Script Properties -> Add script property
+```powershell
+Get-Content gas/Code.gs -Raw | node --check -
 ```
 
-Manual test selepas properties diset:
+Push code:
 
-```text
-Run function: testTelegramNotification
+```powershell
+clasp push
 ```
 
-Expected message:
+Kemudian deploy Web App version baharu:
 
 ```text
-Ujian Telegram eOuting ITU berjaya.
+Deploy -> Manage deployments -> Edit -> New version -> Deploy
 ```
 
-Nota keselamatan:
+Kekalkan URL deployment sedia ada. `clasp push` tidak menggantikan langkah deployment version.
 
-- Jangan hardcode Telegram token atau chat ID dalam `Code.gs`.
-- Jangan print token dalam logs.
-- Jika Telegram gagal, action utama eOuting masih perlu berjaya.
-- Selepas `clasp push`, deploy version baru supaya Web App menggunakan backend terbaru.
-- Jangan masukkan real token, secret, atau chat ID ke dokumentasi atau repo.
+## Verifikasi Selepas Deployment
 
-## Nota Pelaksanaan
+1. Uji `/exec?action=health` jika diperlukan.
+2. Uji `/exec?action=getTodayRecords` dan sahkan hanya enam field public.
+3. Uji `getStudents` dan sahkan nombor matrik tidak wujud.
+4. Uji login Pelajar dengan nombor matrik betul dan salah.
+5. Uji Warden/Guard POST `getTodayRecords` dengan credential sah dan tidak sah.
+6. Uji approve/reject serta confirm keluar/masuk.
+7. Semak Telegram tanpa mendedahkan token dalam log.
+8. Jalankan regression suite repo.
 
-- Jangan commit token, secret, password, API key, atau deployment credential.
-- PIN sekarang hanya untuk pilot/basic internal access control.
-- Roadmap security masih termasuk hash PIN, Google login/domain restriction, dan backend-issued session token.
-- Setiap deployment backend perlu diuji semula dengan frontend live.
+Jika `/exec` masih memulangkan behavior lama selepas `clasp push`, semak Manage deployments dan pastikan version baharu telah dipilih.
+
+## Roadmap Keselamatan
+
+PIN ialah basic internal access control, bukan authentication production-grade. Kerja masa hadapan termasuk PIN hashing, Google/domain login dan backend-issued session token.

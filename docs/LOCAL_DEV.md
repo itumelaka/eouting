@@ -1,217 +1,112 @@
-# Local Development eOuting ITU
+# Local Development dan Testing
 
-Dokumen ini menerangkan workflow local untuk pembangunan dan testing eOuting ITU.
-
-Local repo path semasa:
-
-```powershell
-C:\Users\burnk\OneDrive\Documents-assets\eouting
-```
-
-GitHub repo:
-
-```text
-https://github.com/itumelaka/eouting
-```
+Panduan ini merujuk eOuting ITU **v1.6.25**.
 
 ## Keperluan
 
 - Git
 - Browser
-- VS Code atau editor pilihan
-- Python untuk local static server
-- Node.js untuk syntax check
-- `clasp` untuk sync Google Apps Script
+- Python untuk static server
+- Node.js untuk test dan syntax checks
+- `clasp` untuk perubahan GAS
 
-## Jalankan Frontend Secara Local
-
-Dari folder repo:
+## Jalankan Frontend
 
 ```powershell
 python -m http.server 8080
 ```
 
-Buka:
+Buka `http://localhost:8080/`. Gunakan server HTTP; jangan buka `index.html` secara terus kerana path PWA/service worker berbeza.
 
-```text
-http://localhost:8080/
-```
+Mock mode hanya untuk development/demo dan perlu diaktifkan secara sengaja dengan `?mock=1`. Production tidak boleh fallback senyap kepada data mock.
 
-Gunakan local server, bukan buka `index.html` terus, supaya PWA/service worker dan path statik lebih hampir dengan GitHub Pages.
+## Automated Tests
 
-## Testing Workflow Live Mode
-
-Semak flow asas browser/local:
-
-1. Buka `http://localhost:8080/`.
-2. Pastikan mode indicator menunjukkan live mode jika backend boleh dicapai.
-3. Login Pelajar guna nama + `no_matrik`.
-4. Submit permohonan `Kecemasan` untuk test di luar waktu outing biasa.
-5. Submit `Outing Biasa` hanya semasa rule masa membenarkan.
-6. Semak `Rekod Aktif`.
-7. Semak `Sejarah Hari Ini`.
-8. Pastikan rekod `SELESAI` / `DITOLAK_WARDEN` compact dan tidak block request baru.
-9. Test `Ingat peranti ini`, refresh browser/PWA, dan pastikan sesi student restore.
-10. Login Warden dengan wrong PIN dan pastikan ditolak.
-11. Login Warden dengan PIN testing semasa.
-12. Jika test remember-device Warden, tick `Ingat peranti ini`, refresh, dan pastikan masih login.
-13. Luluskan atau tolak permohonan.
-14. Pastikan Telegram alert approve/reject diterima.
-15. Login Guard dengan wrong PIN dan pastikan ditolak.
-16. Login Guard dengan PIN testing semasa.
-17. Jika test guard PC, tick `Ingat peranti ini`, refresh, dan pastikan sesi Guard restore.
-18. Sahkan keluar.
-19. Sahkan masuk.
-20. Pastikan Telegram alert keluar/masuk diterima.
-21. Semak Dashboard Hari Ini.
-22. Semak Pemantauan Semasa.
-23. Semak Statistik Outing.
-24. Pastikan pilihan tahun Statistik hanya `2026`, `2027`, `2028`, `2029`, `2030`.
-25. Test filter Statistik mengikut bulan, tahun, dan kelas.
-26. Jika boleh, test sambungan live tidak stabil dan pastikan mesej friendly dipaparkan.
-27. Tekan `Cuba Lagi` dan pastikan app cuba reload live data tanpa clear browser data.
-28. Tekan `Muat Semula Sistem` jika PWA/browser memegang cache lama.
-29. Tekan `Log Keluar` dan pastikan sesi localStorage dibuang.
-
-## Mock Mode Development
-
-Production mesti guna Live Mode Google Sheets.
-
-Mock Mode hanya untuk development/demo dan mesti diaktifkan secara sengaja:
-
-```text
-http://localhost:8080/?mock=1
-https://itumelaka.github.io/eouting/?mock=1
-```
-
-Tanpa `?mock=1`, app tidak akan fallback senyap kepada demo data. Jika sambungan live gagal, pengguna akan nampak mesej:
-
-```text
-Sambungan Live Tidak Stabil
-Sistem tidak dapat berhubung dengan Google Sheets buat masa ini. Sila tekan Cuba Lagi atau Muat Semula Sistem.
-```
-
-Untuk pilot/production, pengguna perlu semak internet, tekan `Cuba Lagi`, atau tekan `Muat Semula Sistem`, bukan terus guna mock data.
-
-## Testing Checklist v1.3.1
-
-- Test live mode di `https://itumelaka.github.io/eouting`.
-- Test Statistik page.
-- Test year options 2026-2030.
-- Test month/class filters.
-- Test API unstable handling jika boleh.
-- Test butang `Cuba Lagi`.
-- Test `Muat Semula Sistem`.
-- Test remember-device refresh/reopen.
-- Test `?mock=1` untuk demo mode sahaja.
-- Test header clock format 24 jam.
-- Test `Rekod Aktif` / `Sejarah Hari Ini`.
-
-## GitHub Pages Testing
-
-Selepas push frontend:
-
-- Buka `https://itumelaka.github.io/eouting`.
-- Semak browser console untuk error.
-- Test student login, warden, guard, dashboard, dan monitoring.
-- Semak footer version, contoh `eOuting ITU • v1.2.2`.
-- Test butang `Muat Semula Sistem` jika PWA/browser masih memegang cache lama.
-- Jika GitHub Pages masih papar code lama, guna cache-busting URL:
-
-```text
-https://itumelaka.github.io/eouting/?v=YYYYMMDD-HHMM
-```
-
-Pengguna biasa patut guna `Muat Semula Sistem` dahulu, bukan clear semua browsing data. Jika PWA masih stale selepas itu, guna cache-busting URL atau reinstall PWA sebagai pilihan terakhir.
-
-## Version Bump / PWA Cache Workflow
-
-Untuk setiap release frontend:
-
-1. Update `APP_VERSION` dalam `assets/app.js`.
-2. Update query string asset dalam `index.html`:
-
-```text
-assets/style.css?v=<version>
-assets/app.js?v=<version>
-```
-
-3. Update `CACHE_NAME` dalam `service-worker.js`, contoh:
-
-```text
-eouting-cache-v<version>
-```
-
-4. Update `APP_SHELL_ASSETS` dalam `service-worker.js` supaya query string JS/CSS sama dengan version release.
-5. Jalankan syntax check:
+Jalankan keseluruhan suite:
 
 ```powershell
-node --check assets\app.js
+node --test tests/*.test.js
+```
+
+Baseline release v1.6.25 ialah **40/40 lulus**.
+
+Suite utama:
+
+- `tests/student-directory-security.test.js`: projection direktori Pelajar dan login backend.
+- `tests/student-login-dropdown-privacy.test.js`: dropdown nama tanpa nombor matrik.
+- `tests/public-monitoring-statistics-security.test.js`: privacy public response, operational POST, credential runtime, statistik agregat dan status kontekstual.
+- `tests/guard-quick-filter.test.js`: filter Guard dan contextual empty-state.
+- `tests/public-monitoring-lifecycle.test.js`: one-click, scroll, GET awam, single-flight, error/cached refresh dan satu render.
+- `tests/public-monitoring-compact-layout.test.js`: layout ringkas, `Senarai Status Semasa`, ringkasan dan isolation Warden/Guard.
+- `tests/service-worker-security.test.js`: API network-only, cache cleanup, static cache dan version consistency.
+
+Jalankan satu fail:
+
+```powershell
+node --test tests/public-monitoring-lifecycle.test.js
+```
+
+## Syntax dan Metadata Checks
+
+```powershell
+node --check assets/app.js
 node --check service-worker.js
+Get-Content gas/Code.gs -Raw | node --check -
+Get-Content version.json -Raw | ConvertFrom-Json
+git diff --check
 ```
 
-6. Deploy ke GitHub Pages.
-7. Buka app dan semak toast `Versi Baru Tersedia` atau guna `Muat Semula Sistem`.
+Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.6.25.
 
-## Mobile / PWA Testing
+## Smoke Test Pelajar
 
-Semak di telefon atau responsive browser tools:
+1. Pastikan dropdown memaparkan nama dan filter A2/A3 berfungsi.
+2. Pilih pelajar; `student_id` kekal value dalaman.
+3. Masukkan nombor matrik betul dan sahkan login berjaya.
+4. Cuba nombor matrik salah dan sahkan login ditolak.
+5. Hantar permohonan dan semak Rekod Saya.
+6. Uji `Ingat peranti ini` dan restore session.
 
-- Header dan layout mobile.
-- Install PWA.
-- App boleh dibuka sebagai standalone.
-- `Ingat peranti ini` restore sesi selepas refresh/reopen selagi belum expired.
-- `Muat Semula Sistem` tidak sepatutnya memadam localStorage session; sesi remember-device masih restore selepas reload jika belum expired.
-- Rekod status masih boleh refresh.
-- Toast/popup feedback tidak menutup form secara mengganggu.
-- `Rekod Aktif` dan `Sejarah Hari Ini` masih kemas di skrin kecil.
+## Smoke Test Warden
 
-## Syntax Checks
+1. Login nama + PIN selepas fresh page load.
+2. Pastikan Dashboard dan Checklist memuatkan nama sebenar.
+3. Semak emoji/label kontekstual.
+4. Refresh Permohonan.
+5. Uji approve/reject dan Telegram.
+6. Pastikan credential hilang menghasilkan error, bukan data Public Monitoring.
 
-Frontend:
+## Smoke Test Guard
 
-```powershell
-node --check assets\app.js
-```
+1. Login nama + PIN.
+2. Refresh dan semak `Sedia Untuk Keluar` serta `Sedang Keluar`.
+3. Uji filter Semua, Outing Harian, Pulang Bermalam, Cuti Semester, Kecemasan dan Lewat.
+4. Pastikan Outing Harian tidak menangkap Kecemasan.
+5. Uji confirm keluar/masuk dan Telegram.
 
-Service worker:
+## Smoke Test Public Monitoring
 
-```powershell
-node --check service-worker.js
-```
+1. Dari halaman utama tekan `Pemantauan Semasa` sekali.
+2. Pastikan workspace aktif dan viewport scroll ke atas.
+3. Pastikan satu GET `getTodayRecords` dibuat dan tiada POST authenticated digunakan.
+4. Semak loading, ringkasan dan `Senarai Status Semasa`.
+5. Semak setiap baris: nama, kelas, jenis, ikon dan label kontekstual.
+6. Pastikan `Rekod Hari Ini`, quick filter monitor dan `Belum Pulang Ke Asrama` tidak wujud.
+7. Klik refresh berulang semasa request aktif dan pastikan tiada overlap.
+8. Simulasi refresh gagal dan pastikan data/timestamp lama kekal.
 
-GAS parser check local:
+## PWA dan Cache
 
-```powershell
-Get-Content -Raw gas\Code.gs | node --check -
-```
+- Semak footer v1.6.25 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v1.6.25`.
+- Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
+- Static HTML/CSS/JS/icon boleh kekal dicache.
 
-## Git Workflow Asas
-
-Sebelum mula kerja:
-
-```powershell
-git status
-```
-
-Selepas edit fail:
+## Workflow Git
 
 ```powershell
 git status --short
 git diff
 ```
 
-Commit hanya bila perubahan sudah diuji dan memang mahu disimpan ke repo.
-
-## Nota Operasi
-
-- Jangan commit data sensitif.
-- Jangan masukkan token, secret, API key, password, atau deployment credential.
-- PIN testing ialah temporary value untuk Live V1.2, bukan PIN production.
-- Untuk backend live, `clasp push` perlu diikuti deployment version baru jika mahu web app users menerima perubahan.
-- Pastikan Telegram group menerima alert semasa test live.
-- Shared guard PC perlu tekan `Log Keluar` selepas digunakan.
-- Warden/Guard PIN jangan disimpan pada public/shared device kecuali diluluskan untuk operasi pilot.
-- Production improvement: backend-issued session token atau Google login menggantikan PIN persistence.
-- Mock Mode ialah demo sahaja dan tidak boleh digunakan untuk operasi sebenar.
-- Jika pengguna masih nampak raw HTML atau `Unexpected token <`, app v1.3.1 sepatutnya convert kepada mesej sambungan live yang friendly. Jika raw error masih muncul, inspect Network tab untuk response GAS yang gagal.
+Jangan commit token, secret, PIN sebenar, API key atau deployment credential. Untuk backend, `clasp push` mesti diikuti deployment Web App version baharu.
