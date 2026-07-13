@@ -1,10 +1,10 @@
-const CACHE_NAME = "eouting-cache-v1.6.19";
+const CACHE_NAME = "eouting-cache-v1.6.20";
 
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/style.css?v=1.6.19",
-  "./assets/app.js?v=1.6.19",
+  "./assets/style.css?v=1.6.20",
+  "./assets/app.js?v=1.6.20",
   "./assets/pwa-logo.png",
   "./assets/eouting-header-logo.png",
   "./assets/icons/icon-192.png",
@@ -29,7 +29,7 @@ self.addEventListener("activate", (event) => {
     caches.keys()
       .then((cacheNames) => Promise.all(
         cacheNames
-          .filter((cacheName) => cacheName !== CACHE_NAME)
+          .filter((cacheName) => cacheName.startsWith("eouting-cache-") && cacheName !== CACHE_NAME)
           .map((cacheName) => caches.delete(cacheName))
       ))
       .then(() => self.clients.claim())
@@ -43,6 +43,11 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(event.request.url);
 
+  if (isApiRequest_(requestUrl)) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   if (event.request.mode === "navigate" || requestUrl.pathname.endsWith("/index.html")) {
     event.respondWith(networkFirst(event.request, "./index.html"));
     return;
@@ -55,6 +60,10 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(staleWhileRevalidate(event.request));
 });
+
+function isApiRequest_(url) {
+  return url.origin !== self.location.origin || url.searchParams.has("action");
+}
 
 function isFreshAsset_(url) {
   return (

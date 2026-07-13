@@ -129,7 +129,7 @@ function getStudents() {
   const sheet = getSheet_(SHEETS.students);
   return getRowsAsObjects_(sheet)
     .filter((row) => isActive_(row.status))
-    .map((row) => pick_(row, ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status"]));
+    .map((row) => pick_(row, ["student_id", "nama", "kelas"]));
 }
 
 function getWardens() {
@@ -161,14 +161,14 @@ function getGuards() {
 }
 
 function loginStudent(payload) {
-  const nama = payload.nama || payload.name;
+  const studentId = payload.student_id || payload.id;
   const noMatrik = payload.no_matrik || payload.matric;
 
-  if (!nama || !noMatrik) {
-    throw new Error("Nama dan no_matrik diperlukan.");
+  if (!studentId || !noMatrik) {
+    throw new Error("student_id dan no_matrik diperlukan.");
   }
 
-  const student = findActiveStudent_(nama, noMatrik);
+  const student = findActiveStudent_(studentId, noMatrik);
 
   if (!student) {
     throw new Error("Pelajar tidak dijumpai atau tidak aktif.");
@@ -1193,9 +1193,9 @@ function ensureHeaders_(sheet, headers) {
   }
 }
 
-function findActiveStudent_(nama, noMatrik) {
+function findActiveStudent_(studentId, noMatrik) {
   return getRowsAsObjects_(getSheet_(SHEETS.students)).find((student) => (
-    normalizeText_(student.nama) === normalizeText_(nama) &&
+    normalizeText_(student.student_id) === normalizeText_(studentId) &&
     normalizeText_(student.no_matrik) === normalizeText_(noMatrik) &&
     isActive_(student.status)
   ));

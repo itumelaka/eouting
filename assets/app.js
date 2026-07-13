@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.19";
+const APP_VERSION = "1.6.20";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -447,7 +447,7 @@ els.studentLoginPanel.addEventListener("submit", async (event) => {
   if (isLiveMode) {
     try {
       const student = await apiPost("loginStudent", {
-        nama: selectedStudent ? selectedStudent.name : "",
+        student_id: selectedStudent ? selectedStudent.id : "",
         no_matrik: enteredMatric
       });
       const mappedStudent = mapLiveStudent(student);
@@ -1307,11 +1307,22 @@ async function restoreSavedSession() {
 }
 
 function findStudentForSavedSession(session) {
-  return students.find((student) => (
-    (session.student_id && normalizeValue(student.student_id || student.studentId || student.id) === normalizeValue(session.student_id)) ||
-    (session.no_matrik && normalizeValue(student.no_matrik || student.noMatrik) === normalizeValue(session.no_matrik)) ||
-    (session.nama && normalizeValue(student.nama || student.name) === normalizeValue(session.nama))
+  const student = students.find((item) => (
+    (session.student_id && normalizeValue(item.student_id || item.studentId || item.id) === normalizeValue(session.student_id)) ||
+    (session.no_matrik && normalizeValue(item.no_matrik || item.noMatrik) === normalizeValue(session.no_matrik)) ||
+    (session.nama && normalizeValue(item.nama || item.name) === normalizeValue(session.nama))
   ));
+
+  if (!student) {
+    return null;
+  }
+
+  return {
+    ...student,
+    no_matrik: session.no_matrik || student.no_matrik || student.noMatrik || "",
+    noMatrik: session.no_matrik || student.no_matrik || student.noMatrik || "",
+    email: session.email || student.email || ""
+  };
 }
 
 function setupFeedbackMessageObservers() {
@@ -3748,30 +3759,26 @@ function normalizeStudentListResponse(response) {
 
 function normalizeStudentRow(row) {
   if (!row || typeof row !== "object") {
-    console.warn("Rekod pelajar bukan objek.", row);
+    console.warn("Rekod pelajar bukan objek.");
     return null;
   }
 
   const id = String(row.student_id || row.id || "").trim();
   const name = String(row.nama || row.name || "").trim();
-  const matric = String(row.no_matrik || row.matric || "").trim();
+  const className = String(row.kelas || row.className || row.class || "").trim();
 
-  if (!id || !name || !matric) {
-    console.warn("Rekod pelajar tidak lengkap.", row);
+  if (!id || !name || !className) {
+    console.warn("Rekod pelajar tidak lengkap.");
     return null;
   }
 
   return {
     id,
     student_id: id,
-    no_matrik: matric,
     name,
     nama: name,
-    email: row.email || row.student_email || "",
-    className: row.kelas || row.className || "",
-    kelas: row.kelas || row.className || "",
-    gender: row.jantina || row.gender || "",
-    status: row.status || ""
+    className,
+    kelas: className
   };
 }
 
@@ -3806,7 +3813,7 @@ function extractArrayResponse(response, label) {
     return response.data;
   }
 
-  console.warn(`Respons ${label} bukan array.`, response);
+  console.warn(`Respons ${label} bukan array.`);
   throw new Error(`Respons ${label} tidak sah.`);
 }
 
