@@ -3682,7 +3682,7 @@ function renderStudentDropdownState(liveStudents) {
   els.studentLoginSelect.disabled = false;
   setStudentLoginDisabled(false);
   els.studentLoginSelect.innerHTML = filteredStudents.map((student) => (
-    `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)} (${escapeHtml(student.no_matrik)})</option>`
+    `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)}</option>`
   )).join("");
 }
 
