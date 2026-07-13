@@ -1,5 +1,5 @@
 {
-  "version": "1.6.20",
+  "version": "1.6.21",
   "releasedAt": "2026-07-13",
-  "notes": "Perkukuh privasi direktori pelajar dan bersihkan cache respons API."
+  "notes": "Perkukuh privasi Pemantauan Semasa dan buang statistik individu."
 }

@@ -96,6 +96,7 @@ function doPost(e) {
     if (action === "loginStudent") return jsonResponse(loginStudent(payload));
     if (action === "loginWarden") return jsonResponse(loginWarden(payload));
     if (action === "loginGuard") return jsonResponse(loginGuard(payload));
+    if (action === "getTodayRecords") return jsonResponse(getOperationalTodayRecords(payload));
     if (action === "submitRequest") return jsonResponse(submitRequest(payload));
     if (action === "approveRequest") return jsonResponse(approveRequest(payload));
     if (action === "rejectRequest") return jsonResponse(rejectRequest(payload));
@@ -498,6 +499,49 @@ function confirmIn(payload) {
 }
 
 function getTodayRecords() {
+  return getTodayRecordRows_().map((row) => ({
+    kelas: String(row.kelas || ""),
+    jenis_permohonan: String(row.jenis_permohonan || ""),
+    status: String(row.status || ""),
+    lewat: String(row.lewat || ""),
+    belum_masuk: String(row.status || "") === STATUS.out && !hasCellValue_(row.masa_masuk)
+  }));
+}
+
+function getOperationalTodayRecords(payload) {
+  const role = normalizeText_(payload && payload.role);
+  const rows = getTodayRecordRows_();
+
+  if (role === "student") {
+    const studentId = payload.student_id || payload.id;
+    const noMatrik = payload.no_matrik || payload.matric;
+    const student = findActiveStudent_(studentId, noMatrik);
+    if (!student) {
+      throw new Error("Akses sesi pelajar tidak sah.");
+    }
+    return rows.filter((row) => normalizeText_(row.student_id) === normalizeText_(student.student_id));
+  }
+
+  if (role === "warden") {
+    const name = payload.nama_warden || payload.warden_name || payload.name;
+    if (!findActiveWarden_(name, payload.pin)) {
+      throw new Error("Akses sesi warden tidak sah.");
+    }
+    return rows;
+  }
+
+  if (role === "guard") {
+    const name = payload.nama_guard || payload.guard_name || payload.name;
+    if (!findActiveGuard_(name, payload.pin)) {
+      throw new Error("Akses sesi guard tidak sah.");
+    }
+    return rows;
+  }
+
+  throw new Error("Akses sesi diperlukan.");
+}
+
+function getTodayRecordRows_() {
   const todayKey = formatDate_(new Date());
   return getRowsAsObjects_(getSheet_(SHEETS.requests))
     .filter((row) => {
@@ -582,7 +626,6 @@ function getOutingStats(payload) {
     const completed = status === STATUS.done;
     const emergency = requestType === REQUEST_TYPE.emergency;
     const normal = requestType === REQUEST_TYPE.normal;
-    const requestAt = row.masa_mohon || row.tarikh || "";
 
     if (status === STATUS.done) totals.total_completed += 1;
     if (status === STATUS.pending) totals.total_pending += 1;
@@ -595,27 +638,7 @@ function getOutingStats(payload) {
 
     statusMap[status] = (statusMap[status] || 0) + 1;
 
-    if (!studentsMap[studentKey]) {
-      studentsMap[studentKey] = {
-        student_id: String(row.student_id || ""),
-        no_matrik: String(row.no_matrik || ""),
-        nama: String(row.nama || ""),
-        kelas: kelas,
-        total_requests: 0,
-        completed: 0,
-        emergency: 0,
-        normal: 0,
-        late: 0,
-        last_request_at: ""
-      };
-    }
-
-    studentsMap[studentKey].total_requests += 1;
-    if (completed) studentsMap[studentKey].completed += 1;
-    if (emergency) studentsMap[studentKey].emergency += 1;
-    if (normal) studentsMap[studentKey].normal += 1;
-    if (late) studentsMap[studentKey].late += 1;
-    studentsMap[studentKey].last_request_at = laterDateValue_(studentsMap[studentKey].last_request_at, requestAt);
+    studentsMap[studentKey] = true;
 
     if (!classMap[kelas]) {
       classMap[kelas] = {
@@ -635,28 +658,6 @@ function getOutingStats(payload) {
     classMap[kelas].studentKeys[studentKey] = true;
   });
 
-  const leaderboard = Object.keys(studentsMap)
-    .map((key) => studentsMap[key])
-    .sort((a, b) => (
-      b.total_requests - a.total_requests ||
-      b.completed - a.completed ||
-      b.late - a.late ||
-      String(a.nama).localeCompare(String(b.nama))
-    ))
-    .map((student, index) => ({
-      rank: index + 1,
-      student_id: student.student_id,
-      no_matrik: student.no_matrik,
-      nama: student.nama,
-      kelas: student.kelas,
-      total_requests: student.total_requests,
-      completed: student.completed,
-      emergency: student.emergency,
-      normal: student.normal,
-      late: student.late,
-      last_request_at: student.last_request_at
-    }));
-
   const classSummary = Object.keys(classMap)
     .sort()
     .map((kelas) => ({
@@ -675,7 +676,6 @@ function getOutingStats(payload) {
     year: year,
     generated_at: now_(),
     totals: totals,
-    leaderboard: leaderboard,
     class_summary: classSummary,
     status_summary: Object.keys(statusMap).sort().map((status) => ({
       status: status,

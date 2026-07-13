@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.20";
+const APP_VERSION = "1.6.21";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -336,7 +336,7 @@ function setupMonitoringPanel() {
       <div class="monitor-loading" id="monitorLoading" hidden>Memuatkan rekod pemantauan...</div>
       <div class="summary-grid monitor-summary" id="monitorSummary"></div>
       <section class="monitor-name-panel" id="monitorNamePanel">
-        <h3>Senarai Nama Semasa</h3>
+        <h3>Senarai Status Semasa</h3>
         <div class="monitor-name-list" id="monitorNameList"></div>
       </section>
       <h3 class="list-title">Rekod Hari Ini</h3>
@@ -402,8 +402,8 @@ function setupStatisticsPanel() {
       <div class="summary-grid stats-summary" id="statsSummary"></div>
       <section class="stats-section">
         <div class="student-record-heading">
-          <h3>🏆 Juara Outing Bulanan</h3>
-          <p>Ranking berdasarkan jumlah permohonan outing bulan ini.</p>
+          <h3>Privasi Statistik</h3>
+          <p>Data individu tidak dipaparkan; hanya ringkasan agregat tersedia.</p>
         </div>
         <div class="stats-list" id="statsLeaderboard"></div>
       </section>
@@ -705,8 +705,11 @@ async function loadTodayRecords() {
   }
 
   try {
-    const records = await apiGet("getTodayRecords");
-    outingRecords = records.map(mapLiveRecord);
+    const accessPayload = buildTodayRecordsAccessPayload();
+    const records = accessPayload
+      ? await apiPost("getTodayRecords", accessPayload)
+      : await apiGet("getTodayRecords");
+    outingRecords = records.map(accessPayload ? mapLiveRecord : mapPublicMonitoringRecord);
     if (currentSession && currentSession.role === "student") {
       studentLastUpdatedAt = new Date();
       updateStudentLastUpdated();
@@ -797,7 +800,6 @@ function mapLiveStudent(student) {
 
 function mapLiveRecord(record) {
   return {
-    raw: record,
     id: record.request_id || "",
     request_id: record.request_id || "",
     studentId: record.student_id || "",
@@ -844,6 +846,20 @@ function mapLiveRecord(record) {
     guardInBy: record.guard_masuk_by || "",
     guard_masuk_by: record.guard_masuk_by || "",
     catatan: record.catatan || ""
+  };
+}
+
+function mapPublicMonitoringRecord(record) {
+  const lateText = String(record.lewat || "");
+  return {
+    className: record.kelas || "",
+    kelas: record.kelas || "",
+    jenis_permohonan: record.jenis_permohonan || REQUEST_TYPE.normal,
+    rawStatus: record.status || "",
+    status: mapLiveStatus(record.status),
+    lewat: lateText.trim().toLowerCase() === "ya",
+    lewatText: lateText,
+    belum_masuk: record.belum_masuk === true
   };
 }
 
@@ -1064,6 +1080,28 @@ function setupAppVersionUi() {
   if (els.appVersionText) {
     els.appVersionText.textContent = `eOuting ITU • v${APP_VERSION}`;
   }
+}
+
+function buildTodayRecordsAccessPayload() {
+  if (!currentSession || !currentSession.user) {
+    return null;
+  }
+
+  const user = currentSession.user;
+  if (currentSession.role === "student") {
+    return {
+      role: "student",
+      student_id: user.student_id || user.id || "",
+      no_matrik: user.no_matrik || user.noMatrik || ""
+    };
+  }
+  if (currentSession.role === "warden") {
+    return { role: "warden", nama_warden: user.nama_warden || user.name || "", pin: user.pin || "" };
+  }
+  if (currentSession.role === "guard") {
+    return { role: "guard", nama_guard: user.nama_guard || user.name || "", pin: user.pin || "" };
+  }
+  return null;
 }
 
 async function refreshSystemCaches() {
@@ -1624,7 +1662,7 @@ async function refreshGuardRecords(source) {
 
   try {
     if (isLiveMode) {
-      const records = await apiGet("getTodayRecords");
+      const records = await apiPost("getTodayRecords", buildTodayRecordsAccessPayload());
       outingRecords = records.map(mapLiveRecord);
       render();
     } else {
@@ -2038,9 +2076,7 @@ function debugStudentRecords(studentRecords) {
     return;
   }
 
-  console.debug("currentStudent", getCurrentStudent());
-  console.debug("todayRecords", outingRecords);
-  console.debug("studentRecords", studentRecords);
+  console.debug("Student record refresh completed.");
 }
 
 function isRecordForStudent(record, student) {
@@ -2519,27 +2555,7 @@ function computeStatsFromRecords(records, month, year) {
     if (late) totals.total_late += 1;
     statusMap[status] = (statusMap[status] || 0) + 1;
 
-    if (!studentMap[studentKey]) {
-      studentMap[studentKey] = {
-        student_id: getRecordStudentId(record),
-        no_matrik: getRecordNoMatrik(record),
-        nama: getRecordName(record),
-        kelas,
-        total_requests: 0,
-        completed: 0,
-        emergency: 0,
-        normal: 0,
-        late: 0,
-        last_request_at: ""
-      };
-    }
-
-    studentMap[studentKey].total_requests += 1;
-    if (completed) studentMap[studentKey].completed += 1;
-    if (requestType === REQUEST_TYPE.emergency) studentMap[studentKey].emergency += 1;
-    if (requestType === REQUEST_TYPE.normal) studentMap[studentKey].normal += 1;
-    if (late) studentMap[studentKey].late += 1;
-    studentMap[studentKey].last_request_at = record.masa_mohon || record.requestedAt || studentMap[studentKey].last_request_at;
+    studentMap[studentKey] = true;
 
     if (!classMap[kelas]) {
       classMap[kelas] = { kelas, total_requests: 0, completed: 0, emergency: 0, late: 0, studentKeys: {} };
@@ -2558,14 +2574,6 @@ function computeStatsFromRecords(records, month, year) {
     year,
     generated_at: new Date().toISOString(),
     totals,
-    leaderboard: Object.values(studentMap)
-      .sort((a, b) => (
-        b.total_requests - a.total_requests ||
-        b.completed - a.completed ||
-        b.late - a.late ||
-        String(a.nama).localeCompare(String(b.nama))
-      ))
-      .map((student, index) => ({ rank: index + 1, ...student })),
     class_summary: Object.values(classMap).map((item) => ({
       kelas: item.kelas,
       total_requests: item.total_requests,
@@ -2595,7 +2603,6 @@ function emptyStats(params) {
       total_late: 0,
       total_students: 0
     },
-    leaderboard: [],
     class_summary: [],
     status_summary: []
   };
@@ -2616,9 +2623,7 @@ function renderStatistics(stats) {
     </article>
   `).join("");
 
-  els.statsLeaderboard.innerHTML = stats.leaderboard && stats.leaderboard.length
-    ? stats.leaderboard.slice(0, 10).map(leaderboardCard).join("")
-    : emptyState("Belum ada rekod outing untuk bulan ini.");
+  els.statsLeaderboard.innerHTML = emptyState("Data individu tidak dipaparkan. Statistik hanya ditunjukkan secara agregat.");
 
   els.statsClassSummary.innerHTML = stats.class_summary && stats.class_summary.length
     ? stats.class_summary.map(classSummaryCard).join("")
@@ -2632,26 +2637,6 @@ function renderStatistics(stats) {
   els.statsStatusSummary.innerHTML = statusOrder.map((status) => `
     <span class="status-pill ${badgeClass(mapLiveStatus(status))}">${escapeHtml(status)} <strong>${Number(statusMap[status] || 0)}</strong></span>
   `).join("");
-}
-
-function leaderboardCard(item) {
-  const topClass = item.rank <= 3 ? ` leaderboard-top-${item.rank}` : "";
-  return `
-    <article class="leaderboard-card${topClass}">
-      <div class="leaderboard-rank">#${Number(item.rank || 0)}</div>
-      <div>
-        <h4>${escapeHtml(item.nama || "-")}</h4>
-        <p>Ranking Kekerapan Outing • ${escapeHtml(item.kelas || "-")}</p>
-      </div>
-      <div class="leaderboard-metrics">
-        <span>Jumlah <strong>${Number(item.total_requests || 0)}</strong></span>
-        <span>Selesai <strong>${Number(item.completed || 0)}</strong></span>
-        <span>Kecemasan <strong>${Number(item.emergency || 0)}</strong></span>
-        <span>Lewat <strong>${Number(item.late || 0)}</strong></span>
-      </div>
-      <small>Terakhir Mohon: ${escapeHtml(formatDisplayDateTime(item.last_request_at))}</small>
-    </article>
-  `;
 }
 
 function classSummaryCard(item) {
@@ -3990,7 +3975,7 @@ async function refreshActiveStatisticsPageV152() {
       els.statsSummary.innerHTML = emptyState("Memuatkan statistik...");
     }
     if (els.statsLeaderboard) {
-      els.statsLeaderboard.innerHTML = emptyState("Memuatkan ranking...");
+      els.statsLeaderboard.innerHTML = emptyState("Memuatkan statistik...");
     }
     if (els.statsClassSummary) {
       els.statsClassSummary.innerHTML = emptyState("Memuatkan ringkasan kelas...");
@@ -5142,11 +5127,7 @@ async function safeRefreshStudentRecordsV161(source) {
   }
 
   try {
-    console.warn("Refresh pelajar: mula reload rekod.", {
-      source,
-      student_id: student.student_id || student.id || "",
-      no_matrik: student.no_matrik || ""
-    });
+    console.warn("Refresh pelajar: mula reload rekod.", { source });
 
     if (typeof loadTodayRecords === "function") {
       await loadTodayRecords();
@@ -5169,11 +5150,7 @@ async function safeRefreshStudentRecordsV161(source) {
     updateStudentSubmitState();
     return { ok: true };
   } catch (error) {
-    console.error("Refresh pelajar gagal pada langkah reload/render.", {
-      source,
-      student,
-      error
-    });
+    console.error("Refresh pelajar gagal pada langkah reload/render.", { source, error });
     showSignedInTab("pelajar");
     ensureStudentRefreshEmptyStateV161(student);
     updateStudentLastUpdatedV161();
@@ -5361,6 +5338,11 @@ function renderMonitoringPageV1612() {
   els.monitorRecordsList.innerHTML = records.map(monitorRecordCardV1612).join("");
 }
 
+function publicMonitorStudentLabel(record) {
+  const className = record && (record.className || record.kelas);
+  return className ? `Pelajar ${className}` : "Pelajar";
+}
+
 function renderMonitorNameListV1613(records) {
   if (!els.monitorNameList) {
     return;
@@ -5368,14 +5350,14 @@ function renderMonitorNameListV1613(records) {
 
   const nameRecords = records.filter(isMonitorNameListRecordV1613);
   if (!nameRecords.length) {
-    els.monitorNameList.innerHTML = emptyState("Tiada senarai nama semasa.");
+    els.monitorNameList.innerHTML = emptyState("Tiada status semasa.");
     return;
   }
 
   const rows = nameRecords.map((record, index) => {
     const icon = getWardenChecklistCopyStatusIcon(record);
     const iconClass = getMonitorNameIconClassV1613(record);
-    const name = record.studentName || record.nama || record.name || "-";
+    const name = publicMonitorStudentLabel(record);
     return `
       <div class="monitor-name-row">
         <span class="monitor-name-icon ${iconClass}" aria-hidden="true">${icon}</span>
@@ -5387,7 +5369,7 @@ function renderMonitorNameListV1613(records) {
 
   els.monitorNameList.innerHTML = `
     <div class="monitor-name-copy">
-      <strong>SENARAI NAMA PERMOHONAN eOUTING</strong>
+      <strong>SENARAI STATUS PERMOHONAN eOUTING</strong>
       <div class="monitor-name-rows">${rows}</div>
       <div class="monitor-name-legend">
         <strong>Petunjuk:</strong>
@@ -5426,7 +5408,7 @@ function getMonitorCountsV1612(records) {
     if (record.status === STATUS.returned) acc.returned += 1;
     if (record.jenis_permohonan === REQUEST_TYPE.emergency) acc.emergency += 1;
     if (isMonitorLateRecordV1612(record)) acc.late += 1;
-    if (record.status === STATUS.out && !record.masa_masuk && !record.returnedAt) acc.notReturned += 1;
+    if (record.belum_masuk === true || (record.status === STATUS.out && !record.masa_masuk && !record.returnedAt)) acc.notReturned += 1;
     return acc;
   }, {
     pending: 0,
@@ -5453,9 +5435,8 @@ function monitorSummaryCardV1612(label, count, className, icon) {
 function monitorRecordCardV1612(record) {
   const status = semesterChecklistStatus(record);
   const typeLabel = requestChecklistTypeLabel(record);
-  const studentName = record.studentName || record.nama || record.name || "-";
+  const studentName = publicMonitorStudentLabel(record);
   const className = record.className || record.kelas || "-";
-  const dateTime = requestChecklistDateTime(record);
   return `
     <article class="record-card monitor-record-card">
       <div class="record-top">
@@ -5467,7 +5448,6 @@ function monitorRecordCardV1612(record) {
           <span class="badge badge-${status.key}">${escapeHtml(status.label)}</span>
         </div>
       </div>
-      <p class="record-detail"><strong>Masa berkaitan:</strong> ${escapeHtml(dateTime)}</p>
     </article>
   `;
 }
@@ -5632,7 +5612,7 @@ async function loadWardenRecordsOnly() {
     return;
   }
 
-  const records = await apiGet("getTodayRecords");
+  const records = await apiPost("getTodayRecords", buildTodayRecordsAccessPayload());
   if (!Array.isArray(records)) {
     throw new Error("Format rekod warden tidak sah.");
   }

@@ -9,7 +9,9 @@ const workerSource = fs.readFileSync(path.join(root, "service-worker.js"), "utf8
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
-const EXPECTED_VERSION = "1.6.20";
+const EXPECTED_VERSION = "1.6.21";
+const EXPECTED_RELEASE_DATE = "2026-07-13";
+const EXPECTED_RELEASE_NOTE = "Perkukuh privasi Pemantauan Semasa dan buang statistik individu.";
 
 function createWorker(cacheNames = []) {
   const listeners = {};
@@ -117,6 +119,7 @@ test("activate removes only old eOuting caches and claims clients", async () => 
     "eouting-cache-v1.6.18",
     "eouting-cache-v1.6.19",
     "eouting-cache-v1.6.20",
+    "eouting-cache-v1.6.21",
     "another-app-cache"
   ]);
   let activation = null;
@@ -125,7 +128,8 @@ test("activate removes only old eOuting caches and claims clients", async () => 
 
   assert.deepEqual(worker.calls.delete.sort(), [
     "eouting-cache-v1.6.18",
-    "eouting-cache-v1.6.19"
+    "eouting-cache-v1.6.19",
+    "eouting-cache-v1.6.20"
   ]);
   assert.equal(worker.calls.claim, 1);
 });
@@ -160,6 +164,6 @@ test("runtime version, cache name, asset URLs, footer and release notes are cons
   assert.match(indexSource, new RegExp(`eOuting ITU • v${EXPECTED_VERSION}`));
   assert.match(workerSource, new RegExp(`style\\.css\\?v=${EXPECTED_VERSION}`));
   assert.match(workerSource, new RegExp(`app\\.js\\?v=${EXPECTED_VERSION}`));
-  assert.match(versionInfo.notes, /privasi/i);
-  assert.match(versionInfo.notes, /cache/i);
+  assert.equal(versionInfo.releasedAt, EXPECTED_RELEASE_DATE);
+  assert.equal(versionInfo.notes, EXPECTED_RELEASE_NOTE);
 });
