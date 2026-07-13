@@ -1,5 +1,5 @@
 {
-  "version": "1.6.22",
+  "version": "1.6.23",
   "releasedAt": "2026-07-13",
-  "notes": "Pulihkan akses rekod operasi Warden, Guard dan Pelajar selepas hardening privasi."
+  "notes": "Pulihkan pemuatan rekod Warden dan Guard serta tambah paparan status kontekstual."
 }

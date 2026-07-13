@@ -9,9 +9,9 @@ const workerSource = fs.readFileSync(path.join(root, "service-worker.js"), "utf8
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
-const EXPECTED_VERSION = "1.6.22";
+const EXPECTED_VERSION = "1.6.23";
 const EXPECTED_RELEASE_DATE = "2026-07-13";
-const EXPECTED_RELEASE_NOTE = "Pulihkan akses rekod operasi Warden, Guard dan Pelajar selepas hardening privasi.";
+const EXPECTED_RELEASE_NOTE = "Pulihkan pemuatan rekod Warden dan Guard serta tambah paparan status kontekstual.";
 
 function createWorker(cacheNames = []) {
   const listeners = {};
@@ -121,6 +121,7 @@ test("activate removes only old eOuting caches and claims clients", async () => 
     "eouting-cache-v1.6.20",
     "eouting-cache-v1.6.21",
     "eouting-cache-v1.6.22",
+    "eouting-cache-v1.6.23",
     "another-app-cache"
   ]);
   let activation = null;
@@ -131,7 +132,8 @@ test("activate removes only old eOuting caches and claims clients", async () => 
     "eouting-cache-v1.6.18",
     "eouting-cache-v1.6.19",
     "eouting-cache-v1.6.20",
-    "eouting-cache-v1.6.21"
+    "eouting-cache-v1.6.21",
+    "eouting-cache-v1.6.22"
   ]);
   assert.equal(worker.calls.claim, 1);
 });

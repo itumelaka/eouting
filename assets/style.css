@@ -845,28 +845,12 @@ textarea {
 }
 
 .semester-status-icon {
-  background: #ffffff;
-  border: 2px solid var(--primary);
-  border-radius: 4px;
-  height: 18px;
-  width: 18px;
-}
-
-.semester-status-icon.semester-status-approved,
-.semester-status-icon.semester-status-returned {
-  background: var(--success);
-  border-color: var(--success);
-}
-
-.semester-status-icon.semester-status-rejected,
-.semester-status-icon.semester-status-late {
-  background: var(--danger);
-  border-color: var(--danger);
-}
-
-.semester-status-icon.semester-status-out {
-  background: var(--warning);
-  border-color: var(--warning);
+  align-items: center;
+  display: inline-flex;
+  font-size: 1.1rem;
+  justify-content: center;
+  line-height: 1;
+  width: 24px;
 }
 
 .semester-checklist-main,

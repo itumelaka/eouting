@@ -214,6 +214,69 @@ test("real student, warden and guard runtime sessions build valid POST credentia
   });
 });
 
+test("fresh staff login responses without PIN retain the entered PIN in runtime credentials", () => {
+  const context = vm.createContext({ currentSession: null });
+  vm.runInContext([
+    extractFunction(appSource, "mapLiveStaffSessionUser", "mapLiveRecord"),
+    extractFunction(appSource, "buildTodayRecordsAccessPayload", "refreshSystemCaches")
+  ].join("\n"), context);
+
+  const wardenUser = plain(context.mapLiveStaffSessionUser(
+    "warden",
+    { nama_warden: "WARDEN TEST", email: "warden@example.test", no_tel: "0111111111" },
+    "WARDEN INPUT",
+    "1234"
+  ));
+  assert.equal(wardenUser.pin, "1234");
+  assert.equal(wardenUser.nama_warden, "WARDEN TEST");
+  context.currentSession = { role: "warden", user: wardenUser };
+  assert.deepEqual(plain(context.buildTodayRecordsAccessPayload()), {
+    role: "warden",
+    nama_warden: "WARDEN TEST",
+    pin: "1234"
+  });
+
+  const guardUser = plain(context.mapLiveStaffSessionUser(
+    "guard",
+    { nama_guard: "GUARD TEST", email: "guard@example.test", no_tel: "0122222222" },
+    "GUARD INPUT",
+    "5678"
+  ));
+  assert.equal(guardUser.pin, "5678");
+  assert.equal(guardUser.nama_guard, "GUARD TEST");
+  context.currentSession = { role: "guard", user: guardUser };
+  assert.deepEqual(plain(context.buildTodayRecordsAccessPayload()), {
+    role: "guard",
+    nama_guard: "GUARD TEST",
+    pin: "5678"
+  });
+});
+
+test("staff runtime credentials are reused by remember-device storage and restore", () => {
+  let storedSession = null;
+  const context = vm.createContext({
+    SESSION_DURATION_MS: { warden: 1000, guard: 1000 },
+    localStorage: {
+      setItem: (_key, value) => { storedSession = JSON.parse(value); }
+    },
+    SESSION_STORAGE_KEY: "test_session",
+    console
+  });
+  vm.runInContext(extractFunction(appSource, "saveSession", "getSavedSession"), context);
+
+  context.saveSession("warden", { name: "WARDEN TEST", nama_warden: "WARDEN TEST", pin: "1234" });
+  assert.equal(storedSession.nama_warden, "WARDEN TEST");
+  assert.equal(storedSession.pin, "1234");
+
+  context.saveSession("guard", { name: "GUARD TEST", nama_guard: "GUARD TEST", pin: "5678" });
+  assert.equal(storedSession.nama_guard, "GUARD TEST");
+  assert.equal(storedSession.pin, "5678");
+
+  const restoreFunction = extractFunction(appSource, "restoreSavedSession", "findStudentForSavedSession");
+  assert.match(restoreFunction, /nama_warden:\s*wardenName[\s\S]*pin:\s*session\.pin/);
+  assert.match(restoreFunction, /nama_guard:\s*guardName[\s\S]*pin:\s*session\.pin/);
+});
+
 test("authenticated records use POST and retain operational names without undefined values", async () => {
   for (const session of [
     { role: "student", user: { student_id: "S001", no_matrik: "0825-0001" } },
@@ -404,8 +467,73 @@ test("sensitive record objects are not printed to console", () => {
   assert.doesNotMatch(appSource, /console\.(?:warn|error|debug)\([^;]*\bstudent\s*,?\s*error/s);
 });
 
-test("Phase 2 hotfix release references version 1.6.22", () => {
-  assert.match(appSource, /const APP_VERSION = "1\.6\.22"/);
-  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.22/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.22");
+test("record status display uses one contextual mapping with late precedence", () => {
+  const context = vm.createContext({
+    STATUS: {
+      pending: "Menunggu Kelulusan",
+      approved: "Diluluskan Warden",
+      rejected: "Ditolak Warden",
+      out: "Sedang Keluar",
+      returned: "Sudah Pulang"
+    },
+    REQUEST_TYPE: {
+      normal: "OUTING_BIASA",
+      emergency: "KECEMASAN",
+      overnight: "PULANG_BERMALAM",
+      semester: "CUTI_SEMESTER"
+    },
+    isHostelReturnLateV160: () => false
+  });
+  vm.runInContext([
+    extractFunction(appSource, "getContextualStatusDisplay", "getWardenChecklistCopyStatusIcon"),
+    extractFunction(appSource, "getWardenChecklistCopyStatusIcon", "getWardenChecklistCopyHeader"),
+    extractFunction(appSource, "isSemesterChecklistLate", "initApp")
+  ].join("\n"), context);
+
+  assert.deepEqual(plain(context.getContextualStatusDisplay({
+    status: "Sedang Keluar",
+    jenis_permohonan: "CUTI_SEMESTER"
+  })), { key: "out", icon: "🏖️", label: "Sedang Bercuti" });
+  assert.deepEqual(plain(context.getContextualStatusDisplay({
+    status: "Sedang Keluar",
+    jenis_permohonan: "PULANG_BERMALAM"
+  })), { key: "out", icon: "🌙", label: "Sedang Bermalam" });
+  for (const requestType of ["OUTING_BIASA", "KECEMASAN"]) {
+    assert.deepEqual(plain(context.getContextualStatusDisplay({
+      status: "Sedang Keluar",
+      jenis_permohonan: requestType
+    })), { key: "out", icon: "🚶", label: "Sedang Keluar" });
+  }
+  assert.deepEqual(plain(context.getContextualStatusDisplay({
+    status: "Sedang Keluar",
+    jenis_permohonan: "CUTI_SEMESTER",
+    lewat: "Ya"
+  })), { key: "late", icon: "🔴", label: "Lewat" });
+  assert.deepEqual(plain(context.getContextualStatusDisplay({ status: "Sudah Pulang" })), {
+    key: "returned", icon: "✅", label: "Sudah Pulang"
+  });
+  assert.deepEqual(plain(context.getContextualStatusDisplay({ status: "Diluluskan Warden" })), {
+    key: "approved", icon: "🟢", label: "Diluluskan"
+  });
+  assert.deepEqual(plain(context.getContextualStatusDisplay({ status: "Menunggu Kelulusan" })), {
+    key: "pending", icon: "🟡", label: "Menunggu Kelulusan"
+  });
+  assert.deepEqual(plain(context.getContextualStatusDisplay({ status: "Ditolak Warden" })), {
+    key: "rejected", icon: "•", label: "Ditolak"
+  });
+
+  const iconRenderer = extractFunction(appSource, "getWardenChecklistCopyStatusIcon", "getWardenChecklistCopyHeader");
+  const statusRenderer = extractFunction(appSource, "semesterChecklistStatus", "isSemesterChecklistLate");
+  const cardRenderer = extractFunction(appSource, "recordCard", "recordDataAttributes");
+  assert.match(iconRenderer, /getContextualStatusDisplay\(record\)/);
+  assert.match(statusRenderer, /getContextualStatusDisplay\(record\)/);
+  assert.match(cardRenderer, /getContextualStatusDisplay\(record\)/);
+  const checklistItem = extractFunction(appSource, "semesterChecklistItem", "requestChecklistDateTime", true);
+  assert.match(checklistItem, /getWardenChecklistCopyStatusIcon\(record\)/);
+});
+
+test("Phase 2 fresh-login hotfix references version 1.6.23", () => {
+  assert.match(appSource, /const APP_VERSION = "1\.6\.23"/);
+  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.23/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.23");
 });

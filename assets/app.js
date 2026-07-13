@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.22";
+const APP_VERSION = "1.6.23";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -480,20 +480,10 @@ els.wardenLoginPanel.addEventListener("submit", async (event) => {
   if (isLiveMode) {
     try {
       const warden = await apiPost("loginWarden", { nama_warden: name, pin });
+      const runtimeWarden = mapLiveStaffSessionUser("warden", warden, name, pin);
       clearStaffLoginSuccessFeedback();
-      startSession("warden", {
-        name: warden.nama_warden || name,
-        pin,
-        email: warden.email || "",
-        phone: warden.no_tel || ""
-      });
-      rememberSessionIfRequested("warden", {
-        name: warden.nama_warden || name,
-        nama_warden: warden.nama_warden || name,
-        pin,
-        email: warden.email || "",
-        phone: warden.no_tel || ""
-      }, els.wardenRememberInput);
+      startSession("warden", runtimeWarden);
+      rememberSessionIfRequested("warden", runtimeWarden, els.wardenRememberInput);
     } catch (error) {
       if (currentSession && currentSession.role === "warden") {
         clearStaffLoginSuccessFeedback();
@@ -528,20 +518,10 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
   if (isLiveMode) {
     try {
       const guard = await apiPost("loginGuard", { nama_guard: name, pin });
+      const runtimeGuard = mapLiveStaffSessionUser("guard", guard, name, pin);
       clearStaffLoginSuccessFeedback();
-      startSession("guard", {
-        name: guard.nama_guard || name,
-        pin,
-        email: guard.email || "",
-        phone: guard.no_tel || ""
-      });
-      rememberSessionIfRequested("guard", {
-        name: guard.nama_guard || name,
-        nama_guard: guard.nama_guard || name,
-        pin,
-        email: guard.email || "",
-        phone: guard.no_tel || ""
-      }, els.guardRememberInput);
+      startSession("guard", runtimeGuard);
+      rememberSessionIfRequested("guard", runtimeGuard, els.guardRememberInput);
     } catch (error) {
       if (currentSession && currentSession.role === "guard") {
         clearStaffLoginSuccessFeedback();
@@ -800,6 +780,29 @@ function mapLiveStudent(student) {
     jantina: student.jantina || student.gender || "",
     status: student.status || ""
   };
+}
+
+function mapLiveStaffSessionUser(role, staff, enteredName, enteredPin) {
+  const response = staff || {};
+  const name = role === "warden"
+    ? response.nama_warden || enteredName || ""
+    : response.nama_guard || enteredName || "";
+  const user = {
+    name,
+    pin: String(enteredPin || "").trim(),
+    email: response.email || "",
+    phone: response.no_tel || ""
+  };
+
+  if (role === "warden") {
+    user.nama_warden = name;
+    return user;
+  }
+  if (role === "guard") {
+    user.nama_guard = name;
+    return user;
+  }
+  throw new Error("Role staff tidak sah.");
 }
 
 function mapLiveRecord(record) {
@@ -1579,6 +1582,7 @@ function renderMonitoring() {
 }
 
 function monitorRecordCard(record) {
+  const statusDisplay = getContextualStatusDisplay(record);
   return `
     <article class="record-card">
       <div class="record-top">
@@ -1587,7 +1591,7 @@ function monitorRecordCard(record) {
           <div class="record-meta">${escapeHtml(getRecordId(record))} | ${escapeHtml(record.className || record.kelas || "-")}</div>
         </div>
         <div class="badge-stack">
-          <span class="badge ${badgeClass(record.status)}">${escapeHtml(record.status || "-")}</span>
+          <span class="badge badge-${statusDisplay.key}">${statusDisplay.icon} ${escapeHtml(statusDisplay.label)}</span>
         </div>
       </div>
       <div class="record-detail">
@@ -3029,13 +3033,13 @@ function removeGuardPendingState(record) {
 
 function recordCard(record, mode) {
   const actions = actionButtons(record, mode);
+  const statusDisplay = getContextualStatusDisplay(record);
   const emergencyBadge = record.jenis_permohonan === REQUEST_TYPE.emergency
     ? `<span class="badge badge-emergency">Kecemasan</span>`
     : "";
   const overnightBadge = record.jenis_permohonan === REQUEST_TYPE.overnight
     ? `<span class="badge badge-overnight">Pulang Bermalam</span>`
     : "";
-  const lateBadge = record.lewat ? `<span class="badge badge-late">Lewat</span>` : "";
   const notReturnedBadge = record.status === STATUS.out && isAfterReturnLimit(new Date(), record)
     ? `<span class="badge badge-not-returned">Belum Masuk</span>`
     : "";
@@ -3056,9 +3060,8 @@ function recordCard(record, mode) {
         <div class="badge-stack">
           ${emergencyBadge}
           ${overnightBadge}
-          ${lateBadge}
           ${notReturnedBadge}
-          <span class="badge ${badgeClass(record.status)}">${escapeHtml(record.status)}</span>
+          <span class="badge badge-${statusDisplay.key}">${statusDisplay.icon} ${escapeHtml(statusDisplay.label)}</span>
         </div>
       </div>
       <div class="record-detail">
@@ -5396,6 +5399,8 @@ function renderMonitorNameListV1613(records) {
         <span><span class="monitor-name-icon status-icon-pending" aria-hidden="true">🟡</span> Menunggu kelulusan</span>
         <span><span class="monitor-name-icon status-icon-approved" aria-hidden="true">🟢</span> Diluluskan warden</span>
         <span><span class="monitor-name-icon status-icon-out" aria-hidden="true">🚶</span> Sedang keluar</span>
+        <span><span class="monitor-name-icon status-icon-out" aria-hidden="true">🌙</span> Sedang bermalam</span>
+        <span><span class="monitor-name-icon status-icon-out" aria-hidden="true">🏖️</span> Sedang bercuti</span>
         <span><span class="monitor-name-icon status-icon-returned" aria-hidden="true">✅</span> Sudah balik ke asrama</span>
       </div>
     </div>
@@ -5465,7 +5470,7 @@ function monitorRecordCardV1612(record) {
           <p class="record-meta">${escapeHtml(className)} · ${escapeHtml(typeLabel)}</p>
         </div>
         <div class="badge-stack">
-          <span class="badge badge-${status.key}">${escapeHtml(status.label)}</span>
+          <span class="badge badge-${status.key}">${status.icon} ${escapeHtml(status.label)}</span>
         </div>
       </div>
     </article>
@@ -5868,17 +5873,36 @@ function buildWardenChecklistCopyText(records) {
     "🟡 Menunggu kelulusan",
     "🟢 Diluluskan warden",
     "🚶 Sedang keluar",
-    "✅ Sudah balik ke asrama"
+    "🌙 Sedang bermalam",
+    "🏖️ Sedang bercuti",
+    "✅ Sudah balik ke asrama",
+    "🔴 Lewat"
   ].join("\n");
 }
 
+function getContextualStatusDisplay(record) {
+  const item = record || {};
+  if (isSemesterChecklistLate(item)) {
+    return { key: "late", icon: "🔴", label: "Lewat" };
+  }
+  if (item.status === STATUS.out) {
+    if (item.jenis_permohonan === REQUEST_TYPE.semester) {
+      return { key: "out", icon: "🏖️", label: "Sedang Bercuti" };
+    }
+    if (item.jenis_permohonan === REQUEST_TYPE.overnight) {
+      return { key: "out", icon: "🌙", label: "Sedang Bermalam" };
+    }
+    return { key: "out", icon: "🚶", label: "Sedang Keluar" };
+  }
+  if (item.status === STATUS.pending) return { key: "pending", icon: "🟡", label: "Menunggu Kelulusan" };
+  if (item.status === STATUS.approved) return { key: "approved", icon: "🟢", label: "Diluluskan" };
+  if (item.status === STATUS.returned) return { key: "returned", icon: "✅", label: "Sudah Pulang" };
+  if (item.status === STATUS.rejected) return { key: "rejected", icon: "•", label: "Ditolak" };
+  return { key: "unknown", icon: "•", label: item.status || "-" };
+}
+
 function getWardenChecklistCopyStatusIcon(record) {
-  if (!record) return "•";
-  if (record.status === STATUS.pending) return "🟡";
-  if (record.status === STATUS.approved) return "🟢";
-  if (record.status === STATUS.out) return "🚶";
-  if (record.status === STATUS.returned) return "✅";
-  return "•";
+  return getContextualStatusDisplay(record).icon;
 }
 
 function getWardenChecklistCopyHeader() {
@@ -5923,7 +5947,7 @@ function semesterChecklistItem(record) {
   const canFocusCard = record.status === STATUS.pending;
   return `
     <button class="semester-checklist-item${canFocusCard ? "" : " is-readonly"}" type="button" data-semester-action="${canFocusCard ? "focus" : "readonly"}" data-semester-record-id="${escapeHtml(recordId)}" aria-disabled="${canFocusCard ? "false" : "true"}">
-      <span class="semester-status-icon semester-status-${status.key}" aria-hidden="true"></span>
+      <span class="semester-status-icon semester-status-${status.key}" aria-hidden="true">${getWardenChecklistCopyStatusIcon(record)}</span>
       <span class="semester-checklist-main">
         <strong>${escapeHtml(record.studentName || record.nama || "-")}</strong>
         <small>${escapeHtml(record.className || record.kelas || "-")}</small>
@@ -5998,15 +6022,7 @@ function semesterChecklistSummary(records) {
 }
 
 function semesterChecklistStatus(record) {
-  if (isSemesterChecklistLate(record)) {
-    return { key: "late", label: record.status === STATUS.returned ? "Selesai Lewat" : "Lewat" };
-  }
-  if (record.status === STATUS.pending) return { key: "pending", label: "Menunggu" };
-  if (record.status === STATUS.approved) return { key: "approved", label: "Diluluskan" };
-  if (record.status === STATUS.out) return { key: "out", label: "Sedang Keluar" };
-  if (record.status === STATUS.returned) return { key: "returned", label: "Selesai" };
-  if (record.status === STATUS.rejected) return { key: "rejected", label: "Ditolak" };
-  return { key: "unknown", label: record.status || "-" };
+  return getContextualStatusDisplay(record);
 }
 
 function isSemesterChecklistLate(record) {
