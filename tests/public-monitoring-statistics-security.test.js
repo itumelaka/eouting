@@ -102,6 +102,42 @@ function createGasContext() {
   return context;
 }
 
+function createFrontendRecordContext(currentSession, overrides = {}) {
+  const calls = { get: 0, post: 0, notices: [] };
+  const context = vm.createContext({
+    currentSession,
+    isLiveMode: true,
+    outingRecords: [],
+    studentLastUpdatedAt: null,
+    els: { monitorWorkspace: null },
+    apiGet: async () => {
+      calls.get += 1;
+      return [{ kelas: "A2", status: "KELUAR" }];
+    },
+    apiPost: async (_action, payload) => {
+      calls.post += 1;
+      calls.payload = plain(payload);
+      return [{ request_id: "OUT-001", nama: "PELAJAR SULIT" }];
+    },
+    mapLiveRecord: (record) => ({ ...record, mappedAs: "operational" }),
+    mapPublicMonitoringRecord: (record) => ({ ...record, mappedAs: "public" }),
+    render: () => {},
+    renderMonitoring: () => {},
+    updateStudentLastUpdated: () => {},
+    showModeNotice: (message) => calls.notices.push(message),
+    ...overrides
+  });
+  const loadStart = appSource.indexOf("async function loadTodayRecords");
+  const loadEnd = appSource.indexOf("\nasync function apiPost(", loadStart);
+  assert.notEqual(loadStart, -1, "loadTodayRecords must exist");
+  assert.notEqual(loadEnd, -1, "loadTodayRecords boundary must exist");
+  vm.runInContext([
+    appSource.slice(loadStart, loadEnd),
+    extractFunction(appSource, "buildTodayRecordsAccessPayload", "refreshSystemCaches")
+  ].join("\n"), context);
+  return { calls, context };
+}
+
 test("public getTodayRecords returns only non-identifying monitoring fields", () => {
   const context = createGasContext();
   const records = plain(context.getTodayRecords());
@@ -144,6 +180,126 @@ test("operational today records require existing credentials and students receiv
     pin: "1234"
   }));
   assert.equal(wardenRecords.length, 2);
+  assert.equal(wardenRecords[0].nama, "PELAJAR SULIT");
+
+  const guardRecords = plain(context.getOperationalTodayRecords({
+    role: "guard",
+    nama_guard: "GUARD TEST",
+    pin: "5678"
+  }));
+  assert.equal(guardRecords.length, 2);
+  assert.equal(guardRecords[0].request_id, "OUT-001");
+  assert.equal(guardRecords[0].nama, "PELAJAR SULIT");
+});
+
+test("real student, warden and guard runtime sessions build valid POST credentials", () => {
+  const cases = [
+    {
+      session: { role: "student", user: { id: "S001", student_id: "S001", no_matrik: "0825-0001" } },
+      expected: { role: "student", student_id: "S001", no_matrik: "0825-0001" }
+    },
+    {
+      session: { role: "warden", user: { name: "WARDEN TEST", pin: "1234" } },
+      expected: { role: "warden", nama_warden: "WARDEN TEST", pin: "1234" }
+    },
+    {
+      session: { role: "guard", user: { name: "GUARD TEST", pin: "5678" } },
+      expected: { role: "guard", nama_guard: "GUARD TEST", pin: "5678" }
+    }
+  ];
+
+  cases.forEach(({ session, expected }) => {
+    const { context } = createFrontendRecordContext(session);
+    assert.deepEqual(plain(context.buildTodayRecordsAccessPayload()), expected);
+  });
+});
+
+test("authenticated records use POST and retain operational names without undefined values", async () => {
+  for (const session of [
+    { role: "student", user: { student_id: "S001", no_matrik: "0825-0001" } },
+    { role: "warden", user: { name: "WARDEN TEST", pin: "1234" } },
+    { role: "guard", user: { name: "GUARD TEST", pin: "5678" } }
+  ]) {
+    const { calls, context } = createFrontendRecordContext(session);
+    await context.loadTodayRecords();
+    assert.equal(calls.post, 1);
+    assert.equal(calls.get, 0);
+    assert.equal(context.outingRecords[0].nama, "PELAJAR SULIT");
+    assert.equal(Object.values(context.outingRecords[0]).includes(undefined), false);
+  }
+});
+
+test("authenticated session with missing credentials errors without public GET fallback", async () => {
+  const { calls, context } = createFrontendRecordContext({ role: "warden" });
+
+  assert.throws(() => context.buildTodayRecordsAccessPayload(), /sesi|credential|akses/i);
+  await context.loadTodayRecords();
+
+  assert.equal(calls.get, 0);
+  assert.equal(calls.post, 0);
+  assert.deepEqual(plain(context.outingRecords), []);
+  assert.equal(calls.notices.length, 1);
+});
+
+test("authenticated session clears anonymous records before its first render", () => {
+  for (const role of ["student", "warden", "guard"]) {
+    let renderedRecords = null;
+    const context = vm.createContext({
+      currentSession: null,
+      isLiveMode: true,
+      outingRecords: [{ kelas: "A2", mappedAs: "public" }],
+      wardenHasLoadedOnce: true,
+      els: {
+        monitorWorkspace: { classList: { remove: () => {} } },
+        accessScreen: { classList: { add: () => {} } },
+        appWorkspace: { classList: { add: () => {} } },
+        sessionRole: { textContent: "" },
+        sessionName: { textContent: "" }
+      },
+      clearStaffLoginSuccessFeedback: () => {},
+      stopStudentAutoRefresh: () => {},
+      stopGuardAutoRefresh: () => {},
+      stopMonitoringAutoRefresh: () => {},
+      roleLabel: (value) => value,
+      applyRoleView: () => {},
+      render: () => { renderedRecords = plain(context.outingRecords); },
+      refreshStudentLiveRecords: () => {},
+      startStudentAutoRefresh: () => {},
+      refreshGuardRecords: () => {},
+      startGuardAutoRefresh: () => {}
+    });
+    vm.runInContext(extractFunction(appSource, "startSession", "applyRoleView"), context);
+
+    context.startSession(role, { name: "TEST", pin: "1234", student_id: "S001", no_matrik: "M001" });
+
+    assert.deepEqual(renderedRecords, [], `${role} must not render anonymous records`);
+    assert.deepEqual(plain(context.outingRecords), []);
+    assert.equal(context.wardenHasLoadedOnce, false);
+  }
+});
+
+test("full operational records map real names and never emit undefined fields", () => {
+  const context = vm.createContext({
+    REQUEST_TYPE: { normal: "OUTING_BIASA" },
+    STATUS: {
+      pending: "Menunggu Kelulusan",
+      approved: "Diluluskan Warden",
+      rejected: "Ditolak Warden",
+      out: "Sedang Keluar",
+      returned: "Sudah Pulang"
+    }
+  });
+  vm.runInContext([
+    extractFunction(appSource, "mapLiveRecord", "mapPublicMonitoringRecord"),
+    extractFunction(appSource, "mapLiveStatus", "parseDateValue"),
+    extractFunction(appSource, "parseDateValue", "setMockMode")
+  ].join("\n"), context);
+
+  const mapped = plain(context.mapLiveRecord(requestRows[0]));
+  assert.equal(mapped.studentName, "PELAJAR SULIT");
+  assert.equal(mapped.nama, "PELAJAR SULIT");
+  assert.equal(mapped.request_id, "OUT-001");
+  assert.equal(Object.values(mapped).includes(undefined), false);
 });
 
 test("GET routing is public-minimum while POST routing is credentialed operational access", () => {
@@ -248,8 +404,8 @@ test("sensitive record objects are not printed to console", () => {
   assert.doesNotMatch(appSource, /console\.(?:warn|error|debug)\([^;]*\bstudent\s*,?\s*error/s);
 });
 
-test("Phase 2 release references version 1.6.21", () => {
-  assert.match(appSource, /const APP_VERSION = "1\.6\.21"/);
-  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.21/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.21");
+test("Phase 2 hotfix release references version 1.6.22", () => {
+  assert.match(appSource, /const APP_VERSION = "1\.6\.22"/);
+  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.22/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.22");
 });

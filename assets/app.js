@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.21";
+const APP_VERSION = "1.6.22";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -705,11 +705,12 @@ async function loadTodayRecords() {
   }
 
   try {
-    const accessPayload = buildTodayRecordsAccessPayload();
-    const records = accessPayload
+    const isAuthenticated = Boolean(currentSession);
+    const accessPayload = isAuthenticated ? buildTodayRecordsAccessPayload() : null;
+    const records = isAuthenticated
       ? await apiPost("getTodayRecords", accessPayload)
       : await apiGet("getTodayRecords");
-    outingRecords = records.map(accessPayload ? mapLiveRecord : mapPublicMonitoringRecord);
+    outingRecords = records.map(isAuthenticated ? mapLiveRecord : mapPublicMonitoringRecord);
     if (currentSession && currentSession.role === "student") {
       studentLastUpdatedAt = new Date();
       updateStudentLastUpdated();
@@ -719,6 +720,9 @@ async function loadTodayRecords() {
       renderMonitoring();
     }
   } catch (error) {
+    if (currentSession) {
+      outingRecords = [];
+    }
     showModeNotice(`Live records unavailable: ${error.message}`);
     render();
   }
@@ -1083,25 +1087,37 @@ function setupAppVersionUi() {
 }
 
 function buildTodayRecordsAccessPayload() {
-  if (!currentSession || !currentSession.user) {
+  if (!currentSession) {
     return null;
   }
 
-  const user = currentSession.user;
+  const user = currentSession.user || currentSession;
   if (currentSession.role === "student") {
-    return {
+    const payload = {
       role: "student",
-      student_id: user.student_id || user.id || "",
+      student_id: user.student_id || user.studentId || user.id || "",
       no_matrik: user.no_matrik || user.noMatrik || ""
     };
+    if (!payload.student_id || !payload.no_matrik) {
+      throw new Error("Credential sesi pelajar tidak lengkap.");
+    }
+    return payload;
   }
   if (currentSession.role === "warden") {
-    return { role: "warden", nama_warden: user.nama_warden || user.name || "", pin: user.pin || "" };
+    const payload = { role: "warden", nama_warden: user.nama_warden || user.name || "", pin: user.pin || "" };
+    if (!payload.nama_warden || !payload.pin) {
+      throw new Error("Credential sesi warden tidak lengkap.");
+    }
+    return payload;
   }
   if (currentSession.role === "guard") {
-    return { role: "guard", nama_guard: user.nama_guard || user.name || "", pin: user.pin || "" };
+    const payload = { role: "guard", nama_guard: user.nama_guard || user.name || "", pin: user.pin || "" };
+    if (!payload.nama_guard || !payload.pin) {
+      throw new Error("Credential sesi guard tidak lengkap.");
+    }
+    return payload;
   }
-  return null;
+  throw new Error("Role sesi tidak sah untuk rekod operasi.");
 }
 
 async function refreshSystemCaches() {
@@ -1840,6 +1856,10 @@ function startSession(role, user) {
   stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = { role, user };
+  if (isLiveMode) {
+    outingRecords = [];
+    wardenHasLoadedOnce = false;
+  }
   if (els.monitorWorkspace) {
     els.monitorWorkspace.classList.remove("active");
   }
