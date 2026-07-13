@@ -1348,6 +1348,21 @@ textarea {
   white-space: nowrap;
 }
 
+.monitor-name-details {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.monitor-name-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.monitor-name-status {
+  justify-self: start;
+}
+
 .monitor-name-number {
   color: var(--muted);
   font-weight: 800;

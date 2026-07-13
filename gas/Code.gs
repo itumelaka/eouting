@@ -500,6 +500,7 @@ function confirmIn(payload) {
 
 function getTodayRecords() {
   return getTodayRecordRows_().map((row) => ({
+    nama: String(row.nama || ""),
     kelas: String(row.kelas || ""),
     jenis_permohonan: String(row.jenis_permohonan || ""),
     status: String(row.status || ""),

@@ -138,12 +138,13 @@ function createFrontendRecordContext(currentSession, overrides = {}) {
   return { calls, context };
 }
 
-test("public getTodayRecords returns only non-identifying monitoring fields", () => {
+test("public getTodayRecords returns only the approved named monitoring fields", () => {
   const context = createGasContext();
   const records = plain(context.getTodayRecords());
 
   assert.deepEqual(records, [
     {
+      nama: "PELAJAR SULIT",
       kelas: "A2",
       jenis_permohonan: "KECEMASAN",
       status: "KELUAR",
@@ -151,6 +152,7 @@ test("public getTodayRecords returns only non-identifying monitoring fields", ()
       belum_masuk: true
     },
     {
+      nama: "PELAJAR KEDUA",
       kelas: "A3",
       jenis_permohonan: "OUTING_BIASA",
       status: "MENUNGGU_KELULUSAN",
@@ -158,6 +160,11 @@ test("public getTodayRecords returns only non-identifying monitoring fields", ()
       belum_masuk: false
     }
   ]);
+  records.forEach((record) => {
+    assert.deepEqual(Object.keys(record).sort(), [
+      "belum_masuk", "jenis_permohonan", "kelas", "lewat", "nama", "status"
+    ]);
+  });
 });
 
 test("operational today records require existing credentials and students receive only their records", () => {
@@ -372,7 +379,9 @@ test("GET routing is public-minimum while POST routing is credentialed operation
   const postRouter = gasSource.slice(postStart, postEnd);
 
   assert.match(getRoute, /getTodayRecords\(\)/);
+  assert.doesNotMatch(getRoute, /getOperationalTodayRecords/);
   assert.match(postRouter, /getOperationalTodayRecords\(payload\)/);
+  assert.doesNotMatch(postRouter, /jsonResponse\(getTodayRecords\(\)\)/);
 });
 
 test("getOutingStats returns aggregate structures only", () => {
@@ -393,7 +402,7 @@ test("getOutingStats returns aggregate structures only", () => {
   });
 });
 
-test("frontend maps a public monitoring response without retaining extra PII", () => {
+test("frontend retains the approved public name without retaining extra PII", () => {
   const context = vm.createContext({
     REQUEST_TYPE: { normal: "OUTING_BIASA" },
     STATUS: {
@@ -416,9 +425,16 @@ test("frontend maps a public monitoring response without retaining extra PII", (
     lewat: "Tidak",
     belum_masuk: true,
     no_matrik: "MUST-NOT-SURVIVE",
-    nama: "MUST-NOT-SURVIVE"
+    student_id: "MUST-NOT-SURVIVE",
+    no_tel: "MUST-NOT-SURVIVE",
+    lokasi: "MUST-NOT-SURVIVE",
+    tujuan: "MUST-NOT-SURVIVE",
+    telefon_waris: "MUST-NOT-SURVIVE",
+    request_id: "MUST-NOT-SURVIVE",
+    nama: "NAMA DIBENARKAN"
   }));
   assert.deepEqual(mapped, {
+    nama: "NAMA DIBENARKAN",
     className: "A2",
     kelas: "A2",
     jenis_permohonan: "KECEMASAN",
@@ -437,10 +453,13 @@ test("monitoring renders safe labels and keeps loading, refresh and error fallba
 
   const context = vm.createContext({});
   vm.runInContext(labelFunction, context);
-  assert.equal(context.publicMonitorStudentLabel({ kelas: "A2", nama: "NAMA SULIT" }), "Pelajar A2");
-  assert.doesNotMatch(labelFunction, /record\.(nama|name|studentName)/);
+  assert.equal(context.publicMonitorStudentLabel({ kelas: "A2", nama: "NAMA PELAJAR" }), "NAMA PELAJAR");
+  assert.equal(context.publicMonitorStudentLabel({ kelas: "A2" }), "Pelajar");
+  assert.match(labelFunction, /record\.nama/);
+  assert.doesNotMatch(labelFunction, /record\.(no_matrik|student_id|no_tel|telefon_waris|lokasi|tujuan)/);
   assert.match(setupPanel, /monitorRefreshButton/);
   assert.match(setupPanel, /Memuatkan rekod pemantauan/);
+  assert.match(setupPanel, /Paparan read-only\. Hanya nama, kelas dan status semasa dipaparkan\./);
   assert.match(refreshFunction, /setMonitorLoadingState\(true/);
   assert.match(refreshFunction, /Rekod pemantauan gagal dimuat/);
   assert.match(refreshFunction, /finally/);
@@ -532,8 +551,8 @@ test("record status display uses one contextual mapping with late precedence", (
   assert.match(checklistItem, /getWardenChecklistCopyStatusIcon\(record\)/);
 });
 
-test("Guard quick-filter release references version 1.6.24", () => {
-  assert.match(appSource, /const APP_VERSION = "1\.6\.24"/);
-  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.24/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.24");
+test("Public Monitoring release references version 1.6.25", () => {
+  assert.match(appSource, /const APP_VERSION = "1\.6\.25"/);
+  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.25/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.25");
 });

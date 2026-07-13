@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.24";
+const APP_VERSION = "1.6.25";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -327,7 +327,7 @@ function setupMonitoringPanel() {
     <section class="tab-panel active" id="monitor">
       <div class="section-heading">
         <h2>Pemantauan Semasa</h2>
-        <p>Read-only. Akses boleh dihadkan kepada Warden/HEP pada versi akan datang.</p>
+        <p>Paparan read-only. Hanya nama, kelas dan status semasa dipaparkan.</p>
       </div>
       <div class="monitor-actions">
         <button class="secondary-action" id="monitorRefreshButton" type="button">Refresh</button>
@@ -339,8 +339,6 @@ function setupMonitoringPanel() {
         <h3>Senarai Status Semasa</h3>
         <div class="monitor-name-list" id="monitorNameList"></div>
       </section>
-      <h3 class="list-title">Rekod Hari Ini</h3>
-      <div class="record-list" id="monitorRecordsList"></div>
     </section>
   `;
   els.appShell.appendChild(panel);
@@ -352,7 +350,6 @@ function setupMonitoringPanel() {
   els.monitorSummary = panel.querySelector("#monitorSummary");
   els.monitorNamePanel = panel.querySelector("#monitorNamePanel");
   els.monitorNameList = panel.querySelector("#monitorNameList");
-  els.monitorRecordsList = panel.querySelector("#monitorRecordsList");
   els.monitorBackButton.addEventListener("click", closeMonitoringPage);
   els.monitorRefreshButton.addEventListener("click", refreshMonitoringRecords);
 }
@@ -859,6 +856,7 @@ function mapLiveRecord(record) {
 function mapPublicMonitoringRecord(record) {
   const lateText = String(record.lewat || "");
   return {
+    nama: record.nama || "",
     className: record.kelas || "",
     kelas: record.kelas || "",
     jenis_permohonan: record.jenis_permohonan || REQUEST_TYPE.normal,
@@ -4267,9 +4265,6 @@ function guardFilterEmptyMessageV15(container, filterValue) {
 function ensureQuickFiltersV15() {
   ensureQuickFilterGroupV15("warden", [els.wardenList, els.wardenApprovedList], els.wardenList, QUICK_FILTERS_V15, "Tiada permohonan menunggu tindakan.");
   ensureQuickFilterGroupV15("guard", [els.guardApprovedList, els.guardOutList], els.guardApprovedList, GUARD_QUICK_FILTERS_V15, guardFilterEmptyMessageV15);
-  if (els.monitorRecordsList) {
-    ensureQuickFilterGroupV15("monitor", [els.monitorRecordsList], els.monitorRecordsList, QUICK_FILTERS_V15, "Tiada rekod untuk filter ini.");
-  }
 }
 
 function ensureQuickFilterGroupV15(scope, containers, anchor, filters, emptyMessage) {
@@ -4340,9 +4335,6 @@ function capitalizeFilterKeyV15(value) {
 
 function ensureOvernightMonitoringSectionsV15() {
   ensureOvernightSectionV15("guardOvernightNotReturnedSection", "Belum Pulang Ke Asrama", els.guardOutList);
-  if (els.monitorRecordsList) {
-    ensureOvernightSectionV15("monitorOvernightNotReturnedSection", "Belum Pulang Ke Asrama", els.monitorRecordsList);
-  }
 }
 
 function ensureOvernightSectionV15(id, title, anchor) {
@@ -4359,7 +4351,6 @@ function ensureOvernightSectionV15(id, title, anchor) {
 
 function renderOvernightNotReturnedSectionsV15() {
   renderOvernightListV15("#guardOvernightNotReturnedSection [data-overnight-not-returned-list]", "guard-in");
-  renderOvernightListV15("#monitorOvernightNotReturnedSection [data-overnight-not-returned-list]", "dashboard");
 }
 
 function renderOvernightListV15(selector, mode) {
@@ -5280,6 +5271,16 @@ updatePulangBermalamFields = function updatePulangBermalamFieldsRequestTypeBridg
   updateRequestTypeFields();
 };
 
+function scrollMonitoringWorkspaceToTop() {
+  if (els.monitorWorkspace && typeof els.monitorWorkspace.scrollIntoView === "function") {
+    els.monitorWorkspace.scrollIntoView({ block: "start" });
+    return;
+  }
+  if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+    window.scrollTo(0, 0);
+  }
+}
+
 async function openMonitoringPage() {
   activeRefreshPage = "monitor";
   if (els.accessScreen) {
@@ -5294,16 +5295,16 @@ async function openMonitoringPage() {
   if (els.monitorWorkspace) {
     els.monitorWorkspace.classList.add("active");
   }
+  scrollMonitoringWorkspaceToTop();
 
-  if (monitoringRefreshIntervalId) {
-    clearInterval(monitoringRefreshIntervalId);
+  if (!monitoringRefreshIntervalId) {
+    monitoringRefreshIntervalId = setInterval(() => {
+      if (activeRefreshPage === "monitor") {
+        refreshMonitoringRecords("auto");
+      }
+    }, 30000);
   }
   await refreshMonitoringRecords("open");
-  monitoringRefreshIntervalId = setInterval(() => {
-    if (activeRefreshPage === "monitor") {
-      refreshMonitoringRecords("auto");
-    }
-  }, 30000);
 }
 
 function closeMonitoringPage() {
@@ -5323,10 +5324,19 @@ function closeMonitoringPage() {
   }
 }
 
+async function loadPublicMonitoringRecords() {
+  const records = await apiGet("getTodayRecords");
+  return (Array.isArray(records) ? records : []).map(mapPublicMonitoringRecord);
+}
+
 async function refreshMonitoringRecords(source) {
+  if (monitorIsLoading) {
+    return false;
+  }
+
   const button = els.monitorRefreshButton;
   const originalText = button ? button.textContent : "";
-  const hasOldData = monitorHasLoadedOnce && els.monitorRecordsList && els.monitorRecordsList.children.length > 0;
+  const hasOldData = monitorHasLoadedOnce;
 
   setMonitorLoadingState(true, !hasOldData);
   if (button) {
@@ -5335,19 +5345,20 @@ async function refreshMonitoringRecords(source) {
   }
 
   try {
-    if (typeof loadTodayRecords === "function") {
-      await loadTodayRecords();
-    }
+    const records = await loadPublicMonitoringRecords();
+    outingRecords = records;
     renderMonitoringPageV1612();
     monitorHasLoadedOnce = true;
     updateMonitorLastUpdatedV1612();
+    return true;
   } catch (error) {
     console.error("Rekod pemantauan gagal dimuat.", { source, error });
-    if (!hasOldData && els.monitorRecordsList) {
-      els.monitorRecordsList.innerHTML = emptyState("Rekod pemantauan gagal dimuat. Sila tekan Refresh.");
+    if (!hasOldData && els.monitorNameList) {
+      els.monitorNameList.innerHTML = emptyState("Rekod pemantauan gagal dimuat. Sila tekan Refresh.");
     } else {
       showError("Rekod pemantauan gagal dimuat. Sila tekan Refresh.", "Pemantauan Gagal");
     }
+    return false;
   } finally {
     setMonitorLoadingState(false, false);
     if (button) {
@@ -5368,10 +5379,10 @@ function setMonitorLoadingState(isLoading, clearCurrentView) {
       els.monitorSummary.innerHTML = "";
     }
   }
-  if (els.monitorRecordsList) {
-    els.monitorRecordsList.classList.toggle("is-loading", isLoading);
+  if (els.monitorNameList) {
+    els.monitorNameList.classList.toggle("is-loading", isLoading);
     if (clearCurrentView) {
-      els.monitorRecordsList.innerHTML = "";
+      els.monitorNameList.innerHTML = "";
     }
   }
 }
@@ -5392,22 +5403,11 @@ function renderMonitoringPageV1612() {
     ].join("");
   }
   renderMonitorNameListV1613(records);
-
-  if (!els.monitorRecordsList) {
-    return;
-  }
-
-  if (!records.length) {
-    els.monitorRecordsList.innerHTML = emptyState("Tiada rekod pemantauan hari ini.");
-    return;
-  }
-
-  els.monitorRecordsList.innerHTML = records.map(monitorRecordCardV1612).join("");
 }
 
 function publicMonitorStudentLabel(record) {
-  const className = record && (record.className || record.kelas);
-  return className ? `Pelajar ${className}` : "Pelajar";
+  const name = record && String(record.nama || "").trim();
+  return name || "Pelajar";
 }
 
 function renderMonitorNameListV1613(records) {
@@ -5422,14 +5422,20 @@ function renderMonitorNameListV1613(records) {
   }
 
   const rows = nameRecords.map((record, index) => {
-    const icon = getWardenChecklistCopyStatusIcon(record);
+    const statusDisplay = getContextualStatusDisplay(record);
     const iconClass = getMonitorNameIconClassV1613(record);
     const name = publicMonitorStudentLabel(record);
+    const className = record.className || record.kelas || "-";
+    const typeLabel = requestChecklistTypeLabel(record);
     return `
       <div class="monitor-name-row">
-        <span class="monitor-name-icon ${iconClass}" aria-hidden="true">${icon}</span>
+        <span class="monitor-name-icon ${iconClass}" aria-hidden="true">${statusDisplay.icon}</span>
         <span class="monitor-name-number">${index + 1}.</span>
-        <strong>${escapeHtml(name)}</strong>
+        <div class="monitor-name-details">
+          <strong>${escapeHtml(name)}</strong>
+          <span class="monitor-name-meta">${escapeHtml(className)} · ${escapeHtml(typeLabel)}</span>
+          <span class="badge badge-${statusDisplay.key} monitor-name-status">${escapeHtml(statusDisplay.label)}</span>
+        </div>
       </div>
     `;
   }).join("");
@@ -5438,15 +5444,6 @@ function renderMonitorNameListV1613(records) {
     <div class="monitor-name-copy">
       <strong>SENARAI STATUS PERMOHONAN eOUTING</strong>
       <div class="monitor-name-rows">${rows}</div>
-      <div class="monitor-name-legend">
-        <strong>Petunjuk:</strong>
-        <span><span class="monitor-name-icon status-icon-pending" aria-hidden="true">🟡</span> Menunggu kelulusan</span>
-        <span><span class="monitor-name-icon status-icon-approved" aria-hidden="true">🟢</span> Diluluskan warden</span>
-        <span><span class="monitor-name-icon status-icon-out" aria-hidden="true">🚶</span> Sedang keluar</span>
-        <span><span class="monitor-name-icon status-icon-out" aria-hidden="true">🌙</span> Sedang bermalam</span>
-        <span><span class="monitor-name-icon status-icon-out" aria-hidden="true">🏖️</span> Sedang bercuti</span>
-        <span><span class="monitor-name-icon status-icon-returned" aria-hidden="true">✅</span> Sudah balik ke asrama</span>
-      </div>
     </div>
   `;
 }
