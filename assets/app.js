@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.23";
+const APP_VERSION = "1.6.24";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -3090,6 +3090,7 @@ function recordDataAttributes(record) {
   const requestType = record.jenis_permohonan || "";
   const isOvernight = requestType === REQUEST_TYPE.overnight;
   const isNormal = requestType === REQUEST_TYPE.normal;
+  const isEmergency = requestType === REQUEST_TYPE.emergency;
   const isOut = status === STATUS.out;
   const isDone = status === STATUS.returned || status === "SELESAI";
   const isPending = status === STATUS.pending;
@@ -3102,6 +3103,7 @@ function recordDataAttributes(record) {
     `data-record-status="${escapeHtml(status)}"`,
     `data-filter-normal="${isNormal ? "1" : "0"}"`,
     `data-filter-overnight="${isOvernight ? "1" : "0"}"`,
+    `data-filter-emergency="${isEmergency ? "1" : "0"}"`,
     `data-filter-pending="${isPending ? "1" : "0"}"`,
     `data-filter-out="${isOut ? "1" : "0"}"`,
     `data-filter-late="${isLate ? "1" : "0"}"`,
@@ -4229,15 +4231,48 @@ const QUICK_FILTERS_V15 = [
   ["done", "Selesai Hari Ini"]
 ];
 
+const GUARD_QUICK_FILTERS_V15 = [
+  ["all", "Semua"],
+  ["normal", "Outing Harian"],
+  ["overnight", "Pulang Bermalam"],
+  ["semester", "Cuti Semester"],
+  ["emergency", "Kecemasan"],
+  ["late", "Lewat"]
+];
+
+const GUARD_FILTER_EMPTY_MESSAGES_V15 = {
+  approved: {
+    all: "Tiada pelajar yang telah diluluskan untuk keluar.",
+    normal: "Tiada rekod Outing Harian yang sedia untuk keluar.",
+    overnight: "Tiada rekod Pulang Bermalam yang sedia untuk keluar.",
+    semester: "Tiada rekod Cuti Semester yang sedia untuk keluar.",
+    emergency: "Tiada rekod Kecemasan yang sedia untuk keluar.",
+    late: "Tiada rekod lewat yang sedia untuk keluar."
+  },
+  out: {
+    all: "Tiada pelajar sedang keluar.",
+    normal: "Tiada rekod Outing Harian yang sedang keluar.",
+    overnight: "Tiada rekod Pulang Bermalam yang sedang bermalam.",
+    semester: "Tiada rekod Cuti Semester yang sedang bercuti.",
+    emergency: "Tiada rekod Kecemasan yang sedang keluar.",
+    late: "Tiada pelajar lewat pulang ke asrama."
+  }
+};
+
+function guardFilterEmptyMessageV15(container, filterValue) {
+  const section = container === els.guardApprovedList ? "approved" : "out";
+  return GUARD_FILTER_EMPTY_MESSAGES_V15[section][filterValue] || "Tiada rekod untuk filter ini.";
+}
+
 function ensureQuickFiltersV15() {
-  ensureQuickFilterGroupV15("warden", [els.wardenList, els.wardenApprovedList], els.wardenList, "Tiada permohonan menunggu tindakan.");
-  ensureQuickFilterGroupV15("guard", [els.guardApprovedList, els.guardOutList], els.guardApprovedList, "Tiada rekod keluar masuk aktif.");
+  ensureQuickFilterGroupV15("warden", [els.wardenList, els.wardenApprovedList], els.wardenList, QUICK_FILTERS_V15, "Tiada permohonan menunggu tindakan.");
+  ensureQuickFilterGroupV15("guard", [els.guardApprovedList, els.guardOutList], els.guardApprovedList, GUARD_QUICK_FILTERS_V15, guardFilterEmptyMessageV15);
   if (els.monitorRecordsList) {
-    ensureQuickFilterGroupV15("monitor", [els.monitorRecordsList], els.monitorRecordsList, "Tiada rekod untuk filter ini.");
+    ensureQuickFilterGroupV15("monitor", [els.monitorRecordsList], els.monitorRecordsList, QUICK_FILTERS_V15, "Tiada rekod untuk filter ini.");
   }
 }
 
-function ensureQuickFilterGroupV15(scope, containers, anchor, emptyMessage) {
+function ensureQuickFilterGroupV15(scope, containers, anchor, filters, emptyMessage) {
   if (!anchor) {
     return;
   }
@@ -4252,7 +4287,7 @@ function ensureQuickFilterGroupV15(scope, containers, anchor, emptyMessage) {
   const group = document.createElement("div");
   group.className = "quick-filter-bar";
   group.dataset.filterScope = scope;
-  group.innerHTML = QUICK_FILTERS_V15.map(([value, label], index) => (
+  group.innerHTML = filters.map(([value, label], index) => (
     `<button class="quick-filter-button${index === 0 ? " active" : ""}" type="button" data-filter-value="${value}">${label}</button>`
   )).join("");
   anchor.parentNode.insertBefore(group, anchor);
@@ -4270,7 +4305,16 @@ function applyQuickFilterV15(containers, filterValue, emptyMessage) {
     const cards = Array.from(container.querySelectorAll('[data-record-card="1"]'));
     const generatedEmpty = container.querySelector("[data-filter-empty='1']");
     if (generatedEmpty) generatedEmpty.remove();
-    if (!cards.length) return;
+    const contextualEmptyMessage = typeof emptyMessage === "function"
+      ? emptyMessage(container, filterValue)
+      : emptyMessage || "Tiada rekod untuk filter ini.";
+    if (!cards.length) {
+      const empty = container.querySelector(".empty-state") || document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = contextualEmptyMessage;
+      if (!empty.parentNode) container.appendChild(empty);
+      return;
+    }
 
     let visibleCount = 0;
     cards.forEach((card) => {
@@ -4284,7 +4328,7 @@ function applyQuickFilterV15(containers, filterValue, emptyMessage) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
       empty.dataset.filterEmpty = "1";
-      empty.textContent = emptyMessage || "Tiada rekod untuk filter ini.";
+      empty.textContent = contextualEmptyMessage;
       container.appendChild(empty);
     }
   });
