@@ -1,5 +1,5 @@
 {
-  "version": "1.6.25",
-  "releasedAt": "2026-07-13",
-  "notes": "Perkemas Pemantauan Semasa, paparkan nama pelajar dan ringkaskan paparan."
+  "version": "1.6.26",
+  "releasedAt": "2026-07-14",
+  "notes": "Baiki kad operasi Guard berganda dan selaraskan quick filter section khas."
 }

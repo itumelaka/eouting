@@ -551,8 +551,8 @@ test("record status display uses one contextual mapping with late precedence", (
   assert.match(checklistItem, /getWardenChecklistCopyStatusIcon\(record\)/);
 });
 
-test("Public Monitoring release references version 1.6.25", () => {
-  assert.match(appSource, /const APP_VERSION = "1\.6\.25"/);
-  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.25/);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.25");
+test("Public Monitoring release references version 1.6.26", () => {
+  assert.match(appSource, /const APP_VERSION = "1\.6\.26"/);
+  assert.match(fs.readFileSync(path.join(root, "service-worker.js"), "utf8"), /eouting-cache-v1\.6\.26/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version, "1.6.26");
 });

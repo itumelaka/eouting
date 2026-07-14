@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.25";
+const APP_VERSION = "1.6.26";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -1684,7 +1684,7 @@ async function refreshGuardRecords(source) {
       outingRecords = records.map(mapLiveRecord);
       render();
     } else {
-      renderGuard();
+      render();
     }
     showSignedInTab("guard");
     updateGuardLastUpdated();
@@ -2768,10 +2768,32 @@ function scrollToRecordCard(recordId) {
   window.setTimeout(() => card.classList.remove("record-card-focus"), 1400);
 }
 
+function uniqueRecordsByRequestId(records) {
+  const seenRecordIds = new Set();
+  return records.filter((record) => {
+    const recordId = getRecordId(record);
+    if (!recordId) {
+      return true;
+    }
+
+    const key = String(recordId);
+    if (seenRecordIds.has(key)) {
+      return false;
+    }
+
+    seenRecordIds.add(key);
+    return true;
+  });
+}
+
 function renderGuard() {
   ensureGuardRefreshControls();
-  const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
-  const outRecords = outingRecords.filter((record) => record.status === STATUS.out);
+  const approvedRecords = uniqueRecordsByRequestId(
+    outingRecords.filter((record) => record.status === STATUS.approved)
+  );
+  const outRecords = uniqueRecordsByRequestId(outingRecords.filter((record) => (
+    record.status === STATUS.out && !isOvernightNotReturnedV15(record)
+  )));
 
   els.guardApprovedList.innerHTML = approvedRecords.length
     ? approvedRecords.map((record) => recordCard(record, "guard-out")).join("")
@@ -4210,9 +4232,9 @@ if (refreshMonitoringRecordsOriginalV15) {
 }
 
 function enhanceOperationalMonitoringV15() {
-  ensureQuickFiltersV15();
   ensureOvernightMonitoringSectionsV15();
   renderOvernightNotReturnedSectionsV15();
+  ensureQuickFiltersV15();
   ensureCsvExportButtonsV15();
   ensureReleaseNotesV15();
   updateFooterActionsVisibility();
@@ -4264,7 +4286,14 @@ function guardFilterEmptyMessageV15(container, filterValue) {
 
 function ensureQuickFiltersV15() {
   ensureQuickFilterGroupV15("warden", [els.wardenList, els.wardenApprovedList], els.wardenList, QUICK_FILTERS_V15, "Tiada permohonan menunggu tindakan.");
-  ensureQuickFilterGroupV15("guard", [els.guardApprovedList, els.guardOutList], els.guardApprovedList, GUARD_QUICK_FILTERS_V15, guardFilterEmptyMessageV15);
+  const guardOvernightList = document.querySelector("#guardOvernightNotReturnedSection [data-overnight-not-returned-list]");
+  ensureQuickFilterGroupV15(
+    "guard",
+    [els.guardApprovedList, els.guardOutList, guardOvernightList],
+    els.guardApprovedList,
+    GUARD_QUICK_FILTERS_V15,
+    guardFilterEmptyMessageV15
+  );
 }
 
 function ensureQuickFilterGroupV15(scope, containers, anchor, filters, emptyMessage) {
@@ -4356,7 +4385,7 @@ function renderOvernightNotReturnedSectionsV15() {
 function renderOvernightListV15(selector, mode) {
   const list = document.querySelector(selector);
   if (!list) return;
-  const records = outingRecords.filter(isOvernightNotReturnedV15);
+  const records = uniqueRecordsByRequestId(outingRecords.filter(isOvernightNotReturnedV15));
   list.innerHTML = records.length
     ? records.map((record) => recordCard(record, mode)).join("")
     : emptyState("Tiada rekod Pulang Bermalam yang belum pulang.");
@@ -4367,6 +4396,7 @@ function renderOvernightListV15(selector, mode) {
 
 function isOvernightNotReturnedV15(record) {
   return record &&
+    record.status === STATUS.out &&
     (record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester) &&
     Boolean(record.outAt || record.masa_keluar) &&
     !record.returnedAt &&
@@ -4489,9 +4519,9 @@ function toggleReleaseNotesV15() {
     panel.innerHTML = `
       <h3>Apa yang baharu v${APP_VERSION}</h3>
       <ul>
-        <li>Tambah Refresh Status pada dashboard Guard</li>
-        <li>Tambah auto-refresh Guard semasa sesi aktif</li>
-        <li>Kukuhkan validasi backend untuk PIN staf dan permohonan aktif</li>
+        <li>Hapus kad dan butang Sahkan Masuk berganda pada dashboard Guard</li>
+        <li>Asingkan Pulang Bermalam dan Cuti Semester ke bahagian Belum Pulang Ke Asrama</li>
+        <li>Selaraskan quick filter Guard selepas refresh dan auto-refresh</li>
       </ul>
       <h3>Sejarah v1.6.6</h3>
       <ul>

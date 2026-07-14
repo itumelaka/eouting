@@ -64,7 +64,8 @@ test("Guard uses only filters compatible with approved and out records", () => {
   assert.ok(!labels.includes("Selesai Hari Ini"));
 
   const ensureFilters = extractFunction("ensureQuickFiltersV15", "ensureQuickFilterGroupV15");
-  assert.match(ensureFilters, /ensureQuickFilterGroupV15\("guard"[\s\S]*GUARD_QUICK_FILTERS_V15[\s\S]*guardFilterEmptyMessageV15/);
+  assert.match(ensureFilters, /guardOvernightNotReturnedSection/);
+  assert.match(ensureFilters, /"guard"[\s\S]*\[els\.guardApprovedList, els\.guardOutList, guardOvernightList\][\s\S]*GUARD_QUICK_FILTERS_V15[\s\S]*guardFilterEmptyMessageV15/);
 });
 
 test("Outing Harian excludes emergency records while Kecemasan includes them", () => {

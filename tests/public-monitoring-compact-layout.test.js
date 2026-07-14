@@ -42,7 +42,7 @@ test("Warden and Guard filter and overnight render wiring remains present", () =
   const overnightRenderSource = extractFunction("renderOvernightNotReturnedSectionsV15", "renderOvernightListV15");
 
   assert.match(quickFilterSource, /ensureQuickFilterGroupV15\("warden", \[els\.wardenList, els\.wardenApprovedList\]/);
-  assert.match(quickFilterSource, /ensureQuickFilterGroupV15\("guard", \[els\.guardApprovedList, els\.guardOutList\]/);
+  assert.match(quickFilterSource, /\[els\.guardApprovedList, els\.guardOutList, guardOvernightList\]/);
   assert.match(overnightSetupSource, /guardOvernightNotReturnedSection/);
   assert.match(overnightRenderSource, /#guardOvernightNotReturnedSection/);
 });
