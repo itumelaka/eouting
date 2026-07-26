@@ -2,7 +2,7 @@
 
 eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Status live semasa: **v1.6.25**.
+Status live semasa: **v1.7.0 — Bukti Pulang Asrama**.
 
 - Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
 - Backend: Google Apps Script (GAS) Web App
@@ -16,11 +16,12 @@ Status live semasa: **v1.6.25**.
 Browser / PWA di GitHub Pages
   -> Google Apps Script Web App
     -> Google Sheets
+    -> Google Drive (bukti selfie private)
     -> Telegram Bot
     -> AUDIT_LOG
 ```
 
-Frontend mengurus paparan dan interaksi. GAS menguatkuasakan login, permission tindakan dan lifecycle rekod. Google Sheets ialah source of truth. Kegagalan Telegram tidak membatalkan tindakan utama yang sudah berjaya.
+Frontend mengurus paparan, kamera dan pemampatan gambar. GAS menguatkuasakan login, permission tindakan, lifecycle rekod dan penghantaran bukti. Google Sheets ialah source of truth, manakala Google Drive menyimpan selfie secara private. Kegagalan Telegram untuk notifikasi biasa tidak membatalkan tindakan utama; bagi bukti selfie, simpanan Drive, penghantaran `sendPhoto` dan kemas kini Sheet dilindungi dengan cleanup transaksi separa.
 
 ## Role
 
@@ -43,7 +44,22 @@ Pelajar hantar permohonan
   -> Warden luluskan atau tolak
   -> Guard sahkan keluar
   -> Guard sahkan masuk
+  -> status utama kekal SELESAI
+  -> Pelajar ambil dan hantar bukti selfie pulang
 ```
+
+## Bukti Pulang Asrama v1.7.0
+
+Bukti selfie pulang diwajibkan selepas Guard mengesahkan masuk untuk semua jenis permohonan:
+
+- `OUTING_BIASA`
+- `KECEMASAN`
+- `PULANG_BERMALAM`
+- `CUTI_SEMESTER`
+
+Selepas `confirmIn`, status utama rekod kekal `SELESAI` dan `selfie_status` menjadi state bukti yang berasingan. Pelajar melihat `Ambil Selfie & Lapor Pulang`, menggunakan kamera depan jika disokong, menyemak preview, mengambil semula jika perlu dan menghantar gambar. Frontend mengecilkan sisi terpanjang kepada kira-kira 1280px dan memampatkan kepada JPEG sebelum memanggil `submitReturnSelfie`.
+
+Backend menyemak pemilikan melalui `student_id` + `no_matrik`, status `SELESAI`, kewujudan `masa_masuk`, MIME/base64 dan duplicate submission. Gambar disimpan secara private dalam folder Drive `eOuting - Bukti Selfie Pulang` dan dihantar sebagai imej sebenar ke Telegram melalui `sendPhoto`. Public Monitoring tidak menerima URL, file ID, nombor matrik atau metadata selfie.
 
 Backend menyimpan nilai status asal seperti `KELUAR`. Frontend memaparkan label kontekstual:
 
@@ -115,7 +131,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline v1.6.25 ialah **40/40 lulus**. Syntax checks:
+Baseline production v1.7.0 ialah **59/59 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -134,10 +150,13 @@ Frontend-only:
 
 Backend GAS:
 
-1. jalankan `clasp push`;
-2. Apps Script: `Deploy -> Manage deployments -> Edit -> New version -> Deploy`;
-3. kekalkan deployment URL;
-4. uji `/exec?action=getTodayRecords`;
-5. kemudian commit dan push repo.
+1. kemas kini `gas/Code.gs`;
+2. jalankan `setupSelfieProofV170()` sekali dan sahkan `SELFIE_FOLDER_ID`;
+3. sahkan Script Properties Telegram;
+4. deploy Web App version baharu sambil mengekalkan URL;
+5. publish frontend dan semak footer/popup v1.7.0;
+6. jalankan ujian hujung-ke-hujung.
+
+Production semasa menggunakan GAS **Version 21**, dideploy pada **26 Jul 2026**. Pull Request #1 telah digabungkan ke `main` pada merge commit `beec1e0` daripada feature commit `21996a2`.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

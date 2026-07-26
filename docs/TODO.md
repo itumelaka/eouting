@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas milestone live **v1.6.25**.
+Senarai kerja selepas milestone live **v1.7.0**.
 
 ## Done / Completed
 
@@ -52,9 +52,25 @@ Senarai kerja selepas milestone live **v1.6.25**.
 - [x] `Rekod Hari Ini`, quick filter monitor dan seksyen `Belum Pulang Ke Asrama` pendua dibuang.
 - [x] `Senarai Status Semasa` memaparkan nama, kelas, jenis, ikon dan label kontekstual.
 
+### Bukti Pulang Asrama v1.7.0
+
+- [x] Bukti selfie pulang untuk `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM` dan `CUTI_SEMESTER`.
+- [x] Kamera depan, preview, ambil semula, resize kira-kira 1280px dan JPEG compression.
+- [x] `submitReturnSelfie` dengan validation pemilikan, `SELESAI`, `masa_masuk`, MIME/base64/saiz.
+- [x] `LockService` duplicate protection dan idempotent rejection.
+- [x] Folder Google Drive private `eOuting - Bukti Selfie Pulang`.
+- [x] Telegram `sendPhoto` dan metadata selfie dalam `OUTING_REQUESTS`.
+- [x] `setupSelfieProofV170()` serta Script Property `SELFIE_FOLDER_ID`.
+- [x] Cleanup transaksi separa dan audit-log failure non-fatal selepas transaksi berjaya.
+- [x] Mock-mode submission tanpa Drive atau Telegram.
+- [x] Service-worker dan Public Monitoring privacy hardening untuk bukti selfie.
+- [x] Test suite **59/59 lulus**.
+- [x] Pull Request #1 digabungkan dan frontend v1.7.0 live di GitHub Pages.
+- [x] GAS Version 21 dideploy dan ujian production hujung-ke-hujung berjaya.
+
 ## Operations Checklist
 
-- [ ] Continue live monitoring after v1.6.25.
+- [ ] Teruskan pemantauan operasi selepas v1.7.0.
 - [ ] Verify Cuti Semester approval and Guard flow in real operation.
 - [ ] Verify Public Monitoring during active Cuti Semester/Pulang Bermalam records.
 - [ ] Verify CSV reports after more Cuti Semester records.
@@ -80,6 +96,7 @@ Senarai kerja selepas milestone live **v1.6.25**.
 - [ ] Hash PIN instead of storing plain text.
 - [ ] Add backend-issued session token if stronger API session control is required.
 - [ ] Review audit log format and retention.
+- [ ] Tetapkan retention/deletion policy untuk selfie.
 - [ ] Review GAS Web App deployment permission.
 - [ ] Decide SOP for changing Warden/Guard PIN.
 - [ ] Review role-based access hardening.
@@ -88,7 +105,10 @@ Senarai kerja selepas milestone live **v1.6.25**.
 ## Future Enhancements
 
 - [ ] QR code.
-- [ ] Upload selfie to Google Drive.
+- [ ] Admin/Warden evidence review UI.
+- [ ] Automated cleanup selfie selepas retention period.
+- [ ] Telegram retry queue untuk kegagalan sementara.
+- [ ] Refinement notis consent/privacy Pelajar.
 - [ ] Admin page for managing master data.
 - [ ] Late-return escalation notification.
 - [ ] Optional WhatsApp notification later if required.

@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi live semasa: **v1.6.25**.
+Versi live semasa: **v1.7.0**.
 
 ## Komponen
 
@@ -8,6 +8,7 @@ Versi live semasa: **v1.6.25**.
 GitHub Pages static frontend / PWA
   -> Google Apps Script Web App router
     -> Google Sheets
+    -> Google Drive private selfie storage
     -> Telegram Bot notifications
     -> AUDIT_LOG
 ```
@@ -22,13 +23,13 @@ Fail utama:
 - `service-worker.js`
 - `version.json`
 
-Frontend mengurus pemilihan role, borang Pelajar, Dashboard Warden/Guard, Public Monitoring read-only, statistik agregat dan update PWA. Frontend role hiding bukan boundary keselamatan.
+Frontend mengurus pemilihan role, borang Pelajar, Dashboard Warden/Guard, Public Monitoring read-only, statistik agregat, update PWA serta input kamera/file untuk bukti pulang. Gambar dipreview, diresize kepada sisi terpanjang kira-kira 1280px dan dieksport sebagai JPEG termampat sebelum upload. Frontend role hiding bukan boundary keselamatan.
 
 ### GAS Router
 
-`gas/Code.gs` menyediakan `doGet(e)` dan `doPost(e)`. Backend membaca dan menulis Google Sheets, mengesahkan credential, menguatkuasakan transition status, menulis audit log dan menghantar Telegram.
+`gas/Code.gs` menyediakan `doGet(e)` dan `doPost(e)`. Backend membaca dan menulis Google Sheets, mengesahkan credential, menguatkuasakan transition status, menyimpan selfie ke Google Drive, menulis audit log dan menghantar Telegram.
 
-Telegram ialah side effect non-blocking; kegagalannya tidak sepatutnya membatalkan operasi utama yang telah berjaya.
+Telegram ialah side effect non-blocking bagi notifikasi lifecycle biasa. Untuk `submitReturnSelfie`, penghantaran imej melalui `sendPhoto` ialah sebahagian daripada hasil bukti yang diperlukan; kegagalan sebelum transaksi lengkap mencetuskan cleanup Drive/Telegram. Kegagalan audit selepas transaksi utama berjaya hanya diberi amaran dan tidak membatalkan submission.
 
 ### Google Sheets
 
@@ -40,7 +41,7 @@ Google Sheets ialah database dan source of truth. Tab utama:
 - `OUTING_REQUESTS`
 - `AUDIT_LOG`
 
-Tiada perubahan schema diperlukan untuk hardening v1.6.20-v1.6.25.
+v1.7.0 menambah lima header selfie secara idempotent melalui `setupSelfieProofV170()` dan mengekalkan `selfie_whatsapp` sebagai kolum legacy.
 
 ## Boundary API
 
@@ -77,6 +78,7 @@ Action write lain kekal melalui POST:
 - `rejectRequest`
 - `confirmOut`
 - `confirmIn`
+- `submitReturnSelfie`
 
 ## Aliran Data Utama
 
@@ -87,8 +89,28 @@ Warden login -> POST getTodayRecords -> approve/reject
   -> Telegram keputusan
 Guard login -> POST getTodayRecords -> confirmOut/confirmIn
   -> Telegram pergerakan
+Pelajar selepas confirmIn -> kamera/preview/compress -> submitReturnSelfie
+  -> LockService -> Drive private -> Telegram sendPhoto -> metadata Sheet
 Public Monitoring -> GET getTodayRecords -> mapPublicMonitoringRecord
 ```
+
+## Status Bukti Selfie
+
+Status lifecycle utama tidak berubah:
+
+```text
+confirmIn -> status = SELESAI
+```
+
+State bukti disimpan secara berasingan:
+
+```text
+selfie_status = BELUM_HANTAR
+  -> submitReturnSelfie berjaya
+selfie_status = SUDAH_HANTAR
+```
+
+Rekod lama tanpa `selfie_status` kekal boleh dibaca. Rekod `SELESAI` yang mempunyai `masa_masuk` tetapi tiada metadata selfie dianggap belum menghantar bukti. `LockService` meliputi semakan duplicate, simpanan Drive, penghantaran Telegram dan kemas kini Sheet. Jika transaksi separa gagal, fail Drive dan/atau mesej Telegram dibersihkan; selepas Sheet berjaya ditanda lengkap, kegagalan `AUDIT_LOG` tidak mengubah hasil.
 
 ## Status dan Paparan
 
@@ -131,6 +153,6 @@ Tiada kad `Rekod Hari Ini`, quick filter monitoring atau seksyen pendua `Belum P
 
 ## PWA dan Cache
 
-Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache semasa ialah `eouting-cache-v1.6.25`.
+Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache semasa ialah `eouting-cache-v1.7.0`.
 
-Service worker tidak membaca atau menulis response API/GAS dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
+Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.

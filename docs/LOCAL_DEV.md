@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v1.6.25**.
+Panduan ini merujuk eOuting ITU **v1.7.0**.
 
 ## Keperluan
 
@@ -20,6 +20,8 @@ Buka `http://localhost:8080/`. Gunakan server HTTP; jangan buka `index.html` sec
 
 Mock mode hanya untuk development/demo dan perlu diaktifkan secara sengaja dengan `?mock=1`. Production tidak boleh fallback senyap kepada data mock.
 
+Dalam mock mode, rekod `SELESAI` yang mempunyai `masa_masuk` boleh menguji UI selfie: pilih/ambil gambar, preview, ambil semula, compression dan loading state. Submission mock menetapkan `selfie_status = SUDAH_HANTAR` serta `masa_selfie` pada rekod local dan tidak memanggil Google Drive atau Telegram. Tiada emulasi Drive atau Telegram local disediakan.
+
 ## Automated Tests
 
 Jalankan keseluruhan suite:
@@ -28,7 +30,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline release v1.6.25 ialah **40/40 lulus**.
+Baseline release v1.7.0 ialah **59/59 lulus**.
 
 Suite utama:
 
@@ -39,6 +41,7 @@ Suite utama:
 - `tests/public-monitoring-lifecycle.test.js`: one-click, scroll, GET awam, single-flight, error/cached refresh dan satu render.
 - `tests/public-monitoring-compact-layout.test.js`: layout ringkas, `Senarai Status Semasa`, ringkasan dan isolation Warden/Guard.
 - `tests/service-worker-security.test.js`: API network-only, cache cleanup, static cache dan version consistency.
+- `tests/selfie-proof-v170.test.js`: eligibility keempat-empat jenis, mapping/private projection, compression/upload, backend validation, duplicate protection, migration, confirmIn, cleanup dan audit failure selepas transaksi berjaya.
 
 Jalankan satu fail:
 
@@ -56,7 +59,7 @@ Get-Content version.json -Raw | ConvertFrom-Json
 git diff --check
 ```
 
-Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.6.25.
+Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## Smoke Test Pelajar
 
@@ -66,6 +69,9 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.6.25.
 4. Cuba nombor matrik salah dan sahkan login ditolak.
 5. Hantar permohonan dan semak Rekod Saya.
 6. Uji `Ingat peranti ini` dan restore session.
+7. Selepas Guard confirm masuk, semak badge `Bukti Selfie Belum Dihantar`.
+8. Uji capture/pilih gambar, preview, ambil semula dan `Hantar Bukti`.
+9. Dalam mock mode, sahkan badge bertukar kepada `Bukti Selfie Dihantar` tanpa request Drive/Telegram.
 
 ## Smoke Test Warden
 
@@ -97,9 +103,10 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.6.25.
 
 ## PWA dan Cache
 
-- Semak footer v1.6.25 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v1.6.25`.
+- Semak footer v1.7.0 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v1.7.0`.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
+- Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.
 
 ## Workflow Git

@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages dan Google Sheets. Backend live v1.6.25 telah di-push dengan `clasp`, dideploy sebagai Web App version baharu dan disahkan melalui GET `getTodayRecords`.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Backend live v1.7.0 telah dideploy sebagai GAS Web App **Version 21** pada 26 Jul 2026 dan disahkan melalui ujian production hujung-ke-hujung.
 
 ## Tanggungjawab Backend
 
@@ -11,7 +11,8 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages dan Google She
 - menyediakan projection public minimum dan rekod operasi authenticated;
 - mengira statistik agregat;
 - menulis `AUDIT_LOG`;
-- menghantar notifikasi Telegram.
+- menghantar notifikasi Telegram;
+- mengesahkan, menyimpan dan menghantar bukti selfie pulang.
 
 ## Router Public GET
 
@@ -45,6 +46,7 @@ Jangan tambah PII atau metadata operasi kepada response public tanpa security re
 - `rejectRequest`
 - `confirmOut`
 - `confirmIn`
+- `submitReturnSelfie`
 
 Authenticated `getTodayRecords` mengesahkan:
 
@@ -70,7 +72,40 @@ TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID
 ```
 
-Kegagalan Telegram hendaklah non-blocking untuk tindakan utama eOuting.
+Script Property bukti selfie:
+
+```text
+SELFIE_FOLDER_ID
+```
+
+Jangan dokumentasi atau commit nilai sebenar token, chat ID atau folder ID. Notifikasi Telegram lifecycle biasa kekal non-blocking. Untuk `submitReturnSelfie`, `sendPhoto` ialah langkah transaksi yang diperlukan dan kegagalan dikendalikan dengan cleanup.
+
+## Setup Bukti Selfie v1.7.0
+
+Jalankan fungsi berikut sekali selepas code GAS v1.7.0 tersedia:
+
+```javascript
+setupSelfieProofV170()
+```
+
+Fungsi ini:
+
+1. mencari sheet `OUTING_REQUESTS`;
+2. menambah hanya header selfie yang belum wujud;
+3. mengekalkan semua kolum dan data lama;
+4. mencari atau mencipta folder `eOuting - Bukti Selfie Pulang`;
+5. menyimpan folder ID dalam `SELFIE_FOLDER_ID`;
+6. memulangkan summary untuk semakan manual.
+
+Fungsi ini idempotent dan tidak perlu dipanggil pada setiap request. Folder Drive mesti kekal private dan hanya dikongsi kepada pentadbir/staf yang benar-benar memerlukan akses. Jangan ubah permission menjadi public atau publicly editable.
+
+Authorization Apps Script diperlukan untuk:
+
+- Spreadsheet (`SpreadsheetApp`) bagi membaca/menulis rekod;
+- Google Drive (`DriveApp`) bagi folder dan fail selfie;
+- external request (`UrlFetchApp`) bagi Telegram Bot API.
+
+Akaun yang menjalankan setup dan deployment perlu meluluskan scope berkaitan sebelum ujian production.
 
 ## `clasp` Workflow
 
@@ -109,7 +144,9 @@ Kekalkan URL deployment sedia ada. `clasp push` tidak menggantikan langkah deplo
 5. Uji Warden/Guard POST `getTodayRecords` dengan credential sah dan tidak sah.
 6. Uji approve/reject serta confirm keluar/masuk.
 7. Semak Telegram tanpa mendedahkan token dalam log.
-8. Jalankan regression suite repo.
+8. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
+9. Sahkan Public Monitoring tidak mengandungi metadata selfie.
+10. Jalankan regression suite repo dan pastikan **59/59 lulus**.
 
 Jika `/exec` masih memulangkan behavior lama selepas `clasp push`, semak Manage deployments dan pastikan version baharu telah dipilih.
 

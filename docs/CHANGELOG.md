@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.7.0 — 2026-07-26
+
+- **Frontend:** menambah flow `Ambil Selfie & Lapor Pulang` untuk `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM` dan `CUTI_SEMESTER`, termasuk kamera depan, preview, ambil semula, loading state, resize kira-kira 1280px dan pemampatan JPEG.
+- **Backend:** menambah POST `submitReturnSelfie` dengan validation pemilikan `student_id` + `no_matrik`, syarat `SELESAI` + `masa_masuk`, semakan MIME/base64/saiz dan duplicate protection menggunakan `LockService`.
+- **Google Drive dan Telegram:** menyimpan imej secara private dalam `eOuting - Bukti Selfie Pulang` dan menghantar imej sebenar melalui Telegram `sendPhoto`.
+- **Database:** menambah `selfie_status`, `selfie_file_id`, `selfie_url`, `masa_selfie` dan `selfie_telegram_message_id`; `selfie_whatsapp` dikekalkan sebagai legacy.
+- **Reliability:** menambah cleanup fail Drive dan mesej Telegram bagi transaksi separa gagal. Kegagalan audit selepas transaksi utama lengkap tidak menggagalkan atau rollback submission.
+- **Security dan privasi:** Public Monitoring tidak menerima metadata selfie, input client tidak boleh menghantar URL Drive sebagai bukti, dan service worker tidak cache API/external request atau imej selfie sensitif.
+- **Mock mode:** mensimulasikan submission berjaya tanpa menyentuh Drive atau Telegram.
+- **PWA:** menyelaraskan footer, asset version, cache name, `version.json` dan release popup kepada v1.7.0.
+- **Testing:** keseluruhan suite lulus **59/59**.
+- **Deployment:** Pull Request #1 digabungkan ke `main` (`beec1e0`, daripada `21996a2`), frontend live di GitHub Pages dan GAS production dideploy sebagai **Version 21** pada 26 Jul 2026.
+- **Production validation:** request `OUT-20260726-121316-1479` selesai dengan `selfie_status = SUDAH_HANTAR`, metadata Drive terisi, `masa_selfie = 2026-07-26 12:18:00`, Telegram message ID `98`, serta imej berjaya disimpan dan dihantar.
+
 ## v1.6.25
 
 - Fixed the Public Monitoring lifecycle with one-click workspace activation and scroll-to-workspace.
