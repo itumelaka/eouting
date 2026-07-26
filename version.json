@@ -1,5 +1,5 @@
 {
-  "version": "1.6.26",
-  "releasedAt": "2026-07-14",
-  "notes": "Baiki kad operasi Guard berganda dan selaraskan quick filter section khas."
+  "version": "1.7.0",
+  "releasedAt": "2026-07-26",
+  "notes": "Bukti selfie pulang asrama untuk semua jenis permohonan dengan kamera depan, preview, simpanan Google Drive, penghantaran Telegram dan status pelajar."
 }

@@ -1,4 +1,4 @@
-const APP_VERSION = "1.6.26";
+const APP_VERSION = "1.7.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -89,6 +89,12 @@ let wardenChecklistTypeFilter = "all";
 let wardenChecklistRecords = [];
 const guardActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
+const RETURN_SELFIE_STATUS = {
+  pending: "BELUM_HANTAR",
+  submitted: "SUDAH_HANTAR"
+};
+const RETURN_SELFIE_TYPES = new Set(Object.values(REQUEST_TYPE));
+const returnSelfieDrafts = new Map();
 
 const els = {
   todayDate: document.querySelector("#todayDate"),
@@ -849,7 +855,12 @@ function mapLiveRecord(record) {
     guard_keluar_by: record.guard_keluar_by || "",
     guardInBy: record.guard_masuk_by || "",
     guard_masuk_by: record.guard_masuk_by || "",
-    catatan: record.catatan || ""
+    catatan: record.catatan || "",
+    selfie_status: record.selfie_status || "",
+    selfie_file_id: record.selfie_file_id || "",
+    selfie_url: record.selfie_url || "",
+    masa_selfie: record.masa_selfie || "",
+    selfie_telegram_message_id: record.selfie_telegram_message_id || ""
   };
 }
 
@@ -2312,6 +2323,7 @@ function renderStudent() {
   debugStudentRecords(studentRecords);
   els.studentRecordsList.innerHTML = renderStudentRecordSections(studentRecords);
   bindStudentHistoryToggles();
+  bindStudentReturnSelfieControls();
   updateStudentSubmitState();
 }
 
@@ -2367,6 +2379,7 @@ function studentHistoryCard(record) {
     : "";
   const emergencyDetail = emergencyDetailHtml(record);
   const actorDetail = actorDetailHtml(record);
+  const selfieProof = returnSelfieProofHtml(record);
 
   return `
     <article class="history-card">
@@ -2383,6 +2396,7 @@ function studentHistoryCard(record) {
         ${inTime}
         ${noteDetail}
       </div>
+      ${selfieProof}
       <button class="history-toggle" type="button" data-history-toggle="${detailsId}" aria-expanded="false">
         Lihat Butiran
       </button>
@@ -2697,6 +2711,274 @@ function renderWarden() {
   });
 }
 
+function isReturnSelfieSubmitted(record) {
+  return String(record && record.selfie_status || "").trim().toUpperCase() === RETURN_SELFIE_STATUS.submitted ||
+    Boolean(record && (record.selfie_file_id || record.masa_selfie));
+}
+
+function isReturnSelfieEligible(record) {
+  const rawStatus = record && (record.rawStatus || reverseDisplayStatus(record.status));
+  return Boolean(
+    currentSession &&
+    currentSession.role === "student" &&
+    record &&
+    isRecordForCurrentStudent(record) &&
+    rawStatus === "SELESAI" &&
+    (record.masa_masuk || record.returnedAt) &&
+    RETURN_SELFIE_TYPES.has(record.jenis_permohonan) &&
+    !isReturnSelfieSubmitted(record)
+  );
+}
+
+function returnSelfieProofHtml(record) {
+  if (!record || (record.rawStatus || reverseDisplayStatus(record.status)) !== "SELESAI" || !(record.masa_masuk || record.returnedAt)) {
+    return "";
+  }
+  if (isReturnSelfieSubmitted(record)) {
+    const submittedTime = record.masa_selfie
+      ? `<span>Masa Bukti: ${escapeHtml(formatDisplayDateTime(record.masa_selfie))}</span>`
+      : "";
+    return `
+      <section class="return-selfie-proof return-selfie-proof-complete" aria-label="Status bukti selfie">
+        <span class="badge badge-selfie-submitted">Bukti Selfie Dihantar</span>
+        ${submittedTime}
+        <strong>Bukti selfie telah dihantar</strong>
+      </section>
+    `;
+  }
+  if (!isReturnSelfieEligible(record)) {
+    return "";
+  }
+
+  const recordId = getRecordId(record);
+  const controlId = `return-selfie-${String(recordId || "record").replace(/[^a-z0-9_-]/gi, "-")}`;
+  return `
+    <section class="return-selfie-proof" data-return-selfie="${escapeHtml(recordId)}" aria-labelledby="${controlId}-title">
+      <span class="badge badge-selfie-pending">Bukti Selfie Belum Dihantar</span>
+      <p id="${controlId}-title">Guard telah mengesahkan anda masuk. Sila ambil selfie selepas tiba di asrama.</p>
+      <label class="primary-action return-selfie-picker" for="${controlId}">
+        Ambil Selfie &amp; Lapor Pulang
+      </label>
+      <input id="${controlId}" class="return-selfie-input" type="file" accept="image/*" capture="user"
+             data-selfie-input="${escapeHtml(recordId)}" aria-label="Ambil selfie bukti pulang">
+      <div class="return-selfie-preview-wrap" data-selfie-preview-wrap hidden>
+        <img class="return-selfie-preview" data-selfie-preview alt="Preview selfie bukti pulang">
+        <div class="return-selfie-actions">
+          <button class="secondary-action" type="button" data-selfie-retake="${escapeHtml(recordId)}">Ambil Semula</button>
+          <button class="primary-action" type="button" data-selfie-submit="${escapeHtml(recordId)}">Hantar Bukti</button>
+        </div>
+      </div>
+      <p class="form-message return-selfie-message" data-selfie-message aria-live="polite"></p>
+    </section>
+  `;
+}
+
+function bindStudentReturnSelfieControls() {
+  if (!els.studentRecordsList) {
+    return;
+  }
+  els.studentRecordsList.querySelectorAll("[data-return-selfie]").forEach((panel) => {
+    const requestId = panel.dataset.returnSelfie;
+    const draft = returnSelfieDrafts.get(requestId);
+    if (!draft || !draft.previewUrl) {
+      return;
+    }
+    const preview = panel.querySelector("[data-selfie-preview]");
+    const previewWrap = panel.querySelector("[data-selfie-preview-wrap]");
+    const message = panel.querySelector("[data-selfie-message]");
+    if (preview) preview.src = draft.previewUrl;
+    if (previewWrap) previewWrap.hidden = false;
+    if (message) message.textContent = "Semak gambar sebelum menghantar.";
+  });
+  els.studentRecordsList.querySelectorAll("[data-selfie-input]").forEach((input) => {
+    input.addEventListener("change", () => previewReturnSelfie(input));
+  });
+  els.studentRecordsList.querySelectorAll("[data-selfie-retake]").forEach((button) => {
+    button.addEventListener("click", () => resetReturnSelfieDraft(button.dataset.selfieRetake));
+  });
+  els.studentRecordsList.querySelectorAll("[data-selfie-submit]").forEach((button) => {
+    button.addEventListener("click", () => submitReturnSelfieFromCard(button.dataset.selfieSubmit));
+  });
+}
+
+function previewReturnSelfie(input) {
+  const requestId = input.dataset.selfieInput;
+  const panel = input.closest("[data-return-selfie]");
+  const file = input.files && input.files[0];
+  const message = panel && panel.querySelector("[data-selfie-message]");
+  if (!file) {
+    return;
+  }
+  if (!String(file.type || "").startsWith("image/") || file.size > 20 * 1024 * 1024) {
+    input.value = "";
+    if (message) message.textContent = "Sila pilih gambar yang sah dan tidak melebihi 20 MB.";
+    return;
+  }
+
+  const previousDraft = returnSelfieDrafts.get(requestId);
+  if (previousDraft && previousDraft.previewUrl) {
+    URL.revokeObjectURL(previousDraft.previewUrl);
+  }
+  const previewUrl = URL.createObjectURL(file);
+  returnSelfieDrafts.set(requestId, { file, previewUrl });
+  const preview = panel.querySelector("[data-selfie-preview]");
+  const previewWrap = panel.querySelector("[data-selfie-preview-wrap]");
+  preview.src = previewUrl;
+  previewWrap.hidden = false;
+  if (message) message.textContent = "Semak gambar sebelum menghantar.";
+}
+
+function resetReturnSelfieDraft(requestId) {
+  const panel = els.studentRecordsList.querySelector(`[data-return-selfie="${cssEscapeValue(requestId)}"]`);
+  if (!panel) {
+    return;
+  }
+  const draft = returnSelfieDrafts.get(requestId);
+  if (draft && draft.previewUrl) {
+    URL.revokeObjectURL(draft.previewUrl);
+  }
+  returnSelfieDrafts.delete(requestId);
+  const input = panel.querySelector("[data-selfie-input]");
+  const preview = panel.querySelector("[data-selfie-preview]");
+  const previewWrap = panel.querySelector("[data-selfie-preview-wrap]");
+  if (input) input.value = "";
+  if (preview) preview.removeAttribute("src");
+  if (previewWrap) previewWrap.hidden = true;
+  if (input) input.click();
+}
+
+function cssEscapeValue(value) {
+  if (window.CSS && typeof window.CSS.escape === "function") {
+    return window.CSS.escape(String(value || ""));
+  }
+  return String(value || "").replace(/["\\]/g, "\\$&");
+}
+
+async function submitReturnSelfieFromCard(requestId) {
+  const record = findRecordById(requestId);
+  const draft = returnSelfieDrafts.get(requestId);
+  const panel = els.studentRecordsList.querySelector(`[data-return-selfie="${cssEscapeValue(requestId)}"]`);
+  const message = panel && panel.querySelector("[data-selfie-message]");
+  const buttons = panel ? panel.querySelectorAll("button, input, .return-selfie-picker") : [];
+  if (!record || !isReturnSelfieEligible(record)) {
+    if (message) message.textContent = "Rekod ini tidak lagi layak untuk penghantaran bukti.";
+    return;
+  }
+  if (!draft || !draft.file) {
+    if (message) message.textContent = "Ambil atau pilih selfie terlebih dahulu.";
+    return;
+  }
+
+  buttons.forEach((control) => {
+    if ("disabled" in control) control.disabled = true;
+    control.classList.add("is-disabled");
+  });
+  if (message) message.textContent = "Memampatkan dan menghantar gambar...";
+
+  try {
+    const compressed = await compressReturnSelfie(draft.file);
+    let result;
+    if (isLiveMode) {
+      result = await apiPost("submitReturnSelfie", {
+        request_id: requestId,
+        student_id: getCurrentStudentId(),
+        no_matrik: getCurrentStudentNoMatrik(),
+        image_base64: compressed.base64,
+        mime_type: compressed.mimeType
+      });
+    } else {
+      result = {
+        request_id: requestId,
+        selfie_status: RETURN_SELFIE_STATUS.submitted,
+        masa_selfie: new Date().toISOString()
+      };
+    }
+    outingRecords = outingRecords.map((item) => getRecordId(item) === requestId
+      ? { ...item, selfie_status: result.selfie_status, masa_selfie: result.masa_selfie }
+      : item);
+    if (draft.previewUrl) URL.revokeObjectURL(draft.previewUrl);
+    returnSelfieDrafts.delete(requestId);
+    renderStudent();
+    showSuccess("Bukti selfie telah dihantar.", "Bukti Pulang");
+  } catch (error) {
+    if (message) message.textContent = error.message || "Bukti gagal dihantar. Sila cuba lagi.";
+    buttons.forEach((control) => {
+      if ("disabled" in control) control.disabled = false;
+      control.classList.remove("is-disabled");
+    });
+    showError(error.message || "Bukti gagal dihantar. Sila cuba lagi.", "Penghantaran Gagal");
+  }
+}
+
+async function compressReturnSelfie(file) {
+  const bitmap = await loadReturnSelfieBitmap(file);
+  const longestSide = Math.max(bitmap.width, bitmap.height);
+  const scale = Math.min(1, 1280 / longestSide);
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(bitmap, 0, 0, width, height);
+  if (typeof bitmap.close === "function") bitmap.close();
+
+  let blob = await canvasToJpegBlob(canvas, 0.8);
+  if (blob.size > 1024 * 1024) {
+    blob = await canvasToJpegBlob(canvas, 0.75);
+  }
+  if (!blob.size || blob.size > 1500 * 1024) {
+    throw new Error("Gambar masih terlalu besar selepas dimampatkan. Sila ambil semula.");
+  }
+  return {
+    base64: await blobToBase64(blob),
+    mimeType: "image/jpeg"
+  };
+}
+
+async function loadReturnSelfieBitmap(file) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (error) {
+      // Fall back to an Image element on browsers without this option.
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Gambar tidak dapat dibaca. Sila ambil semula."));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToJpegBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Gambar tidak dapat dimampatkan."));
+    }, "image/jpeg", quality);
+  });
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(new Error("Gambar tidak dapat diproses."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function ensureWardenSemesterChecklist() {
   if (!els.wardenList || els.wardenSemesterChecklist) {
     return;
@@ -2967,6 +3249,7 @@ async function confirmIn(id) {
     masa_masuk: record.masa_masuk || now,
     guardInBy: currentSession.user.name,
     guard_masuk_by: currentSession.user.name,
+    selfie_status: RETURN_SELFIE_STATUS.pending,
     catatan: guardReturnNote.trim() || record.catatan || "",
     _guardActionPending: "in"
   }));
@@ -3584,7 +3867,12 @@ mapLiveRecord = function mapLiveRecordWithPulangBermalamFields(record) {
     telefon_waris: record.telefon_waris || mapped.telefon_waris || "",
     hubungan_waris: record.hubungan_waris || mapped.hubungan_waris || "",
     tujuan: record.tujuan || mapped.tujuan || mapped.purpose || "",
-    lokasi: record.lokasi || mapped.lokasi || mapped.location || ""
+    lokasi: record.lokasi || mapped.lokasi || mapped.location || "",
+    selfie_status: record.selfie_status || mapped.selfie_status || "",
+    selfie_file_id: record.selfie_file_id || mapped.selfie_file_id || "",
+    selfie_url: record.selfie_url || mapped.selfie_url || "",
+    masa_selfie: record.masa_selfie || mapped.masa_selfie || "",
+    selfie_telegram_message_id: record.selfie_telegram_message_id || mapped.selfie_telegram_message_id || ""
   };
 };
 
@@ -4518,6 +4806,14 @@ function toggleReleaseNotesV15() {
     panel.className = "release-notes-panel";
     panel.innerHTML = `
       <h3>Apa yang baharu v${APP_VERSION}</h3>
+      <ul>
+        <li>Bukti selfie pulang asrama untuk semua jenis permohonan</li>
+        <li>Kamera depan dan preview gambar sebelum dihantar</li>
+        <li>Gambar disimpan ke Google Drive</li>
+        <li>Bukti gambar dihantar ke Telegram</li>
+        <li>Status bukti dipaparkan kepada pelajar</li>
+      </ul>
+      <h3>Sejarah v1.6.26</h3>
       <ul>
         <li>Hapus kad dan butang Sahkan Masuk berganda pada dashboard Guard</li>
         <li>Asingkan Pulang Bermalam dan Cuti Semester ke bahagian Belum Pulang Ke Asrama</li>

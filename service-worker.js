@@ -1,10 +1,10 @@
-const CACHE_NAME = "eouting-cache-v1.6.26";
+const CACHE_NAME = "eouting-cache-v1.7.0";
 
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/style.css?v=1.6.26",
-  "./assets/app.js?v=1.6.26",
+  "./assets/style.css?v=1.7.0",
+  "./assets/app.js?v=1.7.0",
   "./assets/pwa-logo.png",
   "./assets/eouting-header-logo.png",
   "./assets/icons/icon-192.png",
@@ -43,7 +43,7 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(event.request.url);
 
-  if (isApiRequest_(requestUrl)) {
+  if (isApiRequest_(requestUrl) || isSensitiveImageRequest_(event.request, requestUrl)) {
     event.respondWith(fetch(event.request));
     return;
   }
@@ -63,6 +63,16 @@ self.addEventListener("fetch", (event) => {
 
 function isApiRequest_(url) {
   return url.origin !== self.location.origin || url.searchParams.has("action");
+}
+
+function isSensitiveImageRequest_(request, url) {
+  if (request.destination !== "image") {
+    return false;
+  }
+  const target = (url.pathname + url.search).toLowerCase();
+  return target.includes("selfie") ||
+    target.includes("bukti") ||
+    url.searchParams.has("request_id");
 }
 
 function isFreshAsset_(url) {

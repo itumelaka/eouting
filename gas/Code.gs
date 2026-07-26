@@ -43,7 +43,12 @@ const HEADERS = {
     "catatan",
     "tarikh_balik",
     "hari_balik",
-    "masa_balik_dijangka"
+    "masa_balik_dijangka",
+    "selfie_status",
+    "selfie_file_id",
+    "selfie_url",
+    "masa_selfie",
+    "selfie_telegram_message_id"
   ],
   AUDIT_LOG: ["timestamp", "action", "request_id", "user_role", "user_name", "details"]
 };
@@ -102,6 +107,7 @@ function doPost(e) {
     if (action === "rejectRequest") return jsonResponse(rejectRequest(payload));
     if (action === "confirmOut") return jsonResponse(confirmOut(payload));
     if (action === "confirmIn") return jsonResponse(confirmIn(payload));
+    if (action === "submitReturnSelfie") return jsonResponse(submitReturnSelfie(payload));
 
     return errorResponse("Unknown action.");
   } catch (error) {
@@ -296,6 +302,11 @@ function submitRequest(payload) {
     guard_masuk_by: "",
     lewat: "",
     selfie_whatsapp: "",
+    selfie_status: "",
+    selfie_file_id: "",
+    selfie_url: "",
+    masa_selfie: "",
+    selfie_telegram_message_id: "",
     catatan: payload.catatan || "",
     tarikh_balik: payload.tarikh_balik || "",
     hari_balik: payload.hari_balik || getDayNameFromDateKey_(payload.tarikh_balik),
@@ -480,6 +491,7 @@ function confirmIn(payload) {
     masa_masuk: now_(),
     guard_masuk_by: guard.nama_guard,
     lewat: late,
+    selfie_status: "BELUM_HANTAR",
     catatan: guardReturnNote || found.record.catatan || ""
   });
 
@@ -496,6 +508,204 @@ function confirmIn(payload) {
     updatedRecord
   ));
   return updatedRecord;
+}
+
+function submitReturnSelfie(payload) {
+  const requestId = String(payload.request_id || "").trim();
+  const studentId = String(payload.student_id || "").trim();
+  const noMatrik = String(payload.no_matrik || "").trim();
+  const mimeType = String(payload.mime_type || "").trim().toLowerCase();
+  const imageBase64 = String(payload.image_base64 || "").trim();
+  const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+  const maxBase64Length = 2 * 1024 * 1024;
+
+  if (!requestId) {
+    throw new Error("request_id diperlukan.");
+  }
+  if (!studentId || !noMatrik) {
+    throw new Error("student_id dan no_matrik diperlukan.");
+  }
+  if (allowedMimeTypes.indexOf(mimeType) === -1) {
+    throw new Error("Format gambar tidak disokong.");
+  }
+  if (!imageBase64 ||
+      imageBase64.length > maxBase64Length ||
+      imageBase64.length % 4 !== 0 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
+    throw new Error("Gambar tidak sah atau terlalu besar.");
+  }
+
+  let imageBytes;
+  try {
+    imageBytes = Utilities.base64Decode(imageBase64);
+  } catch (error) {
+    throw new Error("Gambar tidak sah atau rosak.");
+  }
+  if (!imageBytes || !imageBytes.length || imageBytes.length > 1500 * 1024) {
+    throw new Error("Gambar tidak sah atau terlalu besar.");
+  }
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    throw new Error("Permintaan sedang diproses. Sila cuba sebentar lagi.");
+  }
+
+  let driveFile = null;
+  let telegramMessageId = "";
+  let completed = false;
+  try {
+    const found = findRowByRequestId_(requestId);
+    if (!found) {
+      throw new Error("Permohonan tidak dijumpai.");
+    }
+    const record = found.record;
+    const ownsRecord =
+      normalizeText_(record.student_id) === normalizeText_(studentId) &&
+      normalizeText_(record.no_matrik) === normalizeText_(noMatrik);
+    if (!ownsRecord) {
+      throw new Error("Anda tidak dibenarkan menghantar bukti untuk rekod ini.");
+    }
+    if (record.status !== STATUS.done || !hasCellValue_(record.masa_masuk)) {
+      throw new Error("Bukti selfie hanya boleh dihantar selepas Guard mengesahkan masuk.");
+    }
+    if (normalizeText_(record.selfie_status) === "sudah_hantar" ||
+        hasCellValue_(record.selfie_file_id) ||
+        hasCellValue_(record.masa_selfie)) {
+      throw new Error("Bukti selfie telah dihantar sebelum ini.");
+    }
+
+    const properties = PropertiesService.getScriptProperties();
+    const folderId = properties.getProperty("SELFIE_FOLDER_ID");
+    if (!folderId) {
+      throw new Error("Folder bukti selfie belum disediakan. Hubungi pentadbir.");
+    }
+
+    let folder;
+    try {
+      folder = DriveApp.getFolderById(folderId);
+      folder.getName();
+    } catch (error) {
+      throw new Error("Folder bukti selfie tidak dapat diakses. Hubungi pentadbir.");
+    }
+
+    const timestamp = now_();
+    const fileName = sanitizeFilenamePart_(requestId) + "_" +
+      sanitizeFilenamePart_(record.no_matrik) + "_" +
+      Utilities.formatDate(new Date(), "Asia/Kuala_Lumpur", "yyyyMMdd-HHmmss") + ".jpg";
+    const sourceBlob = Utilities.newBlob(imageBytes, mimeType, fileName);
+    const jpegBlob = mimeType === "image/jpeg"
+      ? sourceBlob
+      : sourceBlob.getAs(MimeType.JPEG).setName(fileName);
+    driveFile = folder.createFile(jpegBlob);
+
+    const telegramResult = sendTelegramPhoto_(jpegBlob, buildReturnSelfieCaption_(record, timestamp));
+    if (!telegramResult.ok) {
+      driveFile.setTrashed(true);
+      driveFile = null;
+      throw new Error(telegramResult.error || "Bukti tidak dapat dihantar ke Telegram. Sila cuba lagi.");
+    }
+    telegramMessageId = String(telegramResult.messageId || "");
+
+    try {
+      updateRowByHeaders_(found.sheet, found.rowNumber, {
+        selfie_status: "SUDAH_HANTAR",
+        selfie_file_id: driveFile.getId(),
+        selfie_url: driveFile.getUrl(),
+        masa_selfie: timestamp,
+        selfie_telegram_message_id: telegramMessageId
+      });
+      completed = true;
+    } catch (error) {
+      deleteTelegramMessage_(telegramMessageId);
+      telegramMessageId = "";
+      driveFile.setTrashed(true);
+      driveFile = null;
+      throw new Error("Bukti tidak dapat disimpan dengan lengkap. Sila cuba lagi.");
+    }
+
+    try {
+      appendAuditLog("SUBMIT_RETURN_SELFIE", requestId, "Student", record.nama || "", JSON.stringify({
+        no_matrik: String(record.no_matrik || ""),
+        jenis_permohonan: record.jenis_permohonan || ""
+      }));
+    } catch (auditError) {
+      if (typeof console !== "undefined" && console && typeof console.warn === "function") {
+        console.warn("SUBMIT_RETURN_SELFIE audit log failed.", auditError);
+      }
+    }
+    const updatedRecord = findRowByRequestId_(requestId).record;
+    return {
+      request_id: updatedRecord.request_id,
+      selfie_status: updatedRecord.selfie_status,
+      masa_selfie: updatedRecord.masa_selfie
+    };
+  } catch (error) {
+    if (!completed) {
+      if (telegramMessageId) {
+        deleteTelegramMessage_(telegramMessageId);
+      }
+      if (driveFile) {
+        try {
+          driveFile.setTrashed(true);
+        } catch (cleanupError) {
+          // The original actionable error is returned to the client.
+        }
+      }
+    }
+    throw error;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setupSelfieProofV170() {
+  const sheet = getSheet_(SHEETS.requests);
+  const beforeHeaders = sheet.getLastRow() > 0
+    ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map((header) => String(header).trim())
+    : [];
+  const selfieHeaders = [
+    "selfie_status",
+    "selfie_file_id",
+    "selfie_url",
+    "masa_selfie",
+    "selfie_telegram_message_id"
+  ];
+  ensureHeaders_(sheet, HEADERS.OUTING_REQUESTS);
+  const addedColumns = selfieHeaders.filter((header) => beforeHeaders.indexOf(header) === -1);
+  const properties = PropertiesService.getScriptProperties();
+  let folderId = properties.getProperty("SELFIE_FOLDER_ID") || "";
+  let folderCreated = false;
+  let folder;
+
+  if (folderId) {
+    try {
+      folder = DriveApp.getFolderById(folderId);
+      folder.getName();
+    } catch (error) {
+      folder = null;
+    }
+  }
+  if (!folder) {
+    const folders = DriveApp.getFoldersByName("eOuting - Bukti Selfie Pulang");
+    if (folders.hasNext()) {
+      folder = folders.next();
+    } else {
+      folder = DriveApp.createFolder("eOuting - Bukti Selfie Pulang");
+      folderCreated = true;
+    }
+    folderId = folder.getId();
+    properties.setProperty("SELFIE_FOLDER_ID", folderId);
+  }
+
+  return {
+    ok: true,
+    sheet: SHEETS.requests,
+    added_columns: addedColumns,
+    folder_id: folderId,
+    folder_name: folder.getName(),
+    folder_created: folderCreated,
+    script_property: "SELFIE_FOLDER_ID"
+  };
 }
 
 function getTodayRecords() {
@@ -780,6 +990,102 @@ function sendTelegramMessage_(message) {
   } catch (error) {
     return false;
   }
+}
+
+function sendTelegramPhoto_(photoBlob, caption) {
+  const config = getTelegramConfig_();
+  if (!config.enabled || !config.token || !config.chatId) {
+    return {
+      ok: false,
+      error: "Telegram belum dikonfigurasi. Hubungi pentadbir."
+    };
+  }
+
+  try {
+    const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + config.token + "/sendPhoto", {
+      method: "post",
+      payload: {
+        chat_id: config.chatId,
+        photo: photoBlob,
+        caption: caption
+      },
+      muteHttpExceptions: true
+    });
+    const responseCode = response.getResponseCode();
+    let body = {};
+    try {
+      body = JSON.parse(response.getContentText() || "{}");
+    } catch (error) {
+      body = {};
+    }
+    const messageId = body && body.result ? body.result.message_id : "";
+    if (responseCode >= 200 && responseCode < 300 && body.ok && messageId) {
+      return {
+        ok: true,
+        messageId: messageId
+      };
+    }
+    return {
+      ok: false,
+      error: "Bukti tidak dapat dihantar ke Telegram. Sila cuba lagi."
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: "Bukti tidak dapat dihantar ke Telegram. Sila cuba lagi."
+    };
+  }
+}
+
+function deleteTelegramMessage_(messageId) {
+  const config = getTelegramConfig_();
+  if (!config.enabled || !config.token || !config.chatId || !messageId) {
+    return false;
+  }
+  try {
+    const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + config.token + "/deleteMessage", {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({
+        chat_id: config.chatId,
+        message_id: messageId
+      }),
+      muteHttpExceptions: true
+    });
+    return response.getResponseCode() >= 200 && response.getResponseCode() < 300;
+  } catch (error) {
+    return false;
+  }
+}
+
+function buildReturnSelfieCaption_(record, selfieTime) {
+  return [
+    "📸 BUKTI PULANG ASRAMA",
+    "",
+    "Nama: " + safeTelegramCaptionValue_(record.nama),
+    "No. Matrik: " + safeTelegramCaptionValue_(record.no_matrik),
+    "Kelas: " + safeTelegramCaptionValue_(record.kelas),
+    "Jenis: " + safeTelegramCaptionValue_(requestTypeLabel_(record.jenis_permohonan)),
+    "Request ID: " + safeTelegramCaptionValue_(record.request_id),
+    "Guard Masuk: " + safeTelegramCaptionValue_(record.guard_masuk_by),
+    "Masa Masuk: " + safeTelegramCaptionValue_(formatTelegramDateTime_(record.masa_masuk)),
+    "Masa Selfie: " + safeTelegramCaptionValue_(formatTelegramDateTime_(selfieTime))
+  ].join("\n");
+}
+
+function safeTelegramCaptionValue_(value) {
+  return String(value === undefined || value === null || value === "" ? "-" : value)
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .trim()
+    .slice(0, 300);
+}
+
+function sanitizeFilenamePart_(value) {
+  const sanitized = String(value || "")
+    .replace(/[^A-Za-z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return sanitized.slice(0, 80) || "unknown";
 }
 
 function formatTelegramDateTime_(value) {
