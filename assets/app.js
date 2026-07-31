@@ -225,7 +225,7 @@ function setupClayRoleNav() {
   els.roleGrid.classList.add("clay-role-nav");
   const roleLabels = {
     student: "Pelajar",
-    warden: "Warden",
+    warden: "Warden & HEP",
     guard: "Guard"
   };
 
