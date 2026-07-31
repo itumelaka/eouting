@@ -3777,23 +3777,7 @@ function validatePulangBermalamRequest() {
   if (returnDate < todayKey) {
     return "Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.";
   }
-
-  const day = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    timeZone: "Asia/Kuala_Lumpur"
-  }).format(now);
-  const time = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Kuala_Lumpur"
-  }).format(now);
-
-  if (day === "Fri" && time <= "17:00") {
-    return "Pulang Bermalam pada hari Jumaat hanya boleh bermula selepas 5:00 PM.";
-  }
-
-  return "";
+    return "";
 }
 
 if (els.requestForm) {
