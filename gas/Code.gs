@@ -63,6 +63,7 @@ const STATUS = {
 
 const REQUEST_TYPE = {
   normal: "OUTING_BIASA",
+  weekend: "OUTING_HUJUNG_MINGGU",
   emergency: "KECEMASAN",
   overnight: "PULANG_BERMALAM",
   semester: "CUTI_SEMESTER"
@@ -236,25 +237,56 @@ function submitRequest(payload) {
   const requestType = payload.jenis_permohonan;
   const now = new Date();
 
-  if (!studentId || !noMatrik) {
-    throw new Error("student_id dan no_matrik diperlukan.");
+if (!studentId || !noMatrik) {
+  throw new Error("student_id dan no_matrik diperlukan.");
+}
+
+if (
+  requestType !== REQUEST_TYPE.normal &&
+  requestType !== REQUEST_TYPE.weekend &&
+  requestType !== REQUEST_TYPE.emergency &&
+  requestType !== REQUEST_TYPE.overnight &&
+  requestType !== REQUEST_TYPE.semester
+) {
+  throw new Error("Jenis permohonan tidak sah.");
+}
+
+if (requestType === REQUEST_TYPE.normal && !isOutingBiasaOpen_(now)) {
+  throw new Error("Outing Biasa hanya dibuka Selasa/Rabu selepas 5:00 PM.");
+}
+
+if (requestType === REQUEST_TYPE.emergency && !normalizeText_(payload.sebab_kecemasan)) {
+  throw new Error("Sebab kecemasan diperlukan.");
+}
+
+if (requestType === REQUEST_TYPE.weekend) {
+  const weekendDateKey = normalizeDateKey_(payload.tarikh);
+  const weekendReturnDateKey = normalizeDateKey_(payload.tarikh_balik);
+  const weekendReturnTime = String(payload.masa_balik_dijangka || "").trim();
+
+  if (!weekendDateKey) {
+    throw new Error("Tarikh Outing Sabtu / Ahad diperlukan.");
   }
 
-  if (requestType !== REQUEST_TYPE.normal && requestType !== REQUEST_TYPE.emergency && requestType !== REQUEST_TYPE.overnight && requestType !== REQUEST_TYPE.semester) {
-    throw new Error("Jenis permohonan tidak sah.");
+  const weekendDate = new Date(weekendDateKey + "T12:00:00+08:00");
+  const weekendDay = weekendDate.getDay();
+
+  if (weekendDay !== 0 && weekendDay !== 6) {
+    throw new Error("Tarikh Outing Sabtu / Ahad mestilah pada hari Sabtu atau Ahad.");
   }
 
-  if (requestType === REQUEST_TYPE.normal && !isOutingBiasaOpen_(now)) {
-    throw new Error("Outing Biasa hanya dibuka Selasa/Rabu selepas 5:00 PM.");
+  if (weekendReturnDateKey !== weekendDateKey) {
+    throw new Error("Outing Sabtu / Ahad mesti pulang pada hari yang sama.");
   }
 
-  if (requestType === REQUEST_TYPE.emergency && !normalizeText_(payload.sebab_kecemasan)) {
-    throw new Error("Sebab kecemasan diperlukan.");
+  if (weekendReturnTime !== "22:00") {
+    throw new Error("Masa wajib pulang untuk Outing Sabtu / Ahad ialah 10:00 malam.");
   }
+}
 
-  if (requestType === REQUEST_TYPE.overnight) {
-    validateOvernightRequest_(payload, now);
-  }
+if (requestType === REQUEST_TYPE.overnight) {
+  validateOvernightRequest_(payload, now);
+}
 
   if (requestType === REQUEST_TYPE.semester) {
     validateSemesterRequest_(payload, now);
@@ -270,15 +302,25 @@ function submitRequest(payload) {
     throw new Error("Anda masih mempunyai permohonan aktif. Sila selesaikan permohonan sedia ada dahulu.");
   }
 
-  const requestId = createRequestId_(now);
-  const requestDate = requestType === REQUEST_TYPE.semester
-    ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
-    : formatDate_(now);
-  const record = {
-    request_id: requestId,
-    tarikh: requestDate,
-    hari: requestType === REQUEST_TYPE.semester ? getDayNameFromDateKey_(requestDate) : getDayName_(now),
-    jenis_permohonan: requestType,
+const requestId = createRequestId_(now);
+
+const requestDate = (
+  requestType === REQUEST_TYPE.semester ||
+  requestType === REQUEST_TYPE.weekend
+)
+  ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
+  : formatDate_(now);
+
+const record = {
+  request_id: requestId,
+  tarikh: requestDate,
+  hari: (
+    requestType === REQUEST_TYPE.semester ||
+    requestType === REQUEST_TYPE.weekend
+  )
+    ? getDayNameFromDateKey_(requestDate)
+    : getDayName_(now),
+  jenis_permohonan: requestType,
     student_id: String(student.student_id || ""),
     no_matrik: String(student.no_matrik || ""),
     nama: student.nama,
@@ -1157,12 +1199,19 @@ function telegramTitle_(icon, text, record) {
 
 function buildTelegramSubmitMessage_(record) {
   let title = "📌 Permohonan Outing Baru";
+
+  if (record.jenis_permohonan === REQUEST_TYPE.weekend) {
+    title = "📅 Permohonan Outing Sabtu / Ahad Baru";
+  }
+
   if (record.jenis_permohonan === REQUEST_TYPE.emergency) {
     title = "🚨 Permohonan Kecemasan Baru";
   }
+
   if (record.jenis_permohonan === REQUEST_TYPE.overnight) {
     title = "🏠 Permohonan Pulang Bermalam Baru";
   }
+
   if (record.jenis_permohonan === REQUEST_TYPE.semester) {
     title = "🏫 Permohonan CUTI SEMESTER Baru";
   }
@@ -1195,7 +1244,12 @@ function buildTelegramStatusMessage_(title, record) {
     lines.push("Hubungan Waris: " + (record.hubungan_waris || "-"));
   }
 
-  if (record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester) {
+  if (
+      record.jenis_permohonan === REQUEST_TYPE.weekend ||
+      record.jenis_permohonan === REQUEST_TYPE.overnight ||
+      record.jenis_permohonan === REQUEST_TYPE.semester
+      ) {
+
     if (record.jenis_permohonan === REQUEST_TYPE.semester) {
       lines.push("Tarikh Keluar: " + formatTelegramDate_(record.tarikh));
     }
@@ -1233,6 +1287,7 @@ function buildTelegramStatusMessage_(title, record) {
 
 function requestTypeLabel_(requestType) {
   if (requestType === REQUEST_TYPE.normal) return "Outing Biasa";
+  if (requestType === REQUEST_TYPE.weekend) return "Outing Sabtu / Ahad";
   if (requestType === REQUEST_TYPE.emergency) return "Kecemasan";
   if (requestType === REQUEST_TYPE.overnight) return "Pulang Bermalam";
   if (requestType === REQUEST_TYPE.semester) return "CUTI SEMESTER";
@@ -1451,7 +1506,11 @@ function isLate_(date) {
 
 function isHostelReturnRequest_(record) {
   return record &&
-    (record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester);
+    (
+      record.jenis_permohonan === REQUEST_TYPE.weekend ||
+      record.jenis_permohonan === REQUEST_TYPE.overnight ||
+      record.jenis_permohonan === REQUEST_TYPE.semester
+    );
 }
 
 function isHostelReturnLate_(date, record) {
