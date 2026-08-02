@@ -1,5 +1,5 @@
 {
-  "version": "1.7.0",
-  "releasedAt": "2026-07-26",
-  "notes": "Bukti selfie pulang asrama untuk semua jenis permohonan dengan kamera depan, preview, simpanan Google Drive, penghantaran Telegram dan status pelajar."
+  "version": "1.7.1",
+  "releasedAt": "2026-08-02",
+  "notes": "Tambah Outing Sabtu / Ahad dengan tarikh wajib Sabtu atau Ahad, pulang hari yang sama sebelum atau pada 10:00 malam, semakan lewat, kelulusan Warden & HEP, pengesahan Guard dan sokongan Telegram."
 }

@@ -1,4 +1,4 @@
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.7.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
@@ -30,6 +30,7 @@ const STATUS = {
 
 const REQUEST_TYPE = {
   normal: "OUTING_BIASA",
+  weekend: "OUTING_HUJUNG_MINGGU",
   emergency: "KECEMASAN",
   overnight: "PULANG_BERMALAM",
   semester: "CUTI_SEMESTER"
@@ -37,6 +38,7 @@ const REQUEST_TYPE = {
 
 const REQUEST_TYPE_LABEL = {
   OUTING_BIASA: "Outing Biasa",
+  OUTING_HUJUNG_MINGGU: "Outing Sabtu / Ahad",
   KECEMASAN: "Kecemasan",
   PULANG_BERMALAM: "Pulang Bermalam",
   CUTI_SEMESTER: "Cuti Semester"
@@ -1750,12 +1752,35 @@ els.requestForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  const student = currentSession && currentSession.role === "student" ? currentSession.user : null;
+if (requestType === REQUEST_TYPE.weekend) {
+  const leaveDate = els.leaveDateInput
+    ? els.leaveDateInput.value
+    : "";
 
-  if (!student) {
-    els.studentMessage.textContent = "Sila masuk sebagai Pelajar dahulu.";
+  if (!leaveDate) {
+    els.studentMessage.textContent = "Sila pilih tarikh Outing Sabtu / Ahad.";
     return;
   }
+
+
+  const selectedDate = new Date(`${leaveDate}T12:00:00`);
+  const selectedDay = selectedDate.getDay();
+  const isWeekendDate = selectedDay === 0 || selectedDay === 6;
+
+  if (!isWeekendDate) {
+    els.studentMessage.textContent = "Tarikh Outing Sabtu / Ahad mestilah pada hari Sabtu atau Ahad.";
+    return;
+  }
+}
+
+const student = currentSession && currentSession.role === "student"
+  ? currentSession.user
+  : null;
+
+if (!student) {
+  els.studentMessage.textContent = "Sila masuk sebagai Pelajar dahulu.";
+  return;
+}
 
   if (outingRecords.some((record) => isRecordForCurrentStudent(record) && isActiveStudentRequest(record))) {
     els.studentMessage.textContent = "Anda sudah mempunyai permohonan aktif hari ini. Sila semak status di bawah.";
@@ -1991,7 +2016,11 @@ function updateRuleNotice(now) {
 }
 
 function canSubmitRequest(requestType, date) {
-  return requestType === REQUEST_TYPE.emergency || isApplicationOpen(date);
+  return (
+    requestType === REQUEST_TYPE.emergency ||
+    requestType === REQUEST_TYPE.weekend ||
+    isApplicationOpen(date)
+  );
 }
 
 function isApplicationOpen(date) {
@@ -3822,12 +3851,45 @@ function syncMockPulangBermalamRecord() {
 
 const apiPostWithoutPulangBermalamFields = apiPost;
 apiPost = async function apiPostWithPulangBermalamFields(action, payload) {
-  if (action === "submitRequest" && payload && payload.jenis_permohonan === REQUEST_TYPE.overnight) {
+  const requestType = payload ? payload.jenis_permohonan : "";
+
+  if (
+    action === "submitRequest" &&
+    payload &&
+    (
+      requestType === REQUEST_TYPE.overnight ||
+      requestType === REQUEST_TYPE.weekend
+    )
+  ) {
+    const leaveDate = els.leaveDateInput
+      ? els.leaveDateInput.value
+      : "";
+
+    const returnDate = requestType === REQUEST_TYPE.weekend
+      ? leaveDate
+      : (
+          els.returnDateInput
+            ? els.returnDateInput.value
+            : ""
+        );
+
     payload = {
       ...payload,
-      tarikh_balik: els.returnDateInput ? els.returnDateInput.value : "",
-      hari_balik: getDayNameFromDateInput(els.returnDateInput ? els.returnDateInput.value : ""),
-      masa_balik_dijangka: els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : ""
+      tarikh: requestType === REQUEST_TYPE.weekend
+        ? leaveDate
+        : payload.tarikh || "",
+      hari: requestType === REQUEST_TYPE.weekend
+        ? getDayNameFromDateInput(leaveDate)
+        : payload.hari || "",
+      tarikh_balik: returnDate,
+      hari_balik: getDayNameFromDateInput(returnDate),
+      masa_balik_dijangka: requestType === REQUEST_TYPE.weekend
+        ? "22:00"
+        : (
+            els.expectedReturnTimeInput
+              ? els.expectedReturnTimeInput.value
+              : ""
+          )
     };
   }
 
@@ -4996,26 +5058,107 @@ function ensureSemesterLeaveDateFieldV160() {
 function updateRequestTypeFields() {
   const requestType = els.requestTypeSelect ? els.requestTypeSelect.value : "";
   const isNormal = requestType === REQUEST_TYPE.normal;
+  const isWeekend = requestType === REQUEST_TYPE.weekend;
   const isEmergency = requestType === REQUEST_TYPE.emergency;
   const isOvernight = requestType === REQUEST_TYPE.overnight;
   const isSemester = requestType === REQUEST_TYPE.semester;
   const purposeLabel = els.purposeInput ? document.querySelector(`label[for="${els.purposeInput.id}"]`) : null;
   const locationLabel = els.locationInput ? document.querySelector(`label[for="${els.locationInput.id}"]`) : null;
 
-  setSectionVisibleV164(els.overnightFields, isOvernight || isSemester);
-  setSectionVisibleV164(els.emergencyFields, isEmergency || isOvernight || isSemester);
-  setFieldAndLabelHiddenV160(els.leaveDateInput, !isSemester);
-  setFieldAndLabelHiddenV160(els.returnDateInput, !(isOvernight || isSemester));
-  setFieldAndLabelHiddenV160(els.expectedReturnTimeInput, !(isOvernight || isSemester));
+  setSectionVisibleV164(
+  els.overnightFields,
+  isWeekend || isOvernight || isSemester
+);
+
+setSectionVisibleV164(
+  els.emergencyFields,
+  isEmergency || isOvernight || isSemester
+);
+
+setFieldAndLabelHiddenV160(
+  els.leaveDateInput,
+  !(isWeekend || isSemester)
+);
+
+setFieldAndLabelHiddenV160(
+  els.returnDateInput,
+  !(isOvernight || isSemester)
+);
+
+setFieldAndLabelHiddenV160(
+  els.expectedReturnTimeInput,
+  !(isWeekend || isOvernight || isSemester)
+);
   setFieldAndLabelHiddenV160(els.emergencyReasonInput, !isEmergency);
   setFieldAndLabelHiddenV160(els.guardianPhoneInput, !(isEmergency || isOvernight || isSemester));
   setFieldAndLabelHiddenV160(els.guardianRelationSelect, !(isEmergency || isOvernight || isSemester));
   setFieldAndLabelHiddenV160(els.emergencyNoteInput, !(isEmergency || isSemester));
 
-  const overnightTitle = els.overnightFields ? els.overnightFields.querySelector("h3") : null;
-  const emergencyTitle = els.emergencyFields ? els.emergencyFields.querySelector("h3") : null;
+const overnightTitle = els.overnightFields
+  ? els.overnightFields.querySelector("h3")
+  : null;
 
-  if (isSemester) {
+const emergencyTitle = els.emergencyFields
+  ? els.emergencyFields.querySelector("h3")
+  : null;
+
+if (els.leaveDateInput) {
+  els.leaveDateInput.required = false;
+}
+
+if (els.expectedReturnTimeInput) {
+  els.expectedReturnTimeInput.required = false;
+  els.expectedReturnTimeInput.readOnly = false;
+}
+
+if (isWeekend) {
+  if (overnightTitle) {
+    overnightTitle.textContent = "Maklumat Outing Sabtu / Ahad";
+  }
+
+  if (purposeLabel) {
+    purposeLabel.textContent = "Tujuan Outing";
+  }
+
+  if (locationLabel) {
+    locationLabel.textContent = "Lokasi Outing";
+  }
+
+  setLabelTextV163(
+    els.leaveDateInput,
+    "Tarikh Outing Sabtu / Ahad"
+  );
+
+  setLabelTextV163(
+    els.expectedReturnTimeInput,
+    "Wajib Pulang Sebelum / Pada"
+  );
+
+  if (els.leaveDateInput) {
+    els.leaveDateInput.required = true;
+  }
+
+  if (els.returnDateInput) {
+    els.returnDateInput.required = false;
+    els.returnDateInput.value = els.leaveDateInput
+      ? els.leaveDateInput.value
+      : "";
+  }
+
+  if (els.expectedReturnTimeInput) {
+    els.expectedReturnTimeInput.required = true;
+    els.expectedReturnTimeInput.value = "22:00";
+    els.expectedReturnTimeInput.readOnly = true;
+  }
+
+  if (els.locationInput) {
+    els.locationInput.placeholder = "Contoh: Pekan Merlimau";
+  }
+
+  return;
+}
+
+if (isSemester) {
     if (overnightTitle) overnightTitle.textContent = "Maklumat Cuti Semester";
     if (emergencyTitle) emergencyTitle.textContent = "Maklumat Waris / Cuti Semester";
     if (purposeLabel) purposeLabel.textContent = "Tujuan Cuti Semester";
@@ -5342,9 +5485,30 @@ function updateStudentSubmitState() {
     let isReady = Boolean(purpose && location && vehicleType);
 
     if (requestType === REQUEST_TYPE.emergency) {
-      const emergencyReason = els.emergencyReasonInput ? els.emergencyReasonInput.value.trim() : "";
+      const emergencyReason = els.emergencyReasonInput
+      ? els.emergencyReasonInput.value.trim()
+      : "";
+
       isReady = isReady && Boolean(emergencyReason);
     }
+
+    if (requestType === REQUEST_TYPE.weekend) {
+  const leaveDate = els.leaveDateInput
+    ? els.leaveDateInput.value
+    : "";
+
+  const selectedDate = leaveDate
+    ? new Date(`${leaveDate}T12:00:00`)
+    : null;
+
+  const selectedDay = selectedDate
+    ? selectedDate.getDay()
+    : -1;
+
+  const isWeekendDate = selectedDay === 0 || selectedDay === 6;
+
+  isReady = isReady && Boolean(leaveDate && isWeekendDate);
+}
 
     if (requestType === REQUEST_TYPE.overnight) {
       const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
