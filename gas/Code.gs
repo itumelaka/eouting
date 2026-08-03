@@ -5,8 +5,12 @@ const SHEETS = {
   wardens: "WARDENS",
   guards: "GUARDS",
   requests: "OUTING_REQUESTS",
-  audit: "AUDIT_LOG"
+  audit: "AUDIT_LOG",
+  outingTypes: "OUTING_TYPES",
+  adminUsers: "ADMIN_USERS"
 };
+
+const OUTING_CONFIG_V2_PROPERTY = "OUTING_CONFIG_V2_ENABLED";
 
 const HEADERS = {
   STUDENTS: ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"],
@@ -50,7 +54,44 @@ const HEADERS = {
     "masa_selfie",
     "selfie_telegram_message_id"
   ],
-  AUDIT_LOG: ["timestamp", "action", "request_id", "user_role", "user_name", "details"]
+  AUDIT_LOG: ["timestamp", "action", "request_id", "user_role", "user_name", "details", "entity_type", "entity_id"],
+  OUTING_TYPES: [
+    "type_code",
+    "display_name",
+    "description",
+    "active",
+    "sort_order",
+    "allowed_days",
+    "application_open_time",
+    "application_close_time",
+    "fixed_return_time",
+    "same_day_only",
+    "require_leave_date",
+    "require_return_date",
+    "require_return_time",
+    "require_guardian_phone",
+    "require_guardian_relation",
+    "require_emergency_reason",
+    "require_purpose",
+    "require_location",
+    "require_vehicle",
+    "require_warden_approval",
+    "require_selfie",
+    "config_version",
+    "created_at",
+    "created_by",
+    "updated_at",
+    "updated_by"
+  ],
+  ADMIN_USERS: [
+    "admin_id",
+    "nama_admin",
+    "pin",
+    "status",
+    "catatan",
+    "created_at",
+    "updated_at"
+  ]
 };
 
 const STATUS = {
@@ -69,6 +110,51 @@ const REQUEST_TYPE = {
   semester: "CUTI_SEMESTER"
 };
 
+const OUTING_TYPE_BOOLEAN_FIELDS = [
+  "active",
+  "same_day_only",
+  "require_leave_date",
+  "require_return_date",
+  "require_return_time",
+  "require_guardian_phone",
+  "require_guardian_relation",
+  "require_emergency_reason",
+  "require_purpose",
+  "require_location",
+  "require_vehicle",
+  "require_warden_approval",
+  "require_selfie"
+];
+
+const OUTING_TYPE_TIME_FIELDS = [
+  "application_open_time",
+  "application_close_time",
+  "fixed_return_time"
+];
+
+const PUBLIC_OUTING_TYPE_FIELDS = [
+  "type_code",
+  "display_name",
+  "description",
+  "sort_order",
+  "allowed_days",
+  "application_open_time",
+  "application_close_time",
+  "fixed_return_time",
+  "same_day_only",
+  "require_leave_date",
+  "require_return_date",
+  "require_return_time",
+  "require_guardian_phone",
+  "require_guardian_relation",
+  "require_emergency_reason",
+  "require_purpose",
+  "require_location",
+  "require_vehicle",
+  "require_warden_approval",
+  "require_selfie"
+];
+
 function doGet(e) {
   try {
     const action = e && e.parameter ? e.parameter.action : "";
@@ -86,6 +172,7 @@ function doGet(e) {
     if (action === "getGuards") return jsonResponse(getGuards());
     if (action === "getTodayRecords") return jsonResponse(getTodayRecords());
     if (action === "getOutingStats") return jsonResponse(getOutingStats(e.parameter || {}));
+    if (action === "getOutingTypes") return jsonResponse(getOutingTypes());
 
     return errorResponse("Unknown action.");
   } catch (error) {
@@ -102,7 +189,12 @@ function doPost(e) {
     if (action === "loginStudent") return jsonResponse(loginStudent(payload));
     if (action === "loginWarden") return jsonResponse(loginWarden(payload));
     if (action === "loginGuard") return jsonResponse(loginGuard(payload));
+    if (action === "loginAdmin") return jsonResponse(loginAdmin(payload));
     if (action === "getTodayRecords") return jsonResponse(getOperationalTodayRecords(payload));
+    if (action === "getAdminOutingTypes") return jsonResponse(getAdminOutingTypes(payload));
+    if (action === "createOutingType") return jsonResponse(createOutingType(payload));
+    if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
+    if (action === "toggleOutingType") return jsonResponse(toggleOutingType(payload));
     if (action === "submitRequest") return jsonResponse(submitRequest(payload));
     if (action === "approveRequest") return jsonResponse(approveRequest(payload));
     if (action === "rejectRequest") return jsonResponse(rejectRequest(payload));
@@ -131,6 +223,434 @@ function setupDatabase() {
     ok: true,
     sheets: Object.keys(HEADERS)
   };
+}
+
+function setupAdminOutingConfigV200() {
+  const outingTypesSheet = getSheet_(SHEETS.outingTypes);
+  const adminUsersSheet = getSheet_(SHEETS.adminUsers);
+  const auditSheet = getSheet_(SHEETS.audit);
+
+  ensureHeaders_(outingTypesSheet, HEADERS.OUTING_TYPES);
+  ensureHeaders_(adminUsersSheet, HEADERS.ADMIN_USERS);
+  ensureHeaders_(auditSheet, HEADERS.AUDIT_LOG);
+
+  [outingTypesSheet, adminUsersSheet, auditSheet].forEach((sheet) => {
+    try {
+      sheet.setFrozenRows(1);
+    } catch (error) {
+      // Freezing is a UI convenience only; migration must remain idempotent.
+    }
+  });
+
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(OUTING_CONFIG_V2_PROPERTY) === null) {
+    properties.setProperty(OUTING_CONFIG_V2_PROPERTY, "false");
+  }
+
+  const existingTypeCodes = {};
+  getRowsAsObjects_(outingTypesSheet).forEach((row) => {
+    const typeCode = normalizeText_(row.type_code);
+    if (typeCode) {
+      existingTypeCodes[typeCode] = true;
+    }
+  });
+
+  const migrationTime = now_();
+  const createdBy = "SYSTEM_MIGRATION_V2.0";
+  const seedTypes = getDefaultOutingTypeSeedsV200_(migrationTime, createdBy);
+  const createdTypeCodes = [];
+
+  seedTypes.forEach((seed) => {
+    const normalizedTypeCode = normalizeText_(seed.type_code);
+    if (existingTypeCodes[normalizedTypeCode]) {
+      return;
+    }
+
+    appendObjectRow_(outingTypesSheet, HEADERS.OUTING_TYPES, seed);
+    existingTypeCodes[normalizedTypeCode] = true;
+    createdTypeCodes.push(seed.type_code);
+  });
+
+  return {
+    ok: true,
+    sheets: [SHEETS.outingTypes, SHEETS.adminUsers, SHEETS.audit],
+    created_type_codes: createdTypeCodes,
+    total_seed_types: seedTypes.length,
+    outing_config_v2_enabled: isOutingConfigV2Enabled_()
+  };
+}
+
+function getDefaultOutingTypeSeedsV200_(timestamp, createdBy) {
+  const allDays = "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU";
+  const common = {
+    active: true,
+    application_close_time: "",
+    require_purpose: true,
+    require_location: true,
+    require_vehicle: true,
+    require_warden_approval: true,
+    require_selfie: true,
+    config_version: 1,
+    created_at: timestamp,
+    created_by: createdBy,
+    updated_at: timestamp,
+    updated_by: createdBy
+  };
+
+  return [
+    {
+      ...common,
+      type_code: REQUEST_TYPE.normal,
+      display_name: "Outing Biasa",
+      description: "Outing harian pada Selasa atau Rabu selepas 5:00 petang.",
+      sort_order: 1,
+      allowed_days: "SELASA,RABU",
+      application_open_time: "17:00",
+      fixed_return_time: "22:00",
+      same_day_only: true,
+      require_leave_date: false,
+      require_return_date: false,
+      require_return_time: false,
+      require_guardian_phone: false,
+      require_guardian_relation: false,
+      require_emergency_reason: false
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.weekend,
+      display_name: "Outing Sabtu / Ahad",
+      description: "Outing hujung minggu yang mesti keluar dan pulang pada hari yang sama.",
+      sort_order: 2,
+      allowed_days: "SABTU,AHAD",
+      application_open_time: "",
+      fixed_return_time: "22:00",
+      same_day_only: true,
+      require_leave_date: true,
+      require_return_date: true,
+      require_return_time: true,
+      require_guardian_phone: false,
+      require_guardian_relation: false,
+      require_emergency_reason: false
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.emergency,
+      display_name: "Kecemasan",
+      description: "Permohonan kecemasan dengan sebab kecemasan wajib diisi.",
+      sort_order: 3,
+      allowed_days: allDays,
+      application_open_time: "",
+      fixed_return_time: "22:00",
+      same_day_only: true,
+      require_leave_date: false,
+      require_return_date: false,
+      require_return_time: false,
+      require_guardian_phone: false,
+      require_guardian_relation: false,
+      require_emergency_reason: true
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.overnight,
+      display_name: "Pulang Bermalam",
+      description: "Pulang bermalam dengan tarikh, masa pulang dan maklumat waris.",
+      sort_order: 4,
+      allowed_days: allDays,
+      application_open_time: "",
+      fixed_return_time: "",
+      same_day_only: false,
+      require_leave_date: false,
+      require_return_date: true,
+      require_return_time: true,
+      require_guardian_phone: true,
+      require_guardian_relation: true,
+      require_emergency_reason: false
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.semester,
+      display_name: "Cuti Semester",
+      description: "Cuti semester dengan tarikh dan masa pulang serta maklumat waris.",
+      sort_order: 5,
+      allowed_days: allDays,
+      application_open_time: "",
+      fixed_return_time: "",
+      same_day_only: false,
+      require_leave_date: false,
+      require_return_date: true,
+      require_return_time: true,
+      require_guardian_phone: true,
+      require_guardian_relation: true,
+      require_emergency_reason: false
+    }
+  ];
+}
+
+function isOutingConfigV2Enabled_() {
+  const value = PropertiesService.getScriptProperties().getProperty(OUTING_CONFIG_V2_PROPERTY);
+  return normalizeText_(value) === "true";
+}
+
+function getOutingTypeInput_(payload) {
+  if (payload && payload.outing_type && typeof payload.outing_type === "object") {
+    return payload.outing_type;
+  }
+  if (payload && payload.config && typeof payload.config === "object") {
+    return payload.config;
+  }
+  return payload || {};
+}
+
+function getEditableOutingTypeFields_() {
+  return [
+    "display_name",
+    "description",
+    "active",
+    "sort_order",
+    "allowed_days",
+    "application_open_time",
+    "application_close_time",
+    "fixed_return_time",
+    "same_day_only",
+    "require_leave_date",
+    "require_return_date",
+    "require_return_time",
+    "require_guardian_phone",
+    "require_guardian_relation",
+    "require_emergency_reason",
+    "require_purpose",
+    "require_location",
+    "require_vehicle",
+    "require_warden_approval",
+    "require_selfie"
+  ];
+}
+
+function validateOutingTypeConfig_(input, options) {
+  const data = input || {};
+  const config = options || {};
+  const typeCode = normalizeOutingTypeCode_(config.typeCode || data.type_code);
+  const displayName = String(data.display_name || "").trim();
+  const description = String(data.description || "").trim();
+
+  if (config.requireTypeCode && !typeCode) {
+    throw new Error("type_code diperlukan.");
+  }
+  if (!displayName) {
+    throw new Error("display_name diperlukan.");
+  }
+  if (displayName.length > 100) {
+    throw new Error("display_name terlalu panjang.");
+  }
+  if (description.length > 500) {
+    throw new Error("description terlalu panjang.");
+  }
+
+  const sortOrder = Number(data.sort_order);
+  if (!Number.isInteger(sortOrder) || sortOrder < 1 || sortOrder > 9999) {
+    throw new Error("sort_order mesti nombor bulat antara 1 dan 9999.");
+  }
+
+  const result = {
+    type_code: typeCode,
+    display_name: displayName,
+    description: description,
+    sort_order: sortOrder,
+    allowed_days: normalizeAllowedDays_(data.allowed_days)
+  };
+
+  OUTING_TYPE_TIME_FIELDS.forEach((field) => {
+    result[field] = normalizeOptionalTime_(data[field], field);
+  });
+  OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
+    result[field] = requireBoolean_(data[field], field);
+  });
+
+  return result;
+}
+
+function normalizeOutingTypeCode_(value) {
+  const typeCode = String(value || "").trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]{2,49}$/.test(typeCode)) {
+    throw new Error("type_code mesti uppercase, bermula dengan huruf dan hanya mengandungi A-Z, 0-9 atau underscore.");
+  }
+  return typeCode;
+}
+
+function assertImmutableTypeCode_(typeCode, input) {
+  const data = input || {};
+  const submittedTypeCode = data.type_code || data.new_type_code || data.updated_type_code;
+  if (submittedTypeCode && normalizeOutingTypeCode_(submittedTypeCode) !== typeCode) {
+    throw new Error("type_code tidak boleh diubah selepas dicipta.");
+  }
+}
+
+function normalizeAllowedDays_(value) {
+  const allowedDayNames = ["AHAD", "ISNIN", "SELASA", "RABU", "KHAMIS", "JUMAAT", "SABTU"];
+  const rawDays = Array.isArray(value) ? value : String(value || "").split(",");
+  const days = [];
+
+  rawDays.forEach((day) => {
+    const normalizedDay = String(day || "").trim().toUpperCase();
+    if (!normalizedDay) {
+      return;
+    }
+    if (allowedDayNames.indexOf(normalizedDay) === -1) {
+      throw new Error("allowed_days mengandungi hari yang tidak sah: " + normalizedDay);
+    }
+    if (days.indexOf(normalizedDay) === -1) {
+      days.push(normalizedDay);
+    }
+  });
+
+  if (days.length === 0) {
+    throw new Error("allowed_days mesti mengandungi sekurang-kurangnya satu hari.");
+  }
+  return days.join(",");
+}
+
+function normalizeOptionalTime_(value, fieldName) {
+  const text = String(value === undefined || value === null ? "" : value).trim();
+  if (!text) {
+    return "";
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) {
+    throw new Error(fieldName + " mesti menggunakan format HH:mm atau dikosongkan.");
+  }
+  return text;
+}
+
+function requireBoolean_(value, fieldName) {
+  if (value !== true && value !== false) {
+    throw new Error(fieldName + " mesti boolean true atau false.");
+  }
+  return value;
+}
+
+function normalizeStoredBoolean_(value) {
+  if (value === true || value === false) {
+    return value;
+  }
+  const normalized = normalizeText_(value);
+  if (normalized === "true" || normalized === "ya" || normalized === "1") {
+    return true;
+  }
+  return false;
+}
+
+function normalizeOutingTypeRecord_(row) {
+  const source = row || {};
+  const result = {};
+  HEADERS.OUTING_TYPES.forEach((field) => {
+    result[field] = source[field] === undefined || source[field] === null ? "" : source[field];
+  });
+  result.type_code = String(result.type_code || "").trim().toUpperCase();
+  result.display_name = String(result.display_name || "").trim();
+  result.description = String(result.description || "").trim();
+  result.sort_order = Number(result.sort_order) || 0;
+  result.allowed_days = String(result.allowed_days || "").trim().toUpperCase();
+  OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
+    result[field] = normalizeStoredBoolean_(result[field]);
+  });
+  result.config_version = Number(result.config_version) > 0
+    ? Math.floor(Number(result.config_version))
+    : 1;
+  return result;
+}
+
+function toPublicOutingType_(row) {
+  return pickDefined_(row, PUBLIC_OUTING_TYPE_FIELDS);
+}
+
+function pickDefined_(object, keys) {
+  const result = {};
+  keys.forEach((key) => {
+    result[key] = object[key] === undefined || object[key] === null ? "" : object[key];
+  });
+  return result;
+}
+
+function sortOutingTypes_(rows) {
+  return rows.slice().sort((left, right) => {
+    const sortDifference = Number(left.sort_order || 0) - Number(right.sort_order || 0);
+    if (sortDifference !== 0) {
+      return sortDifference;
+    }
+    return String(left.display_name || left.type_code || "")
+      .localeCompare(String(right.display_name || right.type_code || ""));
+  });
+}
+
+function findOutingTypeRowByCode_(sheet, typeCode) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    return null;
+  }
+  const headers = values[0].map((header) => String(header).trim());
+  const typeCodeIndex = headers.indexOf("type_code");
+  if (typeCodeIndex === -1) {
+    return null;
+  }
+
+  for (let index = 1; index < values.length; index += 1) {
+    if (normalizeText_(values[index][typeCodeIndex]) === normalizeText_(typeCode)) {
+      const record = {};
+      headers.forEach((header, columnIndex) => {
+        record[header] = values[index][columnIndex];
+      });
+      return {
+        sheet: sheet,
+        rowNumber: index + 1,
+        record: record
+      };
+    }
+  }
+  return null;
+}
+
+function validateExpectedConfigVersion_(value) {
+  const version = Number(value);
+  if (!Number.isInteger(version) || version < 1) {
+    throw new Error("expected_config_version mesti nombor bulat positif.");
+  }
+  return version;
+}
+
+function assertConfigVersionMatches_(currentVersion, expectedVersion) {
+  if (Number(currentVersion) !== Number(expectedVersion)) {
+    throw new Error(
+      "CONFIG_VERSION_CONFLICT: konfigurasi telah berubah. Muat semula sebelum menyimpan."
+    );
+  }
+}
+
+function getOutingTypeChanges_(current, next) {
+  const changes = {};
+  getEditableOutingTypeFields_().forEach((field) => {
+    if (field === "active") {
+      return;
+    }
+    if (String(current[field]) !== String(next[field])) {
+      changes[field] = { from: current[field], to: next[field] };
+    }
+  });
+  return changes;
+}
+
+function getSafeAdminIdentity_(admin) {
+  return String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+}
+
+function withScriptLock_(callback) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    throw new Error("Konfigurasi sedang dikemas kini. Sila cuba sebentar lagi.");
+  }
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getStudents() {
@@ -231,65 +751,491 @@ function loginGuard(payload) {
   };
 }
 
+function loginAdmin(payload) {
+  const admin = validateAdminCredentials_(payload);
+  return pick_(admin, ["admin_id", "nama_admin", "status", "catatan", "created_at", "updated_at"]);
+}
+
+function validateAdminCredentials_(payload) {
+  const data = payload || {};
+  const adminId = String(data.admin_id || "").trim();
+  const adminName = String(data.nama_admin || data.admin_name || data.name || "").trim();
+  const pin = String(data.pin === undefined || data.pin === null ? "" : data.pin).trim();
+
+  if ((!adminId && !adminName) || !pin) {
+    throw new Error("ID atau nama Admin dan PIN diperlukan.");
+  }
+
+  const admin = getAdminByCredentials_(adminId, adminName, pin);
+  if (!admin) {
+    throw new Error("Admin tidak dijumpai, tidak aktif atau PIN tidak sah.");
+  }
+
+  return admin;
+}
+
+function getAdminByCredentials_(adminId, adminName, pin) {
+  const normalizedId = normalizeText_(adminId);
+  const normalizedName = normalizeText_(adminName);
+  const normalizedPin = String(pin === undefined || pin === null ? "" : pin).trim();
+
+  if ((!normalizedId && !normalizedName) || !normalizedPin) {
+    return null;
+  }
+
+  return getRowsAsObjects_(getSheet_(SHEETS.adminUsers)).find((admin) => {
+    const identityMatches =
+      (normalizedId && normalizeText_(admin.admin_id) === normalizedId) ||
+      (normalizedName && normalizeText_(admin.nama_admin) === normalizedName);
+    return identityMatches &&
+      isActive_(admin.status) &&
+      String(admin.pin === undefined || admin.pin === null ? "" : admin.pin).trim() === normalizedPin;
+  }) || null;
+}
+
+function getOutingTypes() {
+  if (!isOutingConfigV2Enabled_()) {
+    return getLegacyPublicOutingTypes_();
+  }
+
+  const rows = getRowsAsObjects_(getSheet_(SHEETS.outingTypes));
+  if (rows.length === 0) {
+    return getLegacyPublicOutingTypes_();
+  }
+
+  return sortOutingTypes_(rows
+    .map(normalizeOutingTypeRecord_)
+    .filter((row) => row.active))
+    .map(toPublicOutingType_);
+}
+
+function getLegacyPublicOutingTypes_() {
+  return sortOutingTypes_(getDefaultOutingTypeSeedsV200_("", "")
+    .map(normalizeOutingTypeRecord_)
+    .filter((row) => row.active))
+    .map(toPublicOutingType_);
+}
+
+function getAdminOutingTypes(payload) {
+  validateAdminCredentials_(payload);
+  return sortOutingTypes_(getRowsAsObjects_(getSheet_(SHEETS.outingTypes))
+    .map(normalizeOutingTypeRecord_))
+    .map((row) => pickDefined_(row, HEADERS.OUTING_TYPES));
+}
+
+function createOutingType(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const input = getOutingTypeInput_(payload);
+
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.outingTypes);
+    ensureHeaders_(sheet, HEADERS.OUTING_TYPES);
+    const typeCode = normalizeOutingTypeCode_(input.type_code || payload.type_code);
+
+    if (findOutingTypeRowByCode_(sheet, typeCode)) {
+      throw new Error("type_code telah wujud.");
+    }
+
+    const validated = validateOutingTypeConfig_(input, {
+      requireTypeCode: true,
+      typeCode: typeCode
+    });
+    const timestamp = now_();
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const record = {
+      ...validated,
+      config_version: 1,
+      created_at: timestamp,
+      created_by: adminIdentity,
+      updated_at: timestamp,
+      updated_by: adminIdentity
+    };
+
+    appendObjectRow_(sheet, HEADERS.OUTING_TYPES, record);
+    appendAuditLog(
+      "CREATE_OUTING_TYPE",
+      "",
+      "Admin",
+      adminIdentity,
+      JSON.stringify({
+        display_name: record.display_name,
+        active: record.active,
+        sort_order: record.sort_order,
+        config_version: record.config_version
+      }),
+      "OUTING_TYPE",
+      record.type_code
+    );
+
+    return normalizeOutingTypeRecord_(record);
+  });
+}
+
+function updateOutingType(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const typeCode = normalizeOutingTypeCode_(payload.type_code);
+  const expectedVersion = validateExpectedConfigVersion_(payload.expected_config_version);
+  const input = getOutingTypeInput_(payload);
+
+  assertImmutableTypeCode_(typeCode, input);
+  if (Object.prototype.hasOwnProperty.call(input, "active")) {
+    throw new Error("Status active hanya boleh diubah melalui toggleOutingType.");
+  }
+
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.outingTypes);
+    const found = findOutingTypeRowByCode_(sheet, typeCode);
+    if (!found) {
+      throw new Error("Jenis outing tidak dijumpai.");
+    }
+
+    const current = normalizeOutingTypeRecord_(found.record);
+    assertConfigVersionMatches_(current.config_version, expectedVersion);
+    const merged = { ...current };
+    getEditableOutingTypeFields_().forEach((field) => {
+      if (field !== "active" && Object.prototype.hasOwnProperty.call(input, field)) {
+        merged[field] = input[field];
+      }
+    });
+
+    const validated = validateOutingTypeConfig_(merged, {
+      requireTypeCode: true,
+      typeCode: typeCode
+    });
+    const changes = getOutingTypeChanges_(current, validated);
+    if (Object.keys(changes).length === 0) {
+      throw new Error("Tiada perubahan konfigurasi untuk disimpan.");
+    }
+
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const updates = {
+      ...validated,
+      config_version: current.config_version + 1,
+      updated_at: now_(),
+      updated_by: adminIdentity
+    };
+    delete updates.created_at;
+    delete updates.created_by;
+
+    updateRowByHeaders_(sheet, found.rowNumber, updates);
+    appendAuditLog(
+      "UPDATE_OUTING_TYPE",
+      "",
+      "Admin",
+      adminIdentity,
+      JSON.stringify({
+        changes: changes,
+        previous_config_version: current.config_version,
+        config_version: updates.config_version
+      }),
+      "OUTING_TYPE",
+      typeCode
+    );
+
+    return normalizeOutingTypeRecord_({
+      ...current,
+      ...updates,
+      created_at: current.created_at,
+      created_by: current.created_by
+    });
+  });
+}
+
+function toggleOutingType(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const typeCode = normalizeOutingTypeCode_(payload.type_code);
+  const expectedVersion = validateExpectedConfigVersion_(payload.expected_config_version);
+  const requestedActive = requireBoolean_(payload.active, "active");
+
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.outingTypes);
+    const found = findOutingTypeRowByCode_(sheet, typeCode);
+    if (!found) {
+      throw new Error("Jenis outing tidak dijumpai.");
+    }
+
+    const current = normalizeOutingTypeRecord_(found.record);
+    assertConfigVersionMatches_(current.config_version, expectedVersion);
+    if (current.active === requestedActive) {
+      throw new Error(requestedActive ? "Jenis outing sudah aktif." : "Jenis outing sudah tidak aktif.");
+    }
+
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const updates = {
+      active: requestedActive,
+      config_version: current.config_version + 1,
+      updated_at: now_(),
+      updated_by: adminIdentity
+    };
+    updateRowByHeaders_(sheet, found.rowNumber, updates);
+
+    appendAuditLog(
+      requestedActive ? "ACTIVATE_OUTING_TYPE" : "DEACTIVATE_OUTING_TYPE",
+      "",
+      "Admin",
+      adminIdentity,
+      JSON.stringify({
+        active: { from: current.active, to: requestedActive },
+        previous_config_version: current.config_version,
+        config_version: updates.config_version
+      }),
+      "OUTING_TYPE",
+      typeCode
+    );
+
+    return normalizeOutingTypeRecord_({ ...current, ...updates });
+  });
+}
+
+function resolveSubmissionOutingTypeConfigV200_(requestType) {
+  if (!isOutingConfigV2Enabled_()) {
+    return null;
+  }
+
+  let typeCode = "";
+  try {
+    typeCode = normalizeOutingTypeCode_(requestType);
+  } catch (error) {
+    throw new Error("Jenis outing tidak tersedia.");
+  }
+
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(SHEETS.outingTypes);
+    if (!sheet) {
+      throw new Error("MISSING_CONFIG_SHEET");
+    }
+    const found = findOutingTypeRowByCode_(sheet, typeCode);
+    if (!found) {
+      throw new Error("NOT_FOUND");
+    }
+
+    const stored = Object.assign({}, found.record);
+    OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
+      if (stored[field] === true || stored[field] === false) {
+        return;
+      }
+      const value = normalizeText_(stored[field]);
+      if (value === "true" || value === "ya" || value === "1") {
+        stored[field] = true;
+        return;
+      }
+      if (value === "false" || value === "tidak" || value === "0") {
+        stored[field] = false;
+        return;
+      }
+      throw new Error("INVALID_BOOLEAN_CONFIG");
+    });
+    const validated = validateOutingTypeConfig_(stored, {
+      requireTypeCode: true,
+      typeCode: typeCode
+    });
+    const configVersion = Number(stored.config_version);
+
+    if (!Number.isInteger(configVersion) || configVersion < 1) {
+      throw new Error("INVALID_CONFIG_VERSION");
+    }
+    if (!validated.active) {
+      throw new Error("INACTIVE");
+    }
+
+    validated.config_version = configVersion;
+    return validated;
+  } catch (error) {
+    if (error && error.message === "INACTIVE") {
+      throw new Error("Jenis outing tidak aktif dan tidak boleh dipohon.");
+    }
+    if (error && error.message === "NOT_FOUND") {
+      throw new Error("Jenis outing tidak tersedia.");
+    }
+    throw new Error("Konfigurasi jenis outing tidak sah. Sila hubungi pentadbir.");
+  }
+}
+
+function normalizeSubmissionDateV200_(value, fieldLabel, required) {
+  if (!hasCellValue_(value)) {
+    if (required) {
+      throw new Error(fieldLabel + " diperlukan.");
+    }
+    return "";
+  }
+
+  const text = String(value).trim();
+  const dateKey = normalizeDateKey_(value);
+  if (!dateKey || (!/^\d{4}-\d{2}-\d{2}$/.test(text) && Object.prototype.toString.call(value) !== "[object Date]")) {
+    throw new Error(fieldLabel + " tidak sah.");
+  }
+
+  const date = new Date(dateKey + "T00:00:00+08:00");
+  if (isNaN(date.getTime()) || Utilities.formatDate(date, "Asia/Kuala_Lumpur", "yyyy-MM-dd") !== dateKey) {
+    throw new Error(fieldLabel + " tidak sah.");
+  }
+  return dateKey;
+}
+
+function normalizeSubmissionTimeV200_(value, fieldLabel, required) {
+  const text = String(value === undefined || value === null ? "" : value).trim();
+  if (!text) {
+    if (required) {
+      throw new Error(fieldLabel + " diperlukan.");
+    }
+    return "";
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) {
+    throw new Error(fieldLabel + " tidak sah.");
+  }
+  return text;
+}
+
+function isSubmissionTimeWithinWindowV200_(currentTime, openTime, closeTime) {
+  if (openTime && closeTime) {
+    return openTime <= closeTime
+      ? currentTime >= openTime && currentTime <= closeTime
+      : currentTime >= openTime || currentTime <= closeTime;
+  }
+  if (openTime) return currentTime >= openTime;
+  if (closeTime) return currentTime <= closeTime;
+  return true;
+}
+
+function requireSubmissionTextV200_(payload, keys, label, required) {
+  const value = keys.reduce((current, key) => current || String(payload[key] || "").trim(), "");
+  if (required && !value) {
+    throw new Error(label + " diperlukan.");
+  }
+  return value;
+}
+
+function validateConfigDrivenSubmissionV200_(payload, config, now) {
+  const submission = Object.assign({}, payload || {});
+  const todayKey = formatDate_(now);
+  const leaveDateKey = normalizeSubmissionDateV200_(
+    submission.tarikh,
+    "Tarikh keluar",
+    config.require_leave_date
+  );
+  let returnDateKey = normalizeSubmissionDateV200_(
+    submission.tarikh_balik,
+    "Tarikh pulang ke asrama",
+    config.require_return_date
+  );
+  const effectiveLeaveDateKey = leaveDateKey || todayKey;
+
+  if (returnDateKey && returnDateKey < effectiveLeaveDateKey) {
+    throw new Error("Tarikh pulang ke asrama tidak boleh lebih awal daripada tarikh keluar.");
+  }
+  if (config.same_day_only) {
+    if (!returnDateKey) {
+      returnDateKey = effectiveLeaveDateKey;
+    }
+    if (returnDateKey !== effectiveLeaveDateKey) {
+      throw new Error("Jenis outing ini mesti keluar dan pulang pada hari yang sama.");
+    }
+  }
+
+  const allowedDays = String(config.allowed_days || "").split(",");
+  const leaveDay = getDayNameFromDateKey_(effectiveLeaveDateKey).toUpperCase();
+  if (allowedDays.indexOf(leaveDay) === -1) {
+    throw new Error("Jenis outing ini tidak dibenarkan pada hari yang dipilih.");
+  }
+
+  const currentTime = Utilities.formatDate(now, "Asia/Kuala_Lumpur", "HH:mm");
+  if (!isSubmissionTimeWithinWindowV200_(
+    currentTime,
+    config.application_open_time,
+    config.application_close_time
+  )) {
+    throw new Error("Permohonan jenis outing ini belum dibuka atau telah ditutup.");
+  }
+
+  if (config.fixed_return_time) {
+    submission.masa_balik_dijangka = config.fixed_return_time;
+  } else {
+    submission.masa_balik_dijangka = normalizeSubmissionTimeV200_(
+      submission.masa_balik_dijangka,
+      "Masa dijangka pulang ke asrama",
+      config.require_return_time
+    );
+  }
+
+  requireSubmissionTextV200_(submission, ["telefon_waris"], "Telefon waris", config.require_guardian_phone);
+  requireSubmissionTextV200_(submission, ["hubungan_waris"], "Hubungan waris", config.require_guardian_relation);
+  requireSubmissionTextV200_(submission, ["sebab_kecemasan"], "Sebab kecemasan", config.require_emergency_reason);
+  requireSubmissionTextV200_(submission, ["tujuan", "purpose"], "Tujuan", config.require_purpose);
+  requireSubmissionTextV200_(submission, ["lokasi", "location"], "Lokasi", config.require_location);
+  requireSubmissionTextV200_(submission, ["jenis_kenderaan", "vehicle_type"], "Jenis kenderaan", config.require_vehicle);
+
+  if (leaveDateKey) submission.tarikh = leaveDateKey;
+  if (returnDateKey) submission.tarikh_balik = returnDateKey;
+  submission.jenis_permohonan = config.type_code;
+  return submission;
+}
+
 function submitRequest(payload) {
   const studentId = payload.student_id;
   const noMatrik = payload.no_matrik;
-  const requestType = payload.jenis_permohonan;
+  let requestType = payload.jenis_permohonan;
   const now = new Date();
 
 if (!studentId || !noMatrik) {
   throw new Error("student_id dan no_matrik diperlukan.");
 }
 
-if (
-  requestType !== REQUEST_TYPE.normal &&
-  requestType !== REQUEST_TYPE.weekend &&
-  requestType !== REQUEST_TYPE.emergency &&
-  requestType !== REQUEST_TYPE.overnight &&
-  requestType !== REQUEST_TYPE.semester
-) {
-  throw new Error("Jenis permohonan tidak sah.");
-}
+  const submissionConfig = resolveSubmissionOutingTypeConfigV200_(requestType);
+  if (submissionConfig) {
+    payload = validateConfigDrivenSubmissionV200_(payload, submissionConfig, now);
+    requestType = submissionConfig.type_code;
+  } else {
+    if (
+      requestType !== REQUEST_TYPE.normal &&
+      requestType !== REQUEST_TYPE.weekend &&
+      requestType !== REQUEST_TYPE.emergency &&
+      requestType !== REQUEST_TYPE.overnight &&
+      requestType !== REQUEST_TYPE.semester
+    ) {
+      throw new Error("Jenis permohonan tidak sah.");
+    }
 
-if (requestType === REQUEST_TYPE.normal && !isOutingBiasaOpen_(now)) {
-  throw new Error("Outing Biasa hanya dibuka Selasa/Rabu selepas 5:00 PM.");
-}
+    if (requestType === REQUEST_TYPE.normal && !isOutingBiasaOpen_(now)) {
+      throw new Error("Outing Biasa hanya dibuka Selasa/Rabu selepas 5:00 PM.");
+    }
 
-if (requestType === REQUEST_TYPE.emergency && !normalizeText_(payload.sebab_kecemasan)) {
-  throw new Error("Sebab kecemasan diperlukan.");
-}
+    if (requestType === REQUEST_TYPE.emergency && !normalizeText_(payload.sebab_kecemasan)) {
+      throw new Error("Sebab kecemasan diperlukan.");
+    }
 
-if (requestType === REQUEST_TYPE.weekend) {
-  const weekendDateKey = normalizeDateKey_(payload.tarikh);
-  const weekendReturnDateKey = normalizeDateKey_(payload.tarikh_balik);
-  const weekendReturnTime = String(payload.masa_balik_dijangka || "").trim();
+    if (requestType === REQUEST_TYPE.weekend) {
+      const weekendDateKey = normalizeDateKey_(payload.tarikh);
+      const weekendReturnDateKey = normalizeDateKey_(payload.tarikh_balik);
+      const weekendReturnTime = String(payload.masa_balik_dijangka || "").trim();
 
-  if (!weekendDateKey) {
-    throw new Error("Tarikh Outing Sabtu / Ahad diperlukan.");
-  }
+      if (!weekendDateKey) {
+        throw new Error("Tarikh Outing Sabtu / Ahad diperlukan.");
+      }
 
-  const weekendDate = new Date(weekendDateKey + "T12:00:00+08:00");
-  const weekendDay = weekendDate.getDay();
+      const weekendDate = new Date(weekendDateKey + "T12:00:00+08:00");
+      const weekendDay = weekendDate.getDay();
 
-  if (weekendDay !== 0 && weekendDay !== 6) {
-    throw new Error("Tarikh Outing Sabtu / Ahad mestilah pada hari Sabtu atau Ahad.");
-  }
+      if (weekendDay !== 0 && weekendDay !== 6) {
+        throw new Error("Tarikh Outing Sabtu / Ahad mestilah pada hari Sabtu atau Ahad.");
+      }
 
-  if (weekendReturnDateKey !== weekendDateKey) {
-    throw new Error("Outing Sabtu / Ahad mesti pulang pada hari yang sama.");
-  }
+      if (weekendReturnDateKey !== weekendDateKey) {
+        throw new Error("Outing Sabtu / Ahad mesti pulang pada hari yang sama.");
+      }
 
-  if (weekendReturnTime !== "22:00") {
-    throw new Error("Masa wajib pulang untuk Outing Sabtu / Ahad ialah 10:00 malam.");
-  }
-}
+      if (weekendReturnTime !== "22:00") {
+        throw new Error("Masa wajib pulang untuk Outing Sabtu / Ahad ialah 10:00 malam.");
+      }
+    }
 
-if (requestType === REQUEST_TYPE.overnight) {
-  validateOvernightRequest_(payload, now);
-}
+    if (requestType === REQUEST_TYPE.overnight) {
+      validateOvernightRequest_(payload, now);
+    }
 
-  if (requestType === REQUEST_TYPE.semester) {
-    validateSemesterRequest_(payload, now);
+    if (requestType === REQUEST_TYPE.semester) {
+      validateSemesterRequest_(payload, now);
+    }
   }
 
   const student = findStudentByIdAndMatric_(studentId, noMatrik);
@@ -303,18 +1249,22 @@ if (requestType === REQUEST_TYPE.overnight) {
   }
 
 const requestId = createRequestId_(now);
+const requiresWardenApproval = !submissionConfig || submissionConfig.require_warden_approval;
 
-const requestDate = (
-  requestType === REQUEST_TYPE.semester ||
-  requestType === REQUEST_TYPE.weekend
-)
+const requestDate = submissionConfig
   ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
-  : formatDate_(now);
+  : (
+    requestType === REQUEST_TYPE.semester ||
+    requestType === REQUEST_TYPE.weekend
+  )
+    ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
+    : formatDate_(now);
 
 const record = {
   request_id: requestId,
   tarikh: requestDate,
   hari: (
+    submissionConfig ||
     requestType === REQUEST_TYPE.semester ||
     requestType === REQUEST_TYPE.weekend
   )
@@ -335,9 +1285,9 @@ const record = {
     hubungan_waris: payload.hubungan_waris || "",
     catatan_kecemasan: payload.catatan_kecemasan || "",
     masa_mohon: now_(),
-    status: STATUS.pending,
-    warden_approve_by: "",
-    masa_approve: "",
+    status: requiresWardenApproval ? STATUS.pending : STATUS.approved,
+    warden_approve_by: requiresWardenApproval ? "" : "AUTO_CONFIG_V2",
+    masa_approve: requiresWardenApproval ? "" : now_(),
     masa_keluar: "",
     guard_keluar_by: "",
     masa_masuk: "",
@@ -356,11 +1306,16 @@ const record = {
   };
 
   appendObjectRow_(getSheet_(SHEETS.requests), HEADERS.OUTING_REQUESTS, record);
-  appendAuditLog("SUBMIT_REQUEST", requestId, "Student", student.nama, JSON.stringify({
+  const auditDetails = {
     student_name: student.nama || "",
     no_matrik: String(student.no_matrik || ""),
     jenis_permohonan: requestType
-  }));
+  };
+  if (submissionConfig) {
+    auditDetails.config_version = submissionConfig.config_version;
+    auditDetails.require_warden_approval = submissionConfig.require_warden_approval;
+  }
+  appendAuditLog("SUBMIT_REQUEST", requestId, "Student", student.nama, JSON.stringify(auditDetails));
   sendTelegramMessage_(buildTelegramSubmitMessage_(record));
 
   return record;
@@ -979,7 +1934,7 @@ function debugGetAllRequests() {
   return getRowsAsObjects_(getSheet_(SHEETS.requests));
 }
 
-function appendAuditLog(action, requestId, userRole, userName, details) {
+function appendAuditLog(action, requestId, userRole, userName, details, entityType, entityId) {
   try {
     const record = {
       timestamp: now_(),
@@ -987,7 +1942,9 @@ function appendAuditLog(action, requestId, userRole, userName, details) {
       request_id: requestId || "",
       user_role: userRole || "",
       user_name: userName || "",
-      details: details || ""
+      details: details || "",
+      entity_type: entityType || "",
+      entity_id: entityId || ""
     };
 
     appendObjectRow_(getSheet_(SHEETS.audit), HEADERS.AUDIT_LOG, record);
@@ -1543,7 +2500,7 @@ function ensureHeaders_(sheet, headers) {
     return;
   }
 
-  const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length))
+  const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
     .getValues()[0]
     .map((header) => String(header).trim());
 
@@ -1555,7 +2512,13 @@ function ensureHeaders_(sheet, headers) {
 
   const missingHeaders = headers.filter((header) => currentHeaders.indexOf(header) === -1);
   if (missingHeaders.length > 0) {
-    sheet.getRange(1, currentHeaders.length + 1, 1, missingHeaders.length).setValues([missingHeaders]);
+    let lastHeaderIndex = -1;
+    currentHeaders.forEach((header, index) => {
+      if (header !== "") {
+        lastHeaderIndex = index;
+      }
+    });
+    sheet.getRange(1, lastHeaderIndex + 2, 1, missingHeaders.length).setValues([missingHeaders]);
   }
 }
 
