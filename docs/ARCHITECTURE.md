@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi live semasa: **v1.7.0**.
+Versi repo semasa: **v1.7.1**.
 
 ## Komponen
 
@@ -40,8 +40,26 @@ Google Sheets ialah database dan source of truth. Tab utama:
 - `GUARDS`
 - `OUTING_REQUESTS`
 - `AUDIT_LOG`
+- `OUTING_TYPES` — schema konfigurasi staging v2.0
+- `ADMIN_USERS` — schema identiti Admin staging v2.0
 
 v1.7.0 menambah lima header selfie secara idempotent melalui `setupSelfieProofV170()` dan mengekalkan `selfie_whatsapp` sebagai kolum legacy.
+
+Fasa 2 eOuting v2.0 menambah `setupAdminOutingConfigV200()` untuk mencipta dua tab staging, meluaskan `AUDIT_LOG` secara additive dan seed lima jenis outing semasa. Script Property `OUTING_CONFIG_V2_ENABLED` diwujudkan dengan default `false`.
+
+Fasa 3 menambah backend authentication dan API konfigurasi tanpa menambah UI Admin atau menukar `submitRequest`. Public config menggunakan GET read-only, manakala login, admin read dan semua write menggunakan POST dengan credential Admin pada setiap request.
+
+Fasa 4 menambah role dan Dashboard Admin pada frontend. Credential Admin disimpan dalam memory runtime sahaja; PIN tidak dimasukkan ke localStorage, log atau DOM selepas login. Dashboard membaca active/inactive config, menyediakan create/edit/toggle terkawal dan menghantar `expected_config_version` untuk update/toggle. Student form masih hard-coded.
+
+Fasa 4.6 menetapkan satu sahaja canonical `apiPost` frontend. Router ini memintas lima action Admin hanya dalam `?mock=1`; selain itu ia menghantar POST `no-store` ke GAS dan menyerahkan semua response kepada `parseApiResponse`. Duplicate dead declaration dibuang tanpa mengubah payload atau call site.
+
+Fasa 5A memuatkan public `GET getOutingTypes` hanya selepas sesi Pelajar dibuka. Dropdown, visibility, required/disabled state, `same_day_only` dan `fixed_return_time` dirender daripada safe config. Kegagalan atau response kosong menggunakan lima legacy config dalam memory; `submitRequest` GAS dan feature flag default tidak berubah.
+
+```text
+Production v1.7.1: config-driven rendering + hard-coded submitRequest
+Staging v2.0:      OUTING_TYPES + ADMIN_USERS (inactive)
+Feature flag:      OUTING_CONFIG_V2_ENABLED=false
+```
 
 ## Boundary API
 
@@ -61,6 +79,8 @@ nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 
 `GET getOutingStats` memulangkan kiraan agregat sahaja. Ia tidak memulangkan row mentah, leaderboard individu, nama atau nombor matrik.
 
+`GET getOutingTypes` memulangkan projection konfigurasi yang selamat. Selagi feature flag bukan `true`, ia memulangkan lima konfigurasi legacy daripada code. Apabila flag `true`, hanya row aktif dipulangkan mengikut `sort_order`; metadata version/audit/Admin tidak didedahkan.
+
 ### Authenticated POST
 
 `POST getTodayRecords` mengesahkan credential sebenar:
@@ -79,6 +99,13 @@ Action write lain kekal melalui POST:
 - `confirmOut`
 - `confirmIn`
 - `submitReturnSelfie`
+- `loginAdmin`
+- `getAdminOutingTypes`
+- `createOutingType`
+- `updateOutingType`
+- `toggleOutingType`
+
+Admin action mengesahkan `admin_id` atau `nama_admin` bersama PIN aktif pada setiap request. Create/update/toggle menggunakan `LockService`. Update dan toggle memerlukan `expected_config_version`; mismatch menghasilkan `CONFIG_VERSION_CONFLICT`.
 
 ## Aliran Data Utama
 
@@ -126,7 +153,7 @@ Helper pusat frontend membentuk paparan kontekstual tanpa mengubah nilai backend
 
 - 🟡 Menunggu Kelulusan
 - 🟢 Diluluskan
-- 🚶 Sedang Keluar untuk Outing Biasa/Kecemasan
+- 🚶 Sedang Keluar untuk Outing Biasa/Outing Sabtu atau Ahad/Kecemasan
 - 🌙 Sedang Bermalam untuk Pulang Bermalam
 - 🏖️ Sedang Bercuti untuk Cuti Semester
 - ✅ Sudah Pulang
@@ -153,6 +180,23 @@ Tiada kad `Rekod Hari Ini`, quick filter monitoring atau seksyen pendua `Belum P
 
 ## PWA dan Cache
 
-Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache semasa ialah `eouting-cache-v1.7.0`.
+Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache semasa ialah `eouting-cache-v1.7.1`.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
+
+## Submission Validation v2.0 — Fasa 5B
+
+`submitRequest` kini mempunyai dua laluan backend yang dipilih hanya oleh Script Property:
+
+```text
+OUTING_CONFIG_V2_ENABLED !== "true"
+  -> validator legacy v1.7.1 yang sedia ada
+
+OUTING_CONFIG_V2_ENABLED === "true"
+  -> resolve type_code case-insensitive daripada OUTING_TYPES
+  -> sahkan row config secara ketat dan active
+  -> validate tarikh, masa, hari dan field wajib di server
+  -> duplicate check dan append/audit/Telegram sedia ada
+```
+
+Frontend tidak menentukan authorization atau validation akhir. Config yang dihantar client tidak dipercayai; resolver sentiasa membaca `OUTING_TYPES`. Sheet hilang, jenis hilang/inactive atau config malformed gagal tertutup. Feature flag kekal `false`, maka flow production semasa masih melalui validator legacy.

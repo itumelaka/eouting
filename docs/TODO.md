@@ -1,15 +1,47 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas milestone live **v1.7.0**.
+Senarai kerja selepas milestone **v1.7.1**.
 
 ## Done / Completed
+
+### eOuting v2.0 — Fasa 2 Schema dan Migration
+
+- [x] Tambah schema staging `OUTING_TYPES` dan `ADMIN_USERS`.
+- [x] Luaskan `AUDIT_LOG` dengan `entity_type` dan `entity_id` secara additive.
+- [x] Tambah migration idempotent `setupAdminOutingConfigV200()`.
+- [x] Seed lima jenis outing v1.7.1 sekali sahaja tanpa menimpa row sedia ada.
+- [x] Tambah Script Property `OUTING_CONFIG_V2_ENABLED` dengan default `false`.
+- [x] Kekalkan `submitRequest` dan flow production hard-coded.
+- [x] Tambah regression tests untuk schema, idempotency, compatibility audit dan feature flag.
+
+### eOuting v2.0 — Fasa 3 Backend Config API
+
+- [x] Tambah `loginAdmin` dan validation Admin aktif tanpa mendedahkan PIN.
+- [x] Tambah public safe `getOutingTypes` dengan fallback legacy semasa flag `false`.
+- [x] Tambah authenticated `getAdminOutingTypes` untuk active/inactive dan metadata config.
+- [x] Tambah create/update/toggle di bawah `LockService` tanpa delete API.
+- [x] Tambah uppercase/unique/immutable `type_code` dan backend validation semua medan config.
+- [x] Tambah optimistic `expected_config_version` dan increment version.
+- [x] Tambah audit create/update/activate/deactivate dengan entity `OUTING_TYPE` tanpa PIN.
+- [x] Kekalkan `submitRequest` serta UI production hard-coded.
+
+### eOuting v2.0 — Fasa 4 Admin Dashboard
+
+- [x] Tambah role, panel login dan runtime-only session Admin.
+- [x] Tambah responsive Dashboard active/inactive dengan loading, empty, error dan retry.
+- [x] Tambah controlled create form untuk semua medan konfigurasi.
+- [x] Tambah edit dengan immutable `type_code` dan optimistic config version.
+- [x] Tambah confirmation toggle aktif/nyahaktif tanpa delete.
+- [x] Tambah conflict refresh dan mesej mesra pengguna.
+- [x] Pastikan logout membersihkan PIN/credential runtime dan Admin tidak disimpan ke localStorage.
+- [x] Tambah accessibility labels, focus, disabled dan aria-live states.
 
 ### Core System
 
 - [x] GitHub Pages frontend dan PWA live.
 - [x] Google Apps Script backend dideploy dan disambungkan ke Google Sheets.
 - [x] Pelajar, Warden dan Guard login.
-- [x] Flow `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM` dan `CUTI_SEMESTER`.
+- [x] Flow `OUTING_BIASA`, `OUTING_HUJUNG_MINGGU`, `KECEMASAN`, `PULANG_BERMALAM` dan `CUTI_SEMESTER`.
 - [x] Backend duplicate active request prevention.
 - [x] Warden approve/reject dan Guard confirm keluar/masuk.
 - [x] Telegram notification basic flow dan `AUDIT_LOG`.
@@ -54,7 +86,7 @@ Senarai kerja selepas milestone live **v1.7.0**.
 
 ### Bukti Pulang Asrama v1.7.0
 
-- [x] Bukti selfie pulang untuk `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM` dan `CUTI_SEMESTER`.
+- [x] Bukti selfie pulang untuk `OUTING_BIASA`, `OUTING_HUJUNG_MINGGU`, `KECEMASAN`, `PULANG_BERMALAM` dan `CUTI_SEMESTER`.
 - [x] Kamera depan, preview, ambil semula, resize kira-kira 1280px dan JPEG compression.
 - [x] `submitReturnSelfie` dengan validation pemilikan, `SELESAI`, `masa_masuk`, MIME/base64/saiz.
 - [x] `LockService` duplicate protection dan idempotent rejection.
@@ -84,6 +116,18 @@ Senarai kerja selepas milestone live **v1.7.0**.
 
 ## Near TODO
 
+- [x] Fasa 6: audit beta readiness, metadata, migration/security boundaries serta sediakan rollout dan rollback checklist.
+- [x] Fasa 4.5: Local/Mock QA Admin dengan lima seed, credential development terasing, error/retry dan optimistic conflict.
+- [x] Fasa 4.6: buang duplicate `apiPost` dan kekalkan satu canonical POST router dengan regression coverage.
+- [x] Fasa 5A: config-driven student form rendering dengan safe GET, legacy fallback dan mock QA.
+- [x] Fasa 5B: selaraskan submission/validation config-driven di belakang feature flag dengan fail-closed config resolution dan legacy fallback.
+- [x] Bina `getOutingTypes` dengan kontrak public projection selamat.
+- [x] Bina CRUD backend dan Dashboard Admin pada fasa berasingan.
+- [ ] Aktifkan config-driven submission hanya selepas live migration, feature flag dan rollback diuji/diluluskan.
+- [ ] Bump metadata secara atomik kepada `v2.0.0-beta.1` hanya apabila beta hendak diterbitkan.
+- [ ] Sediakan persekitaran beta berasingan atau kelulusan khusus jika menggunakan data production.
+- [ ] Sambungkan `require_selfie` kepada lifecycle sebelum membenarkannya sebagai tetapan operasi.
+- [ ] Jadikan statistik dan label Telegram config-aware sebelum jenis custom dibuka secara umum.
 - [ ] Telegram inline button/link to open Warden/Guard/Pemantauan page.
 - [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Aplikasi`, if still required.
 - [ ] Optional `request_id` deep link/highlight later.

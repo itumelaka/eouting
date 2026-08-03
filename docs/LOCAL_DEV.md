@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v1.7.0**.
+Panduan ini merujuk eOuting ITU **v1.7.1**.
 
 ## Keperluan
 
@@ -22,6 +22,34 @@ Mock mode hanya untuk development/demo dan perlu diaktifkan secara sengaja denga
 
 Dalam mock mode, rekod `SELESAI` yang mempunyai `masa_masuk` boleh menguji UI selfie: pilih/ambil gambar, preview, ambil semula, compression dan loading state. Submission mock menetapkan `selfie_status = SUDAH_HANTAR` serta `masa_selfie` pada rekod local dan tidak memanggil Google Drive atau Telegram. Tiada emulasi Drive atau Telegram local disediakan.
 
+### Admin Dashboard Mock QA
+
+Buka `http://localhost:8080/?mock=1`, pilih `Admin` dan gunakan credential local berikut:
+
+- ID: `ADMIN-MOCK`
+- nama alternatif: `Admin Mock QA`
+- PIN: `2468`
+
+Credential ini hanya dibina apabila query tepat `mock=1` hadir. Tanpa query tersebut, semua action Admin menggunakan GAS live dan credential mock tidak diterima. Mock login response tidak mengandungi PIN; PIN hanya berada dalam runtime tab semasa dan dibersihkan semasa logout.
+
+Lima jenis outing disediakan dalam memory, termasuk `CUTI_SEMESTER` yang tidak aktif untuk QA toggle. Create, edit dan toggle hanya mengubah array memory dan tidak memanggil GAS atau Google Sheets. Refresh page mengembalikan seed asal.
+
+URL senario tambahan:
+
+- `http://localhost:8080/?mock=1&mockAdminError=1` — read pertama gagal sekali; tekan `Cuba Lagi` untuk berjaya.
+- `http://localhost:8080/?mock=1&mockAdminConflict=1` — update/toggle pertama menghasilkan `CONFIG_VERSION_CONFLICT`, kemudian data terkini dimuatkan.
+
+### Student Config Mock QA
+
+Login Pelajar mock menggunakan `Ahmad Hakimi` / `M001`. Data mock menggunakan kelas A2/A3.
+
+- `http://localhost:8080/?mock=1` — empat config aktif; `CUTI_SEMESTER` inactive dan tidak muncul.
+- `http://localhost:8080/?mock=1&mockOutingTypes=optional` — satu jenis tanpa medan wajib untuk menguji hidden/disabled/required false.
+- `http://localhost:8080/?mock=1&mockOutingTypes=empty` — response kosong dan fallback lima legacy types.
+- `http://localhost:8080/?mock=1&mockOutingTypes=error-once` — request pertama gagal, fallback legacy dipaparkan dan `Cuba Lagi` memuatkan config aktif.
+
+Semak Weekend mengisi `22:00` secara read-only. Tukar kepada Pulang Bermalam dan pastikan masa lama dikosongkan. Field tersembunyi mesti `disabled` serta tidak `required`.
+
 ## Automated Tests
 
 Jalankan keseluruhan suite:
@@ -30,7 +58,22 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline release v1.7.0 ialah **59/59 lulus**.
+Baseline release v1.7.1 ialah **60/60 lulus**.
+
+Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
+Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
+Fasa 5A menambah `tests/student-config-form-v200.test.js` untuk loader, dropdown, sorting, inactive filtering, fallback, field mapping, fixed return time dan mock isolation.
+
+Ujian manual Admin Dashboard:
+
+1. buka role Admin dan cuba PIN salah; pastikan mesej generik;
+2. login Admin aktif dan pastikan PIN input kosong;
+3. refresh list dan sahkan active/inactive serta turutan;
+4. buka create, semak semua medan dan batalkan confirmation;
+5. edit row dan pastikan `type_code` read-only serta active tidak boleh diubah;
+6. uji conflict melalui `mockAdminConflict=1` dan pastikan data direfresh;
+7. toggle active/inactive dengan confirmation;
+8. logout dan pastikan refresh browser tidak memulihkan session Admin.
 
 Suite utama:
 
@@ -103,8 +146,8 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## PWA dan Cache
 
-- Semak footer v1.7.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v1.7.0`.
+- Semak footer v1.7.1 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v1.7.1`.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

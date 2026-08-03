@@ -1,6 +1,94 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow live **v1.7.0**.
+Dokumen ini menerangkan flow repo semasa **v1.7.1**.
+
+## Backend Config API v2.0
+
+```text
+Public GET getOutingTypes
+  -> flag false: lima legacy config dari code
+  -> flag true: OUTING_TYPES active sahaja, sort_order, safe projection
+
+Admin POST loginAdmin / getAdminOutingTypes
+  -> admin_id atau nama_admin + PIN
+  -> ADMIN_USERS status AKTIF
+
+Admin POST create/update/toggle
+  -> credential validation
+  -> LockService
+  -> backend field validation
+  -> optimistic config_version untuk update/toggle
+  -> OUTING_TYPES
+  -> AUDIT_LOG entity OUTING_TYPE
+```
+
+Tiada delete flow. `type_code` immutable. Fasa 5A menggunakan public projection untuk rendering borang Pelajar. Fasa 5B menambah validation config-driven pada `submitRequest`, tetapi laluan itu hanya boleh dicapai apabila `OUTING_CONFIG_V2_ENABLED` tepat `"true"`; default dan production semasa kekal pada validator legacy.
+
+## Backend Submission Config — Fasa 5B
+
+```text
+submitRequest
+  -> flag false: jalankan whitelist dan validator legacy tanpa OUTING_TYPES
+  -> flag true: resolve row OUTING_TYPES daripada type_code
+       -> type mesti active dan schema lengkap/sah
+       -> allowed_days + application window
+       -> tarikh/masa server-side + fixed_return_time + same_day_only
+       -> required fields menurut config
+  -> semak pelajar aktif
+  -> duplicate request protection sedia ada
+  -> simpan OUTING_REQUESTS + audit minimum + Telegram
+```
+
+`fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN` dengan identiti sistem `AUTO_CONFIG_V2`. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
+
+## Student Form Config Rendering — Fasa 5A
+
+```text
+Pelajar login / student form dibuka
+  -> GET getOutingTypes
+  -> active sahaja + sort_order
+  -> bina dropdown type_code/display_name
+  -> apply visibility, required dan disabled state
+  -> same_day_only sync tarikh
+  -> fixed_return_time isi dan lock masa
+
+GET gagal atau config kosong
+  -> lima legacy config dalam memory
+  -> OUTING_HUJUNG_MINGGU kekal Sabtu/Ahad + 22:00
+  -> retry tersedia untuk kegagalan request
+```
+
+Hidden field dikosongkan apabila tidak lagi relevan dan sentiasa disabled. Rendering ini tidak menukar payload contract atau backend `submitRequest`.
+
+## Admin Dashboard v2.0 — Fasa 4
+
+```text
+Pilih Admin
+  -> isi admin_id atau nama_admin + PIN
+  -> POST loginAdmin
+  -> credential disimpan dalam memory runtime sahaja
+  -> buka Admin Dashboard
+  -> POST getAdminOutingTypes
+
+Tambah
+  -> form semua medan config
+  -> confirmation
+  -> POST createOutingType
+  -> refresh list
+
+Edit
+  -> type_code read-only, active tiada dalam form edit
+  -> expected_config_version
+  -> POST updateOutingType
+  -> refresh list
+
+Aktif/Nyahaktif
+  -> confirmation + expected_config_version
+  -> POST toggleOutingType
+  -> refresh list
+```
+
+Jika backend memulangkan `CONFIG_VERSION_CONFLICT`, editor ditutup, data terkini direfresh dan Admin diminta membuka Edit semula. Logout mengosongkan credential runtime dan PIN input. Tiada “ingat peranti” untuk Admin.
 
 ## Lifecycle Rekod
 
@@ -20,7 +108,7 @@ KELUAR
 ```text
 Pelajar pilih nama + masukkan no_matrik
   -> backend sahkan student_id + no_matrik dari STUDENTS
-  -> Pelajar hantar OUTING_BIASA / KECEMASAN / PULANG_BERMALAM / CUTI_SEMESTER
+  -> Pelajar hantar OUTING_BIASA / OUTING_HUJUNG_MINGGU / KECEMASAN / PULANG_BERMALAM / CUTI_SEMESTER
   -> backend halang duplicate active request
   -> MENUNGGU_KELULUSAN + Telegram
 Warden login nama + PIN
@@ -46,7 +134,7 @@ Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown me
 
 Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords`. Active request menghalang permohonan baharu sehingga selesai atau ditolak.
 
-Selepas Guard mengesahkan masuk, bukti selfie pulang diwajibkan untuk keempat-empat jenis permohonan. Sebelum submission, dashboard menunjukkan `Bukti Selfie Belum Dihantar`. Selepas berjaya, action upload hilang dan dashboard menunjukkan `Bukti Selfie Dihantar` bersama `Masa Bukti`.
+Selepas Guard mengesahkan masuk, bukti selfie pulang diwajibkan untuk kelima-lima jenis permohonan. Sebelum submission, dashboard menunjukkan `Bukti Selfie Belum Dihantar`. Selepas berjaya, action upload hilang dan dashboard menunjukkan `Bukti Selfie Dihantar` bersama `Masa Bukti`.
 
 ## Warden
 
@@ -101,7 +189,7 @@ Submission kedua selepas kejayaan ditolak dengan mesej bahawa bukti telah dihant
 
 - 🟡 Menunggu Kelulusan
 - 🟢 Diluluskan
-- 🚶 Sedang Keluar untuk `OUTING_BIASA` atau `KECEMASAN` + `KELUAR`
+- 🚶 Sedang Keluar untuk `OUTING_BIASA`, `OUTING_HUJUNG_MINGGU` atau `KECEMASAN` + `KELUAR`
 - 🌙 Sedang Bermalam untuk `PULANG_BERMALAM` + `KELUAR`
 - 🏖️ Sedang Bercuti untuk `CUTI_SEMESTER` + `KELUAR`
 - ✅ Sudah Pulang
@@ -135,6 +223,19 @@ Paparan hanya mempunyai kad ringkasan dan `Senarai Status Semasa`. Setiap baris 
 ## Statistik
 
 `getOutingStats` memulangkan agregat sahaja. Statistik tidak memaparkan leaderboard individu atau row rekod mentah.
+
+## Local Mock QA Admin
+
+```text
+?mock=1
+  -> bina satu credential Admin QA dan lima OUTING_TYPES dalam memory
+  -> apiPost memintas lima action Admin sahaja
+  -> login/list/create/update/toggle diproses tanpa fetch atau GAS
+  -> logout kosongkan credential runtime
+  -> refresh page reset data mock
+```
+
+Tanpa `mock=1`, cabang mock tidak boleh dicapai dan `apiPost` meneruskan request ke GAS. `mockAdminError=1` menggagalkan read pertama untuk menguji error/retry; `mockAdminConflict=1` menggagalkan write pertama dengan conflict version dan memaksa refresh data.
 
 ## Prinsip Keselamatan
 
