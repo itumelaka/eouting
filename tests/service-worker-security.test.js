@@ -9,9 +9,9 @@ const workerSource = fs.readFileSync(path.join(root, "service-worker.js"), "utf8
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
-const EXPECTED_VERSION = "1.7.0";
-const EXPECTED_RELEASE_DATE = "2026-07-26";
-const EXPECTED_RELEASE_NOTE = "Bukti selfie pulang asrama untuk semua jenis permohonan dengan kamera depan, preview, simpanan Google Drive, penghantaran Telegram dan status pelajar.";
+const EXPECTED_VERSION = "1.7.1";
+const EXPECTED_RELEASE_DATE = "2026-08-02";
+const EXPECTED_RELEASE_NOTE = "Tambah Outing Sabtu / Ahad dengan tarikh wajib Sabtu atau Ahad, pulang hari yang sama sebelum atau pada 10:00 malam, semakan lewat, kelulusan Warden & HEP, pengesahan Guard dan sokongan Telegram.";
 
 function createWorker(cacheNames = []) {
   const listeners = {};

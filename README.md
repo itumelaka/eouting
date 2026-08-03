@@ -2,7 +2,7 @@
 
 eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Status live semasa: **v1.7.0 — Bukti Pulang Asrama**.
+Versi repo semasa: **v1.7.1 — Outing Sabtu / Ahad**.
 
 - Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
 - Backend: Google Apps Script (GAS) Web App
@@ -33,6 +33,7 @@ Frontend mengurus paparan, kamera dan pemampatan gambar. GAS menguatkuasakan log
 ## Jenis Permohonan
 
 - `OUTING_BIASA`
+- `OUTING_HUJUNG_MINGGU`
 - `KECEMASAN`
 - `PULANG_BERMALAM`
 - `CUTI_SEMESTER`
@@ -53,6 +54,7 @@ Pelajar hantar permohonan
 Bukti selfie pulang diwajibkan selepas Guard mengesahkan masuk untuk semua jenis permohonan:
 
 - `OUTING_BIASA`
+- `OUTING_HUJUNG_MINGGU`
 - `KECEMASAN`
 - `PULANG_BERMALAM`
 - `CUTI_SEMESTER`
@@ -67,7 +69,7 @@ Backend menyimpan nilai status asal seperti `KELUAR`. Frontend memaparkan label 
 |---|---|
 | Menunggu kelulusan | 🟡 Menunggu Kelulusan |
 | Diluluskan | 🟢 Diluluskan |
-| `OUTING_BIASA` / `KECEMASAN` + `KELUAR` | 🚶 Sedang Keluar |
+| `OUTING_BIASA` / `OUTING_HUJUNG_MINGGU` / `KECEMASAN` + `KELUAR` | 🚶 Sedang Keluar |
 | `PULANG_BERMALAM` + `KELUAR` | 🌙 Sedang Bermalam |
 | `CUTI_SEMESTER` + `KELUAR` | 🏖️ Sedang Bercuti |
 | Sudah pulang | ✅ Sudah Pulang |
@@ -131,7 +133,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline production v1.7.0 ialah **59/59 lulus**. Syntax checks:
+Baseline repo v1.7.1 ialah **60/60 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -154,9 +156,9 @@ Backend GAS:
 2. jalankan `setupSelfieProofV170()` sekali dan sahkan `SELFIE_FOLDER_ID`;
 3. sahkan Script Properties Telegram;
 4. deploy Web App version baharu sambil mengekalkan URL;
-5. publish frontend dan semak footer/popup v1.7.0;
+5. publish frontend dan semak footer/popup versi semasa;
 6. jalankan ujian hujung-ke-hujung.
 
-Production semasa menggunakan GAS **Version 21**, dideploy pada **26 Jul 2026**. Pull Request #1 telah digabungkan ke `main` pada merge commit `beec1e0` daripada feature commit `21996a2`.
+Deployment GAS v1.7.0 yang terakhir didokumenkan menggunakan **Version 21**, dideploy pada **26 Jul 2026**. Pull Request #2 untuk v1.7.1 telah digabungkan ke `main` pada merge commit `fa7227e` daripada feature commit `1e6303c`.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).
