@@ -47,6 +47,10 @@
             <strong>Guard</strong>
             <span>Sahkan keluar dan masuk pelajar di pos guard.</span>
           </button>
+          <button class="role-card" type="button" data-role-choice="admin">
+            <strong>Admin</strong>
+            <span>Urus tetapan jenis outing eOuting v2.0.</span>
+          </button>
         </div>
 
         <form class="access-panel" id="studentLoginPanel">
@@ -90,6 +94,18 @@
 
           <button class="primary-action" type="submit">Masuk sebagai Guard</button>
         </form>
+
+        <form class="access-panel" id="adminLoginPanel" autocomplete="off">
+          <h3>Masuk sebagai Admin</h3>
+          <label for="adminIdentityInput">ID atau Nama Admin</label>
+          <input id="adminIdentityInput" type="text" autocomplete="username" required>
+
+          <label for="adminPinInput">PIN</label>
+          <input id="adminPinInput" type="password" inputmode="numeric" autocomplete="current-password" required>
+
+          <button class="primary-action" id="adminLoginButton" type="submit">Masuk sebagai Admin</button>
+          <p class="form-message" id="adminLoginMessage" aria-live="polite"></p>
+        </form>
       </section>
 
       <section class="app-workspace" id="appWorkspace">
@@ -131,6 +147,10 @@
             <option value="PULANG_BERMALAM">Pulang Bermalam</option>
             <option value="CUTI_SEMESTER">Cuti Semester</option>
           </select>
+          <div id="studentOutingTypesState" class="student-config-state" aria-live="polite">
+            <small id="studentOutingTypesMessage"></small>
+            <button id="studentOutingTypesRetryButton" class="secondary-action" type="button" hidden>Cuba Lagi</button>
+          </div>
 
           <label for="purposeInput">Tujuan Outing</label>
           <textarea id="purposeInput" rows="3" placeholder="Contoh: membeli barang keperluan" required></textarea>
@@ -260,6 +280,100 @@
 
         <h3 class="list-title">Rekod Outing Hari Ini</h3>
         <div class="record-list" id="allRecordsList"></div>
+        </section>
+
+        <section class="tab-panel admin-dashboard" id="admin" aria-labelledby="adminDashboardTitle">
+          <div class="section-heading admin-dashboard-heading">
+            <div>
+              <h2 id="adminDashboardTitle">Admin Tetapan Outing</h2>
+              <p>Urus konfigurasi jenis outing tanpa mengubah kod permohonan production.</p>
+            </div>
+            <div class="admin-heading-actions">
+              <button class="secondary-action" id="adminRefreshButton" type="button">Refresh</button>
+              <button class="primary-action" id="adminAddTypeButton" type="button">+ Tambah Jenis</button>
+            </div>
+          </div>
+
+          <p class="form-message admin-dashboard-message" id="adminDashboardMessage" aria-live="polite"></p>
+          <div class="admin-type-list" id="adminTypeList" aria-live="polite"></div>
+
+          <section class="admin-editor" id="adminTypeEditor" hidden aria-labelledby="adminEditorTitle">
+            <div class="admin-editor-heading">
+              <div>
+                <h3 id="adminEditorTitle">Tambah Jenis Outing</h3>
+                <p>Validation frontend membantu UX; GAS kekal source of truth.</p>
+              </div>
+              <button class="secondary-action" id="adminEditorCancelButton" type="button">Batal</button>
+            </div>
+
+            <form id="adminOutingTypeForm" class="admin-config-form">
+              <input id="adminConfigVersionInput" type="hidden" value="">
+
+              <div class="admin-form-grid">
+                <label>Type Code
+                  <input id="adminTypeCodeInput" type="text" maxlength="50" pattern="[A-Z][A-Z0-9_]{2,49}" required>
+                </label>
+                <label>Nama Paparan
+                  <input id="adminDisplayNameInput" type="text" maxlength="100" required>
+                </label>
+                <label class="admin-field-wide">Penerangan
+                  <textarea id="adminDescriptionInput" rows="3" maxlength="500"></textarea>
+                </label>
+                <label>Turutan Paparan
+                  <input id="adminSortOrderInput" type="number" min="1" max="9999" step="1" required>
+                </label>
+                <label id="adminActiveField">Status Awal
+                  <select id="adminActiveInput">
+                    <option value="true">Aktif</option>
+                    <option value="false">Tidak Aktif</option>
+                  </select>
+                </label>
+                <label>Masa Permohonan Dibuka
+                  <input id="adminOpenTimeInput" type="time">
+                </label>
+                <label>Masa Permohonan Ditutup
+                  <input id="adminCloseTimeInput" type="time">
+                </label>
+                <label>Masa Pulang Tetap
+                  <input id="adminFixedReturnTimeInput" type="time">
+                </label>
+              </div>
+
+              <fieldset class="admin-config-fieldset">
+                <legend>Hari Dibenarkan</legend>
+                <div class="admin-checkbox-grid" id="adminAllowedDays">
+                  <label><input type="checkbox" value="AHAD"> Ahad</label>
+                  <label><input type="checkbox" value="ISNIN"> Isnin</label>
+                  <label><input type="checkbox" value="SELASA"> Selasa</label>
+                  <label><input type="checkbox" value="RABU"> Rabu</label>
+                  <label><input type="checkbox" value="KHAMIS"> Khamis</label>
+                  <label><input type="checkbox" value="JUMAAT"> Jumaat</label>
+                  <label><input type="checkbox" value="SABTU"> Sabtu</label>
+                </div>
+              </fieldset>
+
+              <fieldset class="admin-config-fieldset">
+                <legend>Peraturan dan Medan Wajib</legend>
+                <div class="admin-checkbox-grid admin-rule-grid">
+                  <label><input id="adminSameDayInput" type="checkbox"> Pulang hari sama</label>
+                  <label><input id="adminRequireLeaveDateInput" type="checkbox"> Tarikh keluar</label>
+                  <label><input id="adminRequireReturnDateInput" type="checkbox"> Tarikh balik</label>
+                  <label><input id="adminRequireReturnTimeInput" type="checkbox"> Masa balik</label>
+                  <label><input id="adminRequireGuardianPhoneInput" type="checkbox"> Telefon waris</label>
+                  <label><input id="adminRequireGuardianRelationInput" type="checkbox"> Hubungan waris</label>
+                  <label><input id="adminRequireEmergencyReasonInput" type="checkbox"> Sebab kecemasan</label>
+                  <label><input id="adminRequirePurposeInput" type="checkbox"> Tujuan</label>
+                  <label><input id="adminRequireLocationInput" type="checkbox"> Lokasi</label>
+                  <label><input id="adminRequireVehicleInput" type="checkbox"> Kenderaan</label>
+                  <label><input id="adminRequireWardenApprovalInput" type="checkbox"> Kelulusan Warden</label>
+                  <label><input id="adminRequireSelfieInput" type="checkbox"> Selfie pulang</label>
+                </div>
+              </fieldset>
+
+              <p class="form-message" id="adminEditorMessage" aria-live="polite"></p>
+              <button class="primary-action" id="adminSaveTypeButton" type="submit">Simpan Jenis Outing</button>
+            </form>
+          </section>
         </section>
       </section>
 

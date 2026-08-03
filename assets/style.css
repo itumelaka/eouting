@@ -17,6 +17,230 @@
   --shadow: 0 12px 30px rgba(3, 18, 47, 0.1);
 }
 
+.student-config-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 1.5rem;
+}
+
+.student-config-state small {
+  color: var(--muted, #526078);
+}
+
+.student-config-state small.error {
+  color: var(--danger, #b42318);
+}
+
+.student-config-state .secondary-action {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.75rem;
+}
+
+.admin-dashboard {
+  min-width: 0;
+}
+
+.admin-dashboard-heading,
+.admin-editor-heading,
+.admin-type-card-heading,
+.admin-type-actions,
+.admin-heading-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.admin-heading-actions,
+.admin-type-actions {
+  justify-content: flex-start;
+}
+
+.admin-dashboard-message,
+.admin-editor .form-message {
+  min-height: 1.5em;
+}
+
+.form-message.error,
+.admin-dashboard-message.error {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.admin-type-list {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-type-card,
+.admin-editor {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+  padding: 16px;
+}
+
+.admin-type-card.is-inactive {
+  background: #f5f6f8;
+  opacity: 0.88;
+}
+
+.admin-type-card h3,
+.admin-editor h3 {
+  margin-bottom: 2px;
+}
+
+.admin-type-card small {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.admin-type-meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0;
+}
+
+.admin-type-meta div {
+  background: #f4f7fb;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.admin-type-meta dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.admin-type-meta dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-editor {
+  margin-top: 18px;
+}
+
+.admin-editor[hidden],
+#adminActiveField[hidden] {
+  display: none;
+}
+
+.admin-config-form,
+.admin-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-form-grid label,
+.admin-config-form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-field-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-config-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 0;
+  min-width: 0;
+  padding: 12px;
+}
+
+.admin-config-fieldset legend {
+  color: var(--primary-dark);
+  font-weight: 700;
+  padding: 0 6px;
+}
+
+.admin-checkbox-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-checkbox-grid label {
+  align-items: center;
+  background: #f4f7fb;
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  padding: 9px;
+}
+
+.admin-checkbox-grid input {
+  flex: 0 0 auto;
+  height: 18px;
+  width: 18px;
+}
+
+.danger-action {
+  background: #fff0f0;
+  border: 1px solid #e4a2a5;
+  border-radius: 6px;
+  color: #9e1117;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 10px 14px;
+}
+
+.admin-dashboard button:focus-visible,
+.admin-dashboard input:focus-visible,
+.admin-dashboard select:focus-visible,
+.admin-dashboard textarea:focus-visible,
+#adminLoginPanel button:focus-visible,
+#adminLoginPanel input:focus-visible {
+  outline: 3px solid rgba(22, 90, 159, 0.35);
+  outline-offset: 2px;
+}
+
+.admin-dashboard button:disabled,
+#adminLoginPanel button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+@media (max-width: 760px) {
+  .admin-type-list,
+  .admin-form-grid,
+  .admin-checkbox-grid,
+  .admin-type-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard-heading,
+  .admin-editor-heading,
+  .admin-heading-actions,
+  .admin-type-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-dashboard-heading button,
+  .admin-editor-heading button,
+  .admin-type-actions button {
+    width: 100%;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
