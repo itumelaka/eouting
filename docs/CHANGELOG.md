@@ -2,6 +2,14 @@
 
 ## v2.0.0-beta.1 — Unreleased
 
+### Admin Student Management beta
+
+- Menambah sub-tab Admin `Tetapan Outing` dan `Pengurusan Pelajar` sambil mengekalkan CRUD outing config sedia ada.
+- Menambah POST Admin `getAdminStudents`, `createStudent`, `updateStudent` dan `toggleStudentStatus` dengan authentication, lock, duplicate protection dan audit.
+- Mengurus schema STUDENTS sedia ada tanpa migration atau version column; `student_id` immutable dan nilai no. matrik/telefon kekal teks.
+- Menambah kelas `LI` untuk Pelajar Latihan Industri (LI). LI muncul dalam pilihan login Pelajar hanya apabila rekod LI aktif wujud dan tidak menjadi role landing baharu.
+- Nyahaktif pelajar mengeluarkan rekod daripada public `getStudents` tanpa memadam sejarah `OUTING_REQUESTS`.
+
 - **Schema staging:** menambah `OUTING_TYPES` dan `ADMIN_USERS` tanpa menyambungkannya kepada router API atau frontend.
 - **Migration:** menambah `setupAdminOutingConfigV200()` yang idempotent, mencipta header dan seed lima jenis outing v1.7.1 sekali sahaja.
 - **Audit:** menambah `entity_type` dan `entity_id` selepas enam kolum legacy `AUDIT_LOG` tanpa menyusun semula data lama.

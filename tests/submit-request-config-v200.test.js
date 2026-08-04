@@ -162,7 +162,11 @@ test("flag true resolves type_code case-insensitively from OUTING_TYPES", () => 
 });
 
 test("submitRequest uses the active Sheet config, auto-approval rule and existing duplicate guard", () => {
-  const row = completeConfig({ require_warden_approval: false, fixed_return_time: "22:00" });
+  const row = completeConfig({
+    allowed_days: "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU",
+    require_warden_approval: false,
+    fixed_return_time: "22:00"
+  });
   const context = createContext({ featureEnabled: true, rows: [row] });
   const payload = {
     student_id: "A3-001",

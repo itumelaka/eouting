@@ -229,8 +229,8 @@ Paparan hanya mempunyai kad ringkasan dan `Senarai Status Semasa`. Setiap baris 
 ```text
 ?mock=1
   -> bina satu credential Admin QA dan lima OUTING_TYPES dalam memory
-  -> apiPost memintas lima action Admin sahaja
-  -> login/list/create/update/toggle diproses tanpa fetch atau GAS
+  -> apiPost memintas sembilan action Admin outing/pelajar sahaja
+  -> login dan list/create/update/toggle outing/pelajar diproses tanpa fetch atau GAS
   -> logout kosongkan credential runtime
   -> refresh page reset data mock
 ```
@@ -245,3 +245,7 @@ Tanpa `mock=1`, cabang mock tidak boleh dicapai dan `apiPost` meneruskan request
 - Public Monitoring tidak boleh mengubah status.
 - API/GAS tidak dicache oleh service worker.
 - Imej selfie dan metadata private tidak dipaparkan oleh Public Monitoring atau dicache sebagai response sensitif.
+
+## Admin — Pengurusan Pelajar Beta
+
+`Admin login -> Pengurusan Pelajar -> getAdminStudents/createStudent/updateStudent/toggleStudentStatus` menggunakan POST dan credential Admin runtime sedia ada. Tetapan Outing kekal pada sub-tab berasingan. Status `TIDAK AKTIF` menyebabkan rekod tidak lagi dipulangkan oleh public `getStudents`, tanpa mengubah `OUTING_REQUESTS` atau sejarah outing. LI ialah nilai `kelas` dalam STUDENTS, bukan role login baharu.

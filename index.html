@@ -28,10 +28,14 @@
       <section class="access-screen" id="accessScreen">
         <div class="section-heading access-heading">
           <img class="access-logo" src="assets/pwa-logo.png" alt="" aria-hidden="true">
-          <div>
+          <div class="access-heading-copy">
             <h2>Masuk Sistem</h2>
             <p>Sila pilih peranan anda.</p>
           </div>
+          <button class="admin-management-button" type="button" data-role-choice="admin">
+            <span class="admin-management-mark" aria-hidden="true"></span>
+            <strong>Admin</strong>
+          </button>
         </div>
 
         <div class="role-grid" id="roleGrid">
@@ -47,10 +51,6 @@
             <strong>Guard</strong>
             <span>Sahkan keluar dan masuk pelajar di pos guard.</span>
           </button>
-          <button class="role-card" type="button" data-role-choice="admin">
-            <strong>Admin</strong>
-            <span>Urus tetapan jenis outing eOuting v2.0.</span>
-          </button>
         </div>
 
         <form class="access-panel" id="studentLoginPanel">
@@ -60,6 +60,7 @@
             <div class="student-class-pills" id="studentClassFilter" role="group" aria-label="Pilih kelas pelajar">
               <button class="student-class-pill active" type="button" data-student-class="A2" aria-pressed="true">A2</button>
               <button class="student-class-pill" type="button" data-student-class="A3" aria-pressed="false">A3</button>
+              <button class="student-class-pill" type="button" data-student-class="LI" aria-pressed="false" hidden>LI</button>
             </div>
           </div>
           <label for="studentLoginSelect">Nama Pelajar</label>
@@ -285,19 +286,39 @@
         <section class="tab-panel admin-dashboard" id="admin" aria-labelledby="adminDashboardTitle">
           <div class="section-heading admin-dashboard-heading">
             <div>
-              <h2 id="adminDashboardTitle">Admin Tetapan Outing</h2>
-              <p>Urus konfigurasi jenis outing tanpa mengubah kod permohonan production.</p>
-            </div>
-            <div class="admin-heading-actions">
-              <button class="secondary-action" id="adminRefreshButton" type="button">Refresh</button>
-              <button class="primary-action" id="adminAddTypeButton" type="button">+ Tambah Jenis</button>
+              <h2 id="adminDashboardTitle">Admin eOuting</h2>
+              <p>Urus tetapan outing dan data pelajar beta melalui satu ruang pengurusan.</p>
             </div>
           </div>
 
-          <p class="form-message admin-dashboard-message" id="adminDashboardMessage" aria-live="polite"></p>
-          <div class="admin-type-list" id="adminTypeList" aria-live="polite"></div>
+          <nav class="admin-subnav" role="tablist" aria-label="Bahagian Admin">
+            <button class="admin-subtab active" id="adminOutingTab" type="button" role="tab"
+              aria-selected="true" aria-controls="adminOutingSettingsPanel" data-admin-section="outing">
+              Tetapan Outing
+            </button>
+            <button class="admin-subtab" id="adminStudentsTab" type="button" role="tab"
+              aria-selected="false" aria-controls="adminStudentManagementPanel" data-admin-section="students">
+              Pengurusan Pelajar
+            </button>
+          </nav>
 
-          <section class="admin-editor" id="adminTypeEditor" hidden aria-labelledby="adminEditorTitle">
+          <section class="admin-subpanel active" id="adminOutingSettingsPanel" role="tabpanel"
+            aria-labelledby="adminOutingTab">
+            <div class="admin-section-toolbar">
+              <div>
+                <h3>Tetapan Outing</h3>
+                <p>Urus konfigurasi jenis outing tanpa mengubah kod permohonan production.</p>
+              </div>
+              <div class="admin-heading-actions">
+                <button class="secondary-action" id="adminRefreshButton" type="button">Refresh</button>
+                <button class="primary-action" id="adminAddTypeButton" type="button">+ Tambah Jenis</button>
+              </div>
+            </div>
+
+            <p class="form-message admin-dashboard-message" id="adminDashboardMessage" aria-live="polite"></p>
+            <div class="admin-type-list" id="adminTypeList" aria-live="polite"></div>
+
+            <section class="admin-editor" id="adminTypeEditor" hidden aria-labelledby="adminEditorTitle">
             <div class="admin-editor-heading">
               <div>
                 <h3 id="adminEditorTitle">Tambah Jenis Outing</h3>
@@ -373,12 +394,106 @@
               <p class="form-message" id="adminEditorMessage" aria-live="polite"></p>
               <button class="primary-action" id="adminSaveTypeButton" type="submit">Simpan Jenis Outing</button>
             </form>
+            </section>
+          </section>
+
+          <section class="admin-subpanel" id="adminStudentManagementPanel" role="tabpanel"
+            aria-labelledby="adminStudentsTab" hidden>
+            <div class="admin-section-toolbar admin-student-toolbar">
+              <div>
+                <h3>Pengurusan Pelajar</h3>
+                <p>Urus pelajar A2, A3 dan Pelajar Latihan Industri (LI) dalam tab STUDENTS sedia ada.</p>
+              </div>
+              <div class="admin-heading-actions">
+                <button class="secondary-action" id="adminStudentsRefreshButton" type="button">Refresh</button>
+                <button class="primary-action" id="adminAddStudentButton" type="button">+ Tambah Pelajar</button>
+              </div>
+            </div>
+
+            <div class="admin-student-filters" aria-label="Tapis senarai pelajar">
+              <label>Kelas
+                <select id="adminStudentClassFilter">
+                  <option value="">Semua</option>
+                  <option value="A2">A2</option>
+                  <option value="A3">A3</option>
+                  <option value="LI">LI</option>
+                </select>
+              </label>
+              <label>Status
+                <select id="adminStudentStatusFilter">
+                  <option value="">Semua</option>
+                  <option value="AKTIF">Aktif</option>
+                  <option value="TIDAK AKTIF">Tidak Aktif</option>
+                </select>
+              </label>
+              <label class="admin-student-search">Carian
+                <input id="adminStudentSearchInput" type="search"
+                  placeholder="Cari ID, no. matrik atau nama" autocomplete="off">
+              </label>
+            </div>
+
+            <p class="form-message admin-dashboard-message" id="adminStudentsMessage" aria-live="polite"></p>
+            <div class="admin-student-list" id="adminStudentList" aria-live="polite"></div>
+
+            <section class="admin-editor admin-student-editor" id="adminStudentEditor" hidden
+              aria-labelledby="adminStudentEditorTitle">
+              <div class="admin-editor-heading">
+                <div>
+                  <h3 id="adminStudentEditorTitle">Tambah Pelajar</h3>
+                  <p>student_id kekal dan tidak boleh diubah selepas pelajar dicipta.</p>
+                </div>
+                <button class="secondary-action" id="adminStudentEditorCancelButton" type="button">Batal</button>
+              </div>
+
+              <form id="adminStudentForm" class="admin-config-form" autocomplete="off">
+                <div class="admin-form-grid admin-student-form-grid">
+                  <label>Student ID
+                    <input id="adminStudentIdInput" name="student_id" type="text" maxlength="100" required>
+                  </label>
+                  <label>No. Matrik
+                    <input id="adminStudentMatricInput" name="no_matrik" type="text" maxlength="100" required>
+                  </label>
+                  <label class="admin-field-wide">Nama
+                    <input id="adminStudentNameInput" name="nama" type="text" maxlength="200" required>
+                  </label>
+                  <label>Email
+                    <input id="adminStudentEmailInput" name="email" type="email" maxlength="200">
+                  </label>
+                  <label>No. Telefon
+                    <input id="adminStudentPhoneInput" name="no_tel" type="text" inputmode="tel" maxlength="50">
+                  </label>
+                  <label>Kelas
+                    <select id="adminStudentClassInput" name="kelas" required>
+                      <option value="A2">A2</option>
+                      <option value="A3">A3</option>
+                      <option value="LI">LI — Pelajar Latihan Industri</option>
+                    </select>
+                  </label>
+                  <label>Jantina
+                    <input id="adminStudentGenderInput" name="jantina" type="text" maxlength="50"
+                      placeholder="Contoh: Lelaki / Perempuan">
+                  </label>
+                  <label>Status
+                    <select id="adminStudentStatusInput" name="status" required>
+                      <option value="AKTIF">Aktif</option>
+                      <option value="TIDAK AKTIF">Tidak Aktif</option>
+                    </select>
+                  </label>
+                  <label class="admin-field-wide">Catatan
+                    <textarea id="adminStudentNoteInput" name="catatan" rows="3" maxlength="500"></textarea>
+                  </label>
+                </div>
+                <p class="form-message" id="adminStudentEditorMessage" aria-live="polite"></p>
+                <button class="primary-action" id="adminSaveStudentButton" type="submit">Simpan Pelajar</button>
+              </form>
+            </section>
           </section>
         </section>
       </section>
 
       <footer class="app-footer">
         <span id="appVersionText">eOuting ITU • v1.7.1</span>
+        <span class="beta-api-indicator" id="betaApiIndicator" hidden>BETA API</span>
       </footer>
     </main>
 

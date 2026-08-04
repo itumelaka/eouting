@@ -142,3 +142,13 @@ Untuk submission config-driven, audit `SUBMIT_REQUEST` hanya menambah `config_ve
 - Jangan publish sheet kepada public.
 - Jangan simpan token, secret, PIN sebenar atau deployment credential dalam repo.
 - Semua identity, status, PIN dan action permission mesti disahkan di GAS, bukan melalui paparan frontend.
+
+## STUDENTS dan Pelajar LI
+
+Pengurusan Pelajar v2 beta menggunakan schema STUDENTS sedia ada tanpa migration:
+
+```text
+student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan
+```
+
+`kelas` dibenarkan ialah A2, A3 atau LI; LI bermaksud Pelajar Latihan Industri (LI). `student_id` immutable dan unik, manakala `no_matrik` juga unik. Nilai no. matrik dan no. telefon dirawat sebagai teks untuk mengekalkan sifar di hadapan. Tiada kolum version ditambah; write serentak dilindungi dengan `LockService` dan duplicate recheck.

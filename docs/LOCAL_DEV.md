@@ -50,6 +50,48 @@ Login Pelajar mock menggunakan `Ahmad Hakimi` / `M001`. Data mock menggunakan ke
 
 Semak Weekend mengisi `22:00` secara read-only. Tukar kepada Pulang Bermalam dan pastikan masa lama dikosongkan. Field tersembunyi mesti `disabled` serta tidak `required`.
 
+### Localhost Beta GAS QA
+
+Gunakan override ini hanya untuk menghubungkan frontend localhost kepada deployment GAS beta. Endpoint production kekal default dan query `api` sengaja diabaikan pada GitHub Pages atau hostname selain `localhost`/`127.0.0.1`.
+
+Jalankan static server dari root repo:
+
+```powershell
+py -m http.server 8080
+```
+
+URL pembukaan pertama:
+
+```text
+http://localhost:8080/?api=<URL-ENCODED-BETA-GAS-WEB-APP-URL>
+```
+
+Nilai URL GAS beta mesti di-URL-encode sepenuhnya. Jangan letakkan PIN, token Telegram atau credential lain dalam query string. Selepas URL beta diterima, endpoint disimpan dalam `sessionStorage` untuk tab localhost itu sahaja. Reload tanpa query masih menggunakan endpoint sesi; menutup tab membersihkan override sesi. Override yang mempunyai protocol bukan HTTPS, domain selain `script.google.com`, path bukan `/macros/s/.../exec`, query tambahan atau fragment akan ditolak dan frontend kembali kepada endpoint production.
+
+Apabila override aktif, footer menunjukkan label `BETA API` sahaja. URL GAS penuh tidak dipaparkan. Jangan jalankan ujian ini melalui URL GitHub Pages production.
+
+Ujian Admin beta:
+
+1. buka URL localhost beta dan pastikan label `BETA API` kelihatan;
+2. pilih role Admin;
+3. masukkan `ADMIN-BETA-01`;
+4. baca PIN secara manual daripada tab `ADMIN_USERS` dalam Spreadsheet beta dan taip ke form;
+5. cuba PIN salah dahulu dan pastikan mesej generik `ID atau nama Admin atau PIN tidak sah`;
+6. login dengan PIN beta yang betul dan pastikan input PIN dikosongkan;
+7. semak lima seed, refresh, create/edit/toggle dan conflict handling pada beta sahaja;
+8. logout dan pastikan credential runtime serta senarai Admin dibersihkan.
+
+Backend semasa belum mengeluarkan session token Admin. PIN yang ditaip disimpan hanya dalam memory runtime tab untuk menghantar authenticated Admin POST berikutnya; ia tidak disimpan dalam `localStorage`, `sessionStorage`, URL atau log. Logout membersihkan credential runtime tersebut.
+
+Dengan `OUTING_CONFIG_V2_ENABLED=false`, jangkaan yang betul ialah:
+
+- authentication Admin serta Admin read/create/update/toggle masih boleh berfungsi untuk menyediakan konfigurasi beta;
+- public `getOutingTypes` memulangkan fallback lima jenis legacy;
+- `submitRequest` terus menggunakan validation legacy;
+- konfigurasi v2 belum menjadi production flow.
+
+Jangan aktifkan feature flag hanya untuk membuka atau memuatkan Admin Dashboard. `TELEGRAM_ENABLED` juga mesti kekal `false` sepanjang connection test ini.
+
 ## Automated Tests
 
 Jalankan keseluruhan suite:
@@ -160,3 +202,25 @@ git diff
 ```
 
 Jangan commit token, secret, PIN sebenar, API key atau deployment credential. Untuk backend, `clasp push` mesti diikuti deployment Web App version baharu.
+
+## Beta QA — Pengurusan Pelajar LI
+
+Gunakan akaun Admin beta sahaja. Jangan gunakan PIN sebenar dalam Git, nota ujian atau tangkap layar.
+
+1. Buka frontend localhost dengan endpoint GAS beta dan login sebagai Admin.
+2. Pilih sub-tab `Pengurusan Pelajar`; pastikan `Tetapan Outing` masih boleh dibuka semula tanpa kehilangan fungsi CRUD sedia ada.
+3. Tekan `Tambah Pelajar` dan cipta satu rekod sementara:
+   - `student_id`: ID beta unik;
+   - `no_matrik`: nilai unik berbentuk teks (uji nilai bermula sifar);
+   - `nama`: nama ujian yang jelas;
+   - `kelas`: `LI`;
+   - `status`: `AKTIF`.
+4. Semak carian melalui `student_id`, `no_matrik` dan `nama`; semak juga filter `LI` dan `Aktif`.
+5. Log keluar Admin, buka flow `Pelajar` dan sahkan pilihan kelas `LI` muncul kerana sekurang-kurangnya seorang pelajar LI aktif wujud.
+6. Pilih kelas LI, login menggunakan nama dan no. matrik sementara, kemudian sahkan flow Pelajar biasa masih berfungsi.
+7. Login Admin semula, nyahaktifkan pelajar sementara dan refresh flow Pelajar; pilihan/nama LI mesti hilang jika tiada lagi pelajar LI aktif.
+8. Aktifkan semula rekod itu dan sahkan kelas serta nama LI muncul kembali.
+9. Edit nama/no. telefon/catatan dan pastikan `student_id` read-only. Cuba no. matrik yang sudah digunakan dan pastikan backend menolak perubahan.
+10. Semak `AUDIT_LOG` beta untuk `CREATE_STUDENT`, `UPDATE_STUDENT`, `DEACTIVATE_STUDENT` dan `ACTIVATE_STUDENT`; pastikan tiada PIN direkodkan.
+
+STUDENTS tidak menerima kolum version dalam fasa ini. Konflik serentak dikurangkan dengan `LockService` dan semakan duplicate di dalam lock; tiada migration schema diperlukan.

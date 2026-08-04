@@ -153,7 +153,8 @@ Senarai kerja selepas milestone **v1.7.1**.
 - [ ] Automated cleanup selfie selepas retention period.
 - [ ] Telegram retry queue untuk kegagalan sementara.
 - [ ] Refinement notis consent/privacy Pelajar.
-- [ ] Admin page for managing master data.
+- [x] Admin beta page for managing STUDENTS (A2, A3 dan LI) tanpa schema migration.
+- [ ] Nilai sama ada optimistic version column diperlukan untuk STUDENTS selepas beta concurrency QA.
 - [ ] Late-return escalation notification.
 - [ ] Optional WhatsApp notification later if required.
 - [ ] Daily/weekly/monthly report automation.

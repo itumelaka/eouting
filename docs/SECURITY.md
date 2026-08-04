@@ -194,3 +194,11 @@ Selfie dihantar sebagai foto sebenar melalui Telegram `sendPhoto`. Pentadbir ata
 - Evidence review UI, retention selfie dan automated cleanup.
 - Refinement notis consent/privacy Pelajar.
 - Deployment permission dan backup policy yang lebih ketat.
+
+## Pengurusan Pelajar Beta
+
+- Semua read/write Pengurusan Pelajar memerlukan credential Admin aktif dan menggunakan POST.
+- PIN Admin kekal dalam runtime browser sahaja dan tidak dimasukkan dalam response atau audit.
+- Create/update/toggle menggunakan `LockService`; semakan keunikan `student_id` dan `no_matrik` diulang dalam lock.
+- Audit menyimpan identiti Admin, `student_id`, tindakan dan ringkasan medan berubah sahaja.
+- Nyahaktif tidak memadam pelajar atau rekod outing lama; public `getStudents` memang menapis rekod tidak aktif.

@@ -18,6 +18,18 @@ test("mock Admin is enabled only by the explicit mock=1 query", () => {
   assert.match(appSource, /const ALLOW_MOCK_MODE = new URLSearchParams\(window\.location\.search\)\.get\("mock"\) === "1"/);
   assert.match(appSource, /const MOCK_ADMIN_QA = ALLOW_MOCK_MODE\s*\?/);
   assert.match(appSource, /let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE\s*\?/);
+  assert.match(appSource, /let mockAdminStudentsV200 = ALLOW_MOCK_MODE\s*\?/);
+});
+
+test("mock Student Management includes LI and stays within mock transport", () => {
+  const seedSource = sourceBetween("function buildMockAdminStudentsV200", "function buildMockAdminOutingTypesV200");
+  assert.match(seedSource, /kelas: "LI"/);
+  assert.match(seedSource, /status: "TIDAK AKTIF"/);
+  const mockSource = sourceBetween("async function mockAdminApiPostV200", "function cloneMockAdminValueV200");
+  for (const action of ["getAdminStudents", "createStudent", "updateStudent", "toggleStudentStatus"]) {
+    assert.match(mockSource, new RegExp(`action === "${action}"`));
+  }
+  assert.doesNotMatch(mockSource, /fetch\(|GAS_WEB_APP_URL|apiPost\(/);
 });
 
 test("mock Admin has exactly five legacy types including an inactive QA row", () => {
@@ -38,7 +50,7 @@ test("live apiPost cannot use mock credentials and mock writes never call GAS", 
   apiPostDefinitions.forEach((apiPostSource) => {
     assert.match(apiPostSource, /if \(ALLOW_MOCK_MODE && MOCK_ADMIN_ACTIONS_V200\.has\(action\)\)/);
     assert.match(apiPostSource, /return mockAdminApiPostV200\(action, payload\)/);
-    assert.match(apiPostSource, /fetch\(GAS_WEB_APP_URL/);
+    assert.match(apiPostSource, /fetch\(getGasWebAppUrlV200\(\)/);
   });
 
   const mockSource = sourceBetween("async function mockAdminApiPostV200", "function cloneMockAdminValueV200");

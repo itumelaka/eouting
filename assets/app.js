@@ -1,5 +1,92 @@
 const APP_VERSION = "1.7.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
+const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
+
+function isLocalBetaApiHostV200(hostname) {
+  const normalizedHostname = String(hostname || "").trim().toLowerCase();
+  return normalizedHostname === "localhost" || normalizedHostname === "127.0.0.1";
+}
+
+function normalizeBetaApiOverrideV200(value) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  try {
+    const url = new URL(rawValue);
+    const isAllowed = url.protocol === "https:" &&
+      url.hostname === "script.google.com" &&
+      !url.port &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash &&
+      /^\/macros\/s\/[^/]+\/exec$/.test(url.pathname);
+    return isAllowed ? `${url.origin}${url.pathname}` : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function resolveGasWebAppUrlV200(locationLike, storage) {
+  const currentLocation = locationLike || {};
+  const isLocalhost = isLocalBetaApiHostV200(currentLocation.hostname);
+  const productionResult = { url: GAS_WEB_APP_URL, isBeta: false };
+
+  if (!isLocalhost) {
+    try {
+      storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+    } catch (error) {
+      // Storage may be unavailable; production endpoint remains authoritative.
+    }
+    return productionResult;
+  }
+
+  let queryValue = null;
+  try {
+    queryValue = new URLSearchParams(currentLocation.search || "").get("api");
+  } catch (error) {
+    queryValue = null;
+  }
+
+  if (queryValue !== null) {
+    const normalizedQueryUrl = normalizeBetaApiOverrideV200(queryValue);
+    try {
+      if (normalizedQueryUrl) {
+        storage.setItem(BETA_API_OVERRIDE_SESSION_KEY_V200, normalizedQueryUrl);
+      } else {
+        storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+      }
+    } catch (error) {
+      return productionResult;
+    }
+  }
+
+  let storedValue = "";
+  try {
+    storedValue = storage.getItem(BETA_API_OVERRIDE_SESSION_KEY_V200) || "";
+  } catch (error) {
+    return productionResult;
+  }
+
+  const normalizedStoredUrl = normalizeBetaApiOverrideV200(storedValue);
+  if (!normalizedStoredUrl) {
+    try {
+      storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+    } catch (error) {
+      // Invalid/unavailable storage must never prevent the production fallback.
+    }
+    return productionResult;
+  }
+
+  return { url: normalizedStoredUrl, isBeta: true };
+}
+
+const ACTIVE_API_ENDPOINT_V200 = resolveGasWebAppUrlV200(window.location, window.sessionStorage);
+
+function getGasWebAppUrlV200() {
+  return ACTIVE_API_ENDPOINT_V200.url;
+}
+
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
 const MOCK_ADMIN_QA = ALLOW_MOCK_MODE
   ? Object.freeze({ admin_id: "ADMIN-MOCK", nama_admin: "Admin Mock QA", pin: "2468" })
@@ -9,7 +96,11 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "getAdminOutingTypes",
   "createOutingType",
   "updateOutingType",
-  "toggleOutingType"
+  "toggleOutingType",
+  "getAdminStudents",
+  "createStudent",
+  "updateStudent",
+  "toggleStudentStatus"
 ]);
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
 
@@ -102,11 +193,15 @@ let wardenChecklistRecords = [];
 let adminRuntimeCredential = null;
 let adminOutingTypes = [];
 let adminEditingTypeCode = "";
+let adminStudentsV200 = [];
+let adminEditingStudentIdV200 = "";
+let activeAdminSectionV200 = "outing";
 let studentOutingTypesV200 = buildLegacyStudentOutingTypesV200();
 let studentOutingTypesLoadingV200 = false;
 let studentOutingTypesUsingFallbackV200 = true;
 let studentPreviousOutingTypeCodeV200 = "";
 let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE ? buildMockAdminOutingTypesV200() : [];
+let mockAdminStudentsV200 = ALLOW_MOCK_MODE ? buildMockAdminStudentsV200() : [];
 let mockAdminReadErrorPendingV200 = ALLOW_MOCK_MODE
   && new URLSearchParams(window.location.search).get("mockAdminError") === "1";
 let mockAdminConflictPendingV200 = ALLOW_MOCK_MODE
@@ -206,6 +301,10 @@ const els = {
   countNotReturned: document.querySelector("#countNotReturned"),
   countEmergency: document.querySelector("#countEmergency"),
   adminDashboard: document.querySelector("#admin"),
+  adminOutingTab: document.querySelector("#adminOutingTab"),
+  adminStudentsTab: document.querySelector("#adminStudentsTab"),
+  adminOutingSettingsPanel: document.querySelector("#adminOutingSettingsPanel"),
+  adminStudentManagementPanel: document.querySelector("#adminStudentManagementPanel"),
   adminDashboardMessage: document.querySelector("#adminDashboardMessage"),
   adminTypeList: document.querySelector("#adminTypeList"),
   adminRefreshButton: document.querySelector("#adminRefreshButton"),
@@ -239,7 +338,30 @@ const els = {
   adminRequireSelfieInput: document.querySelector("#adminRequireSelfieInput"),
   adminEditorMessage: document.querySelector("#adminEditorMessage"),
   adminSaveTypeButton: document.querySelector("#adminSaveTypeButton"),
+  adminStudentsRefreshButton: document.querySelector("#adminStudentsRefreshButton"),
+  adminAddStudentButton: document.querySelector("#adminAddStudentButton"),
+  adminStudentClassFilter: document.querySelector("#adminStudentClassFilter"),
+  adminStudentStatusFilter: document.querySelector("#adminStudentStatusFilter"),
+  adminStudentSearchInput: document.querySelector("#adminStudentSearchInput"),
+  adminStudentsMessage: document.querySelector("#adminStudentsMessage"),
+  adminStudentList: document.querySelector("#adminStudentList"),
+  adminStudentEditor: document.querySelector("#adminStudentEditor"),
+  adminStudentEditorTitle: document.querySelector("#adminStudentEditorTitle"),
+  adminStudentEditorCancelButton: document.querySelector("#adminStudentEditorCancelButton"),
+  adminStudentForm: document.querySelector("#adminStudentForm"),
+  adminStudentIdInput: document.querySelector("#adminStudentIdInput"),
+  adminStudentMatricInput: document.querySelector("#adminStudentMatricInput"),
+  adminStudentNameInput: document.querySelector("#adminStudentNameInput"),
+  adminStudentEmailInput: document.querySelector("#adminStudentEmailInput"),
+  adminStudentPhoneInput: document.querySelector("#adminStudentPhoneInput"),
+  adminStudentClassInput: document.querySelector("#adminStudentClassInput"),
+  adminStudentGenderInput: document.querySelector("#adminStudentGenderInput"),
+  adminStudentStatusInput: document.querySelector("#adminStudentStatusInput"),
+  adminStudentNoteInput: document.querySelector("#adminStudentNoteInput"),
+  adminStudentEditorMessage: document.querySelector("#adminStudentEditorMessage"),
+  adminSaveStudentButton: document.querySelector("#adminSaveStudentButton"),
   appVersionText: document.querySelector("#appVersionText"),
+  betaApiIndicator: document.querySelector("#betaApiIndicator"),
   dataModeIndicator: null,
   liveRetryButton: null
 };
@@ -261,10 +383,58 @@ function setupAccessEnhancements() {
   setupClayRoleNav();
   setupStaffPinFields();
   setupStudentClassFilter();
+  setupStudentLiClassV200();
   setupStudentOutingTypesV200();
   setupMonitoringPanel();
   setupStatisticsPanel();
   setupAdminDashboardV200();
+}
+
+function setupStudentLiClassV200() {
+  const liButton = document.querySelector('[data-student-class="LI"]');
+  if (liButton && liButton.dataset.liReady !== "1") {
+    liButton.dataset.liReady = "1";
+    liButton.addEventListener("click", () => {
+      selectedStudentLoginClass = "LI";
+      refreshStudentClassChoicesV200();
+    });
+  }
+  refreshStudentClassChoicesV200();
+}
+
+function refreshStudentClassChoicesV200() {
+  if (!els.studentClassFilter) return;
+  const hasLiStudents = students.some((student) => String(student.className || student.kelas || "").trim().toUpperCase() === "LI");
+  const liButton = els.studentClassFilter.querySelector('[data-student-class="LI"]');
+  if (liButton) liButton.hidden = !hasLiStudents;
+  let selectionChanged = false;
+  if (selectedStudentLoginClass === "LI" && !hasLiStudents) {
+    selectedStudentLoginClass = students.some((student) => String(student.className || student.kelas || "").trim().toUpperCase() === "A2")
+      ? "A2"
+      : "A3";
+    selectionChanged = true;
+  }
+  els.studentClassFilter.querySelectorAll("[data-student-class]").forEach((button) => {
+    const active = button.dataset.studentClass === selectedStudentLoginClass;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  if (selectedStudentLoginClass === "LI") renderLiStudentLoginOptionsV200();
+  if (selectionChanged && typeof renderStudentDropdownState === "function") renderStudentDropdownState();
+}
+
+function renderLiStudentLoginOptionsV200() {
+  if (!els.studentLoginSelect) return;
+  const liStudents = students.filter((student) => String(student.className || student.kelas || "").trim().toUpperCase() === "LI");
+  if (!liStudents.length) {
+    els.studentLoginSelect.innerHTML = '<option value="">Tiada pelajar LI ditemui</option>';
+    els.studentLoginSelect.disabled = true;
+    return;
+  }
+  els.studentLoginSelect.innerHTML = '<option value="">Pilih nama pelajar</option>' + liStudents.map((student) =>
+    `<option value="${escapeHtml(student.id || student.student_id || "")}">${escapeHtml(student.name || student.nama || "-")}</option>`
+  ).join("");
+  els.studentLoginSelect.disabled = false;
 }
 
 function showAdminLoginPanelV200() {
@@ -292,6 +462,33 @@ function setupAdminDashboardV200() {
   els.adminEditorCancelButton.addEventListener("click", closeAdminEditorV200);
   els.adminOutingTypeForm.addEventListener("submit", handleAdminTypeSubmitV200);
   els.adminTypeList.addEventListener("click", handleAdminTypeListActionV200);
+  if (els.adminOutingTab) {
+    els.adminOutingTab.addEventListener("click", () => setAdminSectionV200("outing"));
+  }
+  if (els.adminStudentsTab) {
+    els.adminStudentsTab.addEventListener("click", () => setAdminSectionV200("students"));
+  }
+  if (els.adminStudentsRefreshButton) {
+    els.adminStudentsRefreshButton.addEventListener("click", loadAdminStudentsV200);
+  }
+  if (els.adminAddStudentButton) {
+    els.adminAddStudentButton.addEventListener("click", openAdminStudentCreateEditorV200);
+  }
+  if (els.adminStudentEditorCancelButton) {
+    els.adminStudentEditorCancelButton.addEventListener("click", closeAdminStudentEditorV200);
+  }
+  if (els.adminStudentForm) {
+    els.adminStudentForm.addEventListener("submit", handleAdminStudentSubmitV200);
+  }
+  if (els.adminStudentList) {
+    els.adminStudentList.addEventListener("click", handleAdminStudentListActionV200);
+  }
+  [els.adminStudentClassFilter, els.adminStudentStatusFilter].forEach((control) => {
+    if (control) control.addEventListener("change", renderAdminStudentsV200);
+  });
+  if (els.adminStudentSearchInput) {
+    els.adminStudentSearchInput.addEventListener("input", renderAdminStudentsV200);
+  }
   els.adminTypeCodeInput.addEventListener("input", () => {
     if (!els.adminTypeCodeInput.readOnly) {
       els.adminTypeCodeInput.value = els.adminTypeCodeInput.value
@@ -372,6 +569,8 @@ function startAdminSessionV200(admin) {
   els.sessionRole.textContent = "Admin";
   els.sessionName.textContent = admin.nama_admin || admin.admin_id || "Admin";
   closeAdminEditorV200();
+  closeAdminStudentEditorV200();
+  setAdminSectionV200("outing");
   loadAdminOutingTypesV200();
 }
 
@@ -379,12 +578,19 @@ function clearAdminRuntimeCredentialV200() {
   adminRuntimeCredential = null;
   adminOutingTypes = [];
   adminEditingTypeCode = "";
+  adminStudentsV200 = [];
+  adminEditingStudentIdV200 = "";
+  activeAdminSectionV200 = "outing";
   if (els.adminPinInput) els.adminPinInput.value = "";
   if (els.adminIdentityInput) els.adminIdentityInput.value = "";
   if (els.adminTypeList) els.adminTypeList.innerHTML = "";
   if (els.adminDashboardMessage) els.adminDashboardMessage.textContent = "";
   if (els.adminOutingTypeForm) els.adminOutingTypeForm.reset();
   if (els.adminTypeEditor) els.adminTypeEditor.hidden = true;
+  if (els.adminStudentList) els.adminStudentList.innerHTML = "";
+  if (els.adminStudentsMessage) els.adminStudentsMessage.textContent = "";
+  if (els.adminStudentForm) els.adminStudentForm.reset();
+  if (els.adminStudentEditor) els.adminStudentEditor.hidden = true;
   const tabs = document.querySelector(".tabs");
   if (tabs) tabs.hidden = false;
   if (els.ruleNotice) els.ruleNotice.hidden = false;
@@ -412,6 +618,295 @@ function buildAdminCredentialPayloadV200() {
     nama_admin: adminRuntimeCredential.nama_admin || "",
     pin: adminRuntimeCredential.pin
   };
+}
+
+function setAdminSectionV200(section) {
+  const nextSection = section === "students" ? "students" : "outing";
+  activeAdminSectionV200 = nextSection;
+  const isOuting = nextSection === "outing";
+  if (els.adminOutingTab) {
+    els.adminOutingTab.classList.toggle("active", isOuting);
+    els.adminOutingTab.setAttribute("aria-selected", String(isOuting));
+  }
+  if (els.adminStudentsTab) {
+    els.adminStudentsTab.classList.toggle("active", !isOuting);
+    els.adminStudentsTab.setAttribute("aria-selected", String(!isOuting));
+  }
+  if (els.adminOutingSettingsPanel) els.adminOutingSettingsPanel.hidden = !isOuting;
+  if (els.adminStudentManagementPanel) els.adminStudentManagementPanel.hidden = isOuting;
+  if (!isOuting && currentSession && currentSession.role === "admin" && !adminStudentsV200.length) {
+    loadAdminStudentsV200();
+  }
+}
+
+function normalizeAdminStudentV200(student) {
+  const item = student || {};
+  return {
+    student_id: String(item.student_id || "").trim(),
+    no_matrik: String(item.no_matrik || "").trim(),
+    nama: String(item.nama || "").trim(),
+    email: String(item.email || "").trim(),
+    no_tel: String(item.no_tel || "").trim(),
+    kelas: String(item.kelas || "").trim().toUpperCase(),
+    jantina: String(item.jantina || "").trim(),
+    status: String(item.status || "").trim().toUpperCase(),
+    catatan: String(item.catatan || "").trim()
+  };
+}
+
+async function loadAdminStudentsV200() {
+  if (!currentSession || currentSession.role !== "admin" || !els.adminStudentList) return;
+  setAdminStudentsBusyV200(true);
+  setAdminStudentsMessageV200("Memuatkan senarai pelajar...");
+  try {
+    const response = await apiPost("getAdminStudents", buildAdminCredentialPayloadV200());
+    adminStudentsV200 = (Array.isArray(response) ? response : response && response.students || [])
+      .map(normalizeAdminStudentV200);
+    setAdminStudentsMessageV200("");
+    renderAdminStudentsV200();
+  } catch (error) {
+    adminStudentsV200 = [];
+    els.adminStudentList.innerHTML = `
+      <div class="empty-state admin-student-retry-state">
+        <p>Senarai pelajar gagal dimuatkan.</p>
+        <button class="secondary-action" type="button" data-admin-student-retry>Cuba Lagi</button>
+      </div>`;
+    setAdminStudentsMessageV200(safeAdminStudentErrorV200(error, "Senarai pelajar gagal dimuatkan."), true);
+  } finally {
+    setAdminStudentsBusyV200(false);
+  }
+}
+
+function setAdminStudentsBusyV200(isBusy) {
+  [els.adminStudentsRefreshButton, els.adminAddStudentButton].forEach((button) => {
+    if (button) button.disabled = Boolean(isBusy);
+  });
+  if (els.adminStudentsRefreshButton) {
+    els.adminStudentsRefreshButton.textContent = isBusy ? "Memuat..." : "Refresh Pelajar";
+  }
+  if (els.adminStudentList) els.adminStudentList.setAttribute("aria-busy", String(Boolean(isBusy)));
+}
+
+function setAdminStudentsMessageV200(message, isError) {
+  if (!els.adminStudentsMessage) return;
+  els.adminStudentsMessage.textContent = message || "";
+  els.adminStudentsMessage.classList.toggle("error", Boolean(isError));
+}
+
+function safeAdminStudentErrorV200(error, fallback) {
+  const message = String(error && error.message || "");
+  if (/duplicate|sudah digunakan|telah wujud|diperlukan|tidak sah|tidak ditemui/i.test(message)) {
+    return message;
+  }
+  return fallback;
+}
+
+function getFilteredAdminStudentsV200() {
+  const classFilter = els.adminStudentClassFilter ? els.adminStudentClassFilter.value : "all";
+  const statusFilter = els.adminStudentStatusFilter ? els.adminStudentStatusFilter.value : "all";
+  const query = els.adminStudentSearchInput ? els.adminStudentSearchInput.value.trim().toLowerCase() : "";
+  return adminStudentsV200.filter((student) => {
+    const classMatches = !classFilter || classFilter === "all" || student.kelas === classFilter;
+    const statusMatches = !statusFilter || statusFilter === "all" || student.status === statusFilter;
+    const searchMatches = !query || [student.student_id, student.no_matrik, student.nama]
+      .some((value) => String(value || "").toLowerCase().includes(query));
+    return classMatches && statusMatches && searchMatches;
+  });
+}
+
+function renderAdminStudentsV200() {
+  if (!els.adminStudentList) return;
+  const filtered = getFilteredAdminStudentsV200();
+  if (!filtered.length) {
+    els.adminStudentList.innerHTML = '<div class="empty-state">Tiada pelajar sepadan dengan tapisan.</div>';
+    return;
+  }
+  els.adminStudentList.innerHTML = filtered.map(adminStudentCardV200).join("");
+}
+
+function adminStudentCardV200(student) {
+  const isActive = student.status === "AKTIF";
+  const liBadge = student.kelas === "LI"
+    ? '<span class="student-li-badge" aria-label="Pelajar Latihan Industri (LI)">LI</span>'
+    : "";
+  const contact = [student.email, student.no_tel].filter(Boolean).map(escapeHtml).join(" · ") || "Tiada maklumat hubungan";
+  return `
+    <article class="admin-student-card ${isActive ? "is-active" : "is-inactive"}">
+      <div class="admin-student-card-heading">
+        <div>
+          <div class="admin-student-code-row">
+            <span class="admin-student-id">${escapeHtml(student.student_id)}</span>
+            ${liBadge}
+          </div>
+          <h4>${escapeHtml(student.nama)}</h4>
+          <p>${escapeHtml(student.no_matrik)} · ${escapeHtml(student.kelas || "-")} · ${escapeHtml(student.jantina || "-")}</p>
+        </div>
+        <span class="clay-status-badge ${isActive ? "is-active" : "is-inactive"}">${isActive ? "Aktif" : "Tidak Aktif"}</span>
+      </div>
+      <p class="admin-student-contact">${contact}</p>
+      ${student.catatan ? `<p class="admin-student-note">${escapeHtml(student.catatan)}</p>` : ""}
+      <div class="admin-student-actions">
+        <button class="secondary-action" type="button" data-admin-student-edit="${escapeHtml(student.student_id)}">Edit</button>
+        <button class="${isActive ? "danger-action" : "success-action"}" type="button"
+          data-admin-student-toggle="${escapeHtml(student.student_id)}" data-next-active="${isActive ? "false" : "true"}">
+          ${isActive ? "Nyahaktif" : "Aktifkan"}
+        </button>
+      </div>
+    </article>`;
+}
+
+function handleAdminStudentListActionV200(event) {
+  const retry = event.target.closest("[data-admin-student-retry]");
+  if (retry) {
+    loadAdminStudentsV200();
+    return;
+  }
+  const edit = event.target.closest("[data-admin-student-edit]");
+  if (edit) {
+    openAdminStudentEditEditorV200(edit.dataset.adminStudentEdit);
+    return;
+  }
+  const toggle = event.target.closest("[data-admin-student-toggle]");
+  if (toggle) {
+    toggleAdminStudentStatusV200(toggle.dataset.adminStudentToggle, toggle.dataset.nextActive === "true");
+  }
+}
+
+function openAdminStudentCreateEditorV200() {
+  adminEditingStudentIdV200 = "";
+  els.adminStudentForm.reset();
+  els.adminStudentEditorTitle.textContent = "Tambah Pelajar";
+  els.adminStudentIdInput.readOnly = false;
+  els.adminStudentClassInput.value = "A2";
+  els.adminStudentStatusInput.value = "AKTIF";
+  els.adminStudentEditorMessage.textContent = "";
+  els.adminStudentEditor.hidden = false;
+  els.adminStudentIdInput.focus();
+}
+
+function openAdminStudentEditEditorV200(studentId) {
+  const student = adminStudentsV200.find((item) => item.student_id === studentId);
+  if (!student) return;
+  adminEditingStudentIdV200 = student.student_id;
+  els.adminStudentEditorTitle.textContent = "Edit Pelajar";
+  els.adminStudentIdInput.value = student.student_id;
+  els.adminStudentIdInput.readOnly = true;
+  els.adminStudentMatricInput.value = student.no_matrik;
+  els.adminStudentNameInput.value = student.nama;
+  els.adminStudentEmailInput.value = student.email;
+  els.adminStudentPhoneInput.value = student.no_tel;
+  els.adminStudentClassInput.value = student.kelas || "A2";
+  els.adminStudentGenderInput.value = student.jantina;
+  els.adminStudentStatusInput.value = student.status || "AKTIF";
+  els.adminStudentNoteInput.value = student.catatan;
+  els.adminStudentEditorMessage.textContent = "";
+  els.adminStudentEditor.hidden = false;
+  els.adminStudentNameInput.focus();
+}
+
+function closeAdminStudentEditorV200() {
+  adminEditingStudentIdV200 = "";
+  if (els.adminStudentForm) els.adminStudentForm.reset();
+  if (els.adminStudentIdInput) els.adminStudentIdInput.readOnly = false;
+  if (els.adminStudentEditorMessage) els.adminStudentEditorMessage.textContent = "";
+  if (els.adminStudentEditor) els.adminStudentEditor.hidden = true;
+}
+
+function buildAdminStudentFormPayloadV200() {
+  return {
+    student_id: els.adminStudentIdInput.value.trim(),
+    no_matrik: els.adminStudentMatricInput.value.trim(),
+    nama: els.adminStudentNameInput.value.trim(),
+    email: els.adminStudentEmailInput.value.trim(),
+    no_tel: els.adminStudentPhoneInput.value.trim(),
+    kelas: els.adminStudentClassInput.value,
+    jantina: els.adminStudentGenderInput.value,
+    status: els.adminStudentStatusInput.value,
+    catatan: els.adminStudentNoteInput.value.trim()
+  };
+}
+
+async function handleAdminStudentSubmitV200(event) {
+  event.preventDefault();
+  const student = buildAdminStudentFormPayloadV200();
+  if (!student.student_id || !student.no_matrik || !student.nama) {
+    setAdminStudentEditorMessageV200("ID pelajar, no. matrik dan nama diperlukan.", true);
+    return;
+  }
+  if (student.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) {
+    setAdminStudentEditorMessageV200("Format e-mel tidak sah.", true);
+    return;
+  }
+  const action = adminEditingStudentIdV200 ? "updateStudent" : "createStudent";
+  const verb = adminEditingStudentIdV200 ? "mengemas kini" : "menambah";
+  if (!window.confirm(`Sahkan untuk ${verb} pelajar ${student.nama}?`)) return;
+  els.adminSaveStudentButton.disabled = true;
+  setAdminStudentEditorMessageV200("Menyimpan pelajar...");
+  try {
+    const payload = Object.assign(buildAdminCredentialPayloadV200(), { student });
+    if (adminEditingStudentIdV200) payload.student_id = adminEditingStudentIdV200;
+    await apiPost(action, payload);
+    closeAdminStudentEditorV200();
+    await loadAdminStudentsV200();
+    await refreshPublicStudentsAfterAdminWriteV200();
+    setAdminStudentsMessageV200("Maklumat pelajar berjaya disimpan.");
+  } catch (error) {
+    setAdminStudentEditorMessageV200(safeAdminStudentErrorV200(error, "Maklumat pelajar gagal disimpan."), true);
+  } finally {
+    els.adminSaveStudentButton.disabled = false;
+  }
+}
+
+function setAdminStudentEditorMessageV200(message, isError) {
+  if (!els.adminStudentEditorMessage) return;
+  els.adminStudentEditorMessage.textContent = message || "";
+  els.adminStudentEditorMessage.classList.toggle("error", Boolean(isError));
+}
+
+async function toggleAdminStudentStatusV200(studentId, active) {
+  const student = adminStudentsV200.find((item) => item.student_id === studentId);
+  if (!student) return;
+  const actionText = active ? "aktifkan" : "nyahaktifkan";
+  if (!window.confirm(`Sahkan untuk ${actionText} ${student.nama}?`)) return;
+  setAdminStudentsBusyV200(true);
+  try {
+    await apiPost("toggleStudentStatus", Object.assign(buildAdminCredentialPayloadV200(), {
+      student_id: studentId,
+      active
+    }));
+    await loadAdminStudentsV200();
+    await refreshPublicStudentsAfterAdminWriteV200();
+    setAdminStudentsMessageV200(`Pelajar berjaya di${active ? "aktifkan" : "nyahaktifkan"}.`);
+  } catch (error) {
+    setAdminStudentsMessageV200(safeAdminStudentErrorV200(error, "Status pelajar gagal dikemas kini."), true);
+  } finally {
+    setAdminStudentsBusyV200(false);
+  }
+}
+
+async function refreshPublicStudentsAfterAdminWriteV200() {
+  if (ALLOW_MOCK_MODE) {
+    students = mockAdminStudentsV200
+      .filter((student) => student.status === "AKTIF")
+      .map((student) => ({
+        id: student.student_id,
+        no_matrik: student.no_matrik,
+        name: student.nama,
+        className: student.kelas,
+        gender: student.jantina,
+        status: student.status
+      }));
+    refreshStudentClassChoicesV200();
+    return;
+  }
+  try {
+    const response = await apiGet("getStudents");
+    const rows = Array.isArray(response) ? response : response && response.students || [];
+    students = rows.map(mapLiveStudent).filter((student) => student.id && student.name);
+    refreshStudentClassChoicesV200();
+  } catch (error) {
+    // Admin write is already complete; the next login refresh will reload public students.
+  }
 }
 
 async function loadAdminOutingTypesV200() {
@@ -447,11 +942,14 @@ function renderAdminOutingTypesV200() {
   }
   els.adminTypeList.innerHTML = adminOutingTypes.map((type) => {
     const active = type.active === true;
-    const timeSummary = [
-      type.application_open_time ? `Buka ${type.application_open_time}` : "",
-      type.application_close_time ? `Tutup ${type.application_close_time}` : "",
-      type.fixed_return_time ? `Pulang ${type.fixed_return_time}` : ""
-    ].filter(Boolean).join(" · ") || "Tiada masa tetap";
+    const timeSummaryItems = [
+      type.application_open_time ? `Buka ${formatAdminTimeOnlyV200(type.application_open_time)}` : "",
+      type.application_close_time ? `Tutup ${formatAdminTimeOnlyV200(type.application_close_time)}` : "",
+      type.fixed_return_time ? `Pulang ${formatAdminTimeOnlyV200(type.fixed_return_time)}` : ""
+    ].filter(Boolean);
+    const timeSummary = (timeSummaryItems.length ? timeSummaryItems : ["Tiada masa tetap"])
+      .map((item) => `<span>${escapeHtml(item)}</span>`)
+      .join("");
     return `
       <article class="admin-type-card ${active ? "is-active" : "is-inactive"}" data-admin-type-code="${escapeHtml(type.type_code)}">
         <div class="admin-type-card-heading">
@@ -465,7 +963,7 @@ function renderAdminOutingTypesV200() {
         <dl class="admin-type-meta">
           <div><dt>Turutan</dt><dd>${escapeHtml(type.sort_order)}</dd></div>
           <div><dt>Hari</dt><dd>${escapeHtml(formatAdminDaysV200(type.allowed_days))}</dd></div>
-          <div><dt>Masa</dt><dd>${escapeHtml(timeSummary)}</dd></div>
+          <div><dt>Masa</dt><dd class="admin-time-stack">${timeSummary}</dd></div>
           <div><dt>Versi</dt><dd>v${escapeHtml(type.config_version)}</dd></div>
         </dl>
         <div class="admin-type-actions">
@@ -774,6 +1272,48 @@ function formatAdminDaysV200(value) {
     .map((day) => labels[day.trim().toUpperCase()] || day.trim())
     .filter(Boolean)
     .join(", ") || "-";
+}
+
+function formatAdminTimeOnlyV200(value) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return "Tiada masa tetap";
+  }
+
+  let hours = null;
+  let minutes = null;
+
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    if (Number.isNaN(value.getTime())) {
+      return "Masa tidak sah";
+    }
+    hours = value.getUTCHours();
+    minutes = value.getUTCMinutes();
+  } else {
+    const text = String(value).trim();
+    const timeOnlyMatch = text.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/);
+    const isoTimeMatch = text.match(/T([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i);
+    const match = timeOnlyMatch || isoTimeMatch;
+    if (!match) {
+      return "Masa tidak sah";
+    }
+    hours = Number(match[1]);
+    minutes = Number(match[2]);
+  }
+
+  const displayHour = hours % 12 || 12;
+  const displayMinutes = String(minutes).padStart(2, "0");
+  let period = "pagi";
+  if (hours === 0) {
+    period = "tengah malam";
+  } else if (hours === 12) {
+    period = "tengah hari";
+  } else if (hours >= 13 && hours < 19) {
+    period = "petang";
+  } else if (hours >= 19) {
+    period = "malam";
+  }
+
+  return `${displayHour}:${displayMinutes} ${period}`;
 }
 
 function setupStudentClassFilter() {
@@ -1167,6 +1707,15 @@ document.querySelectorAll(".tab-button").forEach((button) => {
   });
 });
 
+function buildMockAdminStudentsV200() {
+  return [
+    { student_id: "A2-MOCK-001", no_matrik: "00120001", nama: "Pelajar Mock A2", email: "a2.mock@example.test", no_tel: "0123456789", kelas: "A2", jantina: "Lelaki", status: "AKTIF", catatan: "" },
+    { student_id: "A3-MOCK-001", no_matrik: "00130001", nama: "Pelajar Mock A3", email: "", no_tel: "", kelas: "A3", jantina: "Perempuan", status: "AKTIF", catatan: "" },
+    { student_id: "LI-MOCK-001", no_matrik: "00009001", nama: "Pelajar Latihan Industri Mock", email: "li.mock@example.test", no_tel: "01100009001", kelas: "LI", jantina: "Perempuan", status: "AKTIF", catatan: "Untuk QA local sahaja" },
+    { student_id: "LI-MOCK-002", no_matrik: "00009002", nama: "Pelajar LI Tidak Aktif", email: "", no_tel: "", kelas: "LI", jantina: "Lelaki", status: "TIDAK AKTIF", catatan: "" }
+  ];
+}
+
 function buildMockAdminOutingTypesV200() {
   const timestamp = "2026-08-03T08:00:00.000Z";
   const allDays = "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU";
@@ -1338,6 +1887,48 @@ async function mockAdminApiPostV200(action, payload) {
       status: "AKTIF"
     };
   }
+  if (action === "getAdminStudents") {
+    return cloneMockAdminValueV200(mockAdminStudentsV200);
+  }
+
+  if (action === "createStudent") {
+    const student = normalizeAdminStudentV200(payload && payload.student);
+    if (!student.student_id || !student.no_matrik || !student.nama) {
+      throw new Error("ID pelajar, no. matrik dan nama diperlukan.");
+    }
+    if (mockAdminStudentsV200.some((item) => item.student_id.toUpperCase() === student.student_id.toUpperCase())) {
+      throw new Error("student_id telah wujud.");
+    }
+    if (mockAdminStudentsV200.some((item) => item.no_matrik.toUpperCase() === student.no_matrik.toUpperCase())) {
+      throw new Error("No. matrik telah digunakan.");
+    }
+    student.status = student.status || "AKTIF";
+    mockAdminStudentsV200.push(student);
+    return cloneMockAdminValueV200(student);
+  }
+
+  if (action === "updateStudent") {
+    const immutableId = String(payload && payload.student_id || "").trim();
+    const index = mockAdminStudentsV200.findIndex((item) => item.student_id === immutableId);
+    if (index < 0) throw new Error("Pelajar tidak ditemui.");
+    const student = normalizeAdminStudentV200(payload && payload.student);
+    if (student.student_id && student.student_id !== immutableId) throw new Error("student_id tidak boleh diubah.");
+    if (mockAdminStudentsV200.some((item, itemIndex) => itemIndex !== index && item.no_matrik.toUpperCase() === student.no_matrik.toUpperCase())) {
+      throw new Error("No. matrik telah digunakan.");
+    }
+    mockAdminStudentsV200[index] = Object.assign({}, mockAdminStudentsV200[index], student, { student_id: immutableId });
+    return cloneMockAdminValueV200(mockAdminStudentsV200[index]);
+  }
+
+  if (action === "toggleStudentStatus") {
+    const studentId = String(payload && payload.student_id || "").trim();
+    const student = mockAdminStudentsV200.find((item) => item.student_id === studentId);
+    if (!student) throw new Error("Pelajar tidak ditemui.");
+    if (typeof payload.active !== "boolean") throw new Error("Status pelajar tidak sah.");
+    student.status = payload.active ? "AKTIF" : "TIDAK AKTIF";
+    return cloneMockAdminValueV200(student);
+  }
+
   if (action === "getAdminOutingTypes") {
     if (mockAdminReadErrorPendingV200) {
       mockAdminReadErrorPendingV200 = false;
@@ -1450,7 +2041,7 @@ async function fetchApiGetWithRetry(action, searchParams) {
     searchParams.set("_ts", String(Date.now()));
 
     try {
-      const response = await fetch(`${GAS_WEB_APP_URL}?${searchParams.toString()}`, {
+      const response = await fetch(`${getGasWebAppUrlV200()}?${searchParams.toString()}`, {
         cache: "no-store"
       });
       return await parseApiResponse(response, action);
@@ -1467,7 +2058,7 @@ async function fetchApiGetWithRetry(action, searchParams) {
 }
 
 async function loadLiveMasters() {
-  if (!GAS_WEB_APP_URL) {
+  if (!getGasWebAppUrlV200()) {
     if (ALLOW_MOCK_MODE) {
       setMockMode("");
     } else {
@@ -1536,7 +2127,7 @@ async function apiPost(action, payload) {
   if (ALLOW_MOCK_MODE && MOCK_ADMIN_ACTIONS_V200.has(action)) {
     return mockAdminApiPostV200(action, payload);
   }
-  const response = await fetch(GAS_WEB_APP_URL, {
+  const response = await fetch(getGasWebAppUrlV200(), {
     method: "POST",
     cache: "no-store",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -7586,6 +8177,9 @@ function isSemesterChecklistLate(record) {
 
 async function initApp() {
   setupAppVersionUi();
+  if (els.betaApiIndicator) {
+    els.betaApiIndicator.hidden = !ACTIVE_API_ENDPOINT_V200.isBeta;
+  }
   setupServiceWorkerUpdates();
   setupAccessEnhancements();
   setupFooterActionsVisibilityV166();
@@ -7599,12 +8193,14 @@ async function initApp() {
   updateClock();
   if (ALLOW_MOCK_MODE) {
     setMockMode("");
+    refreshStudentClassChoicesV200();
     await restoreSavedSession();
     return;
   } else {
     updateDataModeIndicator();
   }
   await loadLiveMasters();
+  refreshStudentClassChoicesV200();
   if (isLiveMode) {
     await restoreSavedSession();
   }

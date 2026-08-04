@@ -52,6 +52,47 @@ test("successful Admin login opens the Admin Dashboard", () => {
   assert.match(sessionSource, /loadAdminOutingTypesV200\(\)/);
 });
 
+test("Admin session hides only the main role navigation and keeps Admin sub-navigation visible", () => {
+  const sessionSource = extractFunction("startAdminSessionV200", "clearAdminRuntimeCredentialV200");
+  const clearSource = extractFunction("clearAdminRuntimeCredentialV200", "buildAdminCredentialPayloadV200");
+
+  assert.match(sessionSource, /document\.querySelector\("\.tabs"\)/);
+  assert.match(sessionSource, /tabs\.hidden\s*=\s*true/);
+  assert.match(styleSource, /\.tabs\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(clearSource, /tabs\.hidden\s*=\s*false/);
+
+  assert.match(indexSource, /class="tab-button active"[^>]*data-tab="pelajar">Pelajar<\/button>/);
+  assert.match(indexSource, /class="tab-button"[^>]*data-tab="warden">Warden &amp; HEP<\/button>/);
+  assert.match(indexSource, /class="tab-button"[^>]*data-tab="guard">Guard<\/button>/);
+  assert.match(indexSource, /class="tab-button"[^>]*data-tab="dashboard">Dashboard<\/button>/);
+  assert.doesNotMatch(indexSource, /<nav class="tabs"[^>]*hidden/);
+
+  assert.match(indexSource, /class="admin-subnav"[^>]*role="tablist"/);
+  assert.match(indexSource, /id="adminOutingTab"[\s\S]*?Tetapan Outing/);
+  assert.match(indexSource, /id="adminStudentsTab"[\s\S]*?Pengurusan Pelajar/);
+  assert.doesNotMatch(sessionSource, /admin-subnav[^\n]*hidden\s*=\s*true/);
+});
+
+test("Student session keeps the main Pelajar navigation available", () => {
+  const clearSource = extractFunction("clearAdminRuntimeCredentialV200", "buildAdminCredentialPayloadV200");
+  assert.match(indexSource, /<nav class="tabs" aria-label="Bahagian sistem">/);
+  assert.match(indexSource, /data-tab="pelajar">Pelajar<\/button>/);
+  assert.doesNotMatch(indexSource, /<nav class="tabs"[^>]*hidden/);
+  assert.match(clearSource, /tabs\.hidden\s*=\s*false/);
+});
+
+test("Warden and Guard main navigation buttons remain unchanged", () => {
+  assert.match(indexSource, /data-tab="warden">Warden &amp; HEP<\/button>/);
+  assert.match(indexSource, /data-tab="guard">Guard<\/button>/);
+  assert.match(indexSource, /data-tab="dashboard">Dashboard<\/button>/);
+});
+
+test("Admin sub-navigation remains available inside the Admin workspace", () => {
+  assert.match(indexSource, /class="admin-subnav"[^>]*role="tablist"/);
+  assert.match(indexSource, /data-admin-section="outing"[\s\S]*?Tetapan Outing|Tetapan Outing[\s\S]*?data-admin-section="outing"/);
+  assert.match(indexSource, /data-admin-section="students"[\s\S]*?Pengurusan Pelajar|Pengurusan Pelajar[\s\S]*?data-admin-section="students"/);
+});
+
 test("failed Admin login shows a safe generic error", () => {
   const source = extractFunction("handleAdminLoginV200", "setAdminLoginLoadingV200");
   assert.match(source, /ID atau nama Admin atau PIN tidak sah\./);

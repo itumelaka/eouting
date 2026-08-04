@@ -1,4 +1,4 @@
-const SPREADSHEET_ID = "1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg";
+const SPREADSHEET_ID = "1_uIvdhP-pdcujgmLdfdQl3ogzyxt3BWL1yvjkGtK7to";
 
 const SHEETS = {
   students: "STUDENTS",
@@ -195,6 +195,10 @@ function doPost(e) {
     if (action === "createOutingType") return jsonResponse(createOutingType(payload));
     if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
     if (action === "toggleOutingType") return jsonResponse(toggleOutingType(payload));
+    if (action === "getAdminStudents") return jsonResponse(getAdminStudents(payload));
+    if (action === "createStudent") return jsonResponse(createStudent(payload));
+    if (action === "updateStudent") return jsonResponse(updateStudent(payload));
+    if (action === "toggleStudentStatus") return jsonResponse(toggleStudentStatus(payload));
     if (action === "submitRequest") return jsonResponse(submitRequest(payload));
     if (action === "approveRequest") return jsonResponse(approveRequest(payload));
     if (action === "rejectRequest") return jsonResponse(rejectRequest(payload));
@@ -538,6 +542,45 @@ function normalizeStoredBoolean_(value) {
   return false;
 }
 
+function getOutingTypeTimeZone_() {
+  let timeZone = "";
+
+  try {
+    const spreadsheet = SpreadsheetApp.getActive();
+    if (spreadsheet && typeof spreadsheet.getSpreadsheetTimeZone === "function") {
+      timeZone = String(spreadsheet.getSpreadsheetTimeZone() || "").trim();
+    }
+  } catch (error) {
+    timeZone = "";
+  }
+
+  if (!timeZone) {
+    try {
+      timeZone = String(Session.getScriptTimeZone() || "").trim();
+    } catch (error) {
+      timeZone = "";
+    }
+  }
+
+  return timeZone || "Asia/Kuala_Lumpur";
+}
+
+function normalizeStoredTimeOnly_(value) {
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    if (isNaN(value.getTime())) {
+      return "";
+    }
+    return Utilities.formatDate(value, getOutingTypeTimeZone_(), "HH:mm");
+  }
+
+  const text = String(value).trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(text) ? text : "";
+}
+
 function normalizeOutingTypeRecord_(row) {
   const source = row || {};
   const result = {};
@@ -549,6 +592,9 @@ function normalizeOutingTypeRecord_(row) {
   result.description = String(result.description || "").trim();
   result.sort_order = Number(result.sort_order) || 0;
   result.allowed_days = String(result.allowed_days || "").trim().toUpperCase();
+  OUTING_TYPE_TIME_FIELDS.forEach((field) => {
+    result[field] = normalizeStoredTimeOnly_(result[field]);
+  });
   OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
     result[field] = normalizeStoredBoolean_(result[field]);
   });
@@ -560,6 +606,14 @@ function normalizeOutingTypeRecord_(row) {
 
 function toPublicOutingType_(row) {
   return pickDefined_(row, PUBLIC_OUTING_TYPE_FIELDS);
+}
+
+function toAdminOutingType_(row) {
+  const result = pickDefined_(row, HEADERS.OUTING_TYPES);
+  OUTING_TYPE_TIME_FIELDS.forEach((field) => {
+    result[field] = normalizeStoredTimeOnly_(result[field]);
+  });
+  return result;
 }
 
 function pickDefined_(object, keys) {
@@ -820,7 +874,288 @@ function getAdminOutingTypes(payload) {
   validateAdminCredentials_(payload);
   return sortOutingTypes_(getRowsAsObjects_(getSheet_(SHEETS.outingTypes))
     .map(normalizeOutingTypeRecord_))
-    .map((row) => pickDefined_(row, HEADERS.OUTING_TYPES));
+    .map(toAdminOutingType_);
+}
+
+function getStudentInput_(payload) {
+  if (payload && payload.student && typeof payload.student === "object") {
+    return payload.student;
+  }
+  return payload || {};
+}
+
+function normalizeStudentStatus_(value, useDefault) {
+  const normalized = String(value === undefined || value === null ? "" : value)
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+  if (!normalized && useDefault) {
+    return "AKTIF";
+  }
+  if (normalized !== "AKTIF" && normalized !== "TIDAK AKTIF") {
+    throw new Error("status pelajar mesti AKTIF atau TIDAK AKTIF.");
+  }
+  return normalized;
+}
+
+function validateStudentInput_(input, options) {
+  const source = input || {};
+  const config = options || {};
+  const studentId = String(config.studentId || source.student_id || "").trim();
+  const noMatrik = String(source.no_matrik === undefined || source.no_matrik === null ? "" : source.no_matrik).trim();
+  const nama = String(source.nama || "").trim();
+  const email = String(source.email || "").trim();
+  const noTel = String(source.no_tel === undefined || source.no_tel === null ? "" : source.no_tel).trim();
+  const kelas = String(source.kelas || "").trim().toUpperCase();
+  const jantina = String(source.jantina || "").trim();
+  const catatan = String(source.catatan || "").trim();
+
+  if (!studentId) {
+    throw new Error("student_id diperlukan.");
+  }
+  if (studentId.length > 100 || /[\u0000-\u001F\u007F]/.test(studentId)) {
+    throw new Error("student_id tidak sah.");
+  }
+  if (!noMatrik) {
+    throw new Error("no_matrik diperlukan.");
+  }
+  if (noMatrik.length > 100 || /[\u0000-\u001F\u007F]/.test(noMatrik)) {
+    throw new Error("no_matrik tidak sah.");
+  }
+  if (!nama) {
+    throw new Error("nama pelajar diperlukan.");
+  }
+  if (nama.length > 200) {
+    throw new Error("nama pelajar terlalu panjang.");
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("email pelajar tidak sah.");
+  }
+  if (email.length > 200) {
+    throw new Error("email pelajar terlalu panjang.");
+  }
+  if (noTel.length > 50) {
+    throw new Error("no_tel pelajar terlalu panjang.");
+  }
+  if (["A2", "A3", "LI"].indexOf(kelas) === -1) {
+    throw new Error("kelas pelajar mesti A2, A3 atau LI.");
+  }
+  if (jantina.length > 50) {
+    throw new Error("jantina pelajar terlalu panjang.");
+  }
+  if (catatan.length > 500) {
+    throw new Error("catatan pelajar terlalu panjang.");
+  }
+
+  return {
+    student_id: studentId,
+    no_matrik: noMatrik,
+    nama: nama,
+    email: email,
+    no_tel: noTel,
+    kelas: kelas,
+    jantina: jantina,
+    status: normalizeStudentStatus_(source.status, Boolean(config.defaultActive)),
+    catatan: catatan
+  };
+}
+
+function normalizeStudentRecord_(row) {
+  const source = row || {};
+  return {
+    student_id: String(source.student_id || "").trim(),
+    no_matrik: String(source.no_matrik === undefined || source.no_matrik === null ? "" : source.no_matrik).trim(),
+    nama: String(source.nama || "").trim(),
+    email: String(source.email || "").trim(),
+    no_tel: String(source.no_tel === undefined || source.no_tel === null ? "" : source.no_tel).trim(),
+    kelas: String(source.kelas || "").trim().toUpperCase(),
+    jantina: String(source.jantina || "").trim(),
+    status: String(source.status || "").trim().toUpperCase(),
+    catatan: String(source.catatan || "").trim()
+  };
+}
+
+function sortAdminStudents_(rows) {
+  const classOrder = { A2: 1, A3: 2, LI: 3 };
+  return rows.slice().sort((left, right) => {
+    const classDifference = (classOrder[left.kelas] || 99) - (classOrder[right.kelas] || 99);
+    if (classDifference !== 0) {
+      return classDifference;
+    }
+    return String(left.nama || left.student_id || "")
+      .localeCompare(String(right.nama || right.student_id || ""));
+  });
+}
+
+function findStudentRowById_(sheet, studentId) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    return null;
+  }
+  const headers = values[0].map((header) => String(header).trim());
+  const studentIdIndex = headers.indexOf("student_id");
+  if (studentIdIndex === -1) {
+    return null;
+  }
+  for (let index = 1; index < values.length; index += 1) {
+    if (normalizeText_(values[index][studentIdIndex]) === normalizeText_(studentId)) {
+      const record = {};
+      headers.forEach((header, columnIndex) => {
+        record[header] = values[index][columnIndex];
+      });
+      return { sheet: sheet, rowNumber: index + 1, record: record };
+    }
+  }
+  return null;
+}
+
+function findStudentRowByMatric_(sheet, noMatrik, excludedStudentId) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    return null;
+  }
+  const headers = values[0].map((header) => String(header).trim());
+  const studentIdIndex = headers.indexOf("student_id");
+  const matricIndex = headers.indexOf("no_matrik");
+  if (studentIdIndex === -1 || matricIndex === -1) {
+    return null;
+  }
+  for (let index = 1; index < values.length; index += 1) {
+    const sameMatric = normalizeText_(values[index][matricIndex]) === normalizeText_(noMatrik);
+    const isExcluded = excludedStudentId
+      && normalizeText_(values[index][studentIdIndex]) === normalizeText_(excludedStudentId);
+    if (sameMatric && !isExcluded) {
+      return { rowNumber: index + 1 };
+    }
+  }
+  return null;
+}
+
+function getAdminStudents(payload) {
+  validateAdminCredentials_(payload);
+  return sortAdminStudents_(getRowsAsObjects_(getSheet_(SHEETS.students))
+    .map(normalizeStudentRecord_));
+}
+
+function createStudent(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const input = getStudentInput_(payload);
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.students);
+    const validated = validateStudentInput_(input, { defaultActive: true });
+    if (findStudentRowById_(sheet, validated.student_id)) {
+      throw new Error("student_id telah wujud.");
+    }
+    if (findStudentRowByMatric_(sheet, validated.no_matrik, "")) {
+      throw new Error("no_matrik telah wujud.");
+    }
+    appendObjectRow_(sheet, HEADERS.STUDENTS, validated);
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    appendAuditLog(
+      "CREATE_STUDENT",
+      "",
+      "Admin",
+      adminIdentity,
+      JSON.stringify({ kelas: validated.kelas, status: validated.status }),
+      "STUDENT",
+      validated.student_id
+    );
+    return normalizeStudentRecord_(validated);
+  });
+}
+
+function updateStudent(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const studentId = String(payload && payload.student_id || "").trim();
+  const input = getStudentInput_(payload);
+  if (!studentId) {
+    throw new Error("student_id diperlukan.");
+  }
+  if (input.student_id && normalizeText_(input.student_id) !== normalizeText_(studentId)) {
+    throw new Error("student_id tidak boleh diubah selepas dicipta.");
+  }
+
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.students);
+    const found = findStudentRowById_(sheet, studentId);
+    if (!found) {
+      throw new Error("Pelajar tidak dijumpai.");
+    }
+    const current = normalizeStudentRecord_(found.record);
+    const merged = { ...current };
+    ["no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"]
+      .forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(input, field)) {
+          merged[field] = input[field];
+        }
+      });
+    const validated = validateStudentInput_(merged, { studentId: current.student_id });
+    if (findStudentRowByMatric_(sheet, validated.no_matrik, current.student_id)) {
+      throw new Error("no_matrik telah wujud.");
+    }
+    const changes = {};
+    ["no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"]
+      .forEach((field) => {
+        if (String(current[field] || "") !== String(validated[field] || "")) {
+          changes[field] = true;
+        }
+      });
+    const changedFields = Object.keys(changes);
+    if (!changedFields.length) {
+      throw new Error("Tiada perubahan pelajar untuk disimpan.");
+    }
+    updateRowByHeaders_(sheet, found.rowNumber, validated);
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    appendAuditLog(
+      "UPDATE_STUDENT",
+      "",
+      "Admin",
+      adminIdentity,
+      JSON.stringify({ changed_fields: changedFields }),
+      "STUDENT",
+      current.student_id
+    );
+    return normalizeStudentRecord_(validated);
+  });
+}
+
+function toggleStudentStatus(payload) {
+  payload = payload || {};
+  if (Object.prototype.hasOwnProperty.call(payload, "active")) {
+    requireBoolean_(payload.active, "active");
+  }
+  const admin = validateAdminCredentials_(payload);
+  const studentId = String(payload && payload.student_id || "").trim();
+  const requestedStatus = Object.prototype.hasOwnProperty.call(payload || {}, "active")
+    ? (payload.active === true ? "AKTIF" : "TIDAK AKTIF")
+    : normalizeStudentStatus_(payload && payload.status, false);
+  if (!studentId) {
+    throw new Error("student_id diperlukan.");
+  }
+
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.students);
+    const found = findStudentRowById_(sheet, studentId);
+    if (!found) {
+      throw new Error("Pelajar tidak dijumpai.");
+    }
+    const current = normalizeStudentRecord_(found.record);
+    if (current.status === requestedStatus) {
+      throw new Error(requestedStatus === "AKTIF" ? "Pelajar sudah aktif." : "Pelajar sudah tidak aktif.");
+    }
+    updateRowByHeaders_(sheet, found.rowNumber, { status: requestedStatus });
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    appendAuditLog(
+      requestedStatus === "AKTIF" ? "ACTIVATE_STUDENT" : "DEACTIVATE_STUDENT",
+      "",
+      "Admin",
+      adminIdentity,
+      JSON.stringify({ status: { from: current.status, to: requestedStatus } }),
+      "STUDENT",
+      current.student_id
+    );
+    return normalizeStudentRecord_({ ...current, status: requestedStatus });
+  });
 }
 
 function createOutingType(payload) {
