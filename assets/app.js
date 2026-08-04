@@ -1,10 +1,21 @@
 const APP_VERSION = "1.7.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
+const GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200 = "https://script.google.com/macros/s/AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1/exec";
 const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
 
 function isLocalBetaApiHostV200(hostname) {
   const normalizedHostname = String(hostname || "").trim().toLowerCase();
   return normalizedHostname === "localhost" || normalizedHostname === "127.0.0.1";
+}
+
+function isGitHubPagesBetaEnvironmentV200(locationLike) {
+  const currentLocation = locationLike || {};
+  const hostname = String(currentLocation.hostname || "").trim().toLowerCase();
+  const pathname = String(currentLocation.pathname || "/");
+  const protocol = String(currentLocation.protocol || "").trim().toLowerCase();
+  const secureProtocol = !protocol || protocol === "https:";
+  const betaPath = pathname === "/eoutingV2" || pathname.startsWith("/eoutingV2/");
+  return secureProtocol && hostname === "itumelaka.github.io" && betaPath;
 }
 
 function normalizeBetaApiOverrideV200(value) {
@@ -31,6 +42,15 @@ function resolveGasWebAppUrlV200(locationLike, storage) {
   const currentLocation = locationLike || {};
   const isLocalhost = isLocalBetaApiHostV200(currentLocation.hostname);
   const productionResult = { url: GAS_WEB_APP_URL, isBeta: false };
+
+  if (isGitHubPagesBetaEnvironmentV200(currentLocation)) {
+    try {
+      storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+    } catch (error) {
+      // The fixed GitHub Pages beta endpoint never depends on browser storage.
+    }
+    return { url: GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200, isBeta: true };
+  }
 
   if (!isLocalhost) {
     try {

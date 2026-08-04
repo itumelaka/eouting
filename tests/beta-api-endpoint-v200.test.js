@@ -8,6 +8,7 @@ const root = path.join(__dirname, "..");
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const serviceWorkerSource = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
+const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
 
 function extractFunctionSource(source, functionName) {
   const signatureIndex = source.indexOf(`function ${functionName}(`);
@@ -49,11 +50,13 @@ function createResolver() {
   const context = vm.createContext({ URL, URLSearchParams });
   const helpers = [
     "isLocalBetaApiHostV200",
+    "isGitHubPagesBetaEnvironmentV200",
     "normalizeBetaApiOverrideV200",
     "resolveGasWebAppUrlV200"
   ].map((name) => extractFunctionSource(appSource, name)).join("\n");
   vm.runInContext(`
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/PRODUCTION_ID/exec";
+    const GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200 = "https://script.google.com/macros/s/FIXED_GITHUB_BETA_ID/exec";
     const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
     ${helpers}
     this.resolveEndpoint = resolveGasWebAppUrlV200;
@@ -63,10 +66,65 @@ function createResolver() {
 
 const validBetaUrl = "https://script.google.com/macros/s/BETA_DEPLOYMENT_ID/exec";
 
+test("GitHub Pages eoutingV2 path uses the fixed Beta GAS without query or storage", () => {
+  for (const pathname of ["/eoutingV2", "/eoutingV2/", "/eoutingV2/index.html", "/eoutingV2/admin/"]) {
+    const storage = createStorage({ eouting_beta_api_override_v200: validBetaUrl });
+    const result = createResolver()({
+      protocol: "https:",
+      hostname: "itumelaka.github.io",
+      pathname,
+      search: ""
+    }, storage);
+    assert.equal(result.isBeta, true);
+    assert.match(result.url, /FIXED_GITHUB_BETA_ID/);
+    assert.deepEqual(storage.snapshot(), {});
+  }
+});
+
+test("GitHub Pages beta ignores query overrides and uses only its fixed deployment", () => {
+  const result = createResolver()({
+    protocol: "https:",
+    hostname: "itumelaka.github.io",
+    pathname: "/eoutingV2/",
+    search: `?api=${encodeURIComponent(validBetaUrl)}`
+  }, createStorage());
+  assert.equal(result.isBeta, true);
+  assert.match(result.url, /FIXED_GITHUB_BETA_ID/);
+  assert.notEqual(result.url, validBetaUrl);
+  assert.match(appSource, /AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1\/exec/);
+});
+
+test("production eouting and unrelated GitHub Pages paths keep production GAS", () => {
+  for (const pathname of ["/eouting/", "/eouting/index.html", "/", "/another-app/", "/eoutingV20/"]) {
+    const result = createResolver()({
+      protocol: "https:",
+      hostname: "itumelaka.github.io",
+      pathname,
+      search: `?api=${encodeURIComponent(validBetaUrl)}`
+    }, createStorage());
+    assert.equal(result.isBeta, false);
+    assert.match(result.url, /PRODUCTION_ID/);
+  }
+});
+
+test("fixed GitHub beta requires the exact secure host and path", () => {
+  for (const location of [
+    { protocol: "https:", hostname: "evil.example", pathname: "/eoutingV2/" },
+    { protocol: "https:", hostname: "itumelaka.github.io.evil.example", pathname: "/eoutingV2/" },
+    { protocol: "http:", hostname: "itumelaka.github.io", pathname: "/eoutingV2/" },
+    { protocol: "https:", hostname: "itumelaka.github.io", pathname: "/EOUTINGV2/" }
+  ]) {
+    const result = createResolver()({ ...location, search: "" }, createStorage());
+    assert.equal(result.isBeta, false);
+    assert.match(result.url, /PRODUCTION_ID/);
+  }
+});
+
 test("production hostname ignores and clears a beta query override", () => {
   const storage = createStorage({ eouting_beta_api_override_v200: validBetaUrl });
   const result = createResolver()({
     hostname: "itumelaka.github.io",
+    pathname: "/eouting/",
     search: `?api=${encodeURIComponent(validBetaUrl)}`
   }, storage);
   assert.equal(result.isBeta, false);
@@ -129,4 +187,19 @@ test("beta indicator exposes only a safe label and service worker caches no endp
   assert.doesNotMatch(indexSource, /script\.google\.com/);
   assert.doesNotMatch(serviceWorkerSource, /script\.google\.com|BETA_DEPLOYMENT_ID/);
   assert.doesNotMatch(appSource, /localStorage\.(?:getItem|setItem)\([^\n]*beta_api/i);
+  assert.match(appSource, /betaApiIndicator\.hidden = !ACTIVE_API_ENDPOINT_V200\.isBeta/);
+});
+
+test("relative app assets, manifest scope and service worker shell support eoutingV2 subpath", () => {
+  const serviceWorkerSetup = extractFunctionSource(appSource, "setupServiceWorkerUpdates");
+  assert.match(indexSource, /href="assets\/style\.css\?v=/);
+  assert.match(indexSource, /src="assets\/app\.js\?v=/);
+  assert.match(indexSource, /href="manifest\.json"/);
+  assert.equal(manifest.start_url, "./index.html");
+  assert.equal(manifest.scope, "./");
+  assert.match(serviceWorkerSource, /"\.\/index\.html"/);
+  assert.match(serviceWorkerSource, /"\.\/assets\/app\.js\?v=/);
+  assert.match(serviceWorkerSource, /url\.origin !== self\.location\.origin/);
+  assert.match(serviceWorkerSetup, /serviceWorker\.register\(["'](?:\.\/)?service-worker\.js["']/);
+  assert.doesNotMatch(serviceWorkerSetup, /serviceWorker\.register\(["']\/service-worker\.js["']/);
 });
