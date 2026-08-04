@@ -231,6 +231,7 @@ let mockAdminConflictPendingV200 = ALLOW_MOCK_MODE
 let mockPublicOutingTypesErrorPendingV200 = ALLOW_MOCK_MODE
   && new URLSearchParams(window.location.search).get("mockOutingTypes") === "error-once";
 const guardActionLocks = {};
+const wardenActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 const RETURN_SELFIE_STATUS = {
   pending: "BELUM_HANTAR",
@@ -4432,11 +4433,11 @@ function renderWarden() {
     : emptyState("Tiada permohonan diluluskan yang menunggu pengesahan guard.");
 
   els.wardenList.querySelectorAll("[data-approve]").forEach((button) => {
-    button.addEventListener("click", () => updateStatus(button.dataset.approve, STATUS.approved));
+    button.addEventListener("click", () => updateStatus(button.dataset.approve, STATUS.approved, button));
   });
 
   els.wardenList.querySelectorAll("[data-reject]").forEach((button) => {
-    button.addEventListener("click", () => updateStatus(button.dataset.reject, STATUS.rejected));
+    button.addEventListener("click", () => updateStatus(button.dataset.reject, STATUS.rejected, button));
   });
 }
 
@@ -4815,11 +4816,11 @@ function renderGuard() {
     : emptyState("Tiada pelajar sedang keluar.");
 
   els.guardApprovedList.querySelectorAll("[data-out]").forEach((button) => {
-    button.addEventListener("click", () => confirmOut(button.dataset.out));
+    button.addEventListener("click", () => confirmOut(button.dataset.out, button));
   });
 
   els.guardOutList.querySelectorAll("[data-in]").forEach((button) => {
-    button.addEventListener("click", () => confirmIn(button.dataset.in));
+    button.addEventListener("click", () => confirmIn(button.dataset.in, button));
   });
 }
 
@@ -4846,13 +4847,86 @@ function countByStatus(status) {
   return outingRecords.filter((record) => record.status === status).length;
 }
 
-async function updateStatus(id, status) {
+function setOperationalActionLoading(button, loadingLabel) {
+  if (!button || typeof button.closest !== "function") {
+    return null;
+  }
+
+  const actionGroup = button.closest(".record-actions");
+  if (!actionGroup) {
+    return null;
+  }
+
+  const controls = Array.from(actionGroup.querySelectorAll("button"));
+  const state = {
+    actionGroup,
+    activeButton: button,
+    activeChildNodes: Array.from(button.childNodes),
+    controls: controls.map((control) => ({ control, disabled: control.disabled })),
+    groupHadAriaBusy: actionGroup.hasAttribute("aria-busy"),
+    groupAriaBusy: actionGroup.getAttribute("aria-busy"),
+    buttonHadAriaBusy: button.hasAttribute("aria-busy"),
+    buttonAriaBusy: button.getAttribute("aria-busy")
+  };
+
+  controls.forEach((control) => {
+    control.disabled = true;
+  });
+
+  const spinner = document.createElement("span");
+  spinner.className = "student-submit-spinner operational-action-spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  const label = document.createElement("span");
+  label.className = "operational-action-loading-label";
+  label.textContent = loadingLabel;
+  button.replaceChildren(spinner, label);
+  button.classList.add("is-loading");
+  button.setAttribute("aria-busy", "true");
+  actionGroup.setAttribute("aria-busy", "true");
+  return state;
+}
+
+function clearOperationalActionLoading(state) {
+  if (!state) {
+    return;
+  }
+
+  state.activeButton.replaceChildren(...state.activeChildNodes);
+  state.activeButton.classList.remove("is-loading");
+  state.controls.forEach(({ control, disabled }) => {
+    control.disabled = disabled;
+  });
+
+  if (state.buttonHadAriaBusy) {
+    state.activeButton.setAttribute("aria-busy", state.buttonAriaBusy);
+  } else {
+    state.activeButton.removeAttribute("aria-busy");
+  }
+  if (state.groupHadAriaBusy) {
+    state.actionGroup.setAttribute("aria-busy", state.groupAriaBusy);
+  } else {
+    state.actionGroup.removeAttribute("aria-busy");
+  }
+}
+
+async function updateStatus(id, status, button) {
   if (!currentSession || currentSession.role !== "warden") {
     return;
   }
 
-  if (isLiveMode) {
-    try {
+  if (wardenActionLocks[id]) {
+    return;
+  }
+
+  const isApproval = status === STATUS.approved;
+  wardenActionLocks[id] = isApproval ? "approve" : "reject";
+  const loadingState = setOperationalActionLoading(
+    button,
+    isApproval ? "Meluluskan..." : "Menolak..."
+  );
+
+  try {
+    if (isLiveMode) {
       const action = status === STATUS.approved ? "approveRequest" : "rejectRequest";
       await apiPost(action, {
         request_id: id,
@@ -4865,35 +4939,38 @@ async function updateStatus(id, status) {
         status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
         status === STATUS.approved ? "Diluluskan" : "Ditolak"
       );
-    } catch (error) {
-      showModeNotice(`Live API error: ${error.message}`);
-      showError(error.message, "Tindakan Gagal");
+      return;
     }
-    return;
+
+    outingRecords = outingRecords.map((record) => {
+      if (record.id !== id) {
+        return record;
+      }
+
+      return {
+        ...record,
+        status,
+        approvedAt: status === STATUS.approved ? new Date() : record.approvedAt,
+        rejectedAt: status === STATUS.rejected ? new Date() : record.rejectedAt,
+        approvedBy: status === STATUS.approved ? currentSession.user.name : record.approvedBy,
+        rejectedBy: status === STATUS.rejected ? currentSession.user.name : record.rejectedBy
+      };
+    });
+    render();
+    showSuccess(
+      status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
+      status === STATUS.approved ? "Diluluskan" : "Ditolak"
+    );
+  } catch (error) {
+    showModeNotice(`Live API error: ${error.message}`);
+    showError(error.message, "Tindakan Gagal");
+  } finally {
+    clearOperationalActionLoading(loadingState);
+    delete wardenActionLocks[id];
   }
-
-  outingRecords = outingRecords.map((record) => {
-    if (record.id !== id) {
-      return record;
-    }
-
-    return {
-      ...record,
-      status,
-      approvedAt: status === STATUS.approved ? new Date() : record.approvedAt,
-      rejectedAt: status === STATUS.rejected ? new Date() : record.rejectedAt,
-      approvedBy: status === STATUS.approved ? currentSession.user.name : record.approvedBy,
-      rejectedBy: status === STATUS.rejected ? currentSession.user.name : record.rejectedBy
-    };
-  });
-  render();
-  showSuccess(
-    status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
-    status === STATUS.approved ? "Diluluskan" : "Ditolak"
-  );
 }
 
-async function confirmOut(id) {
+async function confirmOut(id, button) {
   if (!currentSession || currentSession.role !== "guard") {
     return;
   }
@@ -4914,41 +4991,39 @@ async function confirmOut(id) {
 
   const now = new Date();
   setGuardActionPending(id, "out");
-  updateLocalRecord(id, (record) => ({
-    ...record,
-    status: STATUS.out,
-    outAt: now,
-    masa_keluar: record.masa_keluar || now,
-    guardOutBy: currentSession.user.name,
-    guard_keluar_by: currentSession.user.name,
-    _guardActionPending: "out"
-  }));
+  const loadingState = setOperationalActionLoading(button, "Mengesahkan keluar...");
 
-  if (isLiveMode) {
-    try {
-      const updatedRecord = await apiPost("confirmOut", {
+  try {
+    if (isLiveMode) {
+      await apiPost("confirmOut", {
         request_id: id,
         nama_guard: currentSession.user.name,
         pin: currentSession.user.pin || ""
       });
-      mergeGuardActionSuccess(id, updatedRecord);
+      await loadTodayRecords();
       showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
-    } catch (error) {
-      restoreGuardActionFailure(id, previousRecord);
-      showModeNotice(`Live API error: ${error.message}`);
-      showError("Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
-    } finally {
-      clearGuardActionPending(id);
+      return;
     }
-    return;
-  }
 
-  updateLocalRecord(id, (record) => removeGuardPendingState(record));
-  clearGuardActionPending(id);
-  showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
+    updateLocalRecord(id, (record) => ({
+      ...record,
+      status: STATUS.out,
+      outAt: now,
+      masa_keluar: record.masa_keluar || now,
+      guardOutBy: currentSession.user.name,
+      guard_keluar_by: currentSession.user.name
+    }));
+    showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
+  } catch (error) {
+    showModeNotice(`Live API error: ${error.message}`);
+    showError("Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
+  } finally {
+    clearOperationalActionLoading(loadingState);
+    clearGuardActionPending(id);
+  }
 }
 
-async function confirmIn(id) {
+async function confirmIn(id, button) {
   if (!currentSession || currentSession.role !== "guard") {
     return;
   }
@@ -4970,42 +5045,40 @@ async function confirmIn(id) {
   const guardReturnNote = window.prompt("Catatan semasa masuk (optional)", "") || "";
   const now = new Date();
   setGuardActionPending(id, "in");
-  updateLocalRecord(id, (record) => ({
-    ...record,
-    status: STATUS.returned,
-    lewat: isAfterReturnLimit(now, record),
-    returnedAt: now,
-    masa_masuk: record.masa_masuk || now,
-    guardInBy: currentSession.user.name,
-    guard_masuk_by: currentSession.user.name,
-    selfie_status: RETURN_SELFIE_STATUS.pending,
-    catatan: guardReturnNote.trim() || record.catatan || "",
-    _guardActionPending: "in"
-  }));
+  const loadingState = setOperationalActionLoading(button, "Mengesahkan masuk...");
 
-  if (isLiveMode) {
-    try {
-      const updatedRecord = await apiPost("confirmIn", {
+  try {
+    if (isLiveMode) {
+      await apiPost("confirmIn", {
         request_id: id,
         nama_guard: currentSession.user.name,
         pin: currentSession.user.pin || "",
         catatan: guardReturnNote.trim()
       });
-      mergeGuardActionSuccess(id, updatedRecord);
+      await loadTodayRecords();
       showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
-    } catch (error) {
-      restoreGuardActionFailure(id, previousRecord);
-      showModeNotice(`Live API error: ${error.message}`);
-      showError("Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
-    } finally {
-      clearGuardActionPending(id);
+      return;
     }
-    return;
-  }
 
-  updateLocalRecord(id, (record) => removeGuardPendingState(record));
-  clearGuardActionPending(id);
-  showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
+    updateLocalRecord(id, (record) => ({
+      ...record,
+      status: STATUS.returned,
+      lewat: isAfterReturnLimit(now, record),
+      returnedAt: now,
+      masa_masuk: record.masa_masuk || now,
+      guardInBy: currentSession.user.name,
+      guard_masuk_by: currentSession.user.name,
+      selfie_status: RETURN_SELFIE_STATUS.pending,
+      catatan: guardReturnNote.trim() || record.catatan || ""
+    }));
+    showSuccess("Pelajar telah disahkan masuk.", "Sahkan Masuk");
+  } catch (error) {
+    showModeNotice(`Live API error: ${error.message}`);
+    showError("Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
+  } finally {
+    clearOperationalActionLoading(loadingState);
+    clearGuardActionPending(id);
+  }
 }
 
 function isGuardActionPending(id) {
@@ -6428,7 +6501,7 @@ function renderOvernightListV15(selector, mode) {
     ? records.map((record) => recordCard(record, mode)).join("")
     : emptyState("Tiada rekod Pulang Bermalam yang belum pulang.");
   list.querySelectorAll("[data-in]").forEach((button) => {
-    button.addEventListener("click", () => confirmIn(button.dataset.in));
+    button.addEventListener("click", () => confirmIn(button.dataset.in, button));
   });
 }
 
