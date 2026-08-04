@@ -1,12 +1,133 @@
-const APP_VERSION = "1.7.1";
+const APP_VERSION = "2.0.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
+const GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200 = "https://script.google.com/macros/s/AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1/exec";
+const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
+
+function isLocalBetaApiHostV200(hostname) {
+  const normalizedHostname = String(hostname || "").trim().toLowerCase();
+  return normalizedHostname === "localhost" || normalizedHostname === "127.0.0.1";
+}
+
+function isGitHubPagesBetaEnvironmentV200(locationLike) {
+  const currentLocation = locationLike || {};
+  const hostname = String(currentLocation.hostname || "").trim().toLowerCase();
+  const pathname = String(currentLocation.pathname || "/");
+  const protocol = String(currentLocation.protocol || "").trim().toLowerCase();
+  const secureProtocol = !protocol || protocol === "https:";
+  const betaPath = pathname === "/eoutingV2" || pathname.startsWith("/eoutingV2/");
+  return secureProtocol && hostname === "itumelaka.github.io" && betaPath;
+}
+
+function normalizeBetaApiOverrideV200(value) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  try {
+    const url = new URL(rawValue);
+    const isAllowed = url.protocol === "https:" &&
+      url.hostname === "script.google.com" &&
+      !url.port &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash &&
+      /^\/macros\/s\/[^/]+\/exec$/.test(url.pathname);
+    return isAllowed ? `${url.origin}${url.pathname}` : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function resolveGasWebAppUrlV200(locationLike, storage) {
+  const currentLocation = locationLike || {};
+  const isLocalhost = isLocalBetaApiHostV200(currentLocation.hostname);
+  const productionResult = { url: GAS_WEB_APP_URL, isBeta: false };
+
+  if (isGitHubPagesBetaEnvironmentV200(currentLocation)) {
+    try {
+      storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+    } catch (error) {
+      // The fixed GitHub Pages beta endpoint never depends on browser storage.
+    }
+    return { url: GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200, isBeta: true };
+  }
+
+  if (!isLocalhost) {
+    try {
+      storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+    } catch (error) {
+      // Storage may be unavailable; production endpoint remains authoritative.
+    }
+    return productionResult;
+  }
+
+  let queryValue = null;
+  try {
+    queryValue = new URLSearchParams(currentLocation.search || "").get("api");
+  } catch (error) {
+    queryValue = null;
+  }
+
+  if (queryValue !== null) {
+    const normalizedQueryUrl = normalizeBetaApiOverrideV200(queryValue);
+    try {
+      if (normalizedQueryUrl) {
+        storage.setItem(BETA_API_OVERRIDE_SESSION_KEY_V200, normalizedQueryUrl);
+      } else {
+        storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+      }
+    } catch (error) {
+      return productionResult;
+    }
+  }
+
+  let storedValue = "";
+  try {
+    storedValue = storage.getItem(BETA_API_OVERRIDE_SESSION_KEY_V200) || "";
+  } catch (error) {
+    return productionResult;
+  }
+
+  const normalizedStoredUrl = normalizeBetaApiOverrideV200(storedValue);
+  if (!normalizedStoredUrl) {
+    try {
+      storage.removeItem(BETA_API_OVERRIDE_SESSION_KEY_V200);
+    } catch (error) {
+      // Invalid/unavailable storage must never prevent the production fallback.
+    }
+    return productionResult;
+  }
+
+  return { url: normalizedStoredUrl, isBeta: true };
+}
+
+const ACTIVE_API_ENDPOINT_V200 = resolveGasWebAppUrlV200(window.location, window.sessionStorage);
+
+function getGasWebAppUrlV200() {
+  return ACTIVE_API_ENDPOINT_V200.url;
+}
+
 const ALLOW_MOCK_MODE = new URLSearchParams(window.location.search).get("mock") === "1";
+const MOCK_ADMIN_QA = ALLOW_MOCK_MODE
+  ? Object.freeze({ admin_id: "ADMIN-MOCK", nama_admin: "Admin Mock QA", pin: "2468" })
+  : null;
+const MOCK_ADMIN_ACTIONS_V200 = new Set([
+  "loginAdmin",
+  "getAdminOutingTypes",
+  "createOutingType",
+  "updateOutingType",
+  "toggleOutingType",
+  "getAdminStudents",
+  "createStudent",
+  "updateStudent",
+  "toggleStudentStatus"
+]);
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
 
 let students = [
-  { id: "S001", no_matrik: "M001", name: "Ahmad Hakimi", className: "SKM 1", gender: "Lelaki", status: "Aktif" },
-  { id: "S002", no_matrik: "M002", name: "Nur Aisyah", className: "SKM 1", gender: "Perempuan", status: "Aktif" },
-  { id: "S003", no_matrik: "M003", name: "Muhammad Amir", className: "SKM 2", gender: "Lelaki", status: "Aktif" }
+  { id: "S001", no_matrik: "M001", name: "Ahmad Hakimi", className: "A2", gender: "Lelaki", status: "Aktif" },
+  { id: "S002", no_matrik: "M002", name: "Nur Aisyah", className: "A2", gender: "Perempuan", status: "Aktif" },
+  { id: "S003", no_matrik: "M003", name: "Muhammad Amir", className: "A3", gender: "Lelaki", status: "Aktif" }
 ];
 
 let wardens = [
@@ -89,6 +210,24 @@ let selectedStudentLoginClass = "A2";
 let studentLoginClassInitialized = false;
 let wardenChecklistTypeFilter = "all";
 let wardenChecklistRecords = [];
+let adminRuntimeCredential = null;
+let adminOutingTypes = [];
+let adminEditingTypeCode = "";
+let adminStudentsV200 = [];
+let adminEditingStudentIdV200 = "";
+let activeAdminSectionV200 = "outing";
+let studentOutingTypesV200 = buildLegacyStudentOutingTypesV200();
+let studentOutingTypesLoadingV200 = false;
+let studentOutingTypesUsingFallbackV200 = true;
+let studentPreviousOutingTypeCodeV200 = "";
+let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE ? buildMockAdminOutingTypesV200() : [];
+let mockAdminStudentsV200 = ALLOW_MOCK_MODE ? buildMockAdminStudentsV200() : [];
+let mockAdminReadErrorPendingV200 = ALLOW_MOCK_MODE
+  && new URLSearchParams(window.location.search).get("mockAdminError") === "1";
+let mockAdminConflictPendingV200 = ALLOW_MOCK_MODE
+  && new URLSearchParams(window.location.search).get("mockAdminConflict") === "1";
+let mockPublicOutingTypesErrorPendingV200 = ALLOW_MOCK_MODE
+  && new URLSearchParams(window.location.search).get("mockOutingTypes") === "error-once";
 const guardActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 const RETURN_SELFIE_STATUS = {
@@ -108,6 +247,11 @@ const els = {
   studentLoginPanel: document.querySelector("#studentLoginPanel"),
   wardenLoginPanel: document.querySelector("#wardenLoginPanel"),
   guardLoginPanel: document.querySelector("#guardLoginPanel"),
+  adminLoginPanel: document.querySelector("#adminLoginPanel"),
+  adminIdentityInput: document.querySelector("#adminIdentityInput"),
+  adminPinInput: document.querySelector("#adminPinInput"),
+  adminLoginButton: document.querySelector("#adminLoginButton"),
+  adminLoginMessage: document.querySelector("#adminLoginMessage"),
   roleGrid: document.querySelector("#roleGrid"),
   studentLoginSelect: document.querySelector("#studentLoginSelect"),
   studentClassFilter: document.querySelector("#studentClassFilter"),
@@ -129,6 +273,9 @@ const els = {
   loggedStudentName: document.querySelector("#loggedStudentName"),
   loggedStudentMeta: document.querySelector("#loggedStudentMeta"),
   requestTypeSelect: document.querySelector("#requestTypeSelect"),
+  studentOutingTypesState: document.querySelector("#studentOutingTypesState"),
+  studentOutingTypesMessage: document.querySelector("#studentOutingTypesMessage"),
+  studentOutingTypesRetryButton: document.querySelector("#studentOutingTypesRetryButton"),
   emergencyFields: document.querySelector("#emergencyFields"),
   overnightFields: document.querySelector("#overnightFields"),
   requestForm: document.querySelector("#requestForm"),
@@ -173,21 +320,1054 @@ const els = {
   countLate: document.querySelector("#countLate"),
   countNotReturned: document.querySelector("#countNotReturned"),
   countEmergency: document.querySelector("#countEmergency"),
+  adminDashboard: document.querySelector("#admin"),
+  adminOutingTab: document.querySelector("#adminOutingTab"),
+  adminStudentsTab: document.querySelector("#adminStudentsTab"),
+  adminOutingSettingsPanel: document.querySelector("#adminOutingSettingsPanel"),
+  adminStudentManagementPanel: document.querySelector("#adminStudentManagementPanel"),
+  adminDashboardMessage: document.querySelector("#adminDashboardMessage"),
+  adminTypeList: document.querySelector("#adminTypeList"),
+  adminRefreshButton: document.querySelector("#adminRefreshButton"),
+  adminAddTypeButton: document.querySelector("#adminAddTypeButton"),
+  adminTypeEditor: document.querySelector("#adminTypeEditor"),
+  adminEditorTitle: document.querySelector("#adminEditorTitle"),
+  adminEditorCancelButton: document.querySelector("#adminEditorCancelButton"),
+  adminOutingTypeForm: document.querySelector("#adminOutingTypeForm"),
+  adminConfigVersionInput: document.querySelector("#adminConfigVersionInput"),
+  adminTypeCodeInput: document.querySelector("#adminTypeCodeInput"),
+  adminDisplayNameInput: document.querySelector("#adminDisplayNameInput"),
+  adminDescriptionInput: document.querySelector("#adminDescriptionInput"),
+  adminSortOrderInput: document.querySelector("#adminSortOrderInput"),
+  adminActiveField: document.querySelector("#adminActiveField"),
+  adminActiveInput: document.querySelector("#adminActiveInput"),
+  adminOpenTimeInput: document.querySelector("#adminOpenTimeInput"),
+  adminCloseTimeInput: document.querySelector("#adminCloseTimeInput"),
+  adminFixedReturnTimeInput: document.querySelector("#adminFixedReturnTimeInput"),
+  adminAllowedDays: document.querySelector("#adminAllowedDays"),
+  adminSameDayInput: document.querySelector("#adminSameDayInput"),
+  adminRequireLeaveDateInput: document.querySelector("#adminRequireLeaveDateInput"),
+  adminRequireReturnDateInput: document.querySelector("#adminRequireReturnDateInput"),
+  adminRequireReturnTimeInput: document.querySelector("#adminRequireReturnTimeInput"),
+  adminRequireGuardianPhoneInput: document.querySelector("#adminRequireGuardianPhoneInput"),
+  adminRequireGuardianRelationInput: document.querySelector("#adminRequireGuardianRelationInput"),
+  adminRequireEmergencyReasonInput: document.querySelector("#adminRequireEmergencyReasonInput"),
+  adminRequirePurposeInput: document.querySelector("#adminRequirePurposeInput"),
+  adminRequireLocationInput: document.querySelector("#adminRequireLocationInput"),
+  adminRequireVehicleInput: document.querySelector("#adminRequireVehicleInput"),
+  adminRequireWardenApprovalInput: document.querySelector("#adminRequireWardenApprovalInput"),
+  adminRequireSelfieInput: document.querySelector("#adminRequireSelfieInput"),
+  adminEditorMessage: document.querySelector("#adminEditorMessage"),
+  adminSaveTypeButton: document.querySelector("#adminSaveTypeButton"),
+  adminStudentsRefreshButton: document.querySelector("#adminStudentsRefreshButton"),
+  adminAddStudentButton: document.querySelector("#adminAddStudentButton"),
+  adminStudentClassFilter: document.querySelector("#adminStudentClassFilter"),
+  adminStudentStatusFilter: document.querySelector("#adminStudentStatusFilter"),
+  adminStudentSearchInput: document.querySelector("#adminStudentSearchInput"),
+  adminStudentsMessage: document.querySelector("#adminStudentsMessage"),
+  adminStudentList: document.querySelector("#adminStudentList"),
+  adminStudentEditor: document.querySelector("#adminStudentEditor"),
+  adminStudentEditorTitle: document.querySelector("#adminStudentEditorTitle"),
+  adminStudentEditorCancelButton: document.querySelector("#adminStudentEditorCancelButton"),
+  adminStudentForm: document.querySelector("#adminStudentForm"),
+  adminStudentIdInput: document.querySelector("#adminStudentIdInput"),
+  adminStudentMatricInput: document.querySelector("#adminStudentMatricInput"),
+  adminStudentNameInput: document.querySelector("#adminStudentNameInput"),
+  adminStudentEmailInput: document.querySelector("#adminStudentEmailInput"),
+  adminStudentPhoneInput: document.querySelector("#adminStudentPhoneInput"),
+  adminStudentClassInput: document.querySelector("#adminStudentClassInput"),
+  adminStudentGenderInput: document.querySelector("#adminStudentGenderInput"),
+  adminStudentStatusInput: document.querySelector("#adminStudentStatusInput"),
+  adminStudentNoteInput: document.querySelector("#adminStudentNoteInput"),
+  adminStudentEditorMessage: document.querySelector("#adminStudentEditorMessage"),
+  adminSaveStudentButton: document.querySelector("#adminSaveStudentButton"),
   appVersionText: document.querySelector("#appVersionText"),
+  betaApiIndicator: document.querySelector("#betaApiIndicator"),
   dataModeIndicator: null,
   liveRetryButton: null
 };
 
 document.querySelectorAll("[data-role-choice]").forEach((button) => {
-  button.addEventListener("click", () => showLoginPanel(button.dataset.roleChoice));
+  button.addEventListener("click", () => {
+    if (button.dataset.roleChoice === "admin") {
+      showAdminLoginPanelV200();
+      return;
+    }
+    if (els.adminLoginPanel) {
+      els.adminLoginPanel.classList.remove("active");
+    }
+    const roleChoice = button.dataset.roleChoice;
+    showLoginPanel(roleChoice);
+    scheduleIntentionalScrollV200(getAccessPanelForRoleV200(roleChoice));
+  });
 });
+
+function getAccessPanelForRoleV200(role) {
+  const panels = {
+    student: els.studentLoginPanel,
+    warden: els.wardenLoginPanel,
+    guard: els.guardLoginPanel
+  };
+  return panels[role] || null;
+}
+
+function prefersReducedMotionV200() {
+  return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+
+function isIntentionalNavigationV200(eventOrOptions) {
+  return Boolean(eventOrOptions && (
+    eventOrOptions.type === "click" || eventOrOptions.intentional === true
+  ));
+}
+
+function scheduleIntentionalScrollV200(target) {
+  if (!target || typeof target.scrollIntoView !== "function") return;
+  const scroll = () => target.scrollIntoView({
+    behavior: prefersReducedMotionV200() ? "auto" : "smooth",
+    block: "start"
+  });
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(scroll);
+  } else {
+    scroll();
+  }
+}
 
 function setupAccessEnhancements() {
   setupClayRoleNav();
   setupStaffPinFields();
   setupStudentClassFilter();
+  setupStudentLiClassV200();
+  setupStudentOutingTypesV200();
   setupMonitoringPanel();
   setupStatisticsPanel();
+  setupAdminDashboardV200();
+}
+
+function setupStudentLiClassV200() {
+  const liButton = document.querySelector('[data-student-class="LI"]');
+  if (liButton && liButton.dataset.liReady !== "1") {
+    liButton.dataset.liReady = "1";
+    liButton.addEventListener("click", () => {
+      selectedStudentLoginClass = "LI";
+      refreshStudentClassChoicesV200();
+    });
+  }
+  refreshStudentClassChoicesV200();
+}
+
+function refreshStudentClassChoicesV200() {
+  if (!els.studentClassFilter) return;
+  const hasLiStudents = students.some((student) => String(student.className || student.kelas || "").trim().toUpperCase() === "LI");
+  const liButton = els.studentClassFilter.querySelector('[data-student-class="LI"]');
+  if (liButton) liButton.hidden = !hasLiStudents;
+  let selectionChanged = false;
+  if (selectedStudentLoginClass === "LI" && !hasLiStudents) {
+    selectedStudentLoginClass = students.some((student) => String(student.className || student.kelas || "").trim().toUpperCase() === "A2")
+      ? "A2"
+      : "A3";
+    selectionChanged = true;
+  }
+  els.studentClassFilter.querySelectorAll("[data-student-class]").forEach((button) => {
+    const active = button.dataset.studentClass === selectedStudentLoginClass;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  if (selectedStudentLoginClass === "LI") renderLiStudentLoginOptionsV200();
+  if (selectionChanged && typeof renderStudentDropdownState === "function") renderStudentDropdownState();
+}
+
+function renderLiStudentLoginOptionsV200() {
+  if (!els.studentLoginSelect) return;
+  const liStudents = students.filter((student) => String(student.className || student.kelas || "").trim().toUpperCase() === "LI");
+  if (!liStudents.length) {
+    els.studentLoginSelect.innerHTML = '<option value="">Tiada pelajar LI ditemui</option>';
+    els.studentLoginSelect.disabled = true;
+    return;
+  }
+  els.studentLoginSelect.innerHTML = '<option value="">Pilih nama pelajar</option>' + liStudents.map((student) =>
+    `<option value="${escapeHtml(student.id || student.student_id || "")}">${escapeHtml(student.name || student.nama || "-")}</option>`
+  ).join("");
+  els.studentLoginSelect.disabled = false;
+}
+
+function showAdminLoginPanelV200() {
+  document.querySelectorAll(".access-panel").forEach((panel) => panel.classList.remove("active"));
+  document.querySelectorAll("[data-role-choice]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.roleChoice === "admin");
+  });
+  if (els.adminLoginPanel) {
+    els.adminLoginPanel.classList.add("active");
+  }
+  setAdminLoginMessageV200("");
+  if (els.adminIdentityInput) {
+    els.adminIdentityInput.focus();
+  }
+}
+
+function setupAdminDashboardV200() {
+  if (!els.adminLoginPanel || els.adminLoginPanel.dataset.ready === "1") {
+    return;
+  }
+  els.adminLoginPanel.dataset.ready = "1";
+  els.adminLoginPanel.addEventListener("submit", handleAdminLoginV200);
+  els.adminRefreshButton.addEventListener("click", loadAdminOutingTypesV200);
+  els.adminAddTypeButton.addEventListener("click", openAdminCreateEditorV200);
+  els.adminEditorCancelButton.addEventListener("click", closeAdminEditorV200);
+  els.adminOutingTypeForm.addEventListener("submit", handleAdminTypeSubmitV200);
+  els.adminTypeList.addEventListener("click", handleAdminTypeListActionV200);
+  if (els.adminOutingTab) {
+    els.adminOutingTab.addEventListener("click", () => setAdminSectionV200("outing"));
+  }
+  if (els.adminStudentsTab) {
+    els.adminStudentsTab.addEventListener("click", () => setAdminSectionV200("students"));
+  }
+  if (els.adminStudentsRefreshButton) {
+    els.adminStudentsRefreshButton.addEventListener("click", loadAdminStudentsV200);
+  }
+  if (els.adminAddStudentButton) {
+    els.adminAddStudentButton.addEventListener("click", openAdminStudentCreateEditorV200);
+  }
+  if (els.adminStudentEditorCancelButton) {
+    els.adminStudentEditorCancelButton.addEventListener("click", closeAdminStudentEditorV200);
+  }
+  if (els.adminStudentForm) {
+    els.adminStudentForm.addEventListener("submit", handleAdminStudentSubmitV200);
+  }
+  if (els.adminStudentList) {
+    els.adminStudentList.addEventListener("click", handleAdminStudentListActionV200);
+  }
+  [els.adminStudentClassFilter, els.adminStudentStatusFilter].forEach((control) => {
+    if (control) control.addEventListener("change", renderAdminStudentsV200);
+  });
+  if (els.adminStudentSearchInput) {
+    els.adminStudentSearchInput.addEventListener("input", renderAdminStudentsV200);
+  }
+  els.adminTypeCodeInput.addEventListener("input", () => {
+    if (!els.adminTypeCodeInput.readOnly) {
+      els.adminTypeCodeInput.value = els.adminTypeCodeInput.value
+        .toUpperCase()
+        .replace(/[^A-Z0-9_]/g, "");
+    }
+  });
+  els.logoutButton.addEventListener("click", (event) => {
+    if (currentSession && currentSession.role === "admin") {
+      event.stopImmediatePropagation();
+      exitAdminSessionV200();
+    }
+  }, { capture: true });
+}
+
+async function handleAdminLoginV200(event) {
+  event.preventDefault();
+  const identity = els.adminIdentityInput.value.trim();
+  const pin = els.adminPinInput.value.trim();
+  if (!identity || !pin) {
+    setAdminLoginMessageV200("ID atau nama Admin dan PIN diperlukan.", true);
+    return;
+  }
+
+  setAdminLoginLoadingV200(true);
+  setAdminLoginMessageV200("Mengesahkan akses Admin...");
+  try {
+    const admin = await apiPost("loginAdmin", {
+      admin_id: identity,
+      nama_admin: identity,
+      pin: pin
+    });
+    adminRuntimeCredential = {
+      admin_id: admin.admin_id || "",
+      nama_admin: admin.nama_admin || identity,
+      pin: pin
+    };
+    els.adminPinInput.value = "";
+    setAdminLoginMessageV200("Log masuk berjaya.");
+    startAdminSessionV200(admin);
+  } catch (error) {
+    adminRuntimeCredential = null;
+    els.adminPinInput.value = "";
+    setAdminLoginMessageV200("ID atau nama Admin atau PIN tidak sah.", true);
+  } finally {
+    setAdminLoginLoadingV200(false);
+  }
+}
+
+function setAdminLoginLoadingV200(isLoading) {
+  if (!els.adminLoginButton) return;
+  els.adminLoginButton.disabled = Boolean(isLoading);
+  els.adminLoginButton.textContent = isLoading ? "Mengesahkan..." : "Masuk sebagai Admin";
+}
+
+function setAdminLoginMessageV200(message, isError) {
+  if (!els.adminLoginMessage) return;
+  els.adminLoginMessage.textContent = message || "";
+  els.adminLoginMessage.classList.toggle("error", Boolean(isError));
+}
+
+function startAdminSessionV200(admin) {
+  currentSession = {
+    role: "admin",
+    user: {
+      admin_id: admin.admin_id || "",
+      nama_admin: admin.nama_admin || "Admin",
+      status: admin.status || "AKTIF"
+    }
+  };
+  els.accessScreen.classList.add("hidden");
+  els.appWorkspace.classList.add("active");
+  document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
+  els.adminDashboard.classList.add("active");
+  const tabs = document.querySelector(".tabs");
+  if (tabs) tabs.hidden = true;
+  if (els.ruleNotice) els.ruleNotice.hidden = true;
+  els.sessionRole.textContent = "Admin";
+  els.sessionName.textContent = admin.nama_admin || admin.admin_id || "Admin";
+  closeAdminEditorV200();
+  closeAdminStudentEditorV200();
+  setAdminSectionV200("outing");
+  loadAdminOutingTypesV200();
+}
+
+function clearAdminRuntimeCredentialV200() {
+  adminRuntimeCredential = null;
+  adminOutingTypes = [];
+  adminEditingTypeCode = "";
+  adminStudentsV200 = [];
+  adminEditingStudentIdV200 = "";
+  activeAdminSectionV200 = "outing";
+  if (els.adminPinInput) els.adminPinInput.value = "";
+  if (els.adminIdentityInput) els.adminIdentityInput.value = "";
+  if (els.adminTypeList) els.adminTypeList.innerHTML = "";
+  if (els.adminDashboardMessage) els.adminDashboardMessage.textContent = "";
+  if (els.adminOutingTypeForm) els.adminOutingTypeForm.reset();
+  if (els.adminTypeEditor) els.adminTypeEditor.hidden = true;
+  if (els.adminStudentList) els.adminStudentList.innerHTML = "";
+  if (els.adminStudentsMessage) els.adminStudentsMessage.textContent = "";
+  if (els.adminStudentForm) els.adminStudentForm.reset();
+  if (els.adminStudentEditor) els.adminStudentEditor.hidden = true;
+  const tabs = document.querySelector(".tabs");
+  if (tabs) tabs.hidden = false;
+  if (els.ruleNotice) els.ruleNotice.hidden = false;
+}
+
+function exitAdminSessionV200() {
+  clearAdminRuntimeCredentialV200();
+  currentSession = null;
+  els.appWorkspace.classList.remove("active");
+  els.accessScreen.classList.remove("hidden");
+  document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
+  document.querySelectorAll(".access-panel").forEach((panel) => panel.classList.remove("active"));
+  document.querySelectorAll("[data-role-choice]").forEach((button) => button.classList.remove("active"));
+  els.sessionRole.textContent = "-";
+  els.sessionName.textContent = "-";
+  showAdminLoginPanelV200();
+}
+
+function buildAdminCredentialPayloadV200() {
+  if (!adminRuntimeCredential || !adminRuntimeCredential.pin) {
+    throw new Error("Sesi Admin telah tamat. Sila log masuk semula.");
+  }
+  return {
+    admin_id: adminRuntimeCredential.admin_id || "",
+    nama_admin: adminRuntimeCredential.nama_admin || "",
+    pin: adminRuntimeCredential.pin
+  };
+}
+
+function setAdminSectionV200(section) {
+  const nextSection = section === "students" ? "students" : "outing";
+  activeAdminSectionV200 = nextSection;
+  const isOuting = nextSection === "outing";
+  if (els.adminOutingTab) {
+    els.adminOutingTab.classList.toggle("active", isOuting);
+    els.adminOutingTab.setAttribute("aria-selected", String(isOuting));
+  }
+  if (els.adminStudentsTab) {
+    els.adminStudentsTab.classList.toggle("active", !isOuting);
+    els.adminStudentsTab.setAttribute("aria-selected", String(!isOuting));
+  }
+  if (els.adminOutingSettingsPanel) els.adminOutingSettingsPanel.hidden = !isOuting;
+  if (els.adminStudentManagementPanel) els.adminStudentManagementPanel.hidden = isOuting;
+  if (!isOuting && currentSession && currentSession.role === "admin" && !adminStudentsV200.length) {
+    loadAdminStudentsV200();
+  }
+}
+
+function normalizeAdminStudentV200(student) {
+  const item = student || {};
+  return {
+    student_id: String(item.student_id || "").trim(),
+    no_matrik: String(item.no_matrik || "").trim(),
+    nama: String(item.nama || "").trim(),
+    email: String(item.email || "").trim(),
+    no_tel: String(item.no_tel || "").trim(),
+    kelas: String(item.kelas || "").trim().toUpperCase(),
+    jantina: String(item.jantina || "").trim(),
+    status: String(item.status || "").trim().toUpperCase(),
+    catatan: String(item.catatan || "").trim()
+  };
+}
+
+async function loadAdminStudentsV200() {
+  if (!currentSession || currentSession.role !== "admin" || !els.adminStudentList) return;
+  setAdminStudentsBusyV200(true);
+  setAdminStudentsMessageV200("Memuatkan senarai pelajar...");
+  try {
+    const response = await apiPost("getAdminStudents", buildAdminCredentialPayloadV200());
+    adminStudentsV200 = (Array.isArray(response) ? response : response && response.students || [])
+      .map(normalizeAdminStudentV200);
+    setAdminStudentsMessageV200("");
+    renderAdminStudentsV200();
+  } catch (error) {
+    adminStudentsV200 = [];
+    els.adminStudentList.innerHTML = `
+      <div class="empty-state admin-student-retry-state">
+        <p>Senarai pelajar gagal dimuatkan.</p>
+        <button class="secondary-action" type="button" data-admin-student-retry>Cuba Lagi</button>
+      </div>`;
+    setAdminStudentsMessageV200(safeAdminStudentErrorV200(error, "Senarai pelajar gagal dimuatkan."), true);
+  } finally {
+    setAdminStudentsBusyV200(false);
+  }
+}
+
+function setAdminStudentsBusyV200(isBusy) {
+  [els.adminStudentsRefreshButton, els.adminAddStudentButton].forEach((button) => {
+    if (button) button.disabled = Boolean(isBusy);
+  });
+  if (els.adminStudentsRefreshButton) {
+    els.adminStudentsRefreshButton.textContent = isBusy ? "Memuat..." : "Refresh Pelajar";
+  }
+  if (els.adminStudentList) els.adminStudentList.setAttribute("aria-busy", String(Boolean(isBusy)));
+}
+
+function setAdminStudentsMessageV200(message, isError) {
+  if (!els.adminStudentsMessage) return;
+  els.adminStudentsMessage.textContent = message || "";
+  els.adminStudentsMessage.classList.toggle("error", Boolean(isError));
+}
+
+function safeAdminStudentErrorV200(error, fallback) {
+  const message = String(error && error.message || "");
+  if (/duplicate|sudah digunakan|telah wujud|diperlukan|tidak sah|tidak ditemui/i.test(message)) {
+    return message;
+  }
+  return fallback;
+}
+
+function getFilteredAdminStudentsV200() {
+  const classFilter = els.adminStudentClassFilter ? els.adminStudentClassFilter.value : "all";
+  const statusFilter = els.adminStudentStatusFilter ? els.adminStudentStatusFilter.value : "all";
+  const query = els.adminStudentSearchInput ? els.adminStudentSearchInput.value.trim().toLowerCase() : "";
+  return adminStudentsV200.filter((student) => {
+    const classMatches = !classFilter || classFilter === "all" || student.kelas === classFilter;
+    const statusMatches = !statusFilter || statusFilter === "all" || student.status === statusFilter;
+    const searchMatches = !query || [student.student_id, student.no_matrik, student.nama]
+      .some((value) => String(value || "").toLowerCase().includes(query));
+    return classMatches && statusMatches && searchMatches;
+  });
+}
+
+function renderAdminStudentsV200() {
+  if (!els.adminStudentList) return;
+  const filtered = getFilteredAdminStudentsV200();
+  if (!filtered.length) {
+    els.adminStudentList.innerHTML = '<div class="empty-state">Tiada pelajar sepadan dengan tapisan.</div>';
+    return;
+  }
+  els.adminStudentList.innerHTML = filtered.map(adminStudentCardV200).join("");
+}
+
+function adminStudentCardV200(student) {
+  const isActive = student.status === "AKTIF";
+  const liBadge = student.kelas === "LI"
+    ? '<span class="student-li-badge" aria-label="Pelajar Latihan Industri (LI)">LI</span>'
+    : "";
+  const contact = [student.email, student.no_tel].filter(Boolean).map(escapeHtml).join(" · ") || "Tiada maklumat hubungan";
+  return `
+    <article class="admin-student-card ${isActive ? "is-active" : "is-inactive"}">
+      <div class="admin-student-card-heading">
+        <div>
+          <div class="admin-student-code-row">
+            <span class="admin-student-id">${escapeHtml(student.student_id)}</span>
+            ${liBadge}
+          </div>
+          <h4>${escapeHtml(student.nama)}</h4>
+          <p>${escapeHtml(student.no_matrik)} · ${escapeHtml(student.kelas || "-")} · ${escapeHtml(student.jantina || "-")}</p>
+        </div>
+        <span class="clay-status-badge ${isActive ? "is-active" : "is-inactive"}">${isActive ? "Aktif" : "Tidak Aktif"}</span>
+      </div>
+      <p class="admin-student-contact">${contact}</p>
+      ${student.catatan ? `<p class="admin-student-note">${escapeHtml(student.catatan)}</p>` : ""}
+      <div class="admin-student-actions">
+        <button class="secondary-action" type="button" data-admin-student-edit="${escapeHtml(student.student_id)}">Edit</button>
+        <button class="${isActive ? "danger-action" : "success-action"}" type="button"
+          data-admin-student-toggle="${escapeHtml(student.student_id)}" data-next-active="${isActive ? "false" : "true"}">
+          ${isActive ? "Nyahaktif" : "Aktifkan"}
+        </button>
+      </div>
+    </article>`;
+}
+
+function handleAdminStudentListActionV200(event) {
+  const retry = event.target.closest("[data-admin-student-retry]");
+  if (retry) {
+    loadAdminStudentsV200();
+    return;
+  }
+  const edit = event.target.closest("[data-admin-student-edit]");
+  if (edit) {
+    openAdminStudentEditEditorV200(edit.dataset.adminStudentEdit);
+    return;
+  }
+  const toggle = event.target.closest("[data-admin-student-toggle]");
+  if (toggle) {
+    toggleAdminStudentStatusV200(toggle.dataset.adminStudentToggle, toggle.dataset.nextActive === "true");
+  }
+}
+
+function openAdminStudentCreateEditorV200() {
+  adminEditingStudentIdV200 = "";
+  els.adminStudentForm.reset();
+  els.adminStudentEditorTitle.textContent = "Tambah Pelajar";
+  els.adminStudentIdInput.readOnly = false;
+  els.adminStudentClassInput.value = "A2";
+  els.adminStudentStatusInput.value = "AKTIF";
+  els.adminStudentEditorMessage.textContent = "";
+  els.adminStudentEditor.hidden = false;
+  els.adminStudentIdInput.focus();
+}
+
+function openAdminStudentEditEditorV200(studentId) {
+  const student = adminStudentsV200.find((item) => item.student_id === studentId);
+  if (!student) return;
+  adminEditingStudentIdV200 = student.student_id;
+  els.adminStudentEditorTitle.textContent = "Edit Pelajar";
+  els.adminStudentIdInput.value = student.student_id;
+  els.adminStudentIdInput.readOnly = true;
+  els.adminStudentMatricInput.value = student.no_matrik;
+  els.adminStudentNameInput.value = student.nama;
+  els.adminStudentEmailInput.value = student.email;
+  els.adminStudentPhoneInput.value = student.no_tel;
+  els.adminStudentClassInput.value = student.kelas || "A2";
+  els.adminStudentGenderInput.value = student.jantina;
+  els.adminStudentStatusInput.value = student.status || "AKTIF";
+  els.adminStudentNoteInput.value = student.catatan;
+  els.adminStudentEditorMessage.textContent = "";
+  els.adminStudentEditor.hidden = false;
+  els.adminStudentNameInput.focus();
+}
+
+function closeAdminStudentEditorV200() {
+  adminEditingStudentIdV200 = "";
+  if (els.adminStudentForm) els.adminStudentForm.reset();
+  if (els.adminStudentIdInput) els.adminStudentIdInput.readOnly = false;
+  if (els.adminStudentEditorMessage) els.adminStudentEditorMessage.textContent = "";
+  if (els.adminStudentEditor) els.adminStudentEditor.hidden = true;
+}
+
+function buildAdminStudentFormPayloadV200() {
+  return {
+    student_id: els.adminStudentIdInput.value.trim(),
+    no_matrik: els.adminStudentMatricInput.value.trim(),
+    nama: els.adminStudentNameInput.value.trim(),
+    email: els.adminStudentEmailInput.value.trim(),
+    no_tel: els.adminStudentPhoneInput.value.trim(),
+    kelas: els.adminStudentClassInput.value,
+    jantina: els.adminStudentGenderInput.value,
+    status: els.adminStudentStatusInput.value,
+    catatan: els.adminStudentNoteInput.value.trim()
+  };
+}
+
+async function handleAdminStudentSubmitV200(event) {
+  event.preventDefault();
+  const student = buildAdminStudentFormPayloadV200();
+  if (!student.student_id || !student.no_matrik || !student.nama) {
+    setAdminStudentEditorMessageV200("ID pelajar, no. matrik dan nama diperlukan.", true);
+    return;
+  }
+  if (student.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(student.email)) {
+    setAdminStudentEditorMessageV200("Format e-mel tidak sah.", true);
+    return;
+  }
+  const action = adminEditingStudentIdV200 ? "updateStudent" : "createStudent";
+  const verb = adminEditingStudentIdV200 ? "mengemas kini" : "menambah";
+  if (!window.confirm(`Sahkan untuk ${verb} pelajar ${student.nama}?`)) return;
+  els.adminSaveStudentButton.disabled = true;
+  setAdminStudentEditorMessageV200("Menyimpan pelajar...");
+  try {
+    const payload = Object.assign(buildAdminCredentialPayloadV200(), { student });
+    if (adminEditingStudentIdV200) payload.student_id = adminEditingStudentIdV200;
+    await apiPost(action, payload);
+    closeAdminStudentEditorV200();
+    await loadAdminStudentsV200();
+    await refreshPublicStudentsAfterAdminWriteV200();
+    setAdminStudentsMessageV200("Maklumat pelajar berjaya disimpan.");
+  } catch (error) {
+    setAdminStudentEditorMessageV200(safeAdminStudentErrorV200(error, "Maklumat pelajar gagal disimpan."), true);
+  } finally {
+    els.adminSaveStudentButton.disabled = false;
+  }
+}
+
+function setAdminStudentEditorMessageV200(message, isError) {
+  if (!els.adminStudentEditorMessage) return;
+  els.adminStudentEditorMessage.textContent = message || "";
+  els.adminStudentEditorMessage.classList.toggle("error", Boolean(isError));
+}
+
+async function toggleAdminStudentStatusV200(studentId, active) {
+  const student = adminStudentsV200.find((item) => item.student_id === studentId);
+  if (!student) return;
+  const actionText = active ? "aktifkan" : "nyahaktifkan";
+  if (!window.confirm(`Sahkan untuk ${actionText} ${student.nama}?`)) return;
+  setAdminStudentsBusyV200(true);
+  try {
+    await apiPost("toggleStudentStatus", Object.assign(buildAdminCredentialPayloadV200(), {
+      student_id: studentId,
+      active
+    }));
+    await loadAdminStudentsV200();
+    await refreshPublicStudentsAfterAdminWriteV200();
+    setAdminStudentsMessageV200(`Pelajar berjaya di${active ? "aktifkan" : "nyahaktifkan"}.`);
+  } catch (error) {
+    setAdminStudentsMessageV200(safeAdminStudentErrorV200(error, "Status pelajar gagal dikemas kini."), true);
+  } finally {
+    setAdminStudentsBusyV200(false);
+  }
+}
+
+async function refreshPublicStudentsAfterAdminWriteV200() {
+  if (ALLOW_MOCK_MODE) {
+    students = mockAdminStudentsV200
+      .filter((student) => student.status === "AKTIF")
+      .map((student) => ({
+        id: student.student_id,
+        no_matrik: student.no_matrik,
+        name: student.nama,
+        className: student.kelas,
+        gender: student.jantina,
+        status: student.status
+      }));
+    refreshStudentClassChoicesV200();
+    return;
+  }
+  try {
+    const response = await apiGet("getStudents");
+    const rows = Array.isArray(response) ? response : response && response.students || [];
+    students = rows.map(mapLiveStudent).filter((student) => student.id && student.name);
+    refreshStudentClassChoicesV200();
+  } catch (error) {
+    // Admin write is already complete; the next login refresh will reload public students.
+  }
+}
+
+async function loadAdminOutingTypesV200() {
+  if (!currentSession || currentSession.role !== "admin") {
+    return;
+  }
+  setAdminDashboardBusyV200(true);
+  setAdminDashboardMessageV200("Memuatkan jenis outing...");
+  els.adminTypeList.innerHTML = '<div class="empty-state">Memuatkan konfigurasi...</div>';
+  try {
+    const rows = await apiPost("getAdminOutingTypes", buildAdminCredentialPayloadV200());
+    adminOutingTypes = Array.isArray(rows) ? rows.slice().sort(adminOutingTypeSortV200) : [];
+    renderAdminOutingTypesV200();
+    setAdminDashboardMessageV200("");
+  } catch (error) {
+    adminOutingTypes = [];
+    renderAdminOutingTypesErrorV200(error);
+  } finally {
+    setAdminDashboardBusyV200(false);
+  }
+}
+
+function adminOutingTypeSortV200(left, right) {
+  const difference = Number(left.sort_order || 0) - Number(right.sort_order || 0);
+  return difference || String(left.display_name || left.type_code || "")
+    .localeCompare(String(right.display_name || right.type_code || ""));
+}
+
+function renderAdminOutingTypesV200() {
+  if (!adminOutingTypes.length) {
+    els.adminTypeList.innerHTML = '<div class="empty-state">Tiada jenis outing dikonfigurasi.</div>';
+    return;
+  }
+  els.adminTypeList.innerHTML = adminOutingTypes.map((type) => {
+    const active = type.active === true;
+    const timeSummaryItems = [
+      type.application_open_time ? `Buka ${formatAdminTimeOnlyV200(type.application_open_time)}` : "",
+      type.application_close_time ? `Tutup ${formatAdminTimeOnlyV200(type.application_close_time)}` : "",
+      type.fixed_return_time ? `Pulang ${formatAdminTimeOnlyV200(type.fixed_return_time)}` : ""
+    ].filter(Boolean);
+    const timeSummary = (timeSummaryItems.length ? timeSummaryItems : ["Tiada masa tetap"])
+      .map((item) => `<span>${escapeHtml(item)}</span>`)
+      .join("");
+    return `
+      <article class="admin-type-card ${active ? "is-active" : "is-inactive"}" data-admin-type-code="${escapeHtml(type.type_code)}">
+        <div class="admin-type-card-heading">
+          <div>
+            <small>${escapeHtml(type.type_code)}</small>
+            <h3>${escapeHtml(type.display_name)}</h3>
+          </div>
+          <span class="status-badge ${active ? "approved" : "rejected"}">${active ? "Aktif" : "Tidak Aktif"}</span>
+        </div>
+        <p>${escapeHtml(type.description || "Tiada penerangan.")}</p>
+        <dl class="admin-type-meta">
+          <div><dt>Turutan</dt><dd>${escapeHtml(type.sort_order)}</dd></div>
+          <div><dt>Hari</dt><dd>${escapeHtml(formatAdminDaysV200(type.allowed_days))}</dd></div>
+          <div><dt>Masa</dt><dd class="admin-time-stack">${timeSummary}</dd></div>
+          <div><dt>Versi</dt><dd>v${escapeHtml(type.config_version)}</dd></div>
+        </dl>
+        <div class="admin-type-actions">
+          <button class="secondary-action" type="button" data-admin-edit="${escapeHtml(type.type_code)}">Edit</button>
+          <button class="${active ? "danger-action" : "primary-action"}" type="button" data-admin-toggle="${escapeHtml(type.type_code)}">
+            ${active ? "Nyahaktif" : "Aktifkan"}
+          </button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderAdminOutingTypesErrorV200(error) {
+  const message = safeAdminApiMessageV200(error, "Konfigurasi gagal dimuatkan.");
+  setAdminDashboardMessageV200(message, true);
+  els.adminTypeList.innerHTML = `
+    <div class="empty-state admin-error-state">
+      <p>${escapeHtml(message)}</p>
+      <button class="secondary-action" type="button" data-admin-retry="1">Cuba Lagi</button>
+    </div>
+  `;
+}
+
+function handleAdminTypeListActionV200(event) {
+  const retryButton = event.target.closest("[data-admin-retry]");
+  if (retryButton) {
+    loadAdminOutingTypesV200();
+    return;
+  }
+  const editButton = event.target.closest("[data-admin-edit]");
+  if (editButton) {
+    openAdminEditEditorV200(editButton.dataset.adminEdit);
+    return;
+  }
+  const toggleButton = event.target.closest("[data-admin-toggle]");
+  if (toggleButton) {
+    handleAdminToggleV200(toggleButton.dataset.adminToggle, toggleButton);
+  }
+}
+
+function openAdminCreateEditorV200() {
+  adminEditingTypeCode = "";
+  els.adminOutingTypeForm.reset();
+  els.adminEditorTitle.textContent = "Tambah Jenis Outing";
+  els.adminTypeCodeInput.readOnly = false;
+  els.adminTypeCodeInput.value = "";
+  els.adminConfigVersionInput.value = "";
+  els.adminActiveField.hidden = false;
+  els.adminActiveInput.value = "true";
+  els.adminSortOrderInput.value = String(getNextAdminSortOrderV200());
+  setAdminDefaultRulesV200();
+  setAdminEditorMessageV200("");
+  els.adminTypeEditor.hidden = false;
+  els.adminTypeCodeInput.focus();
+  els.adminTypeEditor.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function openAdminEditEditorV200(typeCode) {
+  const type = adminOutingTypes.find((item) => item.type_code === typeCode);
+  if (!type) {
+    setAdminDashboardMessageV200("Jenis outing tidak ditemui. Sila refresh.", true);
+    return;
+  }
+  adminEditingTypeCode = type.type_code;
+  els.adminOutingTypeForm.reset();
+  els.adminEditorTitle.textContent = `Edit ${type.display_name}`;
+  els.adminTypeCodeInput.value = type.type_code;
+  els.adminTypeCodeInput.readOnly = true;
+  els.adminConfigVersionInput.value = String(type.config_version);
+  els.adminDisplayNameInput.value = type.display_name || "";
+  els.adminDescriptionInput.value = type.description || "";
+  els.adminSortOrderInput.value = String(type.sort_order || 1);
+  els.adminActiveField.hidden = true;
+  els.adminOpenTimeInput.value = type.application_open_time || "";
+  els.adminCloseTimeInput.value = type.application_close_time || "";
+  els.adminFixedReturnTimeInput.value = type.fixed_return_time || "";
+  setAdminAllowedDaysV200(type.allowed_days);
+  getAdminRuleInputMapV200().forEach(([field, input]) => {
+    input.checked = type[field] === true;
+  });
+  setAdminEditorMessageV200("");
+  els.adminTypeEditor.hidden = false;
+  els.adminDisplayNameInput.focus();
+  els.adminTypeEditor.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function closeAdminEditorV200() {
+  adminEditingTypeCode = "";
+  if (els.adminOutingTypeForm) els.adminOutingTypeForm.reset();
+  if (els.adminTypeCodeInput) els.adminTypeCodeInput.readOnly = false;
+  if (els.adminTypeEditor) els.adminTypeEditor.hidden = true;
+  setAdminEditorMessageV200("");
+}
+
+function setAdminDefaultRulesV200() {
+  els.adminAllowedDays.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.checked = true;
+  });
+  getAdminRuleInputMapV200().forEach(([field, input]) => {
+    input.checked = [
+      "require_purpose",
+      "require_location",
+      "require_vehicle",
+      "require_warden_approval",
+      "require_selfie"
+    ].includes(field);
+  });
+}
+
+function getAdminRuleInputMapV200() {
+  return [
+    ["same_day_only", els.adminSameDayInput],
+    ["require_leave_date", els.adminRequireLeaveDateInput],
+    ["require_return_date", els.adminRequireReturnDateInput],
+    ["require_return_time", els.adminRequireReturnTimeInput],
+    ["require_guardian_phone", els.adminRequireGuardianPhoneInput],
+    ["require_guardian_relation", els.adminRequireGuardianRelationInput],
+    ["require_emergency_reason", els.adminRequireEmergencyReasonInput],
+    ["require_purpose", els.adminRequirePurposeInput],
+    ["require_location", els.adminRequireLocationInput],
+    ["require_vehicle", els.adminRequireVehicleInput],
+    ["require_warden_approval", els.adminRequireWardenApprovalInput],
+    ["require_selfie", els.adminRequireSelfieInput]
+  ];
+}
+
+function setAdminAllowedDaysV200(allowedDays) {
+  const selected = new Set(String(allowedDays || "").split(",").map((day) => day.trim().toUpperCase()));
+  els.adminAllowedDays.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.checked = selected.has(input.value);
+  });
+}
+
+function collectAdminOutingTypeConfigV200() {
+  const allowedDays = Array.from(els.adminAllowedDays.querySelectorAll('input[type="checkbox"]:checked'))
+    .map((input) => input.value);
+  if (!allowedDays.length) {
+    throw new Error("Pilih sekurang-kurangnya satu hari dibenarkan.");
+  }
+  const config = {
+    type_code: els.adminTypeCodeInput.value.trim().toUpperCase(),
+    display_name: els.adminDisplayNameInput.value.trim(),
+    description: els.adminDescriptionInput.value.trim(),
+    sort_order: Number(els.adminSortOrderInput.value),
+    allowed_days: allowedDays.join(","),
+    application_open_time: els.adminOpenTimeInput.value || "",
+    application_close_time: els.adminCloseTimeInput.value || "",
+    fixed_return_time: els.adminFixedReturnTimeInput.value || ""
+  };
+  getAdminRuleInputMapV200().forEach(([field, input]) => {
+    config[field] = Boolean(input.checked);
+  });
+  if (!adminEditingTypeCode) {
+    config.active = els.adminActiveInput.value === "true";
+  }
+  return config;
+}
+
+async function handleAdminTypeSubmitV200(event) {
+  event.preventDefault();
+  if (!els.adminOutingTypeForm.reportValidity()) {
+    return;
+  }
+
+  let config;
+  try {
+    config = collectAdminOutingTypeConfigV200();
+  } catch (error) {
+    setAdminEditorMessageV200(error.message, true);
+    return;
+  }
+  const isEditing = Boolean(adminEditingTypeCode);
+  const confirmation = isEditing
+    ? `Simpan perubahan untuk ${adminEditingTypeCode}?`
+    : `Tambah jenis outing ${config.type_code}?`;
+  if (!window.confirm(confirmation)) {
+    return;
+  }
+
+  setAdminEditorBusyV200(true);
+  setAdminEditorMessageV200(isEditing ? "Menyimpan perubahan..." : "Menambah jenis outing...");
+  try {
+    const credentials = buildAdminCredentialPayloadV200();
+    if (isEditing) {
+      const updateConfig = { ...config };
+      delete updateConfig.type_code;
+      delete updateConfig.active;
+      await apiPost("updateOutingType", {
+        ...credentials,
+        type_code: adminEditingTypeCode,
+        expected_config_version: Number(els.adminConfigVersionInput.value),
+        outing_type: updateConfig
+      });
+    } else {
+      await apiPost("createOutingType", {
+        ...credentials,
+        outing_type: config
+      });
+    }
+    const successMessage = isEditing ? "Jenis outing berjaya dikemas kini." : "Jenis outing berjaya ditambah.";
+    closeAdminEditorV200();
+    await loadAdminOutingTypesV200();
+    setAdminDashboardMessageV200(successMessage);
+  } catch (error) {
+    if (isAdminConfigConflictV200(error)) {
+      closeAdminEditorV200();
+      await loadAdminOutingTypesV200();
+      setAdminDashboardMessageV200(
+        "Konfigurasi telah berubah di tempat lain. Data terkini telah dimuatkan; buka Edit semula.",
+        true
+      );
+    } else {
+      setAdminEditorMessageV200(safeAdminApiMessageV200(error, "Konfigurasi gagal disimpan."), true);
+    }
+  } finally {
+    setAdminEditorBusyV200(false);
+  }
+}
+
+async function handleAdminToggleV200(typeCode, button) {
+  const type = adminOutingTypes.find((item) => item.type_code === typeCode);
+  if (!type) return;
+  const nextActive = type.active !== true;
+  const verb = nextActive ? "aktifkan" : "nyahaktifkan";
+  if (!window.confirm(`Pasti mahu ${verb} ${type.display_name}?`)) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    await apiPost("toggleOutingType", {
+      ...buildAdminCredentialPayloadV200(),
+      type_code: type.type_code,
+      expected_config_version: Number(type.config_version),
+      active: nextActive
+    });
+    await loadAdminOutingTypesV200();
+    setAdminDashboardMessageV200(`Jenis outing berjaya di${nextActive ? "aktifkan" : "nyahaktifkan"}.`);
+  } catch (error) {
+    if (isAdminConfigConflictV200(error)) {
+      await loadAdminOutingTypesV200();
+      setAdminDashboardMessageV200(
+        "Konfigurasi telah berubah di tempat lain. Data terkini telah dimuatkan.",
+        true
+      );
+    } else {
+      setAdminDashboardMessageV200(safeAdminApiMessageV200(error, "Status gagal dikemas kini."), true);
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function isAdminConfigConflictV200(error) {
+  return String(error && error.message || error || "").includes("CONFIG_VERSION_CONFLICT");
+}
+
+function safeAdminApiMessageV200(error, fallback) {
+  let message = String(error && error.message || fallback || "Ralat Admin.");
+  if (adminRuntimeCredential && adminRuntimeCredential.pin) {
+    message = message.split(adminRuntimeCredential.pin).join("***");
+  }
+  return message.slice(0, 300);
+}
+
+function setAdminDashboardBusyV200(isBusy) {
+  [els.adminRefreshButton, els.adminAddTypeButton].forEach((button) => {
+    if (button) button.disabled = Boolean(isBusy);
+  });
+}
+
+function setAdminEditorBusyV200(isBusy) {
+  if (!els.adminSaveTypeButton) return;
+  els.adminSaveTypeButton.disabled = Boolean(isBusy);
+  els.adminSaveTypeButton.textContent = isBusy ? "Menyimpan..." : "Simpan Jenis Outing";
+}
+
+function setAdminDashboardMessageV200(message, isError) {
+  if (!els.adminDashboardMessage) return;
+  els.adminDashboardMessage.textContent = message || "";
+  els.adminDashboardMessage.classList.toggle("error", Boolean(isError));
+}
+
+function setAdminEditorMessageV200(message, isError) {
+  if (!els.adminEditorMessage) return;
+  els.adminEditorMessage.textContent = message || "";
+  els.adminEditorMessage.classList.toggle("error", Boolean(isError));
+}
+
+function getNextAdminSortOrderV200() {
+  const highest = adminOutingTypes.reduce((max, type) => Math.max(max, Number(type.sort_order || 0)), 0);
+  return highest + 1;
+}
+
+function formatAdminDaysV200(value) {
+  const labels = {
+    AHAD: "Ahad",
+    ISNIN: "Isnin",
+    SELASA: "Selasa",
+    RABU: "Rabu",
+    KHAMIS: "Khamis",
+    JUMAAT: "Jumaat",
+    SABTU: "Sabtu"
+  };
+  return String(value || "").split(",")
+    .map((day) => labels[day.trim().toUpperCase()] || day.trim())
+    .filter(Boolean)
+    .join(", ") || "-";
+}
+
+function formatAdminTimeOnlyV200(value) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return "Tiada masa tetap";
+  }
+
+  let hours = null;
+  let minutes = null;
+
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    if (Number.isNaN(value.getTime())) {
+      return "Masa tidak sah";
+    }
+    hours = value.getUTCHours();
+    minutes = value.getUTCMinutes();
+  } else {
+    const text = String(value).trim();
+    const timeOnlyMatch = text.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/);
+    const isoTimeMatch = text.match(/T([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i);
+    const match = timeOnlyMatch || isoTimeMatch;
+    if (!match) {
+      return "Masa tidak sah";
+    }
+    hours = Number(match[1]);
+    minutes = Number(match[2]);
+  }
+
+  const displayHour = hours % 12 || 12;
+  const displayMinutes = String(minutes).padStart(2, "0");
+  let period = "pagi";
+  if (hours === 0) {
+    period = "tengah malam";
+  } else if (hours === 12) {
+    period = "tengah hari";
+  } else if (hours >= 13 && hours < 19) {
+    period = "petang";
+  } else if (hours >= 19) {
+    period = "malam";
+  }
+
+  return `${displayHour}:${displayMinutes} ${period}`;
 }
 
 function setupStudentClassFilter() {
@@ -228,7 +1408,8 @@ function setupClayRoleNav() {
   const roleLabels = {
     student: "Pelajar",
     warden: "Warden & HEP",
-    guard: "Guard"
+    guard: "Guard",
+    admin: "Admin"
   };
 
   els.roleGrid.querySelectorAll("[data-role-choice]").forEach((button) => {
@@ -580,11 +1761,314 @@ document.querySelectorAll(".tab-button").forEach((button) => {
   });
 });
 
+function buildMockAdminStudentsV200() {
+  return [
+    { student_id: "A2-MOCK-001", no_matrik: "00120001", nama: "Pelajar Mock A2", email: "a2.mock@example.test", no_tel: "0123456789", kelas: "A2", jantina: "Lelaki", status: "AKTIF", catatan: "" },
+    { student_id: "A3-MOCK-001", no_matrik: "00130001", nama: "Pelajar Mock A3", email: "", no_tel: "", kelas: "A3", jantina: "Perempuan", status: "AKTIF", catatan: "" },
+    { student_id: "LI-MOCK-001", no_matrik: "00009001", nama: "Pelajar Latihan Industri Mock", email: "li.mock@example.test", no_tel: "01100009001", kelas: "LI", jantina: "Perempuan", status: "AKTIF", catatan: "Untuk QA local sahaja" },
+    { student_id: "LI-MOCK-002", no_matrik: "00009002", nama: "Pelajar LI Tidak Aktif", email: "", no_tel: "", kelas: "LI", jantina: "Lelaki", status: "TIDAK AKTIF", catatan: "" }
+  ];
+}
+
+function buildMockAdminOutingTypesV200() {
+  const timestamp = "2026-08-03T08:00:00.000Z";
+  const allDays = "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU";
+  const common = {
+    active: true,
+    application_open_time: "",
+    application_close_time: "",
+    fixed_return_time: "",
+    same_day_only: false,
+    require_leave_date: false,
+    require_return_date: false,
+    require_return_time: false,
+    require_guardian_phone: false,
+    require_guardian_relation: false,
+    require_emergency_reason: false,
+    require_purpose: true,
+    require_location: true,
+    require_vehicle: true,
+    require_warden_approval: true,
+    require_selfie: true,
+    config_version: 1,
+    created_at: timestamp,
+    created_by: "MOCK-SETUP",
+    updated_at: timestamp,
+    updated_by: "MOCK-SETUP"
+  };
+  return [
+    {
+      ...common,
+      type_code: REQUEST_TYPE.normal,
+      display_name: "Outing Biasa",
+      description: "Outing harian pada Selasa atau Rabu selepas 5:00 petang.",
+      sort_order: 1,
+      allowed_days: "SELASA,RABU",
+      application_open_time: "17:00",
+      fixed_return_time: "22:00",
+      same_day_only: true
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.weekend,
+      display_name: "Outing Sabtu / Ahad",
+      description: "Outing hujung minggu dan pulang pada hari yang sama.",
+      sort_order: 2,
+      allowed_days: "SABTU,AHAD",
+      fixed_return_time: "22:00",
+      same_day_only: true,
+      require_leave_date: true,
+      require_return_date: true,
+      require_return_time: true
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.emergency,
+      display_name: "Kecemasan",
+      description: "Permohonan kecemasan dengan sebab wajib diisi.",
+      sort_order: 3,
+      allowed_days: allDays,
+      fixed_return_time: "22:00",
+      same_day_only: true,
+      require_emergency_reason: true
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.overnight,
+      display_name: "Pulang Bermalam",
+      description: "Pulang bermalam dengan tarikh, masa pulang dan maklumat waris.",
+      sort_order: 4,
+      allowed_days: allDays,
+      require_return_date: true,
+      require_return_time: true,
+      require_guardian_phone: true,
+      require_guardian_relation: true
+    },
+    {
+      ...common,
+      type_code: REQUEST_TYPE.semester,
+      display_name: "Cuti Semester",
+      description: "Contoh konfigurasi tidak aktif untuk QA toggle.",
+      active: false,
+      sort_order: 5,
+      allowed_days: allDays,
+      require_return_date: true,
+      require_return_time: true,
+      require_guardian_phone: true,
+      require_guardian_relation: true
+    }
+  ];
+}
+
+function buildLegacyStudentOutingTypesV200() {
+  return buildMockAdminOutingTypesV200().map((type) => {
+    const {
+      config_version,
+      created_at,
+      created_by,
+      updated_at,
+      updated_by,
+      ...publicType
+    } = type;
+    return { ...publicType, active: true };
+  });
+}
+
+async function mockPublicOutingTypesV200() {
+  if (!ALLOW_MOCK_MODE) {
+    throw new Error("Mock public config tidak tersedia dalam live mode.");
+  }
+  await delay(250);
+  const scenario = new URLSearchParams(window.location.search).get("mockOutingTypes");
+  if (mockPublicOutingTypesErrorPendingV200) {
+    mockPublicOutingTypesErrorPendingV200 = false;
+    throw new Error("Ralat mock konfigurasi sekali sahaja.");
+  }
+  if (scenario === "empty") {
+    return [];
+  }
+  const publicRows = mockAdminOutingTypesV200
+    .filter((type) => type.active === true)
+    .map((type) => {
+      const {
+        active,
+        config_version,
+        created_at,
+        created_by,
+        updated_at,
+        updated_by,
+        ...publicType
+      } = type;
+      return publicType;
+    });
+  if (scenario === "optional") {
+    return [{
+      ...publicRows[0],
+      display_name: "Outing Tanpa Medan Wajib (QA)",
+      require_leave_date: false,
+      require_return_date: false,
+      require_return_time: false,
+      require_guardian_phone: false,
+      require_guardian_relation: false,
+      require_emergency_reason: false,
+      require_purpose: false,
+      require_location: false,
+      require_vehicle: false,
+      same_day_only: false,
+      fixed_return_time: ""
+    }];
+  }
+  return publicRows;
+}
+
+async function mockAdminApiPostV200(action, payload) {
+  if (!ALLOW_MOCK_MODE || !MOCK_ADMIN_QA || !MOCK_ADMIN_ACTIONS_V200.has(action)) {
+    throw new Error("Mock Admin tidak tersedia dalam live mode.");
+  }
+  await delay(250);
+  const request = payload || {};
+  const identity = String(request.admin_id || request.nama_admin || "").trim().toUpperCase();
+  const validIdentity = identity === MOCK_ADMIN_QA.admin_id
+    || identity === MOCK_ADMIN_QA.nama_admin.toUpperCase();
+  const validPin = String(request.pin || "") === MOCK_ADMIN_QA.pin;
+  if (!validIdentity || !validPin) {
+    throw new Error("ID atau nama Admin atau PIN tidak sah.");
+  }
+  if (action === "loginAdmin") {
+    return {
+      admin_id: MOCK_ADMIN_QA.admin_id,
+      nama_admin: MOCK_ADMIN_QA.nama_admin,
+      status: "AKTIF"
+    };
+  }
+  if (action === "getAdminStudents") {
+    return cloneMockAdminValueV200(mockAdminStudentsV200);
+  }
+
+  if (action === "createStudent") {
+    const student = normalizeAdminStudentV200(payload && payload.student);
+    if (!student.student_id || !student.no_matrik || !student.nama) {
+      throw new Error("ID pelajar, no. matrik dan nama diperlukan.");
+    }
+    if (mockAdminStudentsV200.some((item) => item.student_id.toUpperCase() === student.student_id.toUpperCase())) {
+      throw new Error("student_id telah wujud.");
+    }
+    if (mockAdminStudentsV200.some((item) => item.no_matrik.toUpperCase() === student.no_matrik.toUpperCase())) {
+      throw new Error("No. matrik telah digunakan.");
+    }
+    student.status = student.status || "AKTIF";
+    mockAdminStudentsV200.push(student);
+    return cloneMockAdminValueV200(student);
+  }
+
+  if (action === "updateStudent") {
+    const immutableId = String(payload && payload.student_id || "").trim();
+    const index = mockAdminStudentsV200.findIndex((item) => item.student_id === immutableId);
+    if (index < 0) throw new Error("Pelajar tidak ditemui.");
+    const student = normalizeAdminStudentV200(payload && payload.student);
+    if (student.student_id && student.student_id !== immutableId) throw new Error("student_id tidak boleh diubah.");
+    if (mockAdminStudentsV200.some((item, itemIndex) => itemIndex !== index && item.no_matrik.toUpperCase() === student.no_matrik.toUpperCase())) {
+      throw new Error("No. matrik telah digunakan.");
+    }
+    mockAdminStudentsV200[index] = Object.assign({}, mockAdminStudentsV200[index], student, { student_id: immutableId });
+    return cloneMockAdminValueV200(mockAdminStudentsV200[index]);
+  }
+
+  if (action === "toggleStudentStatus") {
+    const studentId = String(payload && payload.student_id || "").trim();
+    const student = mockAdminStudentsV200.find((item) => item.student_id === studentId);
+    if (!student) throw new Error("Pelajar tidak ditemui.");
+    if (typeof payload.active !== "boolean") throw new Error("Status pelajar tidak sah.");
+    student.status = payload.active ? "AKTIF" : "TIDAK AKTIF";
+    return cloneMockAdminValueV200(student);
+  }
+
+  if (action === "getAdminOutingTypes") {
+    if (mockAdminReadErrorPendingV200) {
+      mockAdminReadErrorPendingV200 = false;
+      throw new Error("Ralat mock sekali sahaja. Tekan Cuba Lagi.");
+    }
+    return cloneMockAdminValueV200(mockAdminOutingTypesV200);
+  }
+
+  const timestamp = new Date().toISOString();
+  const typeCode = String(request.type_code || request.outing_type && request.outing_type.type_code || "")
+    .trim()
+    .toUpperCase();
+  const existingIndex = mockAdminOutingTypesV200.findIndex((item) => item.type_code === typeCode);
+
+  if (action === "createOutingType") {
+    if (!typeCode || existingIndex !== -1) {
+      throw new Error(existingIndex !== -1 ? "type_code telah wujud." : "type_code diperlukan.");
+    }
+    const created = {
+      ...cloneMockAdminValueV200(request.outing_type || {}),
+      type_code: typeCode,
+      active: request.outing_type && request.outing_type.active === true,
+      config_version: 1,
+      created_at: timestamp,
+      created_by: MOCK_ADMIN_QA.admin_id,
+      updated_at: timestamp,
+      updated_by: MOCK_ADMIN_QA.admin_id
+    };
+    mockAdminOutingTypesV200.push(created);
+    return cloneMockAdminValueV200(created);
+  }
+
+  if (existingIndex === -1) {
+    throw new Error("Jenis outing tidak ditemui.");
+  }
+  const current = mockAdminOutingTypesV200[existingIndex];
+  if (mockAdminConflictPendingV200) {
+    mockAdminConflictPendingV200 = false;
+    current.config_version += 1;
+    current.updated_at = timestamp;
+    current.updated_by = "MOCK-CONCURRENT-ADMIN";
+    throw new Error("CONFIG_VERSION_CONFLICT: konfigurasi mock telah berubah.");
+  }
+  if (Number(request.expected_config_version) !== Number(current.config_version)) {
+    throw new Error("CONFIG_VERSION_CONFLICT: muat semula konfigurasi terkini.");
+  }
+
+  if (action === "updateOutingType") {
+    const updated = {
+      ...current,
+      ...cloneMockAdminValueV200(request.outing_type || {}),
+      type_code: current.type_code,
+      active: current.active,
+      config_version: current.config_version + 1,
+      created_at: current.created_at,
+      created_by: current.created_by,
+      updated_at: timestamp,
+      updated_by: MOCK_ADMIN_QA.admin_id
+    };
+    mockAdminOutingTypesV200[existingIndex] = updated;
+    return cloneMockAdminValueV200(updated);
+  }
+
+  const toggled = {
+    ...current,
+    active: request.active === true,
+    config_version: current.config_version + 1,
+    updated_at: timestamp,
+    updated_by: MOCK_ADMIN_QA.admin_id
+  };
+  mockAdminOutingTypesV200[existingIndex] = toggled;
+  return cloneMockAdminValueV200(toggled);
+}
+
+function cloneMockAdminValueV200(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 async function apiGet(action) {
   return apiGetWithParams(action);
 }
 
 async function apiGetWithParams(action, params = {}) {
+  if (ALLOW_MOCK_MODE && action === "getOutingTypes") {
+    return mockPublicOutingTypesV200();
+  }
   const searchParams = new URLSearchParams({
     action,
     _ts: String(Date.now())
@@ -611,7 +2095,7 @@ async function fetchApiGetWithRetry(action, searchParams) {
     searchParams.set("_ts", String(Date.now()));
 
     try {
-      const response = await fetch(`${GAS_WEB_APP_URL}?${searchParams.toString()}`, {
+      const response = await fetch(`${getGasWebAppUrlV200()}?${searchParams.toString()}`, {
         cache: "no-store"
       });
       return await parseApiResponse(response, action);
@@ -627,28 +2111,8 @@ async function fetchApiGetWithRetry(action, searchParams) {
   throw lastError || new Error(LIVE_API_UNSTABLE_MESSAGE);
 }
 
-async function apiPost(action, payload) {
-  const response = await fetch(GAS_WEB_APP_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8"
-    },
-    body: JSON.stringify({
-      action,
-      ...payload
-    })
-  });
-  const result = await response.json();
-
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error || `API POST failed: ${action}`);
-  }
-
-  return result.data;
-}
-
 async function loadLiveMasters() {
-  if (!GAS_WEB_APP_URL) {
+  if (!getGasWebAppUrlV200()) {
     if (ALLOW_MOCK_MODE) {
       setMockMode("");
     } else {
@@ -714,7 +2178,10 @@ async function loadTodayRecords() {
 }
 
 async function apiPost(action, payload) {
-  const response = await fetch(GAS_WEB_APP_URL, {
+  if (ALLOW_MOCK_MODE && MOCK_ADMIN_ACTIONS_V200.has(action)) {
+    return mockAdminApiPostV200(action, payload);
+  }
+  const response = await fetch(getGasWebAppUrlV200(), {
     method: "POST",
     cache: "no-store",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -1224,9 +2691,162 @@ function showUpdatePrompt() {
   if (closeButton) closeButton.addEventListener("click", dismissToast);
 }
 
+function setupStudentOutingTypesV200() {
+  if (els.studentOutingTypesRetryButton && els.studentOutingTypesRetryButton.dataset.ready !== "1") {
+    els.studentOutingTypesRetryButton.dataset.ready = "1";
+    els.studentOutingTypesRetryButton.addEventListener("click", loadStudentOutingTypesV200);
+  }
+  if (els.leaveDateInput && els.leaveDateInput.dataset.sameDaySyncV200 !== "1") {
+    els.leaveDateInput.dataset.sameDaySyncV200 = "1";
+    els.leaveDateInput.addEventListener("change", syncStudentSameDayReturnV200);
+  }
+}
+
+async function loadStudentOutingTypesV200() {
+  if (!currentSession || currentSession.role !== "student" || studentOutingTypesLoadingV200) {
+    return;
+  }
+  studentOutingTypesLoadingV200 = true;
+  setStudentOutingTypesStateV200("Memuatkan jenis outing...", false, false);
+  if (els.requestTypeSelect) els.requestTypeSelect.disabled = true;
+  try {
+    const rows = await apiGet("getOutingTypes");
+    const activeRows = normalizeStudentOutingTypesV200(rows);
+    if (!activeRows.length) {
+      useLegacyStudentOutingTypesV200("Tiada konfigurasi aktif. Lima jenis legacy digunakan.", false);
+    } else {
+      studentOutingTypesV200 = activeRows;
+      studentOutingTypesUsingFallbackV200 = false;
+      renderStudentOutingTypesV200();
+      setStudentOutingTypesStateV200("", false, false);
+    }
+  } catch (error) {
+    useLegacyStudentOutingTypesV200("Konfigurasi gagal dimuatkan. Lima jenis legacy digunakan.", true);
+  } finally {
+    studentOutingTypesLoadingV200 = false;
+    if (els.requestTypeSelect) els.requestTypeSelect.disabled = false;
+    updateRequestTypeFields();
+    updateStudentSubmitState();
+  }
+}
+
+function normalizeStudentOutingTypesV200(rows) {
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set();
+  return rows
+    .filter((row) => row && row.active !== false)
+    .map((row) => ({
+      ...row,
+      type_code: String(row.type_code || "").trim().toUpperCase(),
+      display_name: String(row.display_name || "").trim(),
+      sort_order: Number(row.sort_order) || 0
+    }))
+    .filter((row) => {
+      if (!row.type_code || !row.display_name || seen.has(row.type_code)) return false;
+      seen.add(row.type_code);
+      return true;
+    })
+    .sort((left, right) => (
+      left.sort_order - right.sort_order
+      || left.display_name.localeCompare(right.display_name)
+    ));
+}
+
+function useLegacyStudentOutingTypesV200(message, showRetry) {
+  studentOutingTypesV200 = buildLegacyStudentOutingTypesV200();
+  studentOutingTypesUsingFallbackV200 = true;
+  renderStudentOutingTypesV200();
+  setStudentOutingTypesStateV200(message, true, showRetry);
+}
+
+function renderStudentOutingTypesV200() {
+  if (!els.requestTypeSelect) return;
+  const previousValue = els.requestTypeSelect.value;
+  const rows = normalizeStudentOutingTypesV200(studentOutingTypesV200);
+  const safeRows = rows.length ? rows : normalizeStudentOutingTypesV200(buildLegacyStudentOutingTypesV200());
+  els.requestTypeSelect.innerHTML = safeRows
+    .map((type) => `<option value="${escapeHtml(type.type_code)}">${escapeHtml(type.display_name)}</option>`)
+    .join("");
+  if (safeRows.some((type) => type.type_code === previousValue)) {
+    els.requestTypeSelect.value = previousValue;
+  }
+  studentOutingTypesV200 = safeRows;
+}
+
+function setStudentOutingTypesStateV200(message, isError, showRetry) {
+  if (els.studentOutingTypesMessage) {
+    els.studentOutingTypesMessage.textContent = message || "";
+    els.studentOutingTypesMessage.classList.toggle("error", Boolean(isError));
+  }
+  if (els.studentOutingTypesRetryButton) {
+    els.studentOutingTypesRetryButton.hidden = !showRetry;
+  }
+}
+
+function getSelectedStudentOutingTypeConfigV200() {
+  const typeCode = els.requestTypeSelect ? els.requestTypeSelect.value : "";
+  return studentOutingTypesV200.find((type) => type.type_code === typeCode) || null;
+}
+
+function setConfigFieldStateV200(field, visible, required, options = {}) {
+  if (!field) return;
+  const shouldReset = !visible || (options.reset === true && options.clearOnTypeChange === true);
+  if (shouldReset) field.value = "";
+  setFieldAndLabelHiddenV160(field, !visible);
+  field.disabled = !visible;
+  field.required = Boolean(visible && required);
+  field.readOnly = Boolean(visible && options.readOnly);
+  if (visible && options.value !== undefined && options.value !== null && options.value !== "") {
+    field.value = String(options.value);
+  }
+}
+
+function applyStudentOutingTypeConfigV200(config) {
+  if (!config) return;
+  const typeChanged = studentPreviousOutingTypeCodeV200 !== config.type_code;
+  const sameDayOnly = config.same_day_only === true;
+  const fixedReturnTime = String(config.fixed_return_time || "").trim();
+  setConfigFieldStateV200(els.leaveDateInput, config.require_leave_date === true, config.require_leave_date === true, { reset: typeChanged, clearOnTypeChange: true });
+  setConfigFieldStateV200(
+    els.returnDateInput,
+    config.require_return_date === true && !sameDayOnly,
+    config.require_return_date === true && !sameDayOnly,
+    { reset: typeChanged, clearOnTypeChange: true }
+  );
+  setConfigFieldStateV200(
+    els.expectedReturnTimeInput,
+    config.require_return_time === true,
+    config.require_return_time === true,
+    { reset: typeChanged, clearOnTypeChange: true, readOnly: Boolean(fixedReturnTime), value: fixedReturnTime }
+  );
+  setConfigFieldStateV200(els.guardianPhoneInput, config.require_guardian_phone === true, config.require_guardian_phone === true, { reset: typeChanged, clearOnTypeChange: true });
+  setConfigFieldStateV200(els.guardianRelationSelect, config.require_guardian_relation === true, config.require_guardian_relation === true, { reset: typeChanged, clearOnTypeChange: true });
+  setConfigFieldStateV200(els.emergencyReasonInput, config.require_emergency_reason === true, config.require_emergency_reason === true, { reset: typeChanged, clearOnTypeChange: true });
+  setConfigFieldStateV200(els.purposeInput, config.require_purpose === true, config.require_purpose === true, { reset: typeChanged });
+  setConfigFieldStateV200(els.locationInput, config.require_location === true, config.require_location === true, { reset: typeChanged });
+  setConfigFieldStateV200(els.vehicleTypeSelect, config.require_vehicle === true, config.require_vehicle === true, { reset: typeChanged });
+  setConfigFieldStateV200(els.vehicleDetailInput, config.require_vehicle === true, false, { reset: typeChanged });
+
+  const overnightVisible = [els.leaveDateInput, els.returnDateInput, els.expectedReturnTimeInput]
+    .some((field) => field && !field.disabled);
+  const guardianVisible = [els.guardianPhoneInput, els.guardianRelationSelect, els.emergencyReasonInput]
+    .some((field) => field && !field.disabled);
+  setSectionVisibleV164(els.overnightFields, overnightVisible);
+  setSectionVisibleV164(els.emergencyFields, guardianVisible || (els.emergencyNoteInput && !els.emergencyNoteInput.hidden));
+  if (sameDayOnly) syncStudentSameDayReturnV200();
+  studentPreviousOutingTypeCodeV200 = config.type_code;
+}
+
+function syncStudentSameDayReturnV200() {
+  const config = getSelectedStudentOutingTypeConfigV200();
+  if (!config || config.same_day_only !== true || !els.returnDateInput || !els.leaveDateInput) return;
+  els.returnDateInput.value = els.leaveDateInput.value;
+}
+
 function startStudentSession(student) {
   try {
     startSession("student", student);
+    loadStudentOutingTypesV200();
   } catch (error) {
     console.warn("Student view render warning:", error);
     if (!els.studentRecordsList || !els.studentRecordsList.innerHTML.trim()) {
@@ -1506,7 +3126,8 @@ function stopStudentAutoRefresh() {
   }
 }
 
-function openMonitoringPage() {
+function obsoleteOpenMonitoringPageV1612(eventOrOptions) {
+  const intentional = isIntentionalNavigationV200(eventOrOptions);
   stopStudentAutoRefresh();
   hideLoginPanels();
   currentSession = null;
@@ -1741,18 +3362,30 @@ els.requestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const requestType = els.requestTypeSelect.value;
+  const selectedConfig = getSelectedStudentOutingTypeConfigV200();
+  const configValidationMessage = selectedConfig
+    ? validateStudentOutingTypeConfigV200(selectedConfig)
+    : "";
+  if (configValidationMessage) {
+    els.studentMessage.textContent = configValidationMessage;
+    return;
+  }
 
   if (!isLiveMode && !canSubmitRequest(requestType, new Date())) {
     els.studentMessage.textContent = "Outing Biasa hanya dibuka pada Selasa/Rabu selepas 5:00 PM. Hanya permohonan Kecemasan boleh dihantar sekarang.";
     return;
   }
 
-  if (requestType === REQUEST_TYPE.emergency && !els.emergencyReasonInput.value.trim()) {
+  if (
+    requestType === REQUEST_TYPE.emergency
+    && (!selectedConfig || selectedConfig.require_emergency_reason === true)
+    && !els.emergencyReasonInput.value.trim()
+  ) {
     els.studentMessage.textContent = "Sila isi Sebab Kecemasan sebelum menghantar permohonan Kecemasan.";
     return;
   }
 
-if (requestType === REQUEST_TYPE.weekend) {
+if (requestType === REQUEST_TYPE.weekend && (!selectedConfig || selectedConfig.require_leave_date === true)) {
   const leaveDate = els.leaveDateInput
     ? els.leaveDateInput.value
     : "";
@@ -2472,7 +4105,8 @@ function bindStudentHistoryToggles() {
   });
 }
 
-function openStatisticsPage() {
+function openStatisticsPage(eventOrOptions) {
+  const intentional = isIntentionalNavigationV200(eventOrOptions);
   stopStudentAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
@@ -2480,6 +4114,9 @@ function openStatisticsPage() {
   els.appWorkspace.classList.remove("active");
   if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
   els.statsWorkspace.classList.add("active");
+  if (intentional) {
+    scheduleIntentionalScrollV200(els.statsWorkspace);
+  }
   setupStatsFilters();
   loadStatistics();
 }
@@ -3793,13 +5430,17 @@ function validatePulangBermalamRequest() {
     return "";
   }
 
+  const config = getSelectedStudentOutingTypeConfigV200();
+  const configMessage = config ? validateStudentOutingTypeConfigV200(config) : "";
+  if (configMessage) return configMessage;
+
   const now = new Date();
   const parts = getKualaLumpurParts(now);
   const todayKey = `${parts.year}-${parts.month}-${parts.day}`;
   const returnDate = els.returnDateInput ? els.returnDateInput.value : "";
   const expectedReturnTime = els.expectedReturnTimeInput ? els.expectedReturnTimeInput.value : "";
 
-  if (!returnDate || !expectedReturnTime) {
+  if (!config && (!returnDate || !expectedReturnTime)) {
     return "Tarikh Pulang Ke Asrama dan Masa Dijangka Pulang Ke Asrama diperlukan untuk Pulang Bermalam.";
   }
 
@@ -5055,7 +6696,7 @@ function ensureSemesterLeaveDateFieldV160() {
   els.leaveDateInput = input;
 }
 
-function updateRequestTypeFields() {
+function updateLegacyRequestTypeFieldsV164() {
   const requestType = els.requestTypeSelect ? els.requestTypeSelect.value : "";
   const isNormal = requestType === REQUEST_TYPE.normal;
   const isWeekend = requestType === REQUEST_TYPE.weekend;
@@ -5226,6 +6867,11 @@ if (isSemester) {
   }
 }
 
+function updateRequestTypeFields() {
+  updateLegacyRequestTypeFieldsV164();
+  applyStudentOutingTypeConfigV200(getSelectedStudentOutingTypeConfigV200());
+}
+
 function updateSemesterFieldsV160() {
   updateRequestTypeFields();
 }
@@ -5331,12 +6977,15 @@ function validateSemesterRequestV160() {
   const guardianPhone = els.guardianPhoneInput ? els.guardianPhoneInput.value.trim() : "";
   const guardianRelation = els.guardianRelationSelect ? els.guardianRelationSelect.value.trim() : "";
 
-  if (!returnDate) return "Tarikh Pulang Ke Asrama diperlukan.";
-  if (!returnTime) return "Masa Dijangka Pulang Ke Asrama diperlukan.";
+  const config = getSelectedStudentOutingTypeConfigV200();
+  const configMessage = config ? validateStudentOutingTypeConfigV200(config) : "";
+  if (configMessage) return configMessage;
+  if (!config && !returnDate) return "Tarikh Pulang Ke Asrama diperlukan.";
+  if (!config && !returnTime) return "Masa Dijangka Pulang Ke Asrama diperlukan.";
   if (leaveDate && returnDate < leaveDate) return "Tarikh Pulang Ke Asrama tidak boleh lebih awal daripada tarikh keluar.";
-  if (!location) return "Alamat / destinasi semasa cuti diperlukan.";
-  if (!guardianPhone) return "Telefon waris diperlukan.";
-  if (!guardianRelation) return "Hubungan waris diperlukan.";
+  if (!config && !location) return "Alamat / destinasi semasa cuti diperlukan.";
+  if (!config && !guardianPhone) return "Telefon waris diperlukan.";
+  if (!config && !guardianRelation) return "Hubungan waris diperlukan.";
   return "";
 }
 
@@ -5459,6 +7108,36 @@ function isHostelReturnLateV160(record) {
   return !isNaN(expected.getTime()) && Date.now() > expected.getTime() && !record.masa_masuk && !record.returnedAt;
 }
 
+function isStudentOutingTypeConfigReadyV200(config) {
+  if (!config) return false;
+  const requiredFields = [
+    [config.require_leave_date, els.leaveDateInput],
+    [config.require_return_date && !config.same_day_only, els.returnDateInput],
+    [config.require_return_time, els.expectedReturnTimeInput],
+    [config.require_guardian_phone, els.guardianPhoneInput],
+    [config.require_guardian_relation, els.guardianRelationSelect],
+    [config.require_emergency_reason, els.emergencyReasonInput],
+    [config.require_purpose, els.purposeInput],
+    [config.require_location, els.locationInput],
+    [config.require_vehicle, els.vehicleTypeSelect]
+  ];
+  const fieldsReady = requiredFields.every(([required, field]) => (
+    required !== true || Boolean(field && String(field.value || "").trim())
+  ));
+  if (!fieldsReady) return false;
+  if (config.require_leave_date === true && config.allowed_days && els.leaveDateInput && els.leaveDateInput.value) {
+    const allowedDays = String(config.allowed_days).split(",").map((day) => day.trim().toUpperCase());
+    const selectedDay = getDayNameFromDateKeyV160(els.leaveDateInput.value).toUpperCase();
+    if (allowedDays.length && !allowedDays.includes(selectedDay)) return false;
+  }
+  return true;
+}
+
+function validateStudentOutingTypeConfigV200(config) {
+  if (isStudentOutingTypeConfigReadyV200(config)) return "";
+  return "Sila lengkapkan semua maklumat wajib untuk jenis outing yang dipilih.";
+}
+
 function updateStudentSubmitState() {
   try {
     if (!els || !els.requestForm) {
@@ -5476,6 +7155,12 @@ function updateStudentSubmitState() {
 
     if (!hasStudentSession || !requestType) {
       submitButton.disabled = true;
+      return;
+    }
+
+    const selectedConfig = getSelectedStudentOutingTypeConfigV200();
+    if (selectedConfig) {
+      submitButton.disabled = !isStudentOutingTypeConfigReadyV200(selectedConfig);
       return;
     }
 
@@ -5755,7 +7440,8 @@ function scrollMonitoringWorkspaceToTop() {
   }
 }
 
-async function openMonitoringPage() {
+async function openMonitoringPage(eventOrOptions) {
+  const intentional = isIntentionalNavigationV200(eventOrOptions);
   activeRefreshPage = "monitor";
   if (els.accessScreen) {
     els.accessScreen.classList.add("hidden");
@@ -5769,7 +7455,9 @@ async function openMonitoringPage() {
   if (els.monitorWorkspace) {
     els.monitorWorkspace.classList.add("active");
   }
-  scrollMonitoringWorkspaceToTop();
+  if (intentional) {
+    scheduleIntentionalScrollV200(els.monitorWorkspace);
+  }
 
   if (!monitoringRefreshIntervalId) {
     monitoringRefreshIntervalId = setInterval(() => {
@@ -6551,6 +8239,9 @@ function isSemesterChecklistLate(record) {
 
 async function initApp() {
   setupAppVersionUi();
+  if (els.betaApiIndicator) {
+    els.betaApiIndicator.hidden = !ACTIVE_API_ENDPOINT_V200.isBeta;
+  }
   setupServiceWorkerUpdates();
   setupAccessEnhancements();
   setupFooterActionsVisibilityV166();
@@ -6564,12 +8255,14 @@ async function initApp() {
   updateClock();
   if (ALLOW_MOCK_MODE) {
     setMockMode("");
+    refreshStudentClassChoicesV200();
     await restoreSavedSession();
     return;
   } else {
     updateDataModeIndicator();
   }
   await loadLiveMasters();
+  refreshStudentClassChoicesV200();
   if (isLiveMode) {
     await restoreSavedSession();
   }

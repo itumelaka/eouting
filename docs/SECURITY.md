@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan live **v1.7.0**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan repo semasa **v2.0.0**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -63,7 +63,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache live semasa ialah `eouting-cache-v1.7.0`.
+- Cache semasa ialah `eouting-cache-v2.0.0`.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -93,6 +93,73 @@ Gambar disimpan dalam folder Google Drive private. `LockService` merangkumi sema
 
 Frontend role hiding, button visibility, PWA install dan local state bukan security enforcement.
 
+## Backend Admin Config v2.0
+
+- `OUTING_TYPES` dan `ADMIN_USERS` diwujudkan sebagai schema staging sahaja.
+- `ADMIN_USERS` tidak diseed dengan akaun atau PIN contoh.
+- Fasa 3 menambah `loginAdmin`, public safe config GET dan Admin read/create/update/toggle melalui POST.
+- Tiada Dashboard Admin, butang login Admin atau session token frontend dalam Fasa 3.
+- `OUTING_CONFIG_V2_ENABLED` default kepada string `false` dan migration tidak pernah menetapkannya kepada `true`.
+- `submitRequest` terus menggunakan whitelist dan validation hard-coded v1.7.1.
+- `type_code` seed tidak ditukar atau ditimpa apabila migration dijalankan semula.
+- Tab `ADMIN_USERS`, khususnya kolum `pin`, mesti kekal private dan tidak boleh diterbitkan melalui GET awam pada fasa akan datang.
+- Login dan setiap Admin API mengesahkan `admin_id` atau `nama_admin`, PIN tepat dan status `AKTIF` terus terhadap Sheet.
+- Response login, public config, Admin config dan audit tidak memulangkan PIN atau row `ADMIN_USERS`.
+- Public `getOutingTypes` tidak mendedahkan `active`, `config_version`, `created_*`, `updated_*` atau metadata Admin.
+- Create/update/toggle menggunakan `LockService`; optimistic `expected_config_version` menghalang overwrite konfigurasi yang sudah berubah.
+- Semua boolean, masa, hari, `sort_order`, kod dan nama disahkan di GAS tanpa mempercayai frontend.
+
+### Frontend Admin Fasa 4
+
+- PIN hanya berada dalam `adminRuntimeCredential` sepanjang session tab semasa.
+- PIN input dikosongkan selepas login berjaya/gagal dan semasa logout.
+- Admin tidak menggunakan `rememberSessionIfRequested`, localStorage atau sessionStorage.
+- Credential dan response Admin tidak dicetak melalui `console`.
+- Error login menggunakan mesej generik dan tidak memaparkan credential yang ditaip.
+- Dashboard tidak membaca atau memaparkan row `ADMIN_USERS`.
+- `type_code` read-only semasa edit; status active hanya melalui toggle dengan confirmation.
+- Frontend validation ialah bantuan UX sahaja; GAS kekal authorization dan validation boundary.
+- Logout membersihkan credential runtime, list config dan state editor Admin.
+
+### Pengasingan Mock Admin Fasa 4.5
+
+- Router Mock Admin hanya aktif apabila URL mempunyai query tepat `mock=1`.
+- Live mode tidak mencipta credential Mock Admin dan terus menghantar action Admin kepada GAS.
+- Credential `ADMIN-MOCK` / PIN QA ialah data development sahaja, bukan akaun `ADMIN_USERS` dan tidak diseed ke Google Sheets.
+- Login response mock tidak memulangkan PIN dan router mock tidak log credential.
+- Create, update dan toggle mock hanya menulis array memory tab semasa; tiada `fetch`, GAS atau persistence browser.
+- PIN Admin mock/live tidak disimpan dalam localStorage atau sessionStorage dan dibersihkan semasa logout.
+- Query `mockAdminError=1` dan `mockAdminConflict=1` hanya berfungsi bersama `mock=1`.
+
+### Canonical POST Router Fasa 4.6
+
+- Frontend mempunyai satu sahaja `apiPost`, mengelakkan security/mock guard ditambah pada declaration yang tidak efektif.
+- Mock guard dinilai sebelum `fetch`; tanpa `mock=1`, action terus menggunakan GAS live.
+- Live POST menggunakan `cache: no-store` dan semua response melalui `parseApiResponse`.
+- HTML, JSON tidak sah, HTTP failure dan backend `ok: false` ditolak secara terkawal tanpa mengubah payload atau authorization GAS.
+
+### Student Config Rendering Fasa 5A
+
+- Pelajar hanya membaca safe public projection `getOutingTypes`; metadata Admin dan row `ADMIN_USERS` tidak terlibat.
+- Loader berjalan selepas sesi Pelajar dibuka, bukan semasa Admin/Warden/Guard flow.
+- Inactive config ditapis dan duplicate/invalid type code tidak dirender.
+- Hidden field dikosongkan, dinyah-required dan disabled supaya nilai lama tidak terbawa dalam submission frontend.
+- Kegagalan atau config kosong menggunakan legacy config tempatan, bukan data raw atau Admin API.
+- Frontend config bukan authorization boundary; GAS `submitRequest` kekal validation source of truth. Fasa 5B membaca config terus daripada Sheet hanya apabila feature flag aktif.
+- Mock public config hanya dipintas apabila query tepat `mock=1` digunakan.
+
+### Submit Validation Fasa 5B
+
+- `OUTING_CONFIG_V2_ENABLED` mesti tepat `"true"`; semua nilai lain menggunakan validator legacy.
+- Backend tidak menerima row config atau required flags daripada payload Pelajar.
+- `type_code` dinormalisasi case-insensitive, tetapi mesti mematuhi format terkawal dan sepadan dengan row active.
+- Semua boolean Sheet dibaca secara ketat. Nilai tidak dikenali, header/sheet hilang, config version tidak sah atau schema malformed gagal tertutup dengan mesej selamat.
+- Tarikh menggunakan format ISO `YYYY-MM-DD`, masa menggunakan `HH:mm`, dan `allowed_days` serta application window dinilai dalam zon `Asia/Kuala_Lumpur`.
+- `fixed_return_time` dikuatkuasakan oleh backend; nilai client tidak boleh mengatasinya.
+- `require_warden_approval = false` menggunakan auto-approval backend beridentiti `AUTO_CONFIG_V2`; client tidak boleh memilih status awal sendiri.
+- Audit hanya menyimpan type code dan config version tambahan, bukan config penuh atau credential.
+- Feature flag kekal `false`; tiada migration atau activation live dilakukan dalam fasa ini.
+
 ## Telegram dan Deployment Secrets
 
 Jangan commit:
@@ -113,6 +180,7 @@ Selfie dihantar sebagai foto sebenar melalui Telegram `sendPhoto`. Pentadbir ata
 - Spreadsheet mesti private dan dikongsi kepada akaun yang perlu sahaja.
 - Jangan publish tab sebagai public.
 - Audit log tidak boleh menyimpan PIN atau raw credential.
+- `entity_type` dan `entity_id` ialah metadata audit generik; jangan gunakan kedua-duanya untuk menyimpan secret atau PII yang tidak diperlukan.
 - Semak access owner/editor secara berkala.
 - Retention dan backup policy masih perlu ditetapkan.
 - Retention/deletion policy khusus untuk selfie masih perlu ditetapkan.
@@ -126,3 +194,11 @@ Selfie dihantar sebagai foto sebenar melalui Telegram `sendPhoto`. Pentadbir ata
 - Evidence review UI, retention selfie dan automated cleanup.
 - Refinement notis consent/privacy Pelajar.
 - Deployment permission dan backup policy yang lebih ketat.
+
+## Pengurusan Pelajar Beta
+
+- Semua read/write Pengurusan Pelajar memerlukan credential Admin aktif dan menggunakan POST.
+- PIN Admin kekal dalam runtime browser sahaja dan tidak dimasukkan dalam response atau audit.
+- Create/update/toggle menggunakan `LockService`; semakan keunikan `student_id` dan `no_matrik` diulang dalam lock.
+- Audit menyimpan identiti Admin, `student_id`, tindakan dan ringkasan medan berubah sahaja.
+- Nyahaktif tidak memadam pelajar atau rekod outing lama; public `getStudents` memang menapis rekod tidak aktif.

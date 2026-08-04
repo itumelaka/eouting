@@ -1,6 +1,20 @@
 # Deployment eOuting ITU
 
-Versi live semasa: **v1.7.0**. Backend production menggunakan GAS **Version 21**, dideploy pada **26 Jul 2026**.
+Versi repo semasa: **v2.0.0**. Backend production GAS **Version 24** telah dideploy dan smoke-tested bersama Spreadsheet serta login Admin sebelum release frontend ini.
+
+## Fasa 5B Belum Diaktifkan
+
+Kod backend config-driven submission sudah tersedia di branch v2.0 tetapi `OUTING_CONFIG_V2_ENABLED` mesti kekal `false` sehingga migration live, semakan lima seed, backup dan QA rollback diluluskan. Jangan mengaktifkan flag sebelum versi GAS yang mengandungi resolver Fasa 5B dideploy dan `OUTING_TYPES` disahkan lengkap.
+
+Urutan activation masa hadapan ialah: backup Sheet, jalankan migration idempotent, semak config active/schema, deploy GAS, uji legacy dengan flag `false`, aktifkan flag dalam tetingkap terkawal, kemudian uji submit/duplicate/Warden/Guard. Rollback segera hanya memerlukan flag dikembalikan kepada `false`; jangan padam tab atau rekod lama. Tiada langkah ini dilakukan dalam Fasa 5B semasa.
+
+## Release Beta v2.0
+
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.0.0`.
+
+Beta pertama hendaklah menguji lima seed sahaja. Jenis custom, statistik dinamik, label Telegram dinamik dan penggunaan operasi `require_selfie` belum menjadi gate yang lengkap. `require_warden_approval=false` juga perlu dianggap high-impact kerana backend akan auto-approve sebagai `AUTO_CONFIG_V2`.
+
+Keutamaan persekitaran ialah salinan Spreadsheet dan deployment GAS beta berasingan. Jika beta perlu menggunakan data production, backup, tetingkap perubahan, pemilik rollback dan kill switch flag mesti disahkan sebelum migration.
 
 ## Frontend-only Release
 
@@ -16,7 +30,7 @@ Gunakan flow ini jika `gas/Code.gs` tidak berubah:
 8. push ke GitHub;
 9. tunggu GitHub Pages dan sahkan versi live/PWA update popup.
 
-v1.6.24 ialah frontend-only release untuk Guard quick filter dan contextual empty-state. v1.7.0 bukan frontend-only kerana melibatkan GAS, schema berasaskan header, Google Drive dan Telegram.
+v1.6.24 ialah frontend-only release untuk Guard quick filter dan contextual empty-state. v1.7.0 bukan frontend-only kerana melibatkan GAS, schema berasaskan header, Google Drive dan Telegram. v1.7.1 turut mengubah frontend dan GAS bagi `OUTING_HUJUNG_MINGGU`, maka ia bukan frontend-only.
 
 ## Backend GAS Release
 
@@ -33,6 +47,42 @@ Gunakan flow ini apabila `gas/Code.gs` berubah:
 
 `clasp push` sahaja tidak menjamin deployment `/exec` menggunakan code baharu. Deployment version baharu tetap diperlukan.
 
+## Migration staging eOuting v2.0
+
+Fasa 2 menyediakan `setupAdminOutingConfigV200()` tetapi tidak mengarahkan deployment production. Apabila fasa deployment diluluskan kemudian:
+
+1. backup Spreadsheet;
+2. sahkan code GAS yang akan dideploy dan `OUTING_CONFIG_V2_ENABLED` belum bernilai `true`;
+3. jalankan `setupAdminOutingConfigV200()` sekali;
+4. sahkan tab `OUTING_TYPES` mempunyai 26 header dan tepat lima seed unik;
+5. sahkan tab `ADMIN_USERS` hanya mempunyai tujuh header tanpa akaun seed;
+6. sahkan `entity_type` dan `entity_id` ditambah selepas header lama `AUDIT_LOG` serta row lama tidak berubah;
+7. jalankan migration kali kedua dan sahkan `created_type_codes` kosong;
+8. sahkan Script Property `OUTING_CONFIG_V2_ENABLED=false`;
+9. uji semula `submitRequest` v1.7.1 sebelum mempertimbangkan activation pada fasa lain.
+
+Jangan isi akaun Admin, mengaktifkan feature flag atau menganggap schema staging sebagai authorization boundary. Rollback Fasa 2 tidak boleh memadam tab/kolum yang mungkin sudah mengandungi data; matikan flag dan kembali kepada deployment stabil sambil mengekalkan data additive.
+
+### Pemeriksaan Fasa 3 sebelum deployment masa hadapan
+
+- Pastikan `OUTING_CONFIG_V2_ENABLED=false`; public `getOutingTypes` mesti memulangkan fallback legacy.
+- Sahkan tiada akaun Admin contoh atau PIN berada dalam repo, test log atau deployment output.
+- Isi akaun Admin sebenar hanya melalui Sheet private dan formatkan PIN sebagai Plain text.
+- Uji login berjaya, PIN salah, Admin tidak aktif, optimistic conflict dan audit tanpa PIN.
+- Sahkan create/update/toggle hanya melalui POST; jangan buka write action melalui GET.
+- Sahkan tiada route delete dan `submitRequest` masih tidak membaca `OUTING_TYPES`.
+- Jangan aktifkan flag sehingga Admin UI, config-driven form dan rollback production diluluskan pada fasa lain.
+
+### Pemeriksaan Fasa 4 sebelum deployment masa hadapan
+
+- Uji role dan panel login Admin pada desktop serta telefon.
+- Pastikan DevTools localStorage/sessionStorage tidak mengandungi Admin PIN atau session Admin.
+- Pastikan refresh browser selepas login memerlukan login Admin semula.
+- Uji loading, empty, error, retry, create, edit, toggle dan conflict state.
+- Pastikan tiada delete control dan tiada data `ADMIN_USERS` dipaparkan.
+- Feature flag mesti kekal `false`; Admin Dashboard boleh menyediakan config tanpa menukar student form production.
+- Deployment Fasa 4 memerlukan frontend dan GAS Fasa 3 serasi, tetapi tidak termasuk live migration atau activation tanpa kelulusan berasingan.
+
 ## Urutan Deployment v1.7.0
 
 1. Kemas kini `gas/Code.gs` dan semak syntax.
@@ -42,7 +92,7 @@ Gunakan flow ini apabila `gas/Code.gs` berubah:
 5. Sahkan `TELEGRAM_ENABLED`, `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` tanpa mencetak nilainya ke log.
 6. Apps Script: `Deploy -> Manage deployments -> Edit -> New version -> Deploy`; kekalkan deployment URL.
 7. Merge/publish frontend ke GitHub Pages.
-8. Sahkan popup update, footer `eOuting ITU • v1.7.0`, query asset dan cache v1.7.0.
+8. Sahkan popup update, footer, query asset dan cache menggunakan versi release yang sama.
 9. Jalankan ujian hujung-ke-hujung: submit request, Warden approve, Guard confirm out/in, Pelajar hantar selfie, kemudian sahkan Sheet, Drive dan Telegram.
 
 Production semasa telah melalui urutan ini dan menggunakan GAS Version 21. Pull Request #1 telah digabungkan ke `main` melalui merge commit `beec1e0`.

@@ -1,18 +1,35 @@
 # Project Status eOuting ITU
 
-Status semasa: **live dan production-validated v1.7.0 — Bukti Pulang Asrama**.
+Status repo semasa: **v2.0.0 — production frontend release**.
 
-- Frontend v1.7.0 live di GitHub Pages dengan footer `eOuting ITU • v1.7.0`.
+## eOuting v2.0 Beta Readiness
+
+Branch `feat/admin-outing-config-v2` telah melengkapkan Fasa 1–5B: baseline, schema/migration additive, Admin backend/API, Admin Dashboard, mock QA, canonical POST router, borang Pelajar config-driven dan validation submission feature-gated.
+
+Verdict semasa ialah **bersedia untuk release frontend production v2.0.0** selepas GAS production Version 24, Spreadsheet dan login Admin selesai diuji. Config-driven submission masih dikawal oleh feature flag yang kekal `false`.
+
+Release gate yang belum selesai:
+
+- backup dan migration pada persekitaran beta;
+- Admin sebenar ditambah manual dan akses Sheet disemak;
+- deployment GAS/frontend beta berasingan;
+- QA semua role dengan flag `false`, kemudian activation manual terkawal;
+- `require_selfie` belum mengawal lifecycle;
+- statistik dan label Telegram belum dinamik sepenuhnya untuk jenis custom.
+
+Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
+
+- Metadata frontend, footer dan cache repo berada pada `v2.0.0`.
 - Pull Request #1 telah digabungkan ke `main`: merge commit `beec1e0`, feature commit `21996a2`.
 - Backend GAS production dideploy sebagai **Version 21** pada **26 Jul 2026**.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
-- Automated test baseline: **59/59 lulus**.
+- Automated test baseline selepas Fasa 5B: **125/125 lulus**.
 
 ## Fungsi Disahkan
 
 - Role Pelajar, Warden, Guard dan Public Monitoring read-only.
-- Jenis `OUTING_BIASA`, `KECEMASAN`, `PULANG_BERMALAM`, `CUTI_SEMESTER`.
+- Jenis `OUTING_BIASA`, `OUTING_HUJUNG_MINGGU`, `KECEMASAN`, `PULANG_BERMALAM`, `CUTI_SEMESTER`.
 - Pelajar login dengan `student_id` dalaman + nombor matrik yang ditaip.
 - Warden approve/reject dan Guard confirm keluar/masuk menggunakan POST authenticated.
 - Runtime credential staff dipulihkan selepas fresh login.
@@ -24,8 +41,8 @@ Status semasa: **live dan production-validated v1.7.0 — Bukti Pulang Asrama**.
 - Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
 - Statistik hanya aggregated counts; leaderboard individu telah dibuang.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Version, footer, asset query strings dan cache konsisten pada v1.7.0.
-- Bukti selfie wajib untuk semua empat jenis permohonan selepas `confirmIn`.
+- Version, footer, asset query strings dan cache konsisten pada v2.0.0.
+- Bukti selfie wajib untuk semua lima jenis permohonan selepas `confirmIn`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR` / `SUDAH_HANTAR` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
 - Backend mengesahkan pemilikan, status/masa masuk, MIME/base64/saiz dan duplicate submission dengan `LockService`.
@@ -69,6 +86,7 @@ Nilai backend `KELUAR` tidak berubah.
 - **v1.6.24:** frontend-only Guard filter release.
 - **v1.6.25:** frontend + GAS Public Monitoring/privacy release.
 - **v1.7.0:** frontend + GAS + Google Drive + Telegram return-selfie release; GAS Version 21.
+- **v1.7.1:** menambah Outing Sabtu / Ahad; Pull Request #2 digabungkan melalui `fa7227e` daripada `1e6303c`.
 
 ## Production Validation v1.7.0
 
