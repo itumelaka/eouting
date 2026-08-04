@@ -2,6 +2,20 @@
 
 Versi repo semasa: **v2.0.0**. Backend production GAS **Version 24** telah dideploy dan smoke-tested bersama Spreadsheet serta login Admin sebelum release frontend ini.
 
+## Rekod Rollout Production v2.0.0 — 4 Ogos 2026
+
+- Frontend production: `https://itumelaka.github.io/eouting/`.
+- Merge commit production: `4eedcbe` — `release: deploy eOuting v2.0.0`.
+- Footer production memaparkan `v2.0.0`; badge `BETA API` tidak dipaparkan dan data production digunakan.
+- Admin production login berjaya; flow Pelajar, Warden dan Guard berjaya dimuatkan.
+- Public Monitoring berjaya pada klik pertama, Statistik berjaya dimuatkan dan auto-scroll mobile berjalan lancar.
+- Backend kekal GAS deployment **Version 24**; nombor versi frontend dan GAS ialah dua version boundary yang berasingan.
+- `OUTING_CONFIG_V2_ENABLED=false`; `submitRequest` production masih menggunakan validation legacy.
+- `TELEGRAM_ENABLED=true` kekal aktif.
+- Suite automatik penuh lulus **177/177** sebelum deployment.
+
+Rollout ini tidak mengaktifkan config-driven submission dan tidak menukar endpoint production.
+
 ## Fasa 5B Belum Diaktifkan
 
 Kod backend config-driven submission sudah tersedia di branch v2.0 tetapi `OUTING_CONFIG_V2_ENABLED` mesti kekal `false` sehingga migration live, semakan lima seed, backup dan QA rollback diluluskan. Jangan mengaktifkan flag sebelum versi GAS yang mengandungi resolver Fasa 5B dideploy dan `OUTING_TYPES` disahkan lengkap.

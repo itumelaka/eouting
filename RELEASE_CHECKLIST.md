@@ -4,11 +4,28 @@ Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan 
 
 ## Keputusan Semasa
 
-- Status code: bersedia untuk release frontend production selepas verifikasi akhir.
-- Status production frontend v2.0: bersedia selepas semakan akhir.
+- Status code: rollout production selesai dan disahkan pada 4 Ogos 2026.
+- Status production frontend v2.0: berjaya.
 - Versi production repo: `v2.0.0`.
 - Backend production: GAS Version 24, telah melalui smoke test Spreadsheet dan login Admin.
-- `OUTING_CONFIG_V2_ENABLED` mesti kekal `false` semasa migration dan ujian awal.
+- `OUTING_CONFIG_V2_ENABLED=false`; validation submission legacy kekal aktif.
+- `TELEGRAM_ENABLED=true` kekal aktif.
+
+## Rekod Pengesahan Production — 4 Ogos 2026
+
+- [x] Frontend live di `https://itumelaka.github.io/eouting/`.
+- [x] Footer memaparkan `v2.0.0`.
+- [x] Badge `BETA API` tidak dipaparkan dan data production digunakan.
+- [x] Admin production login berjaya.
+- [x] Flow Pelajar, Warden dan Guard berjaya dimuatkan.
+- [x] Public Monitoring berfungsi pada klik pertama.
+- [x] Statistik berjaya dimuatkan.
+- [x] Intentional auto-scroll mobile berjalan lancar.
+- [x] Backend production kekal GAS Version 24.
+- [x] `OUTING_CONFIG_V2_ENABLED=false`; validator submission legacy masih aktif.
+- [x] `TELEGRAM_ENABLED=true`.
+- [x] Suite automatik penuh lulus **177/177** sebelum deployment.
+- [x] Merge commit production ialah `4eedcbe` (`release: deploy eOuting v2.0.0`).
 
 ## Had Beta yang Diketahui
 

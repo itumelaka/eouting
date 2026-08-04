@@ -10,6 +10,12 @@ Versi repo semasa: **v2.0.0 — Admin Tetapan Outing dan Pengurusan Pelajar**.
 - Notifikasi: Telegram Bot melalui GAS
 - Repo: [itumelaka/eouting](https://github.com/itumelaka/eouting)
 
+## Status Production v2.0.0
+
+Rollout production selesai dan disahkan pada **4 Ogos 2026** melalui merge commit `4eedcbe` (`release: deploy eOuting v2.0.0`). Frontend production berada di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan memaparkan footer `v2.0.0` tanpa badge `BETA API`.
+
+Backend production kekal deployment GAS **Version 24**. `OUTING_CONFIG_V2_ENABLED=false`, maka submission Pelajar masih menggunakan validation legacy yang stabil; Admin Dashboard boleh digunakan tanpa mengaktifkan config-driven submission. `TELEGRAM_ENABLED=true` kekal aktif. Login dan paparan Pelajar, Warden, Guard serta Admin, Public Monitoring sekali klik, Statistik dan auto-scroll mobile telah disahkan menggunakan data production. Suite automatik sebelum deployment lulus **177/177**.
+
 ## Architecture Ringkas
 
 ```text

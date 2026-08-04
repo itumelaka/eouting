@@ -9,6 +9,10 @@
 - **Routing:** mengekalkan `/eouting/` pada endpoint GAS production dan `/eoutingV2/` pada endpoint beta tetap tanpa query override di luar localhost.
 - **Safety:** GAS/API kekal network-only, imej selfie dan response sensitif tidak dicache, serta `OUTING_CONFIG_V2_ENABLED` kekal `false`.
 - **Backend:** GAS production Version 24 dan login Admin telah melalui smoke test sebelum release frontend ini.
+- **Production rollout:** frontend berjaya diterbitkan di `https://itumelaka.github.io/eouting/` melalui merge commit `4eedcbe` (`release: deploy eOuting v2.0.0`). Footer memaparkan `v2.0.0`, tiada badge `BETA API` dan data production digunakan.
+- **Production verification:** login Admin serta flow Pelajar, Warden dan Guard berjaya dimuatkan; Public Monitoring berfungsi pada klik pertama, Statistik berjaya dimuatkan dan intentional auto-scroll mobile berjalan lancar.
+- **Runtime controls:** backend kekal GAS Version 24, `OUTING_CONFIG_V2_ENABLED=false` dan validator submission legacy kekal aktif. `TELEGRAM_ENABLED=true` kekal aktif.
+- **Quality gate:** suite automatik penuh lulus **177/177** sebelum deployment.
 
 ### Admin Student Management beta
 
