@@ -220,6 +220,8 @@ let studentOutingTypesV200 = buildLegacyStudentOutingTypesV200();
 let studentOutingTypesLoadingV200 = false;
 let studentOutingTypesUsingFallbackV200 = true;
 let studentPreviousOutingTypeCodeV200 = "";
+let studentRequestSubmissionInFlight = false;
+let studentSubmitButtonContentState = null;
 let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE ? buildMockAdminOutingTypesV200() : [];
 let mockAdminStudentsV200 = ALLOW_MOCK_MODE ? buildMockAdminStudentsV200() : [];
 let mockAdminReadErrorPendingV200 = ALLOW_MOCK_MODE
@@ -3361,6 +3363,10 @@ els.requestTypeSelect.addEventListener("change", updateEmergencyFields);
 els.requestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  if (studentRequestSubmissionInFlight) {
+    return;
+  }
+
   const requestType = els.requestTypeSelect.value;
   const selectedConfig = getSelectedStudentOutingTypeConfigV200();
   const configValidationMessage = selectedConfig
@@ -3421,6 +3427,8 @@ if (!student) {
     return;
   }
 
+  setStudentRequestSubmitting(true, "Menghantar permohonan...");
+
   if (isLiveMode) {
     try {
       const payload = {
@@ -3448,44 +3456,50 @@ if (!student) {
       renderStudent();
     } catch (error) {
       els.studentMessage.textContent = error.message;
+    } finally {
+      setStudentRequestSubmitting(false);
     }
     return;
   }
 
-  const record = {
-    id: createRequestId(),
-    studentId: student.id,
-    no_matrik: student.no_matrik,
-    studentName: student.name,
-    className: student.className,
-    gender: student.gender,
-    jenis_permohonan: requestType,
-    purpose: els.purposeInput.value.trim(),
-    location: els.locationInput.value.trim(),
-    jenis_kenderaan: els.vehicleTypeSelect.value,
-    butiran_kenderaan: els.vehicleDetailInput.value.trim(),
-    sebab_kecemasan: els.emergencyReasonInput.value.trim(),
-    telefon_waris: els.guardianPhoneInput.value.trim(),
-    hubungan_waris: els.guardianRelationSelect.value,
-    catatan_kecemasan: els.emergencyNoteInput.value.trim(),
-    status: STATUS.pending,
-    lewat: false,
-    requestedAt: new Date(),
-    approvedAt: null,
-    rejectedAt: null,
-    outAt: null,
-    returnedAt: null,
-    approvedBy: "",
-    rejectedBy: "",
-    guardOutBy: "",
-    guardInBy: ""
-  };
+  try {
+    const record = {
+      id: createRequestId(),
+      studentId: student.id,
+      no_matrik: student.no_matrik,
+      studentName: student.name,
+      className: student.className,
+      gender: student.gender,
+      jenis_permohonan: requestType,
+      purpose: els.purposeInput.value.trim(),
+      location: els.locationInput.value.trim(),
+      jenis_kenderaan: els.vehicleTypeSelect.value,
+      butiran_kenderaan: els.vehicleDetailInput.value.trim(),
+      sebab_kecemasan: els.emergencyReasonInput.value.trim(),
+      telefon_waris: els.guardianPhoneInput.value.trim(),
+      hubungan_waris: els.guardianRelationSelect.value,
+      catatan_kecemasan: els.emergencyNoteInput.value.trim(),
+      status: STATUS.pending,
+      lewat: false,
+      requestedAt: new Date(),
+      approvedAt: null,
+      rejectedAt: null,
+      outAt: null,
+      returnedAt: null,
+      approvedBy: "",
+      rejectedBy: "",
+      guardOutBy: "",
+      guardInBy: ""
+    };
 
-  outingRecords.unshift(record);
-  els.requestForm.reset();
-  updateEmergencyFields();
-  els.studentMessage.textContent = `Permohonan ${record.id} telah dihantar dan sedang menunggu kelulusan warden.`;
-  render();
+    outingRecords.unshift(record);
+    els.requestForm.reset();
+    updateEmergencyFields();
+    els.studentMessage.textContent = `Permohonan ${record.id} telah dihantar dan sedang menunggu kelulusan warden.`;
+    render();
+  } finally {
+    setStudentRequestSubmitting(false);
+  }
 });
 
 function showLoginPanel(role) {
@@ -3714,6 +3728,55 @@ function updateStudentSubmitAvailability() {
 function isActiveStudentRequest(record) {
   const status = record.rawStatus || reverseDisplayStatus(record.status);
   return ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "KELUAR"].includes(status);
+}
+
+function setStudentRequestSubmitting(isSubmitting, message) {
+  studentRequestSubmissionInFlight = Boolean(isSubmitting);
+  const submitButton = els.requestForm
+    ? els.requestForm.querySelector('button[type="submit"]')
+    : null;
+
+  if (submitButton) {
+    if (studentRequestSubmissionInFlight && !studentSubmitButtonContentState) {
+      studentSubmitButtonContentState = {
+        button: submitButton,
+        childNodes: Array.from(submitButton.childNodes),
+        hadAriaBusy: submitButton.hasAttribute("aria-busy"),
+        ariaBusy: submitButton.getAttribute("aria-busy")
+      };
+
+      const spinner = document.createElement("span");
+      spinner.className = "student-submit-spinner";
+      spinner.setAttribute("aria-hidden", "true");
+      const loadingLabel = document.createElement("span");
+      loadingLabel.className = "student-submit-loading-label";
+      loadingLabel.textContent = "Menghantar...";
+      submitButton.replaceChildren(spinner, loadingLabel);
+    } else if (!studentRequestSubmissionInFlight && studentSubmitButtonContentState) {
+      const originalState = studentSubmitButtonContentState;
+      originalState.button.replaceChildren(...originalState.childNodes);
+      if (originalState.hadAriaBusy) {
+        originalState.button.setAttribute("aria-busy", originalState.ariaBusy);
+      } else {
+        originalState.button.removeAttribute("aria-busy");
+      }
+      studentSubmitButtonContentState = null;
+    }
+
+    submitButton.classList.toggle("is-loading", studentRequestSubmissionInFlight);
+    submitButton.disabled = studentRequestSubmissionInFlight;
+    if (studentRequestSubmissionInFlight) {
+      submitButton.setAttribute("aria-busy", "true");
+    }
+  }
+
+  if (studentRequestSubmissionInFlight && message && els.studentMessage) {
+    els.studentMessage.textContent = message;
+  }
+
+  if (!studentRequestSubmissionInFlight) {
+    updateStudentSubmitState();
+  }
 }
 
 function getRecordId(record) {
@@ -6921,6 +6984,10 @@ async function submitSemesterRequestV160(event) {
   event.preventDefault();
   event.stopImmediatePropagation();
 
+  if (studentRequestSubmissionInFlight) {
+    return;
+  }
+
   const message = validateSemesterRequestV160();
   if (message) {
     if (els.studentMessage) els.studentMessage.textContent = message;
@@ -6934,9 +7001,7 @@ async function submitSemesterRequestV160(event) {
     return;
   }
 
-  const submitButton = els.requestForm ? els.requestForm.querySelector('button[type="submit"]') : null;
-  if (submitButton) submitButton.disabled = true;
-  if (els.studentMessage) els.studentMessage.textContent = "Menghantar permohonan Cuti Semester...";
+  setStudentRequestSubmitting(true, "Menghantar permohonan Cuti Semester...");
 
   try {
     const payload = buildSemesterPayloadV160(student);
@@ -6964,7 +7029,7 @@ async function submitSemesterRequestV160(event) {
     if (els.studentMessage) els.studentMessage.textContent = errorMessage;
     showError(errorMessage, "Permohonan Gagal");
   } finally {
-    if (submitButton) submitButton.disabled = false;
+    setStudentRequestSubmitting(false);
     updateSemesterFieldsV160();
   }
 }
@@ -7146,6 +7211,11 @@ function updateStudentSubmitState() {
 
     const submitButton = els.requestForm.querySelector('button[type="submit"]');
     if (!submitButton) {
+      return;
+    }
+
+    if (studentRequestSubmissionInFlight) {
+      submitButton.disabled = true;
       return;
     }
 

@@ -65,6 +65,8 @@ function createContext({ featureEnabled = false, rows = [] } = {}) {
   sheets.set("OUTING_REQUESTS", new FakeSheet([]));
   sheets.set("AUDIT_LOG", new FakeSheet([]));
   const properties = { OUTING_CONFIG_V2_ENABLED: featureEnabled ? "true" : "false" };
+  let scriptLockHeld = false;
+  const lockEvents = [];
   const spreadsheet = {
     getSheetByName: (name) => sheets.get(name) || null,
     insertSheet: (name) => {
@@ -75,7 +77,28 @@ function createContext({ featureEnabled = false, rows = [] } = {}) {
   };
   const context = vm.createContext({
     console,
-    SpreadsheetApp: { openById: () => spreadsheet },
+    SpreadsheetApp: {
+      openById: () => spreadsheet,
+      flush: () => {
+        assert.equal(scriptLockHeld, true, "request append must flush while ScriptLock is held");
+        lockEvents.push("flush");
+      }
+    },
+    LockService: {
+      getScriptLock: () => ({
+        tryLock: () => {
+          assert.equal(scriptLockHeld, false);
+          scriptLockHeld = true;
+          lockEvents.push("tryLock");
+          return true;
+        },
+        releaseLock: () => {
+          assert.equal(scriptLockHeld, true);
+          lockEvents.push("releaseLock");
+          scriptLockHeld = false;
+        }
+      })
+    },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (key) => Object.prototype.hasOwnProperty.call(properties, key) ? properties[key] : null
@@ -95,6 +118,7 @@ function createContext({ featureEnabled = false, rows = [] } = {}) {
   });
   vm.runInContext(gasSource, context);
   context.__testSheets = sheets;
+  context.__testLockEvents = lockEvents;
   return context;
 }
 
@@ -149,8 +173,8 @@ test("submitRequest uses legacy validation while the flag is false", () => {
   assert.throws(() => context.submitRequest({
     student_id: "A3-001",
     no_matrik: "A3001",
-    jenis_permohonan: "OUTING_BIASA"
-  }), /Outing Biasa hanya dibuka/);
+    jenis_permohonan: "KECEMASAN"
+  }), /Sebab kecemasan diperlukan/);
   assert.equal(context.__testSheets.get("OUTING_TYPES"), undefined);
 });
 
@@ -179,7 +203,11 @@ test("submitRequest uses the active Sheet config, auto-approval rule and existin
   assert.equal(result.masa_balik_dijangka, "22:00");
   assert.equal(result.status, "DILULUSKAN_WARDEN");
   assert.equal(result.warden_approve_by, "AUTO_CONFIG_V2");
+  assert.deepEqual(context.__testLockEvents, ["tryLock", "flush", "releaseLock"]);
   assert.throws(() => context.submitRequest(payload), /permohonan aktif/);
+  assert.deepEqual(context.__testLockEvents, [
+    "tryLock", "flush", "releaseLock", "tryLock", "releaseLock"
+  ]);
 });
 
 test("enabled resolver rejects missing, inactive and malformed configuration safely", () => {

@@ -674,6 +674,40 @@ textarea {
   cursor: not-allowed;
 }
 
+#requestForm .primary-action.is-loading:disabled {
+  align-items: center;
+  background: linear-gradient(145deg, #2187e5, #0b4f9d);
+  box-shadow:
+    5px 6px 12px rgba(19, 50, 87, 0.2),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  display: inline-flex;
+  gap: 9px;
+  justify-content: center;
+  opacity: 1;
+}
+
+.student-submit-spinner {
+  border: 3px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  flex: 0 0 auto;
+  height: 17px;
+  width: 17px;
+}
+
+@keyframes studentSubmitSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .student-submit-spinner {
+    animation: studentSubmitSpin 0.75s linear infinite;
+  }
+}
+
 .approve-button,
 .out-button,
 .in-button {

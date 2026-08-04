@@ -695,10 +695,13 @@ function getSafeAdminIdentity_(admin) {
   return String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
 }
 
-function withScriptLock_(callback) {
+function withScriptLock_(callback, timeoutMessage) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) {
-    throw new Error("Konfigurasi sedang dikemas kini. Sila cuba sebentar lagi.");
+    const safeTimeoutMessage = typeof timeoutMessage === "string" && timeoutMessage.trim()
+      ? timeoutMessage.trim()
+      : "Konfigurasi sedang dikemas kini. Sila cuba sebentar lagi.";
+    throw new Error(safeTimeoutMessage);
   }
   try {
     return callback();
@@ -1579,11 +1582,6 @@ if (!studentId || !noMatrik) {
     throw new Error("Pelajar tidak dijumpai atau tidak aktif.");
   }
 
-  if (hasActiveRequestForStudent_(student)) {
-    throw new Error("Anda masih mempunyai permohonan aktif. Sila selesaikan permohonan sedia ada dahulu.");
-  }
-
-const requestId = createRequestId_(now);
 const requiresWardenApproval = !submissionConfig || submissionConfig.require_warden_approval;
 
 const requestDate = submissionConfig
@@ -1595,8 +1593,17 @@ const requestDate = submissionConfig
     ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
     : formatDate_(now);
 
-const record = {
-  request_id: requestId,
+const record = withScriptLock_(function () {
+  const requestSheet = getSheet_(SHEETS.requests);
+  const requestRows = getRowsAsObjects_(requestSheet);
+
+  if (hasActiveRequestForStudent_(student, requestRows)) {
+    throw new Error("Anda masih mempunyai permohonan aktif. Sila selesaikan permohonan sedia ada dahulu.");
+  }
+
+  const requestId = createRequestId_(now);
+  const requestRecord = {
+    request_id: requestId,
   tarikh: requestDate,
   hari: (
     submissionConfig ||
@@ -1640,7 +1647,11 @@ const record = {
     masa_balik_dijangka: payload.masa_balik_dijangka || ""
   };
 
-  appendObjectRow_(getSheet_(SHEETS.requests), HEADERS.OUTING_REQUESTS, record);
+  appendObjectRow_(requestSheet, HEADERS.OUTING_REQUESTS, requestRecord);
+  SpreadsheetApp.flush();
+  return requestRecord;
+}, "Permohonan sedang diproses. Sila cuba sebentar lagi.");
+  const requestId = record.request_id;
   const auditDetails = {
     student_name: student.nama || "",
     no_matrik: String(student.no_matrik || ""),
@@ -2108,7 +2119,7 @@ function isActiveRequestStatus_(status) {
   return text === STATUS.pending || text === STATUS.approved || text === STATUS.out;
 }
 
-function hasActiveRequestForStudent_(student) {
+function hasActiveRequestForStudent_(student, requestRows) {
   const studentId = normalizeText_(student && student.student_id);
   const noMatrik = normalizeText_(student && student.no_matrik);
 
@@ -2116,7 +2127,11 @@ function hasActiveRequestForStudent_(student) {
     return false;
   }
 
-  return getRowsAsObjects_(getSheet_(SHEETS.requests)).some((row) => (
+  const rows = Array.isArray(requestRows)
+    ? requestRows
+    : getRowsAsObjects_(getSheet_(SHEETS.requests));
+
+  return rows.some((row) => (
     isActiveRequestStatus_(row.status) &&
     (
       (studentId && normalizeText_(row.student_id) === studentId) ||
