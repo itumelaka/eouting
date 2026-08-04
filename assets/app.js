@@ -395,9 +395,43 @@ document.querySelectorAll("[data-role-choice]").forEach((button) => {
     if (els.adminLoginPanel) {
       els.adminLoginPanel.classList.remove("active");
     }
-    showLoginPanel(button.dataset.roleChoice);
+    const roleChoice = button.dataset.roleChoice;
+    showLoginPanel(roleChoice);
+    scheduleIntentionalScrollV200(getAccessPanelForRoleV200(roleChoice));
   });
 });
+
+function getAccessPanelForRoleV200(role) {
+  const panels = {
+    student: els.studentLoginPanel,
+    warden: els.wardenLoginPanel,
+    guard: els.guardLoginPanel
+  };
+  return panels[role] || null;
+}
+
+function prefersReducedMotionV200() {
+  return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+
+function isIntentionalNavigationV200(eventOrOptions) {
+  return Boolean(eventOrOptions && (
+    eventOrOptions.type === "click" || eventOrOptions.intentional === true
+  ));
+}
+
+function scheduleIntentionalScrollV200(target) {
+  if (!target || typeof target.scrollIntoView !== "function") return;
+  const scroll = () => target.scrollIntoView({
+    behavior: prefersReducedMotionV200() ? "auto" : "smooth",
+    block: "start"
+  });
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(scroll);
+  } else {
+    scroll();
+  }
+}
 
 function setupAccessEnhancements() {
   setupClayRoleNav();
@@ -3092,7 +3126,8 @@ function stopStudentAutoRefresh() {
   }
 }
 
-function openMonitoringPage() {
+function obsoleteOpenMonitoringPageV1612(eventOrOptions) {
+  const intentional = isIntentionalNavigationV200(eventOrOptions);
   stopStudentAutoRefresh();
   hideLoginPanels();
   currentSession = null;
@@ -4070,7 +4105,8 @@ function bindStudentHistoryToggles() {
   });
 }
 
-function openStatisticsPage() {
+function openStatisticsPage(eventOrOptions) {
+  const intentional = isIntentionalNavigationV200(eventOrOptions);
   stopStudentAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
@@ -4078,6 +4114,9 @@ function openStatisticsPage() {
   els.appWorkspace.classList.remove("active");
   if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
   els.statsWorkspace.classList.add("active");
+  if (intentional) {
+    scheduleIntentionalScrollV200(els.statsWorkspace);
+  }
   setupStatsFilters();
   loadStatistics();
 }
@@ -7401,7 +7440,8 @@ function scrollMonitoringWorkspaceToTop() {
   }
 }
 
-async function openMonitoringPage() {
+async function openMonitoringPage(eventOrOptions) {
+  const intentional = isIntentionalNavigationV200(eventOrOptions);
   activeRefreshPage = "monitor";
   if (els.accessScreen) {
     els.accessScreen.classList.add("hidden");
@@ -7415,7 +7455,9 @@ async function openMonitoringPage() {
   if (els.monitorWorkspace) {
     els.monitorWorkspace.classList.add("active");
   }
-  scrollMonitoringWorkspaceToTop();
+  if (intentional) {
+    scheduleIntentionalScrollV200(els.monitorWorkspace);
+  }
 
   if (!monitoringRefreshIntervalId) {
     monitoringRefreshIntervalId = setInterval(() => {

@@ -56,7 +56,8 @@ function createLifecycleContext(options = {}) {
     timestamp: 0,
     scroll: [],
     errors: [],
-    intervals: 0
+    intervals: 0,
+    scrollAfterActivation: false
   };
   const hadCachedData = options.hadCachedData === true;
   const oldRecords = options.oldRecords || [{ nama: "DATA LAMA" }];
@@ -98,6 +99,13 @@ function createLifecycleContext(options = {}) {
     },
     emptyState: (message) => `ERROR: ${message}`,
     showError: (message, title) => calls.errors.push({ message, title }),
+    isIntentionalNavigationV200: (eventOrOptions) => Boolean(eventOrOptions && (
+      eventOrOptions.type === "click" || eventOrOptions.intentional === true
+    )),
+    scheduleIntentionalScrollV200: (target) => {
+      calls.scrollAfterActivation = target.classList.contains("active");
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
     setInterval: () => {
       calls.intervals += 1;
       return 100 + calls.intervals;
@@ -133,20 +141,21 @@ function createLifecycleContext(options = {}) {
   return { context, calls, els, request };
 }
 
-test("one monitoring click activates and scrolls synchronously, then performs one public mapped render", async () => {
+test("first monitoring click activates before scrolling and performs one public mapped render", async () => {
   const { context, calls, els, request } = createLifecycleContext();
 
-  const firstOpen = context.openMonitoringPage();
+  const firstOpen = context.openMonitoringPage({ type: "click" });
 
   assert.equal(els.monitorWorkspace.classList.contains("active"), true);
   assert.equal(els.accessScreen.classList.contains("hidden"), true);
   assert.equal(els.appWorkspace.classList.contains("active"), false);
   assert.equal(els.statsWorkspace.classList.contains("active"), false);
-  assert.deepEqual(JSON.parse(JSON.stringify(calls.scroll)), [{ block: "start" }]);
+  assert.equal(calls.scrollAfterActivation, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls.scroll)), [{ behavior: "smooth", block: "start" }]);
   assert.deepEqual(calls.apiGet, ["getTodayRecords"]);
   assert.equal(els.monitorLoading.hidden, false);
 
-  const repeatedOpen = context.openMonitoringPage();
+  const repeatedOpen = context.openMonitoringPage({ type: "click" });
   const autoRefresh = context.refreshMonitoringRecords("auto");
   assert.equal(calls.apiGet.length, 1, "repeated click and auto refresh must share the active request");
 
@@ -167,7 +176,10 @@ test("one monitoring click activates and scrolls synchronously, then performs on
 test("failed first load does not mark monitoring successful or set a new timestamp", async () => {
   const { context, calls, els, request } = createLifecycleContext();
 
-  const refresh = context.refreshMonitoringRecords("open");
+  const refresh = context.openMonitoringPage({ type: "click" });
+  assert.equal(els.monitorWorkspace.classList.contains("active"), true);
+  assert.equal(els.monitorLoading.hidden, false);
+  assert.equal(calls.apiGet.length, 1);
   request.reject(new Error("network unavailable"));
   await refresh;
 
@@ -177,6 +189,33 @@ test("failed first load does not mark monitoring successful or set a new timesta
   assert.equal(calls.timestamp, 0);
   assert.equal(calls.render, 0);
   assert.match(els.monitorNameList.innerHTML, /gagal dimuat/i);
+});
+
+test("successful empty first load renders once and timestamps only after success", async () => {
+  const { context, calls, els, request } = createLifecycleContext();
+
+  const firstOpen = context.openMonitoringPage({ type: "click" });
+  assert.equal(els.monitorWorkspace.classList.contains("active"), true);
+  assert.equal(els.monitorLoading.hidden, false);
+  assert.equal(calls.apiGet.length, 1);
+
+  request.resolve([]);
+  await firstOpen;
+
+  const state = context.readMonitoringState();
+  assert.deepEqual(JSON.parse(JSON.stringify(state.outingRecords)), []);
+  assert.equal(calls.render, 1);
+  assert.equal(calls.timestamp, 1);
+  assert.equal(els.monitorLoading.hidden, true);
+});
+
+test("non-intentional monitoring open does not auto-scroll", async () => {
+  const request = deferred();
+  const { context, calls } = createLifecycleContext({ request });
+  const open = context.openMonitoringPage();
+  assert.deepEqual(calls.scroll, []);
+  request.resolve([]);
+  await open;
 });
 
 test("failed cached refresh retains old records and uses the friendly refresh error", async () => {
