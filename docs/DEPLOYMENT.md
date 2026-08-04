@@ -1,6 +1,6 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v1.7.1**. Rekod deployment backend terakhir yang didokumenkan ialah GAS **Version 21** untuk v1.7.0 pada **26 Jul 2026**; nombor deployment GAS bagi perubahan selepas itu perlu disahkan di Apps Script sebelum release seterusnya.
+Versi repo semasa: **v2.0.0**. Backend production GAS **Version 24** telah dideploy dan smoke-tested bersama Spreadsheet serta login Admin sebelum release frontend ini.
 
 ## Fasa 5B Belum Diaktifkan
 
@@ -10,7 +10,7 @@ Urutan activation masa hadapan ialah: backup Sheet, jalankan migration idempoten
 
 ## Release Beta v2.0
 
-Runbook authoritative untuk beta ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Cadangan versi ialah `v2.0.0-beta.1`, tetapi metadata runtime kekal `v1.7.1` sehingga keputusan publish beta dibuat. Apabila diluluskan, `APP_VERSION`, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation mesti dibump dalam satu perubahan atomik.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.0.0`.
 
 Beta pertama hendaklah menguji lima seed sahaja. Jenis custom, statistik dinamik, label Telegram dinamik dan penggunaan operasi `require_selfie` belum menjadi gate yang lengkap. `require_warden_approval=false` juga perlu dianggap high-impact kerana backend akan auto-approve sebagai `AUTO_CONFIG_V2`.
 

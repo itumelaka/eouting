@@ -2,7 +2,7 @@
 
 eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Versi repo semasa: **v1.7.1 — Outing Sabtu / Ahad**.
+Versi repo semasa: **v2.0.0 — Admin Tetapan Outing dan Pengurusan Pelajar**.
 
 - Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
 - Backend: Google Apps Script (GAS) Web App
@@ -133,7 +133,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo v1.7.1 ialah **60/60 lulus**. Syntax checks:
+Baseline release v2.0.0 ialah **177/177 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -159,6 +159,6 @@ Backend GAS:
 5. publish frontend dan semak footer/popup versi semasa;
 6. jalankan ujian hujung-ke-hujung.
 
-Deployment GAS v1.7.0 yang terakhir didokumenkan menggunakan **Version 21**, dideploy pada **26 Jul 2026**. Pull Request #2 untuk v1.7.1 telah digabungkan ke `main` pada merge commit `fa7227e` daripada feature commit `1e6303c`.
+Backend production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

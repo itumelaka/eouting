@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v1.7.1**.
+Panduan ini merujuk eOuting ITU **v2.0.0**.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline release v1.7.1 ialah **60/60 lulus**.
+Baseline release v2.0.0 ialah **177/177 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -188,8 +188,8 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## PWA dan Cache
 
-- Semak footer v1.7.1 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v1.7.1`.
+- Semak footer v2.0.0 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v2.0.0`.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

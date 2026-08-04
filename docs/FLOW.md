@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow repo semasa **v1.7.1**.
+Dokumen ini menerangkan flow repo semasa **v2.0.0**.
 
 ## Backend Config API v2.0
 

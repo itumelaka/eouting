@@ -1,6 +1,6 @@
 # Struktur Database Google Sheets
 
-Google Sheets ialah database dan source of truth eOuting ITU v1.7.1. Frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
+Google Sheets ialah database dan source of truth eOuting ITU v2.0.0. Frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
 ## `STUDENTS`
 

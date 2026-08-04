@@ -1,13 +1,13 @@
-# eOuting v2.0.0-beta.1 Release Checklist
+# eOuting v2.0.0 Release Checklist
 
-Dokumen ini ialah runbook terkawal untuk beta modul Admin Tetapan Outing. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
+Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
 ## Keputusan Semasa
 
-- Status code: bersedia secara bersyarat untuk beta terkawal.
-- Status production v2.0: belum bersedia.
-- Versi production repo kekal `v1.7.1` sehingga release beta benar-benar diluluskan.
-- Versi beta dicadangkan: `v2.0.0-beta.1`.
+- Status code: bersedia untuk release frontend production selepas verifikasi akhir.
+- Status production frontend v2.0: bersedia selepas semakan akhir.
+- Versi production repo: `v2.0.0`.
+- Backend production: GAS Version 24, telah melalui smoke test Spreadsheet dan login Admin.
 - `OUTING_CONFIG_V2_ENABLED` mesti kekal `false` semasa migration dan ujian awal.
 
 ## Had Beta yang Diketahui
@@ -37,7 +37,7 @@ Dokumen ini ialah runbook terkawal untuk beta modul Admin Tetapan Outing. Ia tid
 - [ ] `node --test tests/*.test.js` lulus sepenuhnya.
 - [ ] `git diff --check` lulus.
 - [ ] Semak `APP_VERSION`, `version.json`, footer, asset query strings dan `CACHE_NAME` masih konsisten.
-- [ ] Hanya apabila beta hendak diterbitkan, bump semua metadata di atas secara atomik kepada `2.0.0-beta.1`.
+- [x] Metadata runtime, footer, asset query, `version.json` dan cache dibump secara atomik kepada `2.0.0`.
 - [ ] Kemas kini release note beta tanpa menukar manifest identity, scope atau icon secara tidak sengaja.
 - [ ] Jalankan semula semua syntax check dan tests selepas version bump.
 

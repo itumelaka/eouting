@@ -1,5 +1,5 @@
 {
-  "version": "1.7.1",
-  "releasedAt": "2026-08-02",
-  "notes": "Tambah Outing Sabtu / Ahad dengan tarikh wajib Sabtu atau Ahad, pulang hari yang sama sebelum atau pada 10:00 malam, semakan lewat, kelulusan Warden & HEP, pengesahan Guard dan sokongan Telegram."
+  "version": "2.0.0",
+  "releasedAt": "2026-08-04",
+  "notes": "eOuting v2.0.0 menambah Admin Dashboard, tetapan outing config-driven, Pengurusan Pelajar termasuk kelas LI, antaramuka 3D Clay, routing beta terkawal dan penambahbaikan navigasi serta Pemantauan Semasa pada telefon."
 }

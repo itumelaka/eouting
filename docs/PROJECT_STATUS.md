@@ -1,12 +1,12 @@
 # Project Status eOuting ITU
 
-Status repo semasa: **v1.7.1 — Outing Sabtu / Ahad**.
+Status repo semasa: **v2.0.0 — production frontend release**.
 
 ## eOuting v2.0 Beta Readiness
 
 Branch `feat/admin-outing-config-v2` telah melengkapkan Fasa 1–5B: baseline, schema/migration additive, Admin backend/API, Admin Dashboard, mock QA, canonical POST router, borang Pelajar config-driven dan validation submission feature-gated.
 
-Verdict semasa ialah **bersedia secara bersyarat untuk beta terkawal**, bukan production v2.0 umum. Runtime/PWA metadata sengaja kekal `v1.7.1`; versi dicadangkan apabila beta benar-benar diterbitkan ialah `v2.0.0-beta.1`.
+Verdict semasa ialah **bersedia untuk release frontend production v2.0.0** selepas GAS production Version 24, Spreadsheet dan login Admin selesai diuji. Config-driven submission masih dikawal oleh feature flag yang kekal `false`.
 
 Release gate yang belum selesai:
 
@@ -19,7 +19,7 @@ Release gate yang belum selesai:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata frontend, footer dan cache repo berada pada `v1.7.1`.
+- Metadata frontend, footer dan cache repo berada pada `v2.0.0`.
 - Pull Request #1 telah digabungkan ke `main`: merge commit `beec1e0`, feature commit `21996a2`.
 - Backend GAS production dideploy sebagai **Version 21** pada **26 Jul 2026**.
 - Google Sheets kekal database/source of truth.
@@ -41,7 +41,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
 - Statistik hanya aggregated counts; leaderboard individu telah dibuang.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Version, footer, asset query strings dan cache konsisten pada v1.7.1.
+- Version, footer, asset query strings dan cache konsisten pada v2.0.0.
 - Bukti selfie wajib untuk semua lima jenis permohonan selepas `confirmIn`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR` / `SUDAH_HANTAR` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.

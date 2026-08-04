@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas milestone **v1.7.1**.
+Senarai kerja selepas release **v2.0.0**.
 
 ## Done / Completed
 

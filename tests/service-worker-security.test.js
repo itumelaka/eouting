@@ -9,9 +9,9 @@ const workerSource = fs.readFileSync(path.join(root, "service-worker.js"), "utf8
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
-const EXPECTED_VERSION = "1.7.1";
-const EXPECTED_RELEASE_DATE = "2026-08-02";
-const EXPECTED_RELEASE_NOTE = "Tambah Outing Sabtu / Ahad dengan tarikh wajib Sabtu atau Ahad, pulang hari yang sama sebelum atau pada 10:00 malam, semakan lewat, kelulusan Warden & HEP, pengesahan Guard dan sokongan Telegram.";
+const EXPECTED_VERSION = "2.0.0";
+const EXPECTED_RELEASE_DATE = "2026-08-04";
+const EXPECTED_RELEASE_NOTE = "eOuting v2.0.0 menambah Admin Dashboard, tetapan outing config-driven, Pengurusan Pelajar termasuk kelas LI, antaramuka 3D Clay, routing beta terkawal dan penambahbaikan navigasi serta Pemantauan Semasa pada telefon.";
 
 function createWorker(cacheNames = []) {
   const listeners = {};
@@ -125,6 +125,7 @@ test("activate removes only old eOuting caches and claims clients", async () => 
     "eouting-cache-v1.6.24",
     "eouting-cache-v1.6.25",
     "eouting-cache-v1.6.26",
+    "eouting-cache-v1.7.1",
     "another-app-cache"
   ]);
   let activation = null;
@@ -140,7 +141,8 @@ test("activate removes only old eOuting caches and claims clients", async () => 
     "eouting-cache-v1.6.23",
     "eouting-cache-v1.6.24",
     "eouting-cache-v1.6.25",
-    "eouting-cache-v1.6.26"
+    "eouting-cache-v1.6.26",
+    "eouting-cache-v1.7.1"
   ]);
   assert.equal(worker.calls.claim, 1);
 });

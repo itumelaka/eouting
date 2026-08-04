@@ -1,6 +1,14 @@
 # Changelog
 
-## v2.0.0-beta.1 — Unreleased
+## v2.0.0 — 2026-08-04
+
+### Production frontend release
+
+- **Release:** menyelaraskan runtime, footer, `version.json`, asset query strings dan cache PWA kepada `2.0.0`.
+- **PWA:** menggunakan namespace cache baharu `eouting-cache-v2.0.0`; activation terus membuang cache eOuting lama sahaja.
+- **Routing:** mengekalkan `/eouting/` pada endpoint GAS production dan `/eoutingV2/` pada endpoint beta tetap tanpa query override di luar localhost.
+- **Safety:** GAS/API kekal network-only, imej selfie dan response sensitif tidak dicache, serta `OUTING_CONFIG_V2_ENABLED` kekal `false`.
+- **Backend:** GAS production Version 24 dan login Admin telah melalui smoke test sebelum release frontend ini.
 
 ### Admin Student Management beta
 
