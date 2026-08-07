@@ -2767,12 +2767,6 @@ function validateOvernightRequest_(payload, keluarDate) {
     throw new Error("Masa Dijangka Pulang Ke Asrama tidak sah.");
   }
 
-  const day = keluarDate.getDay();
-  const hour = Number(Utilities.formatDate(keluarDate, "Asia/Kuala_Lumpur", "H"));
-  const minute = Number(Utilities.formatDate(keluarDate, "Asia/Kuala_Lumpur", "m"));
-  if (day === 5 && (hour < 17 || (hour === 17 && minute === 0))) {
-    throw new Error("Pulang Bermalam pada hari Jumaat hanya boleh bermula selepas 5:00 PM.");
-  }
 }
 
 function validateSemesterRequest_(payload, now) {
