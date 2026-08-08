@@ -117,6 +117,7 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "createOutingType",
   "updateOutingType",
   "toggleOutingType",
+  "getAdminIndividualStats",
   "getAdminStudents",
   "createStudent",
   "updateStudent",
@@ -222,6 +223,7 @@ let studentOutingTypesUsingFallbackV200 = true;
 let studentPreviousOutingTypeCodeV200 = "";
 let studentRequestSubmissionInFlight = false;
 let studentSubmitButtonContentState = null;
+let studentAnnualSummary = null;
 let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE ? buildMockAdminOutingTypesV200() : [];
 let mockAdminStudentsV200 = ALLOW_MOCK_MODE ? buildMockAdminStudentsV200() : [];
 let mockAdminReadErrorPendingV200 = ALLOW_MOCK_MODE
@@ -294,6 +296,7 @@ const els = {
   guardianRelationSelect: document.querySelector("#guardianRelationSelect"),
   emergencyNoteInput: document.querySelector("#emergencyNoteInput"),
   studentMessage: document.querySelector("#studentMessage"),
+  studentAnnualSummary: document.querySelector("#studentAnnualSummary"),
   studentRecordsList: document.querySelector("#studentRecordsList"),
   studentRefreshButton: null,
   studentLastUpdated: null,
@@ -324,6 +327,7 @@ const els = {
   countNotReturned: document.querySelector("#countNotReturned"),
   countEmergency: document.querySelector("#countEmergency"),
   adminDashboard: document.querySelector("#admin"),
+  adminStatisticsButton: document.querySelector("#adminStatisticsButton"),
   adminOutingTab: document.querySelector("#adminOutingTab"),
   adminStudentsTab: document.querySelector("#adminStudentsTab"),
   adminOutingSettingsPanel: document.querySelector("#adminOutingSettingsPanel"),
@@ -530,6 +534,9 @@ function setupAdminDashboardV200() {
   }
   if (els.adminAddStudentButton) {
     els.adminAddStudentButton.addEventListener("click", openAdminStudentCreateEditorV200);
+  }
+  if (els.adminStatisticsButton) {
+    els.adminStatisticsButton.addEventListener("click", openAdminStatisticsPageV200);
   }
   if (els.adminStudentEditorCancelButton) {
     els.adminStudentEditorCancelButton.addEventListener("click", closeAdminStudentEditorV200);
@@ -1591,8 +1598,8 @@ function setupStatisticsPanel() {
       <div class="summary-grid stats-summary" id="statsSummary"></div>
       <section class="stats-section">
         <div class="student-record-heading">
-          <h3>Privasi Statistik</h3>
-          <p>Data individu tidak dipaparkan; hanya ringkasan agregat tersedia.</p>
+          <h3>Statistik Individu Pelajar</h3>
+          <p id="statsPrivacyMessage">Ringkasan agregat tersedia kepada umum; statistik individu terhad kepada Admin yang dibenarkan.</p>
         </div>
         <div class="stats-list" id="statsLeaderboard"></div>
       </section>
@@ -1619,6 +1626,7 @@ function setupStatisticsPanel() {
   els.statsGenerateButton = panel.querySelector("#statsGenerateButton");
   els.statsRefreshButton = panel.querySelector("#statsRefreshButton");
   els.statsSummary = panel.querySelector("#statsSummary");
+  els.statsPrivacyMessage = panel.querySelector("#statsPrivacyMessage");
   els.statsLeaderboard = panel.querySelector("#statsLeaderboard");
   els.statsClassSummary = panel.querySelector("#statsClassSummary");
   els.statsStatusSummary = panel.querySelector("#statsStatusSummary");
@@ -1943,6 +1951,9 @@ async function mockAdminApiPostV200(action, payload) {
       nama_admin: MOCK_ADMIN_QA.nama_admin,
       status: "AKTIF"
     };
+  }
+  if (action === "getAdminIndividualStats") {
+    return buildMockAdminIndividualStatsV200(request);
   }
   if (action === "getAdminStudents") {
     return cloneMockAdminValueV200(mockAdminStudentsV200);
@@ -3083,7 +3094,7 @@ function ensureStudentRefreshControls() {
   els.studentRefreshButton.type = "button";
   els.studentRefreshButton.textContent = "Refresh Status";
   els.studentRefreshButton.addEventListener("click", async () => {
-    await refreshStudentLiveRecords();
+    await refreshStudentLiveRecords(true);
   });
 
   els.studentLastUpdated = document.createElement("small");
@@ -3094,20 +3105,88 @@ function ensureStudentRefreshControls() {
   els.studentRecordsList.parentNode.insertBefore(controls, els.studentRecordsList);
 }
 
-async function refreshStudentLiveRecords() {
+async function refreshStudentLiveRecords(includeAnnualSummary = false) {
   if (!currentSession || currentSession.role !== "student") {
     stopStudentAutoRefresh();
     return;
   }
 
   if (isLiveMode) {
-    await loadTodayRecords();
+    const requests = [loadTodayRecords()];
+    if (includeAnnualSummary) {
+      requests.push(loadStudentAnnualSummary());
+    }
+    await Promise.all(requests);
   } else {
+    if (includeAnnualSummary) {
+      studentAnnualSummary = buildMockStudentAnnualSummary();
+    }
     renderStudent();
   }
 
   studentLastUpdatedAt = new Date();
   updateStudentLastUpdated();
+}
+
+async function loadStudentAnnualSummary() {
+  if (!currentSession || currentSession.role !== "student") {
+    return;
+  }
+
+  const user = currentSession.user || {};
+  const studentId = user.student_id || user.studentId || user.id || "";
+  const noMatrik = user.no_matrik || user.noMatrik || "";
+  if (!studentId || !noMatrik) {
+    throw new Error("Credential sesi pelajar tidak lengkap.");
+  }
+
+  if (els.studentAnnualSummary) {
+    els.studentAnnualSummary.textContent = "Jumlah Outing: Memuatkan...";
+  }
+
+  try {
+    studentAnnualSummary = await apiPost("getStudentAnnualSummary", {
+      student_id: studentId,
+      no_matrik: noMatrik
+    });
+  } catch (error) {
+    studentAnnualSummary = { year: getMalaysiaYearV200(), error: true };
+  } finally {
+    renderStudentAnnualSummary();
+  }
+}
+
+function buildMockStudentAnnualSummary() {
+  const currentYear = getMalaysiaYearV200();
+  const totalOutings = outingRecords.filter((record) => {
+    const status = record.rawStatus || reverseDisplayStatus(record.status);
+    const date = parseFlexibleDate(record.tarikh || record.masa_mohon || record.requestedAt);
+    return isRecordForCurrentStudent(record) && status === "SELESAI" && date && date.getFullYear() === currentYear;
+  }).length;
+  return { year: currentYear, total_outings: totalOutings };
+}
+
+function renderStudentAnnualSummary() {
+  if (!els.studentAnnualSummary) {
+    return;
+  }
+  if (!studentAnnualSummary) {
+    const year = getMalaysiaYearV200();
+    els.studentAnnualSummary.textContent = `Jumlah Outing ${year}: —`;
+    return;
+  }
+  if (studentAnnualSummary.error) {
+    els.studentAnnualSummary.textContent = `Jumlah Outing ${Number(studentAnnualSummary.year)}: Tidak dapat dimuatkan`;
+    return;
+  }
+  els.studentAnnualSummary.textContent = `Jumlah Outing ${Number(studentAnnualSummary.year)}: ${Number(studentAnnualSummary.total_outings || 0)} kali`;
+}
+
+function getMalaysiaYearV200() {
+  return Number(new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).format(new Date()));
 }
 
 function startStudentAutoRefresh() {
@@ -3556,7 +3635,8 @@ function startSession(role, user) {
   applyRoleView();
   render();
   if (role === "student") {
-    refreshStudentLiveRecords();
+    studentAnnualSummary = null;
+    refreshStudentLiveRecords(true);
     startStudentAutoRefresh();
   }
   if (role === "guard") {
@@ -3697,6 +3777,7 @@ function renderStudent() {
   ensureStudentRefreshControls();
   updateStudentLastUpdated();
   updateStudentSubmitAvailability();
+  renderStudentAnnualSummary();
 
   const studentRecords = outingRecords.filter(isRecordForCurrentStudent);
   debugStudentRecords(studentRecords);
@@ -4174,6 +4255,7 @@ function openStatisticsPage(eventOrOptions) {
   stopStudentAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
+  if (els.statsBackButton) els.statsBackButton.textContent = "Tukar Peranan";
   els.accessScreen.classList.add("hidden");
   els.appWorkspace.classList.remove("active");
   if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
@@ -4185,8 +4267,31 @@ function openStatisticsPage(eventOrOptions) {
   loadStatistics();
 }
 
+function openAdminStatisticsPageV200(eventOrOptions) {
+  if (!currentSession || currentSession.role !== "admin" || !adminRuntimeCredential) {
+    showError("Sesi Admin telah tamat. Sila log masuk semula.", "Akses Statistik");
+    return;
+  }
+
+  const intentional = isIntentionalNavigationV200(eventOrOptions) || Boolean(eventOrOptions);
+  els.accessScreen.classList.add("hidden");
+  els.appWorkspace.classList.remove("active");
+  if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
+  els.statsWorkspace.classList.add("active");
+  if (els.statsBackButton) els.statsBackButton.textContent = "Kembali ke Admin";
+  if (intentional) scheduleIntentionalScrollV200(els.statsWorkspace);
+  setupStatsFilters();
+  loadStatistics();
+}
+
 function closeStatisticsPage() {
   els.statsWorkspace.classList.remove("active");
+  if (currentSession && currentSession.role === "admin" && adminRuntimeCredential) {
+    els.appWorkspace.classList.add("active");
+    els.accessScreen.classList.add("hidden");
+    els.adminDashboard.classList.add("active");
+    return;
+  }
   els.accessScreen.classList.remove("hidden");
   hideLoginPanels();
 }
@@ -4269,6 +4374,25 @@ async function loadStatistics() {
   } catch (error) {
     showError(error.message || "Statistik gagal dimuat.", "Statistik Gagal");
     renderStatistics(emptyStats(params));
+  }
+
+  const hasAdminAccess = Boolean(currentSession && currentSession.role === "admin" && adminRuntimeCredential);
+  if (!hasAdminAccess) {
+    renderAdminIndividualStatsV200(null);
+    return;
+  }
+
+  if (els.statsLeaderboard) {
+    els.statsLeaderboard.innerHTML = emptyState("Memuatkan statistik individu...");
+  }
+  try {
+    const individualStats = await apiPost("getAdminIndividualStats", {
+      ...buildAdminCredentialPayloadV200(),
+      ...params
+    });
+    renderAdminIndividualStatsV200(individualStats);
+  } catch (error) {
+    els.statsLeaderboard.innerHTML = emptyState("Statistik individu tidak dapat dimuatkan. Sila cuba lagi.");
   }
 }
 
@@ -4389,8 +4513,6 @@ function renderStatistics(stats) {
     </article>
   `).join("");
 
-  els.statsLeaderboard.innerHTML = emptyState("Data individu tidak dipaparkan. Statistik hanya ditunjukkan secara agregat.");
-
   els.statsClassSummary.innerHTML = stats.class_summary && stats.class_summary.length
     ? stats.class_summary.map(classSummaryCard).join("")
     : emptyState("Belum ada ringkasan kelas untuk bulan ini.");
@@ -4403,6 +4525,97 @@ function renderStatistics(stats) {
   els.statsStatusSummary.innerHTML = statusOrder.map((status) => `
     <span class="status-pill ${badgeClass(mapLiveStatus(status))}">${escapeHtml(status)} <strong>${Number(statusMap[status] || 0)}</strong></span>
   `).join("");
+}
+
+function renderAdminIndividualStatsV200(stats) {
+  const hasAdminAccess = Boolean(currentSession && currentSession.role === "admin" && adminRuntimeCredential);
+  if (els.statsPrivacyMessage) {
+    els.statsPrivacyMessage.textContent = hasAdminAccess
+      ? "Ringkasan agregat kekal tersedia; data individu ini hanya dipaparkan selepas pengesahan Admin."
+      : "Ringkasan agregat tersedia kepada umum; statistik individu terhad kepada Admin yang dibenarkan.";
+  }
+  if (!els.statsLeaderboard) {
+    return;
+  }
+  if (!hasAdminAccess) {
+    els.statsLeaderboard.innerHTML = emptyState("Log masuk sebagai Admin untuk melihat statistik individu pelajar.");
+    return;
+  }
+
+  const students = stats && Array.isArray(stats.students) ? stats.students : [];
+  if (!students.length) {
+    els.statsLeaderboard.innerHTML = emptyState("Tiada rekod SELESAI bagi bulan, tahun dan kelas yang dipilih.");
+    return;
+  }
+
+  els.statsLeaderboard.innerHTML = `
+    <div class="individual-stats-table-wrap">
+      <table class="individual-stats-table">
+        <thead>
+          <tr><th>Pelajar</th><th>Kelas</th><th>Jumlah Outing</th><th>Jumlah Tempoh Outing</th></tr>
+        </thead>
+        <tbody>
+          ${students.map((student) => `
+            <tr>
+              <td data-label="Pelajar">${escapeHtml(student.student_name || "-")}</td>
+              <td data-label="Kelas">${escapeHtml(student.kelas || "-")}</td>
+              <td data-label="Jumlah Outing">${Number(student.total_outings || 0)}</td>
+              <td data-label="Jumlah Tempoh Outing">${escapeHtml(student.total_duration || "0 minit")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function buildMockAdminIndividualStatsV200(params) {
+  const month = Number(params.month);
+  const year = Number(params.year);
+  const kelasFilter = normalizeValue(params.kelas);
+  const studentsMap = {};
+  outingRecords.forEach((record) => {
+    const status = record.rawStatus || reverseDisplayStatus(record.status);
+    const date = parseFlexibleDate(record.tarikh || record.masa_mohon || record.requestedAt);
+    const kelas = record.kelas || record.className || "Tidak Dinyatakan";
+    if (status !== "SELESAI" || !date || date.getMonth() + 1 !== month || date.getFullYear() !== year) return;
+    if (kelasFilter && normalizeValue(kelas) !== kelasFilter) return;
+    const key = getRecordStudentId(record) || getRecordNoMatrik(record) || getRecordName(record);
+    if (!key) return;
+    if (!studentsMap[key]) {
+      studentsMap[key] = {
+        student_name: getRecordName(record) || "Tidak Dinyatakan",
+        kelas,
+        total_outings: 0,
+        total_duration_minutes: 0
+      };
+    }
+    studentsMap[key].total_outings += 1;
+    const keluar = parseFlexibleDate(record.masa_keluar || record.outAt);
+    const masuk = parseFlexibleDate(record.masa_masuk || record.returnedAt);
+    if (keluar && masuk && masuk > keluar) {
+      studentsMap[key].total_duration_minutes += Math.floor((masuk - keluar) / 60000);
+    }
+  });
+  const students = Object.values(studentsMap)
+    .map((student) => ({
+      ...student,
+      total_duration: formatOutingDurationClientV200(student.total_duration_minutes)
+    }))
+    .sort((left, right) => right.total_outings - left.total_outings || left.student_name.localeCompare(right.student_name));
+  return { month, year, kelas: params.kelas || "", students };
+}
+
+function formatOutingDurationClientV200(totalMinutes) {
+  const safeMinutes = Math.max(0, Math.floor(Number(totalMinutes) || 0));
+  const days = Math.floor(safeMinutes / 1440);
+  const hours = Math.floor((safeMinutes % 1440) / 60);
+  const minutes = safeMinutes % 60;
+  const parts = [];
+  if (days) parts.push(`${days} hari`);
+  if (hours) parts.push(`${hours} jam`);
+  if (minutes || !parts.length) parts.push(`${minutes} minit`);
+  return parts.join(" ");
 }
 
 function classSummaryCard(item) {

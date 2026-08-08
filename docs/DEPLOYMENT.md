@@ -1,6 +1,6 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v2.0.0**. Backend production GAS **Version 24** telah dideploy dan smoke-tested bersama Spreadsheet serta login Admin sebelum release frontend ini.
+Versi repo semasa: **v2.0.0**. Backend production semasa ialah GAS **Version 26** setakat **8 Ogos 2026**. Source executable kanonik ialah `gas/Code.gs`, terikat kepada Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
 
 ## Rekod Rollout Production v2.0.0 — 4 Ogos 2026
 
@@ -50,6 +50,8 @@ v1.6.24 ialah frontend-only release untuk Guard quick filter dan contextual empt
 
 Gunakan flow ini apabila `gas/Code.gs` berubah:
 
+`gas/Code.gs` ialah satu-satunya source GAS executable kanonik. `.claspignore` mesti kekal sebagai whitelist untuk `Code.gs` dan `appsscript.json`; snapshot arkib tidak boleh berada dalam skop `rootDir` tanpa ignore yang eksplisit.
+
 1. semak syntax GAS secara local;
 2. jalankan `clasp push`;
 3. buka Apps Script: `Deploy -> Manage deployments -> Edit`;
@@ -57,7 +59,8 @@ Gunakan flow ini apabila `gas/Code.gs` berubah:
 5. kekalkan deployment URL sedia ada;
 6. uji endpoint live `/exec?action=getTodayRecords`;
 7. uji flow authenticated POST yang terlibat;
-8. kemudian commit dan push repo.
+8. rekod Git SHA, Apps Script version, deployment ID/URL, Spreadsheet ID, description dan tarikh release;
+9. kemudian commit dan push repo.
 
 `clasp push` sahaja tidak menjamin deployment `/exec` menggunakan code baharu. Deployment version baharu tetap diperlukan.
 

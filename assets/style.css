@@ -1866,6 +1866,54 @@ textarea {
   gap: 10px;
 }
 
+.student-record-summary-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.student-annual-summary {
+  background: #e8f3ff;
+  border: 1px solid rgba(11, 79, 157, 0.18);
+  border-radius: 999px;
+  color: var(--deep-navy);
+  font-size: 0.88rem;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.individual-stats-table-wrap {
+  border: 1px solid rgba(8, 36, 92, 0.12);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.individual-stats-table {
+  background: #ffffff;
+  border-collapse: collapse;
+  min-width: 680px;
+  width: 100%;
+}
+
+.individual-stats-table th,
+.individual-stats-table td {
+  border-bottom: 1px solid rgba(8, 36, 92, 0.1);
+  padding: 11px 12px;
+  text-align: left;
+}
+
+.individual-stats-table th {
+  background: #eaf1fb;
+  color: var(--deep-navy);
+  font-size: 0.85rem;
+}
+
+.individual-stats-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 .stats-summary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -2793,6 +2841,60 @@ textarea:focus {
 @media (min-width: 720px) {
   #guardOvernightNotReturnedSection [data-overnight-not-returned-list] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 719px) {
+  .individual-stats-table-wrap {
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .individual-stats-table {
+    background: transparent;
+    min-width: 0;
+  }
+
+  .individual-stats-table thead {
+    display: none;
+  }
+
+  .individual-stats-table,
+  .individual-stats-table tbody,
+  .individual-stats-table tr,
+  .individual-stats-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .individual-stats-table tr {
+    background: #ffffff;
+    border: 1px solid rgba(8, 36, 92, 0.12);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 10px;
+    padding: 8px 11px;
+  }
+
+  .individual-stats-table td {
+    align-items: baseline;
+    border-bottom: 1px solid rgba(8, 36, 92, 0.08);
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1.1fr);
+    padding: 8px 0;
+  }
+
+  .individual-stats-table td::before {
+    color: var(--muted);
+    content: attr(data-label);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .individual-stats-table tr td:last-child {
+    border-bottom: 0;
   }
 }
 

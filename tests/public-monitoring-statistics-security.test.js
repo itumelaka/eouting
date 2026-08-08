@@ -465,17 +465,21 @@ test("monitoring renders safe labels and keeps loading, refresh and error fallba
   assert.match(refreshFunction, /finally/);
 });
 
-test("statistics UI no longer consumes or renders individual leaderboard data", () => {
+test("public statistics stay aggregate while individual statistics require Admin access", () => {
   const setupStart = appSource.indexOf("function setupStatisticsPanel");
   const setupEnd = appSource.indexOf("\nels.studentLoginPanel.addEventListener", setupStart);
   assert.notEqual(setupStart, -1, "setupStatisticsPanel must exist");
   assert.notEqual(setupEnd, -1, "setupStatisticsPanel boundary must exist");
   const setupStats = appSource.slice(setupStart, setupEnd);
-  const renderStats = extractFunction(appSource, "renderStatistics", "classSummaryCard");
+  const renderStats = extractFunction(appSource, "renderStatistics", "renderAdminIndividualStatsV200");
+  const renderIndividual = extractFunction(appSource, "renderAdminIndividualStatsV200", "buildMockAdminIndividualStatsV200");
 
   assert.doesNotMatch(setupStats, /Juara Outing|Ranking berdasarkan/);
   assert.doesNotMatch(renderStats, /stats\.leaderboard|leaderboardCard/);
-  assert.match(renderStats, /Data individu tidak dipaparkan/);
+  assert.doesNotMatch(renderStats, /student_name|total_duration/);
+  assert.match(renderIndividual, /currentSession\.role === "admin"/);
+  assert.match(renderIndividual, /adminRuntimeCredential/);
+  assert.match(renderIndividual, /Log masuk sebagai Admin untuk melihat statistik individu pelajar/);
 });
 
 test("sensitive record objects are not printed to console", () => {

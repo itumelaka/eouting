@@ -14,7 +14,7 @@ Versi repo semasa: **v2.0.0 — Admin Tetapan Outing dan Pengurusan Pelajar**.
 
 Rollout production selesai dan disahkan pada **4 Ogos 2026** melalui merge commit `4eedcbe` (`release: deploy eOuting v2.0.0`). Frontend production berada di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan memaparkan footer `v2.0.0` tanpa badge `BETA API`.
 
-Backend production kekal deployment GAS **Version 24**. `OUTING_CONFIG_V2_ENABLED=false`, maka submission Pelajar masih menggunakan validation legacy yang stabil; Admin Dashboard boleh digunakan tanpa mengaktifkan config-driven submission. `TELEGRAM_ENABLED=true` kekal aktif. Login dan paparan Pelajar, Warden, Guard serta Admin, Public Monitoring sekali klik, Statistik dan auto-scroll mobile telah disahkan menggunakan data production. Suite automatik sebelum deployment lulus **177/177**.
+Backend production menggunakan GAS **Version 26** setakat **8 Ogos 2026**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` ialah satu-satunya source GAS executable kanonik; snapshot arkib tidak boleh dimasukkan ke dalam skop upload clasp.
 
 ## Architecture Ringkas
 
@@ -158,13 +158,13 @@ Frontend-only:
 
 Backend GAS:
 
-1. kemas kini `gas/Code.gs`;
+1. kemas kini source kanonik `gas/Code.gs`;
 2. jalankan `setupSelfieProofV170()` sekali dan sahkan `SELFIE_FOLDER_ID`;
 3. sahkan Script Properties Telegram;
 4. deploy Web App version baharu sambil mengekalkan URL;
 5. publish frontend dan semak footer/popup versi semasa;
 6. jalankan ujian hujung-ke-hujung.
 
-Backend production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. Deployment semasa telah bergerak ke **Version 26**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

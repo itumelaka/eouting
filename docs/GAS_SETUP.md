@@ -121,6 +121,8 @@ Semak syntax GAS:
 Get-Content gas/Code.gs -Raw | node --check -
 ```
 
+`gas/Code.gs` ialah source GAS executable kanonik. `.claspignore` mengehadkan upload kepada fail itu dan `appsscript.json`; jangan letakkan snapshot `.gs` arkib dalam skop clasp kecuali ia diabaikan secara eksplisit.
+
 Push code:
 
 ```powershell

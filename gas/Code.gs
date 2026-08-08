@@ -1,4 +1,4 @@
-const SPREADSHEET_ID = "1_uIvdhP-pdcujgmLdfdQl3ogzyxt3BWL1yvjkGtK7to";
+const SPREADSHEET_ID = "1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg";
 
 const SHEETS = {
   students: "STUDENTS",
@@ -191,6 +191,8 @@ function doPost(e) {
     if (action === "loginGuard") return jsonResponse(loginGuard(payload));
     if (action === "loginAdmin") return jsonResponse(loginAdmin(payload));
     if (action === "getTodayRecords") return jsonResponse(getOperationalTodayRecords(payload));
+    if (action === "getStudentAnnualSummary") return jsonResponse(getStudentAnnualSummary(payload));
+    if (action === "getAdminIndividualStats") return jsonResponse(getAdminIndividualStats(payload));
     if (action === "getAdminOutingTypes") return jsonResponse(getAdminOutingTypes(payload));
     if (action === "createOutingType") return jsonResponse(createOutingType(payload));
     if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
@@ -2240,6 +2242,125 @@ function getOutingStats(payload) {
       count: statusMap[status]
     }))
   };
+}
+
+function getStudentAnnualSummary(payload) {
+  const data = payload || {};
+  const student = findActiveStudent_(
+    data.student_id || data.id,
+    data.no_matrik || data.matric
+  );
+  if (!student) {
+    throw new Error("Akses sesi pelajar tidak sah.");
+  }
+
+  const year = Number(Utilities.formatDate(new Date(), "Asia/Kuala_Lumpur", "yyyy"));
+  const totalOutings = getRowsAsObjects_(getSheet_(SHEETS.requests))
+    .filter((row) => isRecordForStudent_(row, student))
+    .filter((row) => String(row.status || "").trim().toUpperCase() === STATUS.done)
+    .filter((row) => isStatsRecordInYear_(row, year))
+    .length;
+
+  return {
+    year: year,
+    total_outings: totalOutings
+  };
+}
+
+function getAdminIndividualStats(payload) {
+  validateAdminCredentials_(payload);
+
+  const data = payload || {};
+  const now = new Date();
+  const month = Number(data.month || Utilities.formatDate(now, "Asia/Kuala_Lumpur", "M"));
+  const year = Number(data.year || Utilities.formatDate(now, "Asia/Kuala_Lumpur", "yyyy"));
+  const kelasFilter = normalizeText_(data.kelas || "");
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000) {
+    throw new Error("Bulan atau tahun statistik tidak sah.");
+  }
+
+  const studentsMap = {};
+  getRowsAsObjects_(getSheet_(SHEETS.requests))
+    .filter((row) => String(row.status || "").trim().toUpperCase() === STATUS.done)
+    .filter((row) => isStatsRecordInMonth_(row, month, year))
+    .filter((row) => !kelasFilter || normalizeText_(row.kelas) === kelasFilter)
+    .forEach((row) => {
+      const studentKey = String(row.student_id || row.no_matrik || row.nama || "").trim();
+      if (!studentKey) {
+        return;
+      }
+
+      if (!studentsMap[studentKey]) {
+        studentsMap[studentKey] = {
+          student_name: String(row.nama || "Tidak Dinyatakan").trim() || "Tidak Dinyatakan",
+          kelas: String(row.kelas || "Tidak Dinyatakan").trim() || "Tidak Dinyatakan",
+          total_outings: 0,
+          total_duration_minutes: 0
+        };
+      }
+
+      studentsMap[studentKey].total_outings += 1;
+      studentsMap[studentKey].total_duration_minutes += calculateOutingDurationMinutes_(row);
+    });
+
+  const students = Object.keys(studentsMap)
+    .map((studentKey) => {
+      const item = studentsMap[studentKey];
+      return {
+        student_name: item.student_name,
+        kelas: item.kelas,
+        total_outings: item.total_outings,
+        total_duration_minutes: item.total_duration_minutes,
+        total_duration: formatOutingDuration_(item.total_duration_minutes)
+      };
+    })
+    .sort((left, right) => (
+      right.total_outings - left.total_outings ||
+      left.student_name.localeCompare(right.student_name, "ms", { sensitivity: "base" })
+    ));
+
+  return {
+    month: month,
+    year: year,
+    kelas: data.kelas || "",
+    generated_at: now_(),
+    students: students
+  };
+}
+
+function isRecordForStudent_(row, student) {
+  const studentId = normalizeText_(student && student.student_id);
+  const noMatrik = normalizeText_(student && student.no_matrik);
+  return Boolean(
+    (studentId && normalizeText_(row && row.student_id) === studentId) ||
+    (noMatrik && normalizeText_(row && row.no_matrik) === noMatrik)
+  );
+}
+
+function isStatsRecordInYear_(row, year) {
+  const dateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
+  return Boolean(dateKey) && Number(dateKey.split("-")[0]) === Number(year);
+}
+
+function calculateOutingDurationMinutes_(row) {
+  const keluar = parseDateForSort_(row && row.masa_keluar);
+  const masuk = parseDateForSort_(row && row.masa_masuk);
+  if (!keluar || !masuk || masuk.getTime() <= keluar.getTime()) {
+    return 0;
+  }
+  return Math.floor((masuk.getTime() - keluar.getTime()) / 60000);
+}
+
+function formatOutingDuration_(totalMinutes) {
+  const safeMinutes = Math.max(0, Math.floor(Number(totalMinutes) || 0));
+  const days = Math.floor(safeMinutes / 1440);
+  const hours = Math.floor((safeMinutes % 1440) / 60);
+  const minutes = safeMinutes % 60;
+  const parts = [];
+  if (days) parts.push(`${days} hari`);
+  if (hours) parts.push(`${hours} jam`);
+  if (minutes || !parts.length) parts.push(`${minutes} minit`);
+  return parts.join(" ");
 }
 
 function isStatsRecordInMonth_(row, month, year) {
