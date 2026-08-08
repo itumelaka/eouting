@@ -4259,7 +4259,7 @@ function openStatisticsPage(eventOrOptions) {
   els.accessScreen.classList.add("hidden");
   els.appWorkspace.classList.remove("active");
   if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
-  els.statsWorkspace.classList.add("active");
+  activateStatisticsWorkspaceV200();
   if (intentional) {
     scheduleIntentionalScrollV200(els.statsWorkspace);
   }
@@ -4277,11 +4277,26 @@ function openAdminStatisticsPageV200(eventOrOptions) {
   els.accessScreen.classList.add("hidden");
   els.appWorkspace.classList.remove("active");
   if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
-  els.statsWorkspace.classList.add("active");
+  activateStatisticsWorkspaceV200();
   if (els.statsBackButton) els.statsBackButton.textContent = "Kembali ke Admin";
   if (intentional) scheduleIntentionalScrollV200(els.statsWorkspace);
   setupStatsFilters();
   loadStatistics();
+}
+
+function activateStatisticsWorkspaceV200() {
+  if (!els.statsWorkspace) {
+    setupStatisticsPanel();
+  }
+  if (!els.statsWorkspace) {
+    return;
+  }
+
+  els.statsWorkspace.classList.add("active");
+  const statsPanel = els.statsWorkspace.querySelector("#stats");
+  if (statsPanel) {
+    statsPanel.classList.add("active");
+  }
 }
 
 function closeStatisticsPage() {
@@ -6501,7 +6516,7 @@ function showStatisticsPageV152() {
     if (els.accessScreen) els.accessScreen.classList.add("hidden");
     if (els.appWorkspace) els.appWorkspace.classList.remove("active");
     if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
-    if (els.statsWorkspace) els.statsWorkspace.classList.add("active");
+    activateStatisticsWorkspaceV200();
   } catch (error) {
     console.warn("Paparan Statistik tidak dapat dikekalkan.", error);
   }

@@ -84,6 +84,14 @@ function currentMalaysiaYear() {
   }).format(new Date()));
 }
 
+function extractFunctionSource(source, name, nextName) {
+  const start = source.indexOf(`function ${name}`);
+  const end = source.indexOf(`function ${nextName}`, start);
+  assert.notEqual(start, -1, `${name} must exist`);
+  assert.notEqual(end, -1, `${nextName} must follow ${name}`);
+  return source.slice(start, end);
+}
+
 test("student annual summary counts only the authenticated student's SELESAI records in the current year", () => {
   const year = currentMalaysiaYear();
   const context = createContext([
@@ -168,6 +176,39 @@ test("frontend exposes a compact self summary and Admin-only individual statisti
   assert.match(appSource, /apiPost\("getAdminIndividualStats"/);
   assert.match(appSource, /Log masuk sebagai Admin untuk melihat statistik individu pelajar/);
   assert.match(appSource, /Tiada rekod SELESAI bagi bulan, tahun dan kelas yang dipilih/);
+});
+
+test("Admin Statistics reactivates both the shared workspace and its inner stats panel", () => {
+  const activateSource = extractFunctionSource(
+    appSource,
+    "activateStatisticsWorkspaceV200",
+    "closeStatisticsPage"
+  );
+  const publicOpenSource = extractFunctionSource(appSource, "openStatisticsPage", "openAdminStatisticsPageV200");
+  const adminOpenSource = extractFunctionSource(appSource, "openAdminStatisticsPageV200", "activateStatisticsWorkspaceV200");
+  let workspaceActive = false;
+  let panelActive = false;
+  const context = vm.createContext({
+    els: {
+      statsWorkspace: {
+        classList: { add: (name) => { workspaceActive = name === "active"; } },
+        querySelector: (selector) => selector === "#stats"
+          ? { classList: { add: (name) => { panelActive = name === "active"; } } }
+          : null
+      }
+    },
+    setupStatisticsPanel: () => { throw new Error("existing shared workspace must be reused"); }
+  });
+  vm.runInContext(activateSource, context);
+  context.activateStatisticsWorkspaceV200();
+
+  assert.equal(workspaceActive, true);
+  assert.equal(panelActive, true);
+  assert.match(publicOpenSource, /activateStatisticsWorkspaceV200\(\)/);
+  assert.match(publicOpenSource, /currentSession = null/);
+  assert.match(adminOpenSource, /activateStatisticsWorkspaceV200\(\)/);
+  assert.doesNotMatch(adminOpenSource, /currentSession\s*=\s*null|adminRuntimeCredential\s*=\s*null/);
+  assert.match(adminOpenSource, /Kembali ke Admin/);
 });
 
 test("clasp upload scope whitelists only the canonical source and manifest", () => {

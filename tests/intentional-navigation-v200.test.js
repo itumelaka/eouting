@@ -230,7 +230,7 @@ test("statistics scroll is intentional and scheduled only after activation", () 
     /^(?:(?:async\s+)?function\s+openStatisticsPage\s*\(eventOrOptions\)|(?:const|let|var)\s+openStatisticsPage\s*=)/
   );
   const setupSource = extractFunction("setupClayRoleNav");
-  const activate = source.indexOf('statsWorkspace.classList.add("active")');
+  const activate = source.indexOf("activateStatisticsWorkspaceV200()");
   const scroll = source.indexOf("scheduleIntentionalScrollV200(els.statsWorkspace)");
   assert.ok(activate >= 0);
   assert.ok(scroll > activate);
