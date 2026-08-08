@@ -1,6 +1,14 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v2.0.0**. Backend production semasa ialah GAS **Version 26** setakat **8 Ogos 2026**. Source executable kanonik ialah `gas/Code.gs`, terikat kepada Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
+Versi repo semasa: **v2.1.0**. Backend production semasa ialah GAS **Version 27**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
+
+## Release Production v2.1.0 — 9 Ogos 2026
+
+- Release commit: `chore: bump eOuting version to 2.1.0` (commit yang membawa rekod ini).
+- Frontend: Guard keluar/masuk diperkemas, kad Sahkan Masuk kompak dan pembaikan rendering Statistik Admin.
+- Statistik selamat: jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi dan tempoh sebenar `masa_keluar` → `masa_masuk`.
+- Deployment hygiene: `gas/Code.gs` kekal source kanonik dan `.claspignore` mengehadkan skop push.
+- GAS production Version 27 telah live; URL dan Spreadsheet production tidak berubah.
 
 ## Rekod Rollout Production v2.0.0 — 4 Ogos 2026
 
@@ -24,7 +32,7 @@ Urutan activation masa hadapan ialah: backup Sheet, jalankan migration idempoten
 
 ## Release Beta v2.0
 
-Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.0.0`.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.1.0`.
 
 Beta pertama hendaklah menguji lima seed sahaja. Jenis custom, statistik dinamik, label Telegram dinamik dan penggunaan operasi `require_selfie` belum menjadi gate yang lengkap. `require_warden_approval=false` juga perlu dianggap high-impact kerana backend akan auto-approve sebagai `AUTO_CONFIG_V2`.
 

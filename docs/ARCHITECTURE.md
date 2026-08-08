@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.0.0**.
+Versi repo semasa: **v2.1.0**.
 
 ## Komponen
 
@@ -180,7 +180,7 @@ Tiada kad `Rekod Hari Ini`, quick filter monitoring atau seksyen pendua `Belum P
 
 ## PWA dan Cache
 
-Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache semasa ialah `eouting-cache-v2.0.0`.
+Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache semasa ialah `eouting-cache-v2.1.0`.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

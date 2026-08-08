@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.0.0**.
+Panduan ini merujuk eOuting ITU **v2.1.0**.
 
 ## Keperluan
 
@@ -188,8 +188,8 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## PWA dan Cache
 
-- Semak footer v2.0.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.0.0`.
+- Semak footer v2.1.0 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v2.1.0`.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

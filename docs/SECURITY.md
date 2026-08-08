@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan repo semasa **v2.0.0**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan repo semasa **v2.1.0**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -63,7 +63,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache semasa ialah `eouting-cache-v2.0.0`.
+- Cache semasa ialah `eouting-cache-v2.1.0`.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 

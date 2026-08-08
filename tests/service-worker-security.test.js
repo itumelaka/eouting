@@ -9,9 +9,9 @@ const workerSource = fs.readFileSync(path.join(root, "service-worker.js"), "utf8
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
-const EXPECTED_VERSION = "2.0.0";
+const EXPECTED_VERSION = "2.1.0";
 const EXPECTED_RELEASE_DATE = "2026-08-04";
-const EXPECTED_RELEASE_NOTE = "eOuting v2.0.0 menambah Admin Dashboard, tetapan outing config-driven, Pengurusan Pelajar termasuk kelas LI, antaramuka 3D Clay, routing beta terkawal dan penambahbaikan navigasi serta Pemantauan Semasa pada telefon.";
+const EXPECTED_RELEASE_NOTE = "eOuting v2.1.0 memperkemas operasi Guard, menambah jumlah outing tahunan Pelajar dan statistik individu Admin yang selamat dengan tempoh outing sebenar.";
 
 function createWorker(cacheNames = []) {
   const listeners = {};

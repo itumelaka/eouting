@@ -2,7 +2,7 @@
 
 eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Versi repo semasa: **v2.0.0 — Admin Tetapan Outing dan Pengurusan Pelajar**.
+Versi repo semasa: **v2.1.0 — Statistik Selamat dan Operasi Guard Diperkemas**.
 
 - Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
 - Backend: Google Apps Script (GAS) Web App
@@ -10,11 +10,11 @@ Versi repo semasa: **v2.0.0 — Admin Tetapan Outing dan Pengurusan Pelajar**.
 - Notifikasi: Telegram Bot melalui GAS
 - Repo: [itumelaka/eouting](https://github.com/itumelaka/eouting)
 
-## Status Production v2.0.0
+## Status Production v2.1.0
 
-Rollout production selesai dan disahkan pada **4 Ogos 2026** melalui merge commit `4eedcbe` (`release: deploy eOuting v2.0.0`). Frontend production berada di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan memaparkan footer `v2.0.0` tanpa badge `BETA API`.
+Frontend production v2.1.0 diterbitkan melalui commit `chore: bump eOuting version to 2.1.0` (commit release ini). Production berada di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS sedia ada.
 
-Backend production menggunakan GAS **Version 26** setakat **8 Ogos 2026**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` ialah satu-satunya source GAS executable kanonik; snapshot arkib tidak boleh dimasukkan ke dalam skop upload clasp.
+Backend production menggunakan GAS **Version 27**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Release ini merangkumi UI Guard keluar/masuk yang diperkemas, kad Sahkan Masuk kompak, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh sebenar `masa_keluar` → `masa_masuk`, hygiene sumber GAS/clasp dan pembaikan rendering Statistik Admin. `gas/Code.gs` kekal source GAS executable kanonik.
 
 ## Architecture Ringkas
 
@@ -165,6 +165,6 @@ Backend GAS:
 5. publish frontend dan semak footer/popup versi semasa;
 6. jalankan ujian hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. Deployment semasa telah bergerak ke **Version 26**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. Deployment semasa telah bergerak ke **Version 27**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

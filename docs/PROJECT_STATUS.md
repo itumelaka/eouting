@@ -1,16 +1,18 @@
 # Project Status eOuting ITU
 
-Status repo semasa: **v2.0.0 — production frontend release**.
+Status repo semasa: **v2.1.0 — production frontend release**.
 
-## eOuting v2.0 Production
+## eOuting v2.1 Production
 
-Frontend v2.0.0 telah berjaya dilancarkan ke production pada **4 Ogos 2026** melalui merge commit `4eedcbe` (`release: deploy eOuting v2.0.0`). URL production ialah `https://itumelaka.github.io/eouting/`.
+Frontend v2.1.0 diterbitkan melalui commit `chore: bump eOuting version to 2.1.0` (commit release ini). URL production ialah `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa ialah **rollout production v2.0.0 berjaya**. Footer live memaparkan `v2.0.0`, badge `BETA API` tidak dipaparkan dan aplikasi menggunakan data production.
+Verdict semasa ialah **release production v2.1.0** dengan GAS Version 27 yang telah live. Footer dan cache repo diselaraskan kepada `v2.1.0`.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.0.0`, manakala backend kekal deployment GAS **Version 24**;
+- frontend release ialah `v2.1.0` dan backend production ialah GAS **Version 27**;
+- Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
+- endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=false`, maka validation submission legacy masih aktif;
 - `TELEGRAM_ENABLED=true` kekal aktif;
 - pengaktifan config-driven submission memerlukan keputusan dan verifikasi berasingan;
@@ -19,9 +21,9 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata frontend, footer dan cache repo berada pada `v2.0.0`.
-- Production v2.0.0 digabungkan ke `main` melalui merge commit `4eedcbe`.
-- Backend GAS production kekal **Version 24**.
+- Metadata frontend, footer dan cache repo berada pada `v2.1.0`.
+- Release v2.1.0 dikenal pasti melalui commit `chore: bump eOuting version to 2.1.0`.
+- Backend GAS production ialah **Version 27**.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - Automated test suite sebelum deployment: **177/177 lulus**.
@@ -39,16 +41,16 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Public Monitoring membuka sekali klik, scroll, membuat GET awam khusus, mengelakkan overlap dan merender sekali.
 - Public Monitoring mengekalkan data lama apabila refresh gagal.
 - Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
-- Statistik hanya aggregated counts; leaderboard individu telah dibuang.
+- Statistik agregat kekal public tanpa nama individu; Admin berautentikasi boleh melihat statistik individu mengikut filter yang sama.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Version, footer, asset query strings dan cache konsisten pada v2.0.0.
+- Version, footer, asset query strings dan cache konsisten pada v2.1.0.
 - Bukti selfie wajib untuk semua lima jenis permohonan selepas `confirmIn`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR` / `SUDAH_HANTAR` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
 - Backend mengesahkan pemilikan, status/masa masuk, MIME/base64/saiz dan duplicate submission dengan `LockService`.
 - Cleanup transaksi separa serta audit failure non-fatal selepas submission lengkap telah disahkan.
 - Public Monitoring dan service worker mengekalkan boundary privasi metadata selfie.
-- Admin production login serta flow Pelajar, Warden dan Guard berjaya dimuatkan pada rollout v2.0.0.
+- Admin production login serta flow Pelajar, Warden dan Guard kekal berfungsi pada v2.1.0.
 - Public Monitoring berfungsi pada klik pertama, Statistik berjaya dimuatkan dan intentional auto-scroll mobile berjalan lancar.
 
 ## Privacy Boundary
@@ -90,6 +92,7 @@ Nilai backend `KELUAR` tidak berubah.
 - **v1.7.0:** frontend + GAS + Google Drive + Telegram return-selfie release; GAS Version 21.
 - **v1.7.1:** menambah Outing Sabtu / Ahad; Pull Request #2 digabungkan melalui `fa7227e` daripada `1e6303c`.
 - **v2.0.0:** production frontend rollout pada 4 Ogos 2026 melalui `4eedcbe`; backend kekal GAS Version 24 dengan feature flag config-driven submission masih `false`.
+- **v2.1.0:** Guard UI diperkemas, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh outing sebenar, hygiene clasp dan pembaikan rendering Statistik Admin; backend GAS Version 27.
 
 ## Production Validation v1.7.0
 

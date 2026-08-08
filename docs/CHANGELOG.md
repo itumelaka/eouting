@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.0 — 2026-08-09
+
+- **Guard:** membezakan aliran keluar/masuk, memperkemas hierarchy operasi dan menjadikan kad Sahkan Masuk lebih kompak.
+- **Pelajar:** menambah jumlah outing tahunan berdasarkan rekod raw-status `SELESAI` milik pelajar sendiri.
+- **Admin:** menambah statistik individu berautentikasi mengikut bulan, tahun dan kelas serta membaiki rendering workspace Statistik Admin.
+- **Tempoh outing:** menjumlahkan tempoh sebenar yang sah daripada `masa_keluar` hingga `masa_masuk`; timestamp tidak lengkap kekal menyumbang sifar tempoh tanpa mengurangkan kiraan outing.
+- **GAS hygiene:** menetapkan `gas/Code.gs` sebagai source executable kanonik dan mengehadkan skop clasp melalui `.claspignore`.
+- **Production:** frontend v2.1.0 menggunakan GAS Version 27, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint GAS production yang tidak berubah.
+- **Release commit:** `chore: bump eOuting version to 2.1.0` (commit yang membawa entri ini).
+
 ## v2.0.0 — 2026-08-04
 
 ### Production frontend release

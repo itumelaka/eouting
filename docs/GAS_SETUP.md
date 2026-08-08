@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Backend production eOuting v2.0.0 menggunakan GAS Web App **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.1.0 menggunakan GAS Web App **Version 27**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
 
 ## Tanggungjawab Backend
 
