@@ -4989,6 +4989,20 @@ async function confirmOut(id, button) {
     return;
   }
 
+  const studentLabel = previousRecord.studentName || previousRecord.nama || "pelajar ini";
+  const classLabel = previousRecord.className || previousRecord.kelas || "-";
+  const confirmMessage = [
+    "SAHKAN KELUAR",
+    "",
+    `Pelajar: ${studentLabel} (${classLabel})`,
+    "Tindakan ini merekodkan pelajar MENINGGALKAN kampus.",
+    "",
+    "Teruskan dengan Sahkan Keluar?"
+  ].join("\n");
+  if (typeof window.confirm === "function" && !window.confirm(confirmMessage)) {
+    return;
+  }
+
   const now = new Date();
   setGuardActionPending(id, "out");
   const loadingState = setOperationalActionLoading(button, "Mengesahkan keluar...");
@@ -5042,7 +5056,21 @@ async function confirmIn(id, button) {
     return;
   }
 
-  const guardReturnNote = window.prompt("Catatan semasa masuk (optional)", "") || "";
+  const studentLabel = previousRecord.studentName || previousRecord.nama || "pelajar ini";
+  const classLabel = previousRecord.className || previousRecord.kelas || "-";
+  const confirmMessage = [
+    "SAHKAN MASUK",
+    "",
+    `Pelajar: ${studentLabel} (${classLabel})`,
+    "Tindakan ini merekodkan pelajar TELAH KEMBALI ke kampus.",
+    "",
+    "Teruskan dengan Sahkan Masuk?"
+  ].join("\n");
+  if (typeof window.confirm === "function" && !window.confirm(confirmMessage)) {
+    return;
+  }
+
+  const guardReturnNote = window.prompt("Catatan untuk pengesahan MASUK (pilihan)", "") || "";
   const now = new Date();
   setGuardActionPending(id, "in");
   const loadingState = setOperationalActionLoading(button, "Mengesahkan masuk...");
@@ -5138,6 +5166,10 @@ function removeGuardPendingState(record) {
 
 function recordCard(record, mode) {
   const actions = actionButtons(record, mode);
+  if (mode === "guard-in") {
+    return guardReturnCard(record, actions);
+  }
+
   const statusDisplay = getContextualStatusDisplay(record);
   const emergencyBadge = record.jenis_permohonan === REQUEST_TYPE.emergency
     ? `<span class="badge badge-emergency">Kecemasan</span>`
@@ -5154,6 +5186,9 @@ function recordCard(record, mode) {
   const actorDetail = actorDetailHtml(record);
   const cardClass = record.jenis_permohonan === REQUEST_TYPE.overnight ? "record-card overnight-card" : "record-card";
   const cardAttrs = recordDataAttributes(record);
+  const guardActionCue = mode === "guard-out"
+    ? `<div class="guard-action-cue guard-action-cue-out"><strong>Tindakan Keluar</strong><span>Pastikan pelajar berada di pos sebelum disahkan meninggalkan kampus.</span></div>`
+    : "";
 
   return `
     <article class="${cardClass}" ${cardAttrs}>
@@ -5185,9 +5220,93 @@ function recordCard(record, mode) {
         <span>Keluar: ${formatTime(record.outAt)}</span>
         <span>Masuk: ${formatTime(record.returnedAt)}</span>
       </div>
+      ${guardActionCue}
       ${actions}
     </article>
   `;
+}
+
+function guardReturnCard(record, actions) {
+  const timing = getGuardReturnTiming(record, new Date());
+  const requestId = getRecordId(record);
+  const cardClass = record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester
+    ? "record-card overnight-card guard-return-card"
+    : "record-card guard-return-card";
+  const vehicleDetail = record.butiran_kenderaan || "Tiada butiran";
+
+  return `
+    <article class="${cardClass}" ${recordDataAttributes(record)}>
+      <div class="guard-return-top">
+        <h3>${escapeHtml(record.studentName || record.nama || "-")}</h3>
+        <div class="record-meta">${escapeHtml(record.className || record.kelas || "-")} · ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}</div>
+      </div>
+      <div class="guard-return-schedule">
+        <p><span>Keluar:</span> <strong>${escapeHtml(formatDisplayDateTime(record.outAt || record.masa_keluar))}</strong></p>
+        <p><span>Pulang:</span> <strong>${escapeHtml(timing.expectedDisplay)}</strong></p>
+      </div>
+      <div class="guard-return-timing ${timing.isLate ? "is-late" : "is-on-time"}" role="status">
+        <strong>${escapeHtml(timing.label)}</strong>
+      </div>
+      <details class="guard-record-details">
+        <summary>Lihat Butiran</summary>
+        <div class="record-detail">
+          <strong>ID Permohonan:</strong> ${escapeHtml(requestId || "-")}<br>
+          <strong>Jenis Permohonan:</strong> ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}<br>
+          <strong>Tujuan:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
+          <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
+          <strong>Kenderaan:</strong> ${escapeHtml(record.jenis_kenderaan || "-")}<br>
+          <strong>Butiran Kenderaan:</strong> ${escapeHtml(vehicleDetail)}
+          ${emergencyDetailHtml(record)}
+          ${overnightDetailHtml(record, "guard-in")}
+          ${actorDetailHtml(record)}
+        </div>
+        <div class="record-times">
+          <span>Mohon: ${formatTime(record.requestedAt)}</span>
+          <span>Lulus/Tolak: ${formatTime(record.approvedAt || record.rejectedAt)}</span>
+        </div>
+      </details>
+      ${actions}
+    </article>
+  `;
+}
+
+function getGuardReturnTiming(record, now) {
+  const deadline = getExpectedReturnDate(record) || getGuardDailyReturnDeadline(record, now);
+  const requiresExplicitReturn = record && (
+    record.jenis_permohonan === REQUEST_TYPE.overnight ||
+    record.jenis_permohonan === REQUEST_TYPE.semester
+  );
+  const isLate = deadline
+    ? now.getTime() > deadline.getTime()
+    : (!requiresExplicitReturn && isAfterReturnLimit(now, record));
+  return {
+    expectedDisplay: deadline ? formatDisplayDateTime(deadline) : expectedReturnDisplay(record),
+    isLate,
+    label: isLate && deadline
+      ? `Lewat ${formatGuardOverdueDuration(now.getTime() - deadline.getTime())}`
+      : (isLate ? "Lewat" : "Dalam tempoh dibenarkan")
+  };
+}
+
+function getGuardDailyReturnDeadline(record, now) {
+  if (record && (record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester)) {
+    return null;
+  }
+
+  const parts = getKualaLumpurParts(now);
+  return parseFlexibleDate(`${parts.year}-${parts.month}-${parts.day} 22:00`);
+}
+
+function formatGuardOverdueDuration(milliseconds) {
+  const totalMinutes = Math.max(1, Math.floor(milliseconds / 60000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (days) parts.push(`${days} hari`);
+  if (hours) parts.push(`${hours} jam`);
+  if (minutes || !parts.length) parts.push(`${minutes} minit`);
+  return parts.join(" ");
 }
 
 function recordDataAttributes(record) {
@@ -6474,7 +6593,7 @@ function capitalizeFilterKeyV15(value) {
 }
 
 function ensureOvernightMonitoringSectionsV15() {
-  ensureOvernightSectionV15("guardOvernightNotReturnedSection", "Belum Pulang Ke Asrama", els.guardOutList);
+  ensureOvernightSectionV15("guardOvernightNotReturnedSection", "Masuk · Belum Pulang Ke Asrama", els.guardOutList);
 }
 
 function ensureOvernightSectionV15(id, title, anchor) {
@@ -6483,10 +6602,11 @@ function ensureOvernightSectionV15(id, title, anchor) {
   section.className = "operational-section";
   section.id = id;
   section.innerHTML = `
-    <h3 class="list-title">${escapeHtml(title)}</h3>
+    <h3 class="list-title guard-list-title guard-list-title-in">${escapeHtml(title)}</h3>
+    <p class="guard-list-hint">Keutamaan pemantauan untuk Pulang Bermalam dan Cuti Semester.</p>
     <div class="record-list" data-overnight-not-returned-list="1"></div>
   `;
-  anchor.parentNode.insertBefore(section, anchor);
+  anchor.parentNode.insertBefore(section, anchor.nextSibling);
 }
 
 function renderOvernightNotReturnedSectionsV15() {
@@ -6675,7 +6795,7 @@ const recordCardOriginalV160 = recordCard;
 recordCard = function recordCardWithSemesterSupport(record, mode) {
   let html = recordCardOriginalV160(record, mode);
   html = sanitizeReturnTimeHtmlV165(html, record);
-  if (!record || record.jenis_permohonan !== REQUEST_TYPE.semester) {
+  if (!record || record.jenis_permohonan !== REQUEST_TYPE.semester || mode === "guard-in" || mode === "guard-out") {
     return html;
   }
 

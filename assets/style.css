@@ -2638,10 +2638,162 @@ textarea:focus {
 
 .success-action,
 .approve-button,
-.out-button,
 .in-button {
   background: linear-gradient(145deg, #20a985, #0d6655);
   color: #ffffff;
+}
+
+.out-button {
+  background: linear-gradient(145deg, #f2a62b, #b95b08);
+  border-color: rgba(111, 50, 0, 0.24);
+  color: #ffffff;
+}
+
+.out-button:hover {
+  background: linear-gradient(145deg, #d9820f, #8f4100);
+}
+
+.in-button:hover {
+  background: linear-gradient(145deg, #168d6f, #084f42);
+}
+
+.record-actions .out-button.is-loading:disabled {
+  background: linear-gradient(145deg, #f2a62b, #b95b08);
+}
+
+.record-actions .in-button.is-loading:disabled {
+  background: linear-gradient(145deg, #20a985, #0d6655);
+}
+
+.guard-list-title {
+  border-left: 5px solid;
+  padding-left: 10px;
+}
+
+.guard-list-title-out {
+  border-left-color: #d8780c;
+}
+
+.guard-list-title-in {
+  border-left-color: #148164;
+}
+
+.guard-list-hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: -5px 0 12px;
+}
+
+.guard-action-cue {
+  border: 1px solid;
+  border-radius: 14px;
+  display: grid;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+}
+
+.guard-action-cue strong {
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.guard-action-cue span {
+  font-size: 0.84rem;
+}
+
+.guard-action-cue-out {
+  background: #fff1d2;
+  border-color: #e3a143;
+  color: #6e3500;
+}
+
+.guard-return-card {
+  border-top-color: #168164;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+}
+
+.guard-return-top {
+  margin-bottom: 8px;
+}
+
+.guard-return-top h3 {
+  margin-bottom: 2px;
+}
+
+.guard-return-schedule {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.guard-return-schedule p {
+  font-size: 0.88rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.guard-return-schedule span {
+  color: var(--muted);
+}
+
+.guard-return-schedule strong {
+  color: var(--ink);
+}
+
+.guard-return-timing {
+  align-self: flex-start;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+}
+
+.guard-return-timing.is-on-time {
+  background: #dff5eb;
+  color: #075844;
+}
+
+.guard-return-timing.is-late {
+  background: #fff0d2;
+  border: 1px solid #dc8b20;
+  color: #713700;
+}
+
+.guard-record-details {
+  border-top: 1px solid rgba(25, 54, 89, 0.12);
+  margin-bottom: 8px;
+  padding-top: 7px;
+}
+
+.guard-record-details summary {
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.guard-record-details[open] summary {
+  margin-bottom: 10px;
+}
+
+.guard-return-card .record-actions {
+  grid-template-columns: 1fr;
+  margin-top: auto;
+}
+
+#guardOvernightNotReturnedSection [data-overnight-not-returned-list] {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 720px) {
+  #guardOvernightNotReturnedSection [data-overnight-not-returned-list] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .primary-action:hover,
