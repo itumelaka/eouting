@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Foto profil Pelajar:** upload/ganti sendiri dengan compression JPEG 3:4, metadata `STUDENTS.photo_file_id` dan `photo_updated_at`, serta folder Drive private berasingan.
+- **Operasi:** thumbnail kompak dengan placeholder pada kad Warden/HEP dan Guard; Tetapan Pelajar Admin menyokong thumbnail dan confirmed removal ber-audit.
+- **Privasi:** foto dihantar melalui POST batch berautentikasi tanpa Drive ID/URL pada response awam; Public Monitoring kekal tanpa foto dan workflow selfie/Telegram tidak berubah.
+- **Production manual:** selepas merge perlu `clasp push`, `setupStudentProfilePhotos()` dan deployment GAS Version 30; langkah tersebut tidak dijalankan oleh perubahan ini.
+
 ## v2.1.0 — 2026-08-09
 
 - **Admin operations:** menambah Pemantauan Semasa baca sahaja, Rekod Master dengan carian/filter/pagination dan Pengurusan Warden & Guard.

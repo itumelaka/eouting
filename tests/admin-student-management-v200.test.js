@@ -6,7 +6,7 @@ const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const gasSource = fs.readFileSync(path.join(root, "gas", "Code.gs"), "utf8");
-const STUDENT_HEADERS = ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"];
+const STUDENT_HEADERS = ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan", "photo_file_id", "photo_updated_at"];
 const ADMIN_HEADERS = ["admin_id", "nama_admin", "pin", "status", "catatan", "created_at", "updated_at"];
 const AUDIT_HEADERS = ["timestamp", "action", "request_id", "user_role", "user_name", "details", "entity_type", "entity_id"];
 
@@ -128,7 +128,7 @@ test("deactivate excludes a student from public getStudents and reactivate resto
   assert.equal(context.getStudents().some((row) => row.student_id === "LI-001"), true);
 });
 
-test("student writes produce safe audit actions and STUDENTS schema remains unchanged", () => {
+test("student writes preserve the extended STUDENTS schema and safe audit actions", () => {
   const { context, sheets } = runtime();
   context.createStudent(auth({ student: liStudent() }));
   context.updateStudent(auth({ student_id: "LI-001", student: liStudent({ nama: "LI Updated" }) }));
@@ -152,5 +152,5 @@ test("Student Management routes are POST-only and no student version migration w
   for (const action of ["getAdminStudents", "createStudent", "updateStudent", "toggleStudentStatus"]) {
     assert.doesNotMatch(doGetSource, new RegExp(action));
   }
-  assert.deepEqual(STUDENT_HEADERS, ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"]);
+  assert.deepEqual(STUDENT_HEADERS, ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan", "photo_file_id", "photo_updated_at"]);
 });

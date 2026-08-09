@@ -14,7 +14,7 @@ Versi repo semasa: **v2.1.0 — Statistik Selamat dan Operasi Guard Diperkemas**
 
 Frontend production v2.1.0 diterbitkan melalui commit `chore: bump eOuting version to 2.1.0` (commit release ini). Production berada di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS sedia ada.
 
-Backend production menggunakan GAS **Version 27**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Release ini merangkumi UI Guard keluar/masuk yang diperkemas, kad Sahkan Masuk kompak, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh sebenar `masa_keluar` → `masa_masuk`, hygiene sumber GAS/clasp dan pembaikan rendering Statistik Admin. `gas/Code.gs` kekal source GAS executable kanonik.
+Backend production yang disahkan sebelum perubahan foto profil menggunakan GAS **Version 29**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Release ini merangkumi UI Guard keluar/masuk yang diperkemas, kad Sahkan Masuk kompak, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh sebenar `masa_keluar` → `masa_masuk`, hygiene sumber GAS/clasp dan pembaikan rendering Statistik Admin. `gas/Code.gs` kekal source GAS executable kanonik.
 
 ## Architecture Ringkas
 
@@ -22,7 +22,7 @@ Backend production menggunakan GAS **Version 27**, Spreadsheet `1QQ0WKstUTVib6rl
 Browser / PWA di GitHub Pages
   -> Google Apps Script Web App
     -> Google Sheets
-    -> Google Drive (bukti selfie private)
+    -> Google Drive (foto profil dan bukti selfie dalam folder private berasingan)
     -> Telegram Bot
     -> AUDIT_LOG
 ```
@@ -69,6 +69,12 @@ Selepas `confirmIn`, status utama rekod kekal `SELESAI` dan `selfie_status` menj
 
 Backend menyemak pemilikan melalui `student_id` + `no_matrik`, status `SELESAI`, kewujudan `masa_masuk`, MIME/base64 dan duplicate submission. Gambar disimpan secara private dalam folder Drive `eOuting - Bukti Selfie Pulang` dan dihantar sebagai imej sebenar ke Telegram melalui `sendPhoto`. Public Monitoring tidak menerima URL, file ID, nombor matrik atau metadata selfie.
 
+## Foto Profil Pelajar
+
+Pelajar berautentikasi boleh menambah atau mengganti foto profil sendiri. Frontend menerima JPEG, PNG atau WebP sehingga 2 MB, memotong paparan tengah kepada nisbah 3:4 dan mengecilkan kepada maksimum kira-kira 600×800 sebelum menghantar JPEG termampat. Metadata private disimpan pada `STUDENTS.photo_file_id` dan `STUDENTS.photo_updated_at`; base64 tidak disimpan dalam Sheet.
+
+Warden/HEP, Guard dan Admin mengambil foto kompak melalui satu POST batch berautentikasi. API operasi hanya membawa indikator `has_profile_photo`; Public Monitoring dan semua GET awam tidak menerima foto, Drive ID atau metadata foto. Fail berada dalam folder private `eOuting - Foto Profil Pelajar` yang ditetapkan melalui `PROFILE_PHOTO_FOLDER_ID`. Foto profil tidak menggunakan field, folder atau Telegram workflow bukti selfie pulang.
+
 Backend menyimpan nilai status asal seperti `KELUAR`. Frontend memaparkan label kontekstual:
 
 | Keadaan | Paparan UI |
@@ -106,7 +112,7 @@ Public GET `getTodayRecords` hanya mengembalikan enam medan:
 nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 ```
 
-Ia tidak mengembalikan `student_id`, `no_matrik`, `request_id`, e-mel, telefon, waris, lokasi, tujuan, kenderaan, PIN, credential atau metadata operasi dalaman.
+Ia tidak mengembalikan `student_id`, `no_matrik`, `request_id`, e-mel, telefon, waris, lokasi, tujuan, kenderaan, PIN, credential, foto profil, Drive ID atau metadata operasi dalaman.
 
 Rekod operasi penuh untuk Pelajar, Warden dan Guard menggunakan POST authenticated yang berasingan. Tiada fallback daripada kegagalan POST operasi kepada data GET awam. Public Monitoring kekal read-only.
 
@@ -166,11 +172,12 @@ Backend GAS:
 
 1. kemas kini source kanonik `gas/Code.gs`;
 2. jalankan `setupSelfieProofV170()` sekali dan sahkan `SELFIE_FOLDER_ID`;
-3. sahkan Script Properties Telegram;
-4. deploy Web App version baharu sambil mengekalkan URL;
-5. publish frontend dan semak footer/popup versi semasa;
-6. jalankan ujian hujung-ke-hujung.
+3. jalankan `setupStudentProfilePhotos()` sekali dan sahkan `PROFILE_PHOTO_FOLDER_ID`;
+4. sahkan Script Properties Telegram;
+5. deploy Web App version baharu sambil mengekalkan URL;
+6. publish frontend dan semak footer/popup versi semasa;
+7. jalankan ujian hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. Deployment semasa telah bergerak ke **Version 27**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. Deployment yang disahkan sebelum ciri foto profil ialah **Version 29**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

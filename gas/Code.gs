@@ -13,7 +13,7 @@ const SHEETS = {
 const OUTING_CONFIG_V2_PROPERTY = "OUTING_CONFIG_V2_ENABLED";
 
 const HEADERS = {
-  STUDENTS: ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"],
+  STUDENTS: ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan", "photo_file_id", "photo_updated_at"],
   WARDENS: ["warden_id", "nama_warden", "email", "no_tel", "pin", "status", "catatan"],
   GUARDS: ["guard_id", "nama_guard", "email", "no_tel", "pin", "status", "catatan"],
   OUTING_REQUESTS: [
@@ -204,6 +204,9 @@ function doPost(e) {
     if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
     if (action === "toggleOutingType") return jsonResponse(toggleOutingType(payload));
     if (action === "getAdminStudents") return jsonResponse(getAdminStudents(payload));
+    if (action === "getStudentProfilePhotos") return jsonResponse(getStudentProfilePhotos(payload));
+    if (action === "submitStudentProfilePhoto") return jsonResponse(submitStudentProfilePhoto(payload));
+    if (action === "removeStudentProfilePhoto") return jsonResponse(removeStudentProfilePhoto(payload));
     if (action === "createStudent") return jsonResponse(createStudent(payload));
     if (action === "updateStudent") return jsonResponse(updateStudent(payload));
     if (action === "toggleStudentStatus") return jsonResponse(toggleStudentStatus(payload));
@@ -768,7 +771,10 @@ function loginStudent(payload) {
     throw new Error("Pelajar tidak dijumpai atau tidak aktif.");
   }
 
-  return pick_(student, ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status"]);
+  const result = pick_(student, ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status"]);
+  result.has_profile_photo = hasCellValue_(student.photo_file_id);
+  result.photo_updated_at = student.photo_updated_at || "";
+  return result;
 }
 
 function loginWarden(payload) {
@@ -1239,7 +1245,9 @@ function validateStaffInput_(input, config, options) {
     no_tel: String(source.no_tel || "").trim(),
     pin: pin,
     status: normalizeStaffStatus_(source.status, Boolean(settings.defaultActive)),
-    catatan: String(source.catatan || "").trim()
+    catatan: String(source.catatan || "").trim(),
+    has_profile_photo: hasCellValue_(source.photo_file_id),
+    photo_updated_at: source.photo_updated_at || ""
   };
 }
 
@@ -2205,6 +2213,244 @@ function setupSelfieProofV170() {
   };
 }
 
+function setupStudentProfilePhotos() {
+  const configuredFolderId = "1EpnqLVO8iWHRpF8MuqsyVAN55T7eq5X3";
+  const sheet = getSheet_(SHEETS.students);
+  const beforeHeaders = sheet.getLastRow() > 0
+    ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map((header) => String(header).trim())
+    : [];
+  ensureHeaders_(sheet, HEADERS.STUDENTS);
+
+  const properties = PropertiesService.getScriptProperties();
+  const existingFolderId = String(properties.getProperty("PROFILE_PHOTO_FOLDER_ID") || "").trim();
+  if (existingFolderId && existingFolderId !== configuredFolderId) {
+    throw new Error("PROFILE_PHOTO_FOLDER_ID sedia ada tidak sepadan dengan folder yang disahkan.");
+  }
+  const folder = DriveApp.getFolderById(configuredFolderId);
+  folder.getName();
+  if (!existingFolderId) {
+    properties.setProperty("PROFILE_PHOTO_FOLDER_ID", configuredFolderId);
+  }
+
+  return {
+    ok: true,
+    sheet: SHEETS.students,
+    added_columns: ["photo_file_id", "photo_updated_at"].filter((header) => beforeHeaders.indexOf(header) === -1),
+    folder_id: configuredFolderId,
+    folder_name: folder.getName(),
+    folder_created: false,
+    script_property: "PROFILE_PHOTO_FOLDER_ID"
+  };
+}
+
+function validateProfilePhotoImage_(payload) {
+  const mimeType = String(payload && payload.mime_type || "").trim().toLowerCase();
+  const imageBase64 = String(payload && payload.image_base64 || "").trim();
+  const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (allowedMimeTypes.indexOf(mimeType) === -1) {
+    throw new Error("Format foto profil tidak disokong.");
+  }
+  if (!imageBase64 || imageBase64.length > 1100 * 1024 || imageBase64.length % 4 !== 0 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
+    throw new Error("Foto profil tidak sah atau terlalu besar.");
+  }
+  let bytes;
+  try {
+    bytes = Utilities.base64Decode(imageBase64);
+  } catch (error) {
+    throw new Error("Foto profil tidak sah atau rosak.");
+  }
+  if (!bytes || !bytes.length || bytes.length > 800 * 1024) {
+    throw new Error("Foto profil tidak sah atau terlalu besar.");
+  }
+  return { mimeType: mimeType, bytes: bytes };
+}
+
+function getProfilePhotoFolder_() {
+  const folderId = String(PropertiesService.getScriptProperties().getProperty("PROFILE_PHOTO_FOLDER_ID") || "").trim();
+  if (!folderId) {
+    throw new Error("Folder foto profil belum disediakan. Hubungi pentadbir.");
+  }
+  try {
+    const folder = DriveApp.getFolderById(folderId);
+    folder.getName();
+    return folder;
+  } catch (error) {
+    throw new Error("Folder foto profil tidak dapat diakses. Hubungi pentadbir.");
+  }
+}
+
+function isFileInFolder_(file, folderId) {
+  if (!file || !folderId) return false;
+  const parents = file.getParents();
+  while (parents.hasNext()) {
+    if (String(parents.next().getId()) === String(folderId)) return true;
+  }
+  return false;
+}
+
+function getVerifiedProfilePhotoFile_(fileId, folder) {
+  if (!fileId || !folder) return null;
+  try {
+    const file = DriveApp.getFileById(String(fileId));
+    if (!isFileInFolder_(file, folder.getId()) || file.isTrashed()) return null;
+    return file;
+  } catch (error) {
+    return null;
+  }
+}
+
+function safelyTrashProfilePhoto_(fileId, folder) {
+  const file = getVerifiedProfilePhotoFile_(fileId, folder);
+  if (!file) return false;
+  try {
+    file.setTrashed(true);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function submitStudentProfilePhoto(payload) {
+  const studentId = String(payload && (payload.student_id || payload.id) || "").trim();
+  const noMatrik = String(payload && (payload.no_matrik || payload.matric) || "").trim();
+  const student = findActiveStudent_(studentId, noMatrik);
+  if (!student) {
+    throw new Error("Akses sesi pelajar tidak sah.");
+  }
+  const image = validateProfilePhotoImage_(payload);
+
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.students);
+    const found = findStudentRowById_(sheet, student.student_id);
+    if (!found || normalizeText_(found.record.no_matrik) !== normalizeText_(noMatrik) || !isActive_(found.record.status)) {
+      throw new Error("Akses sesi pelajar tidak sah.");
+    }
+    const folder = getProfilePhotoFolder_();
+    const oldFileId = String(found.record.photo_file_id || "").trim();
+    const timestamp = now_();
+    const fileName = "profile_" + sanitizeFilenamePart_(student.student_id) + "_" +
+      Utilities.formatDate(new Date(), "Asia/Kuala_Lumpur", "yyyyMMdd-HHmmss") + ".jpg";
+    const sourceBlob = Utilities.newBlob(image.bytes, image.mimeType, fileName);
+    const jpegBlob = image.mimeType === "image/jpeg"
+      ? sourceBlob
+      : sourceBlob.getAs(MimeType.JPEG).setName(fileName);
+    let newFile = null;
+    let metadataSaved = false;
+    try {
+      newFile = folder.createFile(jpegBlob);
+      updateRowByHeaders_(sheet, found.rowNumber, {
+        photo_file_id: newFile.getId(),
+        photo_updated_at: timestamp
+      });
+      SpreadsheetApp.flush();
+      metadataSaved = true;
+      if (oldFileId && oldFileId !== newFile.getId()) {
+        safelyTrashProfilePhoto_(oldFileId, folder);
+      }
+      appendAuditLog("UPDATE_STUDENT_PROFILE_PHOTO", "", "Student", found.record.nama || "", "", "STUDENT", found.record.student_id);
+      return { student_id: found.record.student_id, has_profile_photo: true, photo_updated_at: timestamp };
+    } catch (error) {
+      if (!metadataSaved && newFile) {
+        try { newFile.setTrashed(true); } catch (cleanupError) { /* Preserve the actionable error. */ }
+      }
+      throw error;
+    }
+  }, "Foto profil sedang dikemas kini. Sila cuba sebentar lagi.");
+}
+
+function validateProfilePhotoViewer_(payload) {
+  const role = normalizeText_(payload && payload.role);
+  if (role === "student") {
+    const student = findActiveStudent_(payload.student_id || payload.id, payload.no_matrik || payload.matric);
+    if (!student) throw new Error("Akses sesi pelajar tidak sah.");
+    return { role: role, studentId: String(student.student_id) };
+  }
+  if (role === "warden") {
+    const warden = findActiveWarden_(payload.nama_warden || payload.warden_name || payload.name, payload.pin);
+    if (!warden) throw new Error("Akses sesi warden tidak sah.");
+    return { role: role };
+  }
+  if (role === "guard") {
+    const guard = findActiveGuard_(payload.nama_guard || payload.guard_name || payload.name, payload.pin);
+    if (!guard) throw new Error("Akses sesi guard tidak sah.");
+    return { role: role };
+  }
+  if (role === "admin") {
+    validateAdminCredentials_(payload);
+    return { role: role };
+  }
+  throw new Error("Akses sesi diperlukan.");
+}
+
+function getStudentProfilePhotos(payload) {
+  const viewer = validateProfilePhotoViewer_(payload || {});
+  let requestedIds = Array.isArray(payload && payload.student_ids) ? payload.student_ids : [];
+  requestedIds = requestedIds.map((id) => String(id || "").trim()).filter(Boolean);
+  if (viewer.role === "student") {
+    if (requestedIds.length && requestedIds.some((id) => normalizeText_(id) !== normalizeText_(viewer.studentId))) {
+      throw new Error("Pelajar hanya boleh mengakses foto profil sendiri.");
+    }
+    requestedIds = [viewer.studentId];
+  }
+  if (viewer.role === "warden" || viewer.role === "guard") {
+    const operationalIds = {};
+    getTodayRecordRows_().forEach((row) => { operationalIds[normalizeText_(row.student_id)] = true; });
+    if (requestedIds.some((id) => !operationalIds[normalizeText_(id)])) {
+      throw new Error("Foto hanya boleh diakses untuk rekod operasi semasa.");
+    }
+  }
+  if (requestedIds.length > 100) {
+    throw new Error("Terlalu banyak foto diminta dalam satu permintaan.");
+  }
+  const requested = {};
+  requestedIds.forEach((id) => { requested[normalizeText_(id)] = true; });
+  if (!Object.keys(requested).length) return { photos: [] };
+
+  const folder = getProfilePhotoFolder_();
+  const photos = getRowsAsObjects_(getSheet_(SHEETS.students)).reduce((result, student) => {
+    if (!requested[normalizeText_(student.student_id)] || !hasCellValue_(student.photo_file_id)) return result;
+    const file = getVerifiedProfilePhotoFile_(student.photo_file_id, folder);
+    if (!file) return result;
+    const mimeType = String(file.getMimeType() || "").toLowerCase();
+    if (["image/jpeg", "image/png", "image/webp"].indexOf(mimeType) === -1) return result;
+    const bytes = file.getBlob().getBytes();
+    if (!bytes.length || bytes.length > 800 * 1024) return result;
+    result.push({
+      student_id: String(student.student_id || ""),
+      photo_data_uri: "data:" + mimeType + ";base64," + Utilities.base64Encode(bytes),
+      photo_updated_at: student.photo_updated_at || ""
+    });
+    return result;
+  }, []);
+  return { photos: photos };
+}
+
+function removeStudentProfilePhoto(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const studentId = String(payload && payload.student_id || "").trim();
+  if (!studentId) throw new Error("student_id diperlukan.");
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.students);
+    const found = findStudentRowById_(sheet, studentId);
+    if (!found) throw new Error("Pelajar tidak dijumpai.");
+    const oldFileId = String(found.record.photo_file_id || "").trim();
+    const folder = oldFileId ? getProfilePhotoFolder_() : null;
+    updateRowByHeaders_(sheet, found.rowNumber, { photo_file_id: "", photo_updated_at: "" });
+    SpreadsheetApp.flush();
+    let fileRemoved = false;
+    if (oldFileId) {
+      fileRemoved = safelyTrashProfilePhoto_(oldFileId, folder);
+    }
+    appendAuditLog(
+      "REMOVE_STUDENT_PROFILE_PHOTO", "", "Admin", getSafeAdminIdentity_(admin),
+      JSON.stringify({ student_name: String(found.record.nama || ""), file_removed: fileRemoved }),
+      "STUDENT", found.record.student_id
+    );
+    return { student_id: found.record.student_id, has_profile_photo: false, photo_updated_at: "" };
+  }, "Foto profil sedang dikemas kini. Sila cuba sebentar lagi.");
+}
+
 function getTodayRecords() {
   return getTodayRecordRows_().map((row) => ({
     nama: String(row.nama || ""),
@@ -2218,7 +2464,7 @@ function getTodayRecords() {
 
 function getOperationalTodayRecords(payload) {
   const role = normalizeText_(payload && payload.role);
-  const rows = getTodayRecordRows_();
+  const rows = addProfilePhotoIndicators_(getTodayRecordRows_());
 
   if (role === "student") {
     const studentId = payload.student_id || payload.id;
@@ -2247,6 +2493,23 @@ function getOperationalTodayRecords(payload) {
   }
 
   throw new Error("Akses sesi diperlukan.");
+}
+
+function addProfilePhotoIndicators_(rows) {
+  const photoByStudentId = {};
+  getRowsAsObjects_(getSheet_(SHEETS.students)).forEach((student) => {
+    photoByStudentId[normalizeText_(student.student_id)] = {
+      has_profile_photo: hasCellValue_(student.photo_file_id),
+      photo_updated_at: student.photo_updated_at || ""
+    };
+  });
+  return (rows || []).map((row) => {
+    const photo = photoByStudentId[normalizeText_(row.student_id)] || {};
+    return Object.assign({}, row, {
+      has_profile_photo: Boolean(photo.has_profile_photo),
+      photo_updated_at: photo.photo_updated_at || ""
+    });
+  });
 }
 
 function getTodayRecordRows_() {

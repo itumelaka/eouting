@@ -5,7 +5,7 @@ Google Sheets ialah database dan source of truth eOuting ITU v2.1.0. Frontend Gi
 ## `STUDENTS`
 
 ```text
-student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan
+student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan | photo_file_id | photo_updated_at
 ```
 
 - `student_id` ialah identifier dalaman yang digunakan oleh frontend login.
@@ -13,6 +13,8 @@ student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | cata
 - Backend memadankan `student_id` + `no_matrik` terus dengan row penuh Google Sheets.
 - Hanya pelajar `Aktif` boleh login dan membuat permohonan.
 - `no_matrik` dan `no_tel` hendaklah berformat Plain text.
+- `photo_file_id` ialah ID fail private dalam folder foto profil yang dikonfigurasi; ia tidak dipulangkan oleh GET awam.
+- `photo_updated_at` ialah masa kemas kini berjaya dalam zon Asia/Kuala_Lumpur. Base64 tidak disimpan dalam Sheet.
 
 Public `getStudents` hanya mengeluarkan:
 
@@ -145,10 +147,10 @@ Untuk submission config-driven, audit `SUBMIT_REQUEST` hanya menambah `config_ve
 
 ## STUDENTS dan Pelajar LI
 
-Pengurusan Pelajar v2 beta menggunakan schema STUDENTS sedia ada tanpa migration:
+Pengurusan Pelajar menggunakan schema STUDENTS yang diluaskan secara additive oleh `setupStudentProfilePhotos()`:
 
 ```text
-student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan
+student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan | photo_file_id | photo_updated_at
 ```
 
 `kelas` dibenarkan ialah A2, A3 atau LI; LI bermaksud Pelajar Latihan Industri (LI). `student_id` immutable dan unik, manakala `no_matrik` juga unik. Nilai no. matrik dan no. telefon dirawat sebagai teks untuk mengekalkan sifar di hadapan. Tiada kolum version ditambah; write serentak dilindungi dengan `LockService` dan duplicate recheck.

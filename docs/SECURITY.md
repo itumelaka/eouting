@@ -91,6 +91,17 @@ Untuk `submitReturnSelfie`, GAS turut mengesahkan:
 
 Gambar disimpan dalam folder Google Drive private. `LockService` merangkumi semakan duplicate, simpanan Drive, penghantaran Telegram dan kemas kini Sheet. Kegagalan transaksi separa membersihkan fail Drive dan/atau mesej Telegram yang baru dibuat. Selepas transaksi utama berjaya, kegagalan audit hanya menghasilkan warning dan tidak menukar `SUDAH_HANTAR` kepada kegagalan.
 
+## Foto Profil Pelajar
+
+- Upload mengesahkan semula `student_id` + `no_matrik` pelajar aktif dan hanya mengemas kini row pelajar tersebut.
+- MIME dibenarkan hanya JPEG, PNG dan WebP; SVG, bukan-imej dan payload berlebihan ditolak pada client dan GAS.
+- `PROFILE_PHOTO_FOLDER_ID` menunjuk ke folder private yang berasingan daripada `SELFIE_FOLDER_ID`; code tidak memanggil `setSharing` atau menghasilkan URL public.
+- API operasi memulangkan indikator sahaja. Byte foto kompak diperoleh melalui satu POST batch yang mengesahkan Student, Warden/HEP, Guard atau Admin. Pelajar dihadkan kepada ID sendiri.
+- Public Monitoring/GET tidak menerima foto, file ID, data URI atau masa kemas kini foto.
+- Semasa replacement, fail baharu dicipta dan metadata Sheet disimpan dahulu. Fail lama hanya ditrash selepas disahkan mempunyai parent folder profil yang dikonfigurasi. Kegagalan sebelum metadata baharu disimpan mengekalkan foto lama.
+- Admin removal memerlukan credential aktif, pengesahan UI, mengosongkan metadata, mengehadkan trash kepada folder profil dan menulis `REMOVE_STUDENT_PROFILE_PHOTO` tanpa byte imej.
+- Foto profil tidak dihantar ke Telegram dan tidak menggunakan mana-mana field `selfie_*`.
+
 Frontend role hiding, button visibility, PWA install dan local state bukan security enforcement.
 
 ## Backend Admin Config v2.0
@@ -184,6 +195,7 @@ Selfie dihantar sebagai foto sebenar melalui Telegram `sendPhoto`. Pentadbir ata
 - Semak access owner/editor secara berkala.
 - Retention dan backup policy masih perlu ditetapkan.
 - Retention/deletion policy khusus untuk selfie masih perlu ditetapkan.
+- Retention/deletion policy khusus untuk foto profil juga perlu ditetapkan.
 
 ## Roadmap
 

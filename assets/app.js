@@ -127,7 +127,9 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "getAdminStudents",
   "createStudent",
   "updateStudent",
-  "toggleStudentStatus"
+  "toggleStudentStatus",
+  "getStudentProfilePhotos",
+  "removeStudentProfilePhoto"
 ]);
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
 
@@ -222,6 +224,8 @@ let adminOutingTypes = [];
 let adminEditingTypeCode = "";
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
+let studentProfilePhotos = new Map();
+let studentProfileUploadInFlight = false;
 let activeAdminSectionV200 = "outing";
 let adminMonitoringV210 = null;
 let adminMonitoringFilterV210 = "all";
@@ -292,6 +296,13 @@ const els = {
   ruleNotice: document.querySelector("#ruleNotice"),
   loggedStudentName: document.querySelector("#loggedStudentName"),
   loggedStudentMeta: document.querySelector("#loggedStudentMeta"),
+  studentProfilePhotoPanel: document.querySelector("#studentProfilePhotoPanel"),
+  studentProfilePhotoPreview: document.querySelector("#studentProfilePhotoPreview"),
+  studentProfilePhotoTitle: document.querySelector("#studentProfilePhotoTitle"),
+  studentProfilePhotoUpdated: document.querySelector("#studentProfilePhotoUpdated"),
+  studentProfilePhotoPicker: document.querySelector("#studentProfilePhotoPicker"),
+  studentProfilePhotoInput: document.querySelector("#studentProfilePhotoInput"),
+  studentProfilePhotoMessage: document.querySelector("#studentProfilePhotoMessage"),
   requestTypeSelect: document.querySelector("#requestTypeSelect"),
   studentOutingTypesState: document.querySelector("#studentOutingTypesState"),
   studentOutingTypesMessage: document.querySelector("#studentOutingTypesMessage"),
@@ -509,6 +520,7 @@ function setupAccessEnhancements() {
   setupMonitoringPanel();
   setupStatisticsPanel();
   setupAdminDashboardV200();
+  setupStudentProfilePhotoControls();
 }
 
 function setupStudentLiClassV200() {
@@ -731,6 +743,7 @@ function clearAdminRuntimeCredentialV200() {
   adminMasterV210 = { page: 1, total_pages: 1, total: 0, records: [] };
   adminStaffV210 = [];
   adminEditingStaffV210 = null;
+  studentProfilePhotos.clear();
   if (els.adminPinInput) els.adminPinInput.value = "";
   if (els.adminIdentityInput) els.adminIdentityInput.value = "";
   if (els.adminTypeList) els.adminTypeList.innerHTML = "";
@@ -965,7 +978,9 @@ function normalizeAdminStudentV200(student) {
     kelas: String(item.kelas || "").trim().toUpperCase(),
     jantina: String(item.jantina || "").trim(),
     status: String(item.status || "").trim().toUpperCase(),
-    catatan: String(item.catatan || "").trim()
+    catatan: String(item.catatan || "").trim(),
+    has_profile_photo: Boolean(item.has_profile_photo),
+    photo_updated_at: item.photo_updated_at || ""
   };
 }
 
@@ -979,6 +994,7 @@ async function loadAdminStudentsV200() {
       .map(normalizeAdminStudentV200);
     setAdminStudentsMessageV200("");
     renderAdminStudentsV200();
+    loadProfilePhotosForStudents(adminStudentsV200.filter((student) => student.has_profile_photo).map((student) => student.student_id));
   } catch (error) {
     adminStudentsV200 = [];
     els.adminStudentList.innerHTML = `
@@ -1048,13 +1064,16 @@ function adminStudentCardV200(student) {
   return `
     <article class="admin-student-card ${isActive ? "is-active" : "is-inactive"}">
       <div class="admin-student-card-heading">
-        <div>
-          <div class="admin-student-code-row">
-            <span class="admin-student-id">${escapeHtml(student.student_id)}</span>
-            ${liBadge}
+        <div class="admin-student-identity">
+          ${profilePhotoMarkup(student.student_id, student.nama, "profile-photo-thumbnail")}
+          <div>
+            <div class="admin-student-code-row">
+              <span class="admin-student-id">${escapeHtml(student.student_id)}</span>
+              ${liBadge}
+            </div>
+            <h4>${escapeHtml(student.nama)}</h4>
+            <p>${escapeHtml(student.no_matrik)} · ${escapeHtml(student.kelas || "-")} · ${escapeHtml(student.jantina || "-")}</p>
           </div>
-          <h4>${escapeHtml(student.nama)}</h4>
-          <p>${escapeHtml(student.no_matrik)} · ${escapeHtml(student.kelas || "-")} · ${escapeHtml(student.jantina || "-")}</p>
         </div>
         <span class="clay-status-badge ${isActive ? "is-active" : "is-inactive"}">${isActive ? "Aktif" : "Tidak Aktif"}</span>
       </div>
@@ -1062,6 +1081,7 @@ function adminStudentCardV200(student) {
       ${student.catatan ? `<p class="admin-student-note">${escapeHtml(student.catatan)}</p>` : ""}
       <div class="admin-student-actions">
         <button class="secondary-action" type="button" data-admin-student-edit="${escapeHtml(student.student_id)}">Edit</button>
+        ${student.has_profile_photo ? `<button class="danger-action" type="button" data-admin-student-photo-remove="${escapeHtml(student.student_id)}">Buang Foto</button>` : '<span class="profile-photo-indicator">Tiada foto</span>'}
         <button class="${isActive ? "danger-action" : "success-action"}" type="button"
           data-admin-student-toggle="${escapeHtml(student.student_id)}" data-next-active="${isActive ? "false" : "true"}">
           ${isActive ? "Nyahaktif" : "Aktifkan"}
@@ -1074,6 +1094,11 @@ function handleAdminStudentListActionV200(event) {
   const retry = event.target.closest("[data-admin-student-retry]");
   if (retry) {
     loadAdminStudentsV200();
+    return;
+  }
+  const removePhoto = event.target.closest("[data-admin-student-photo-remove]");
+  if (removePhoto) {
+    removeAdminStudentProfilePhoto(removePhoto.dataset.adminStudentPhotoRemove, removePhoto);
     return;
   }
   const edit = event.target.closest("[data-admin-student-edit]");
@@ -1696,6 +1721,24 @@ function setupClayRoleNav() {
   }
 }
 
+async function removeAdminStudentProfilePhoto(studentId, button) {
+  const student = adminStudentsV200.find((item) => item.student_id === studentId);
+  if (!student || !student.has_profile_photo) return;
+  if (!window.confirm(`Buang foto profil ${student.nama}? Tindakan ini tidak boleh dibatalkan.`)) return;
+  button.disabled = true;
+  try {
+    await apiPost("removeStudentProfilePhoto", Object.assign(buildAdminCredentialPayloadV200(), { student_id: studentId }));
+    student.has_profile_photo = false;
+    student.photo_updated_at = "";
+    studentProfilePhotos.delete(String(studentId));
+    renderAdminStudentsV200();
+    setAdminStudentsMessageV200("Foto profil pelajar telah dibuang.");
+  } catch (error) {
+    setAdminStudentsMessageV200(error.message || "Foto profil gagal dibuang.", true);
+    button.disabled = false;
+  }
+}
+
 function setupStaffPinFields() {
   if (!els.wardenPinInput) {
     const wardenButton = els.wardenLoginPanel.querySelector('button[type="submit"]');
@@ -1906,6 +1949,7 @@ els.logoutButton.addEventListener("click", () => {
   stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
+  studentProfilePhotos.clear();
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
   hideLoginPanels();
@@ -2131,6 +2175,16 @@ async function mockAdminApiPostV200(action, payload) {
   if (action === "getAdminStudents") {
     return cloneMockAdminValueV200(mockAdminStudentsV200);
   }
+  if (action === "getStudentProfilePhotos") {
+    return { photos: [] };
+  }
+  if (action === "removeStudentProfilePhoto") {
+    const student = mockAdminStudentsV200.find((item) => item.student_id === String(request.student_id || ""));
+    if (!student) throw new Error("Pelajar tidak ditemui.");
+    student.has_profile_photo = false;
+    student.photo_updated_at = "";
+    return { student_id: student.student_id, has_profile_photo: false, photo_updated_at: "" };
+  }
 
   if (action === "createStudent") {
     const student = normalizeAdminStudentV200(payload && payload.student);
@@ -2352,6 +2406,11 @@ async function loadTodayRecords() {
       updateStudentLastUpdated();
     }
     render();
+    if (isAuthenticated && typeof loadProfilePhotosForStudents === "function") {
+      if (typeof loadProfilePhotosForStudents === "function") {
+        loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
+      }
+    }
     if (els.publicMonitoringPanel && !els.publicMonitoringPanel.hidden) {
       renderMonitoring();
     }
@@ -2437,7 +2496,9 @@ function mapLiveStudent(student) {
     kelas: student.kelas || student.className || "",
     gender: student.jantina || student.gender || "",
     jantina: student.jantina || student.gender || "",
-    status: student.status || ""
+    status: student.status || "",
+    has_profile_photo: Boolean(student.has_profile_photo),
+    photo_updated_at: student.photo_updated_at || ""
   };
 }
 
@@ -2473,6 +2534,8 @@ function mapLiveRecord(record) {
     no_matrik: record.no_matrik || "",
     noMatrik: record.no_matrik || "",
     studentName: record.nama || "",
+    has_profile_photo: Boolean(record.has_profile_photo),
+    photo_updated_at: record.photo_updated_at || "",
     nama: record.nama || "",
     name: record.nama || "",
     className: record.kelas || "",
@@ -3030,10 +3093,174 @@ function syncStudentSameDayReturnV200() {
   els.returnDateInput.value = els.leaveDateInput.value;
 }
 
+function setupStudentProfilePhotoControls() {
+  if (!els.studentProfilePhotoInput || els.studentProfilePhotoInput.dataset.ready === "1") return;
+  els.studentProfilePhotoInput.dataset.ready = "1";
+  els.studentProfilePhotoInput.addEventListener("change", handleStudentProfilePhotoSelection);
+}
+
+function profilePhotoInitials(name) {
+  return String(name || "?").trim().split(/\s+/).slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase()).join("") || "?";
+}
+
+function safeProfilePhotoDataUri(value) {
+  const dataUri = String(value || "");
+  return /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(dataUri) ? dataUri : "";
+}
+
+function profilePhotoMarkup(studentId, studentName, extraClass = "") {
+  const photo = studentProfilePhotos.get(String(studentId || ""));
+  const dataUri = safeProfilePhotoDataUri(photo && photo.photo_data_uri);
+  const className = `profile-photo-frame ${extraClass}`.trim();
+  if (dataUri) {
+    return `<span class="${className}"><img src="${escapeHtml(dataUri)}" alt="Foto profil ${escapeHtml(studentName || "pelajar")}"></span>`;
+  }
+  return `<span class="${className} profile-photo-placeholder" aria-label="Tiada foto profil">${escapeHtml(profilePhotoInitials(studentName))}</span>`;
+}
+
+function buildProfilePhotoAccessPayload(studentIds) {
+  const ids = Array.from(new Set((studentIds || []).map((id) => String(id || "").trim()).filter(Boolean)));
+  if (!currentSession) throw new Error("Akses sesi diperlukan.");
+  if (currentSession.role === "admin") {
+    return Object.assign(buildAdminCredentialPayloadV200(), { role: "admin", student_ids: ids });
+  }
+  return Object.assign(buildTodayRecordsAccessPayload(), { student_ids: ids });
+}
+
+async function loadProfilePhotosForStudents(studentIds) {
+  const ids = Array.from(new Set((studentIds || []).map((id) => String(id || "").trim()).filter(Boolean)));
+  if (!ids.length || !currentSession || !isLiveMode) return;
+  try {
+    const response = await apiPost("getStudentProfilePhotos", buildProfilePhotoAccessPayload(ids));
+    const photos = response && Array.isArray(response.photos) ? response.photos : [];
+    ids.forEach((id) => studentProfilePhotos.delete(id));
+    photos.forEach((photo) => {
+      const dataUri = safeProfilePhotoDataUri(photo.photo_data_uri);
+      if (photo.student_id && dataUri) {
+        studentProfilePhotos.set(String(photo.student_id), {
+          photo_data_uri: dataUri,
+          photo_updated_at: photo.photo_updated_at || ""
+        });
+      }
+    });
+    renderProfilePhotoConsumers();
+  } catch (error) {
+    // Operational controls remain usable with placeholders when photo delivery fails.
+  }
+}
+
+function renderProfilePhotoConsumers() {
+  if (!currentSession) return;
+  if (currentSession.role === "student") renderStudent();
+  if (currentSession.role === "warden") renderWarden();
+  if (currentSession.role === "guard") renderGuard();
+  if (currentSession.role === "admin" && activeAdminSectionV200 === "students") renderAdminStudentsV200();
+}
+
+function renderStudentProfilePhotoArea() {
+  if (!els.studentProfilePhotoPreview || !currentSession || currentSession.role !== "student") return;
+  const student = currentSession.user || {};
+  const studentId = student.student_id || student.studentId || student.id || "";
+  const photo = studentProfilePhotos.get(String(studentId));
+  const hasPhoto = Boolean(photo || student.has_profile_photo);
+  els.studentProfilePhotoPreview.innerHTML = profilePhotoMarkup(studentId, student.name || student.nama || "Pelajar", "profile-photo-frame-large");
+  els.studentProfilePhotoTitle.textContent = hasPhoto ? "Foto Profil" : "Tiada Foto Profil";
+  const updatedAt = photo && photo.photo_updated_at || student.photo_updated_at || "";
+  els.studentProfilePhotoUpdated.textContent = updatedAt ? `Dikemas kini: ${formatDisplayDateTime(updatedAt)}` : "";
+  els.studentProfilePhotoPicker.textContent = hasPhoto ? "Kemaskini Foto" : "Tambah Foto";
+  els.studentProfilePhotoPicker.classList.toggle("is-disabled", studentProfileUploadInFlight);
+  els.studentProfilePhotoInput.disabled = studentProfileUploadInFlight;
+}
+
+async function handleStudentProfilePhotoSelection(event) {
+  const input = event.currentTarget;
+  const file = input.files && input.files[0];
+  if (!file || studentProfileUploadInFlight || !currentSession || currentSession.role !== "student") return;
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (allowedTypes.indexOf(String(file.type || "").toLowerCase()) === -1 || file.size > 2 * 1024 * 1024) {
+    input.value = "";
+    els.studentProfilePhotoMessage.textContent = "Pilih fail JPEG, PNG atau WebP yang tidak melebihi 2 MB.";
+    els.studentProfilePhotoMessage.classList.add("error");
+    return;
+  }
+
+  studentProfileUploadInFlight = true;
+  els.studentProfilePhotoMessage.classList.remove("error");
+  els.studentProfilePhotoMessage.textContent = "Memampatkan dan memuat naik foto...";
+  renderStudentProfilePhotoArea();
+  try {
+    const compressed = await compressStudentProfilePhoto(file);
+    const studentId = getCurrentStudentId();
+    let result;
+    if (isLiveMode) {
+      result = await apiPost("submitStudentProfilePhoto", {
+        student_id: studentId,
+        no_matrik: getCurrentStudentNoMatrik(),
+        image_base64: compressed.base64,
+        mime_type: compressed.mimeType
+      });
+      currentSession.user.has_profile_photo = true;
+      currentSession.user.photo_updated_at = result.photo_updated_at || "";
+      await loadProfilePhotosForStudents([studentId]);
+    } else {
+      const updatedAt = new Date().toISOString();
+      studentProfilePhotos.set(String(studentId), { photo_data_uri: compressed.dataUri, photo_updated_at: updatedAt });
+      currentSession.user.has_profile_photo = true;
+      currentSession.user.photo_updated_at = updatedAt;
+    }
+    els.studentProfilePhotoMessage.textContent = "Foto profil berjaya dikemas kini.";
+    showSuccess("Foto profil berjaya dikemas kini.", "Foto Profil");
+  } catch (error) {
+    els.studentProfilePhotoMessage.textContent = error.message || "Foto profil gagal dimuat naik. Foto semasa dikekalkan.";
+    els.studentProfilePhotoMessage.classList.add("error");
+  } finally {
+    studentProfileUploadInFlight = false;
+    input.value = "";
+    renderStudentProfilePhotoArea();
+  }
+}
+
+async function compressStudentProfilePhoto(file) {
+  const bitmap = await loadReturnSelfieBitmap(file);
+  const targetRatio = 3 / 4;
+  const sourceRatio = bitmap.width / bitmap.height;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = bitmap.width;
+  let sourceHeight = bitmap.height;
+  if (sourceRatio > targetRatio) {
+    sourceWidth = Math.round(bitmap.height * targetRatio);
+    sourceX = Math.round((bitmap.width - sourceWidth) / 2);
+  } else if (sourceRatio < targetRatio) {
+    sourceHeight = Math.round(bitmap.width / targetRatio);
+    sourceY = Math.round((bitmap.height - sourceHeight) / 2);
+  }
+  const scale = Math.min(1, 600 / sourceWidth, 800 / sourceHeight);
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(bitmap, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+  if (typeof bitmap.close === "function") bitmap.close();
+  let blob = await canvasToJpegBlob(canvas, 0.82);
+  if (blob.size > 700 * 1024) blob = await canvasToJpegBlob(canvas, 0.72);
+  if (!blob.size || blob.size > 800 * 1024) {
+    throw new Error("Foto masih terlalu besar selepas dimampatkan. Sila pilih foto lain.");
+  }
+  const base64 = await blobToBase64(blob);
+  return { base64: base64, mimeType: "image/jpeg", dataUri: "data:image/jpeg;base64," + base64 };
+}
+
 function startStudentSession(student) {
   try {
     startSession("student", student);
     loadStudentOutingTypesV200();
+    loadProfilePhotosForStudents([student.student_id || student.studentId || student.id || ""]);
   } catch (error) {
     console.warn("Student view render warning:", error);
     if (!els.studentRecordsList || !els.studentRecordsList.innerHTML.trim()) {
@@ -3529,6 +3756,7 @@ async function refreshGuardRecords(source) {
       const records = await apiPost("getTodayRecords", buildTodayRecordsAccessPayload());
       outingRecords = records.map(mapLiveRecord);
       render();
+      loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
     } else {
       render();
     }
@@ -4249,6 +4477,7 @@ function renderStudent() {
   ensureStudentRefreshControls();
   els.loggedStudentName.textContent = student.name || student.nama || "-";
   els.loggedStudentMeta.textContent = `${student.className || student.kelas || "-"} | ${student.no_matrik || student.noMatrik || "-"}`;
+  renderStudentProfilePhotoArea();
   els.ruleNotice.className = canSubmitNormalOuting() ? "notice ok" : "notice";
   els.ruleNotice.textContent = canSubmitNormalOuting()
     ? "Outing Biasa dibuka. Permohonan kecemasan juga boleh dihantar jika perlu."
@@ -5505,9 +5734,12 @@ function recordCard(record, mode) {
   return `
     <article class="${cardClass}" ${cardAttrs}>
       <div class="record-top">
-        <div>
-          <h3>${escapeHtml(record.studentName)}</h3>
-          <div class="record-meta">${escapeHtml(record.id)} | ${escapeHtml(record.className)}</div>
+        <div class="record-person">
+          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail")}
+          <div>
+            <h3>${escapeHtml(record.studentName)}</h3>
+            <div class="record-meta">${escapeHtml(record.id)} | ${escapeHtml(record.className)}</div>
+          </div>
         </div>
         <div class="badge-stack">
           ${emergencyBadge}
@@ -5549,8 +5781,13 @@ function guardReturnCard(record, actions) {
   return `
     <article class="${cardClass}" ${recordDataAttributes(record)}>
       <div class="guard-return-top">
-        <h3>${escapeHtml(record.studentName || record.nama || "-")}</h3>
-        <div class="record-meta">${escapeHtml(record.className || record.kelas || "-")} · ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}</div>
+        <div class="record-person">
+          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail")}
+          <div>
+            <h3>${escapeHtml(record.studentName || record.nama || "-")}</h3>
+            <div class="record-meta">${escapeHtml(record.className || record.kelas || "-")} · ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}</div>
+          </div>
+        </div>
       </div>
       <div class="guard-return-schedule">
         <p><span>Keluar:</span> <strong>${escapeHtml(formatDisplayDateTime(record.outAt || record.masa_keluar))}</strong></p>
@@ -8335,6 +8572,9 @@ async function loadWardenRecordsOnly() {
     throw new Error("Format rekod warden tidak sah.");
   }
   outingRecords = records.map(mapLiveRecord);
+  if (typeof loadProfilePhotosForStudents === "function") {
+    loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
+  }
 }
 
 function setWardenLoadingState(isLoading, clearCurrentView) {

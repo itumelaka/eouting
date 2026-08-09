@@ -152,9 +152,23 @@
 
         <form class="form-card" id="requestForm">
           <div class="identity-panel">
-            <span>Pelajar</span>
-            <strong id="loggedStudentName">-</strong>
-            <small id="loggedStudentMeta">-</small>
+            <div class="student-identity-copy">
+              <span>Pelajar</span>
+              <strong id="loggedStudentName">-</strong>
+              <small id="loggedStudentMeta">-</small>
+            </div>
+            <div class="student-profile-photo-panel" id="studentProfilePhotoPanel">
+              <div id="studentProfilePhotoPreview" aria-label="Foto profil pelajar"></div>
+              <div class="student-profile-photo-copy">
+                <strong id="studentProfilePhotoTitle">Tiada Foto Profil</strong>
+                <small id="studentProfilePhotoUpdated"></small>
+                <label class="secondary-action student-profile-photo-picker" id="studentProfilePhotoPicker" for="studentProfilePhotoInput">Tambah Foto</label>
+                <input id="studentProfilePhotoInput" class="profile-photo-input" type="file"
+                  accept="image/jpeg,image/png,image/webp" aria-label="Pilih foto profil">
+                <small class="profile-photo-guidance">Gunakan gambar muka yang jelas seperti gambar ukuran pasport.</small>
+                <p class="form-message student-profile-photo-message" id="studentProfilePhotoMessage" aria-live="polite"></p>
+              </div>
+            </div>
           </div>
 
           <label for="requestTypeSelect">Jenis Permohonan</label>

@@ -3434,6 +3434,144 @@ button:disabled,
 
 }
 
+/* Authenticated student profile photos. Return-selfie styles remain separate. */
+.identity-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.student-profile-photo-panel,
+.record-person,
+.admin-student-identity {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.student-profile-photo-panel {
+  border-top: 1px solid rgba(216, 138, 8, 0.22);
+  padding-top: 12px;
+}
+
+.student-profile-photo-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.student-profile-photo-copy small,
+.profile-photo-guidance {
+  color: var(--muted);
+}
+
+.student-profile-photo-picker {
+  display: inline-flex;
+  justify-content: center;
+  margin-top: 3px;
+  width: fit-content;
+}
+
+.student-profile-photo-picker.is-disabled {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.profile-photo-input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.student-profile-photo-message {
+  margin: 0;
+}
+
+.profile-photo-frame {
+  align-items: center;
+  aspect-ratio: 3 / 4;
+  background: linear-gradient(145deg, #e7edf3, #cbd8e3);
+  border: 2px solid rgba(8, 36, 92, 0.12);
+  border-radius: 12px;
+  box-shadow: 4px 4px 10px rgba(3, 18, 47, 0.12), -3px -3px 8px rgba(255, 255, 255, 0.8);
+  color: #476175;
+  display: inline-flex;
+  flex: 0 0 64px;
+  font-size: 1rem;
+  font-weight: 900;
+  justify-content: center;
+  overflow: hidden;
+  width: 64px;
+}
+
+.profile-photo-frame-large {
+  flex-basis: 72px;
+  width: 72px;
+}
+
+.profile-photo-frame img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.record-person > div,
+.admin-student-identity > div {
+  min-width: 0;
+}
+
+.record-person .record-meta {
+  margin-bottom: 0;
+}
+
+.guard-return-top .record-person {
+  margin-bottom: 8px;
+}
+
+.admin-student-identity {
+  flex: 1 1 auto;
+}
+
+.profile-photo-indicator {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+@media (min-width: 720px) {
+  .identity-panel {
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.85fr);
+  }
+
+  .student-profile-photo-panel {
+    border-left: 1px solid rgba(216, 138, 8, 0.22);
+    border-top: 0;
+    padding-left: 16px;
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .profile-photo-frame {
+    flex-basis: 58px;
+    width: 58px;
+  }
+
+  .profile-photo-frame-large {
+    flex-basis: 68px;
+    width: 68px;
+  }
+
+  .admin-student-card-heading {
+    align-items: flex-start;
+  }
+}
+
 @media (min-width: 521px) and (max-width: 719px) {
   .clay-role-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));

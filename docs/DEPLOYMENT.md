@@ -1,6 +1,6 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v2.1.0**. Backend production semasa ialah GAS **Version 27**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
+Versi repo semasa: **v2.1.0**. Backend production yang disahkan sebelum ciri foto profil ialah GAS **Version 29**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
 
 ## Release Production v2.1.0 — 9 Ogos 2026
 
@@ -8,7 +8,7 @@ Versi repo semasa: **v2.1.0**. Backend production semasa ialah GAS **Version 27*
 - Frontend: Guard keluar/masuk diperkemas, kad Sahkan Masuk kompak dan pembaikan rendering Statistik Admin.
 - Statistik selamat: jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi dan tempoh sebenar `masa_keluar` → `masa_masuk`.
 - Deployment hygiene: `gas/Code.gs` kekal source kanonik dan `.claspignore` mengehadkan skop push.
-- GAS production Version 27 telah live; URL dan Spreadsheet production tidak berubah.
+- GAS production Version 29 telah live sebelum perubahan ini; URL dan Spreadsheet production tidak berubah.
 
 ## Rekod Rollout Production v2.0.0 — 4 Ogos 2026
 
@@ -120,7 +120,22 @@ Jangan isi akaun Admin, mengaktifkan feature flag atau menganggap schema staging
 8. Sahkan popup update, footer, query asset dan cache menggunakan versi release yang sama.
 9. Jalankan ujian hujung-ke-hujung: submit request, Warden approve, Guard confirm out/in, Pelajar hantar selfie, kemudian sahkan Sheet, Drive dan Telegram.
 
-Production semasa telah melalui urutan ini dan menggunakan GAS Version 21. Pull Request #1 telah digabungkan ke `main` melalui merge commit `beec1e0`.
+Rollout v1.7.0 melalui urutan ini menggunakan GAS Version 21. Pull Request #1 telah digabungkan ke `main` melalui merge commit `beec1e0`.
+
+## Urutan Manual Foto Profil Pelajar (selepas merge)
+
+Perubahan ini tidak menjalankan clasp atau deployment. Production yang disahkan bermula pada GAS Version 29. Untuk mengaktifkan ciri:
+
+1. Jalankan semula semua ujian pada commit release.
+2. Jalankan `clasp push` secara manual daripada source kanonik `gas/Code.gs`.
+3. Dalam Apps Script, jalankan `setupStudentProfilePhotos()` sekali dengan akaun yang boleh mengakses Spreadsheet dan folder Drive.
+4. Sahkan summary menunjukkan header `photo_file_id`, `photo_updated_at`, folder ID `1EpnqLVO8iWHRpF8MuqsyVAN55T7eq5X3`, dan Script Property `PROFILE_PHOTO_FOLDER_ID`.
+5. Pastikan folder profil dan folder selfie kekal private dan berasingan.
+6. Cipta deployment Web App **Version 30** melalui Manage deployments sambil mengekalkan URL production.
+7. Smoke-test upload/ganti Pelajar, kad Warden/HEP, ketiga-tiga kad Guard, thumbnail/removal Admin dan audit log.
+8. Sahkan GET Public Monitoring tidak mengandungi sebarang field atau byte foto profil.
+
+Jangan deploy frontend yang memanggil action foto baharu sebelum GAS Version 30 tersedia; flow operasi sedia ada kekal serasi tetapi foto tidak akan dimuatkan.
 
 ## Semakan Release
 
@@ -162,6 +177,8 @@ Backend:
 - `submitReturnSelfie` menolak pemilikan/status/input yang tidak sah dan duplicate submission;
 - imej berada dalam folder Drive private dan Telegram menerima foto sebenar;
 - Public Monitoring tidak mengandungi metadata selfie.
+- foto profil hanya boleh dimuat melalui POST batch berautentikasi dan Public Monitoring tidak mengandungi metadata/byte foto;
+- replacement/removal hanya mentrash fail yang disahkan berada dalam folder profil yang dikonfigurasi, tanpa menyentuh folder selfie.
 
 Jika PWA masih menggunakan asset lama, semak cache name dan asset query strings dahulu. Jangan ubah deployment URL atau menambah `skipWaiting` automatik jika popup update semasa bergantung pada tindakan pengguna.
 

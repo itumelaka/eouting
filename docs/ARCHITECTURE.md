@@ -8,7 +8,7 @@ Versi repo semasa: **v2.1.0**.
 GitHub Pages static frontend / PWA
   -> Google Apps Script Web App router
     -> Google Sheets
-    -> Google Drive private selfie storage
+    -> Google Drive private profile-photo and selfie storage (separate folders)
     -> Telegram Bot notifications
     -> AUDIT_LOG
 ```
@@ -23,7 +23,7 @@ Fail utama:
 - `service-worker.js`
 - `version.json`
 
-Frontend mengurus pemilihan role, borang Pelajar, Dashboard Warden/Guard, Public Monitoring read-only, statistik agregat, update PWA serta input kamera/file untuk bukti pulang. Gambar dipreview, diresize kepada sisi terpanjang kira-kira 1280px dan dieksport sebagai JPEG termampat sebelum upload. Frontend role hiding bukan boundary keselamatan.
+Frontend mengurus pemilihan role, borang Pelajar, Dashboard Warden/Guard, Public Monitoring read-only, statistik agregat, update PWA serta input kamera/file untuk foto profil dan bukti pulang. Foto profil dipotong 3:4 dan dikecilkan kepada maksimum kira-kira 600×800; selfie kekal pada resize sisi terpanjang kira-kira 1280px. Frontend role hiding bukan boundary keselamatan.
 
 ### GAS Router
 
@@ -44,6 +44,8 @@ Google Sheets ialah database dan source of truth. Tab utama:
 - `ADMIN_USERS` — schema identiti Admin staging v2.0
 
 v1.7.0 menambah lima header selfie secara idempotent melalui `setupSelfieProofV170()` dan mengekalkan `selfie_whatsapp` sebagai kolum legacy.
+
+Foto profil menambah `photo_file_id` dan `photo_updated_at` pada `STUDENTS` secara idempotent melalui `setupStudentProfilePhotos()`. Fail profil berada dalam folder private berasingan dan tidak berkongsi lifecycle atau Telegram side effect selfie.
 
 Fasa 2 eOuting v2.0 menambah `setupAdminOutingConfigV200()` untuk mencipta dua tab staging, meluaskan `AUDIT_LOG` secara additive dan seed lima jenis outing semasa. Script Property `OUTING_CONFIG_V2_ENABLED` diwujudkan dengan default `false`.
 
@@ -116,10 +118,14 @@ Warden login -> POST getTodayRecords -> approve/reject
   -> Telegram keputusan
 Guard login -> POST getTodayRecords -> confirmOut/confirmIn
   -> Telegram pergerakan
+Pelajar login -> compress 3:4 -> submitStudentProfilePhoto -> STUDENTS metadata
+Warden/Guard/Admin -> POST getStudentProfilePhotos (batch authenticated) -> compact data URI
 Pelajar selepas confirmIn -> kamera/preview/compress -> submitReturnSelfie
   -> LockService -> Drive private -> Telegram sendPhoto -> metadata Sheet
 Public Monitoring -> GET getTodayRecords -> mapPublicMonitoringRecord
 ```
+
+`getOperationalTodayRecords` menambah hanya `has_profile_photo` dan masa kemas kini. Selepas kad operasi dirender dengan placeholder, frontend membuat satu batch request bagi semua ID yang diperlukan. Kegagalan batch tidak menghalang approve, reject, confirm out atau confirm in. `getTodayRecords` awam kekal pada projection enam medan tanpa metadata foto.
 
 ## Status Bukti Selfie
 

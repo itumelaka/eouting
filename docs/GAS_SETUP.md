@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.1.0 menggunakan GAS Web App **Version 27**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.1.0 yang disahkan sebelum ciri foto profil menggunakan GAS Web App **Version 29**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
 
 ## Tanggungjawab Backend
 
@@ -78,6 +78,12 @@ Script Property bukti selfie:
 SELFIE_FOLDER_ID
 ```
 
+Script Property foto profil pelajar:
+
+```text
+PROFILE_PHOTO_FOLDER_ID=1EpnqLVO8iWHRpF8MuqsyVAN55T7eq5X3
+```
+
 Jangan dokumentasi atau commit nilai sebenar token, chat ID atau folder ID. Notifikasi Telegram lifecycle biasa kekal non-blocking. Untuk `submitReturnSelfie`, `sendPhoto` ialah langkah transaksi yang diperlukan dan kegagalan dikendalikan dengan cleanup.
 
 ## Setup Bukti Selfie v1.7.0
@@ -98,6 +104,16 @@ Fungsi ini:
 6. memulangkan summary untuk semakan manual.
 
 Fungsi ini idempotent dan tidak perlu dipanggil pada setiap request. Folder Drive mesti kekal private dan hanya dikongsi kepada pentadbir/staf yang benar-benar memerlukan akses. Jangan ubah permission menjadi public atau publicly editable.
+
+## Setup Foto Profil Pelajar
+
+Selepas source GAS baharu tersedia, jalankan sekali:
+
+```javascript
+setupStudentProfilePhotos()
+```
+
+Helper ini menambah hanya `photo_file_id` dan `photo_updated_at` yang belum wujud, tidak menimpa data pelajar, mengesahkan folder `eOuting - Foto Profil Pelajar`, dan menetapkan `PROFILE_PHOTO_FOLDER_ID` kepada ID yang disahkan jika property masih kosong. Jika property sedia ada berbeza, helper berhenti tanpa menukarnya. Folder tidak dicipta dan tidak dijadikan public oleh code.
 
 Authorization Apps Script diperlukan untuk:
 
@@ -148,7 +164,9 @@ Kekalkan URL deployment sedia ada. `clasp push` tidak menggantikan langkah deplo
 7. Semak Telegram tanpa mendedahkan token dalam log.
 8. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
 9. Sahkan Public Monitoring tidak mengandungi metadata selfie.
-10. Jalankan regression suite repo dan pastikan **59/59 lulus**.
+10. Uji tambah/ganti foto Pelajar, batch thumbnail Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
+11. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at` atau data URI.
+12. Jalankan regression suite repo dan pastikan semua ujian lulus.
 
 Jika `/exec` masih memulangkan behavior lama selepas `clasp push`, semak Manage deployments dan pastikan version baharu telah dipilih.
 
