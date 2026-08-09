@@ -586,7 +586,8 @@ function normalizeStoredTimeOnly_(value) {
   }
 
   const text = String(value).trim();
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(text) ? text : "";
+  const match = text.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  return match ? match[1] + ":" + match[2] : "";
 }
 
 function normalizeOutingTypeRecord_(row) {
@@ -2313,6 +2314,8 @@ function isAdminRecordOverdue_(row, now) {
 
 function toAdminOperationalRecord_(row, now) {
   const overdue = isAdminRecordOverdue_(row, now);
+  const returnDate = normalizeDateKey_(row.tarikh_balik);
+  const returnTime = normalizeStoredTimeOnly_(row.masa_balik_dijangka);
   return {
     request_id: row.request_id || "",
     student_id: row.student_id || "",
@@ -2325,8 +2328,9 @@ function toAdminOperationalRecord_(row, now) {
     masa_mohon: row.masa_mohon || "",
     masa_keluar: row.masa_keluar || "",
     masa_masuk: row.masa_masuk || "",
-    tarikh_balik: row.tarikh_balik || "",
-    masa_balik_dijangka: row.masa_balik_dijangka || "",
+    tarikh_balik: returnDate,
+    masa_balik_dijangka: returnTime,
+    expected_return_at: returnDate && returnTime ? returnDate + " " + returnTime + ":00" : "",
     lewat: overdue,
     tujuan: row.tujuan || "",
     lokasi: row.lokasi || "",
@@ -3185,7 +3189,7 @@ function isHostelReturnRequest_(record) {
 
 function isHostelReturnLate_(date, record) {
   const returnDateKey = normalizeDateKey_(record.tarikh_balik);
-  const expectedReturnTime = String(record.masa_balik_dijangka || "").trim();
+  const expectedReturnTime = normalizeStoredTimeOnly_(record.masa_balik_dijangka);
   if (!returnDateKey || !expectedReturnTime) {
     return false;
   }

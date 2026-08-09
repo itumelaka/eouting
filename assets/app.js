@@ -810,6 +810,30 @@ async function loadAdminMonitoringV210() {
   }
 }
 
+function adminMonitoringStatusLabelV210(status) {
+  const labels = {
+    MENUNGGU_KELULUSAN: "Menunggu Kelulusan",
+    DILULUSKAN_WARDEN: "Diluluskan",
+    KELUAR: "Sedang Keluar",
+    SELESAI: "Selesai",
+    DITOLAK_WARDEN: "Ditolak"
+  };
+  return labels[String(status || "").trim().toUpperCase()] || String(status || "-");
+}
+
+function formatAdminExpectedReturnV210(record) {
+  const row = record || {};
+  if (row.expected_return_at) return formatDisplayDateTime(row.expected_return_at);
+  const dateText = formatDisplayDate(row.tarikh_balik);
+  const timeText = formatExpectedReturnTime(row.masa_balik_dijangka);
+  return dateText === "-" || timeText === "-" ? "-" : `${dateText}, ${timeText}`;
+}
+
+function formatAdminMonitoringRequestV210(record) {
+  const row = record || {};
+  return row.masa_mohon ? formatDisplayDateTime(row.masa_mohon) : formatDisplayDate(row.tarikh);
+}
+
 function renderAdminMonitoringV210() {
   if (!adminMonitoringV210) return;
   const kpis = adminMonitoringV210.kpis || {};
@@ -828,7 +852,24 @@ function renderAdminMonitoringV210() {
     if (adminMonitoringFilterV210 === "emergency") return row.jenis_permohonan === "KECEMASAN";
     return true;
   });
-  els.adminMonitoringList.innerHTML = rows.length ? rows.map((row) => `<article class="admin-ops-card ${row.lewat ? "is-late" : ""}"><div><h4>${escapeHtml(row.nama || "-")}</h4><p>${escapeHtml(row.kelas || "-")} · ${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</p></div><span class="status-badge ${row.lewat ? "late" : ""}">${row.lewat ? "LEWAT · " : ""}${escapeHtml(row.status)}</span><dl><div><dt>Tarikh / Mohon</dt><dd>${escapeHtml(formatDisplayDateTime(row.masa_mohon || row.tarikh))}</dd></div><div><dt>Keluar sebenar</dt><dd>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "Belum keluar")}</dd></div><div><dt>Jangka pulang</dt><dd>${escapeHtml([row.tarikh_balik, row.masa_balik_dijangka].filter(Boolean).join(" ") || "22:00")}</dd></div></dl></article>`).join("") : '<div class="empty-state">Tiada rekod untuk kategori ini.</div>';
+  els.adminMonitoringList.innerHTML = rows.length ? rows.map((row) => {
+    const isOut = row.status === "KELUAR";
+    return `<article class="admin-ops-card ${row.lewat ? "is-late" : ""}">
+      <header class="admin-ops-card-heading">
+        <h4>${escapeHtml(row.nama || "-")}</h4>
+        <div class="admin-ops-summary">
+          <span>${escapeHtml(row.kelas || "-")} · ${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</span>
+          <span class="status-badge admin-ops-status ${isOut ? "is-out" : ""}">${escapeHtml(adminMonitoringStatusLabelV210(row.status))}</span>
+        </div>
+      </header>
+      ${row.lewat ? '<div class="admin-ops-late" role="status">Lewat · Belum pulang pada waktu dijangka</div>' : ""}
+      <dl class="admin-ops-meta">
+        <div><dt>Mohon</dt><dd>${escapeHtml(formatAdminMonitoringRequestV210(row))}</dd></div>
+        <div><dt>Keluar</dt><dd>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</dd></div>
+        <div><dt>Jangka Pulang</dt><dd>${escapeHtml(formatAdminExpectedReturnV210(row))}</dd></div>
+      </dl>
+    </article>`;
+  }).join("") : '<div class="empty-state">Tiada rekod untuk kategori ini.</div>';
 }
 
 async function loadAdminMasterV210(page) {
@@ -5881,6 +5922,14 @@ function formatExpectedReturnTime(value) {
   }
 
   const text = String(value).trim();
+  if (/^1899-12-30T\d{2}:\d{2}/.test(text)) {
+    const sentinel = new Date(text);
+    if (Number.isNaN(sentinel.getTime())) return "-";
+    const malaysiaMinutes = (sentinel.getUTCHours() * 60 + sentinel.getUTCMinutes() + 8 * 60) % (24 * 60);
+    const hours = String(Math.floor(malaysiaMinutes / 60)).padStart(2, "0");
+    const minutes = String(malaysiaMinutes % 60).padStart(2, "0");
+    return formatDisplayTime(parseFlexibleDate(`2000-01-01 ${hours}:${minutes}`));
+  }
   if (/^\d{2}:\d{2}/.test(text)) {
     const date = parseFlexibleDate(`2000-01-01 ${text.slice(0, 5)}`);
     return formatDisplayTime(date);
