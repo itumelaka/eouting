@@ -989,8 +989,17 @@ function normalizeStudentRecord_(row) {
     kelas: String(source.kelas || "").trim().toUpperCase(),
     jantina: String(source.jantina || "").trim(),
     status: String(source.status || "").trim().toUpperCase(),
-    catatan: String(source.catatan || "").trim()
+    catatan: String(source.catatan || "").trim(),
+    has_profile_photo: hasCellValue_(source.photo_file_id),
+    photo_updated_at: normalizeProfilePhotoUpdatedAt_(source.photo_updated_at)
   };
+}
+
+function normalizeProfilePhotoUpdatedAt_(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, "Asia/Kuala_Lumpur", "yyyy-MM-dd HH:mm:ss");
+  }
+  return String(value === undefined || value === null ? "" : value).trim();
 }
 
 function sortAdminStudents_(rows) {
@@ -1245,9 +1254,7 @@ function validateStaffInput_(input, config, options) {
     no_tel: String(source.no_tel || "").trim(),
     pin: pin,
     status: normalizeStaffStatus_(source.status, Boolean(settings.defaultActive)),
-    catatan: String(source.catatan || "").trim(),
-    has_profile_photo: hasCellValue_(source.photo_file_id),
-    photo_updated_at: source.photo_updated_at || ""
+    catatan: String(source.catatan || "").trim()
   };
 }
 

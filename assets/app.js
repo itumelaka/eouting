@@ -226,6 +226,8 @@ let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
 let studentProfilePhotos = new Map();
 let studentProfileUploadInFlight = false;
+let profilePhotoBatchWarningAt = 0;
+let profilePhotoBatchWarningType = "";
 let activeAdminSectionV200 = "outing";
 let adminMonitoringV210 = null;
 let adminMonitoringFilterV210 = "all";
@@ -296,6 +298,7 @@ const els = {
   ruleNotice: document.querySelector("#ruleNotice"),
   loggedStudentName: document.querySelector("#loggedStudentName"),
   loggedStudentMeta: document.querySelector("#loggedStudentMeta"),
+  studentIdentityProfilePhoto: document.querySelector("#studentIdentityProfilePhoto"),
   studentProfilePhotoPanel: document.querySelector("#studentProfilePhotoPanel"),
   studentProfilePhotoPreview: document.querySelector("#studentProfilePhotoPreview"),
   studentProfilePhotoTitle: document.querySelector("#studentProfilePhotoTitle"),
@@ -1730,7 +1733,7 @@ async function removeAdminStudentProfilePhoto(studentId, button) {
     await apiPost("removeStudentProfilePhoto", Object.assign(buildAdminCredentialPayloadV200(), { student_id: studentId }));
     student.has_profile_photo = false;
     student.photo_updated_at = "";
-    studentProfilePhotos.delete(String(studentId));
+    studentProfilePhotos.delete(profilePhotoCacheKey(studentId));
     renderAdminStudentsV200();
     setAdminStudentsMessageV200("Foto profil pelajar telah dibuang.");
   } catch (error) {
@@ -2407,9 +2410,7 @@ async function loadTodayRecords() {
     }
     render();
     if (isAuthenticated && typeof loadProfilePhotosForStudents === "function") {
-      if (typeof loadProfilePhotosForStudents === "function") {
-        loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
-      }
+      loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
     }
     if (els.publicMonitoringPanel && !els.publicMonitoringPanel.hidden) {
       renderMonitoring();
@@ -3099,6 +3100,10 @@ function setupStudentProfilePhotoControls() {
   els.studentProfilePhotoInput.addEventListener("change", handleStudentProfilePhotoSelection);
 }
 
+function profilePhotoCacheKey(studentId) {
+  return String(studentId || "").trim().toLowerCase();
+}
+
 function profilePhotoInitials(name) {
   return String(name || "?").trim().split(/\s+/).slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase()).join("") || "?";
@@ -3110,7 +3115,7 @@ function safeProfilePhotoDataUri(value) {
 }
 
 function profilePhotoMarkup(studentId, studentName, extraClass = "") {
-  const photo = studentProfilePhotos.get(String(studentId || ""));
+  const photo = studentProfilePhotos.get(profilePhotoCacheKey(studentId));
   const dataUri = safeProfilePhotoDataUri(photo && photo.photo_data_uri);
   const className = `profile-photo-frame ${extraClass}`.trim();
   if (dataUri) {
@@ -3134,20 +3139,32 @@ async function loadProfilePhotosForStudents(studentIds) {
   try {
     const response = await apiPost("getStudentProfilePhotos", buildProfilePhotoAccessPayload(ids));
     const photos = response && Array.isArray(response.photos) ? response.photos : [];
-    ids.forEach((id) => studentProfilePhotos.delete(id));
+    ids.forEach((id) => studentProfilePhotos.delete(profilePhotoCacheKey(id)));
     photos.forEach((photo) => {
       const dataUri = safeProfilePhotoDataUri(photo.photo_data_uri);
       if (photo.student_id && dataUri) {
-        studentProfilePhotos.set(String(photo.student_id), {
+        studentProfilePhotos.set(profilePhotoCacheKey(photo.student_id), {
           photo_data_uri: dataUri,
           photo_updated_at: photo.photo_updated_at || ""
         });
       }
     });
+    profilePhotoBatchWarningAt = 0;
+    profilePhotoBatchWarningType = "";
     renderProfilePhotoConsumers();
   } catch (error) {
-    // Operational controls remain usable with placeholders when photo delivery fails.
+    warnProfilePhotoBatchFailure(error);
   }
+}
+
+function warnProfilePhotoBatchFailure(error) {
+  const rawType = String(error && error.name || "Error");
+  const safeType = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(rawType) ? rawType : "Error";
+  const now = Date.now();
+  if (profilePhotoBatchWarningType === safeType && now - profilePhotoBatchWarningAt < 60000) return;
+  profilePhotoBatchWarningType = safeType;
+  profilePhotoBatchWarningAt = now;
+  console.warn("Profile photo batch request failed", { error_type: safeType });
 }
 
 function renderProfilePhotoConsumers() {
@@ -3162,8 +3179,15 @@ function renderStudentProfilePhotoArea() {
   if (!els.studentProfilePhotoPreview || !currentSession || currentSession.role !== "student") return;
   const student = currentSession.user || {};
   const studentId = student.student_id || student.studentId || student.id || "";
-  const photo = studentProfilePhotos.get(String(studentId));
+  const photo = studentProfilePhotos.get(profilePhotoCacheKey(studentId));
   const hasPhoto = Boolean(photo || student.has_profile_photo);
+  if (els.studentIdentityProfilePhoto) {
+    els.studentIdentityProfilePhoto.innerHTML = profilePhotoMarkup(
+      studentId,
+      student.name || student.nama || "Pelajar",
+      "profile-photo-identity"
+    );
+  }
   els.studentProfilePhotoPreview.innerHTML = profilePhotoMarkup(studentId, student.name || student.nama || "Pelajar", "profile-photo-frame-large");
   els.studentProfilePhotoTitle.textContent = hasPhoto ? "Foto Profil" : "Tiada Foto Profil";
   const updatedAt = photo && photo.photo_updated_at || student.photo_updated_at || "";
@@ -3205,7 +3229,7 @@ async function handleStudentProfilePhotoSelection(event) {
       await loadProfilePhotosForStudents([studentId]);
     } else {
       const updatedAt = new Date().toISOString();
-      studentProfilePhotos.set(String(studentId), { photo_data_uri: compressed.dataUri, photo_updated_at: updatedAt });
+      studentProfilePhotos.set(profilePhotoCacheKey(studentId), { photo_data_uri: compressed.dataUri, photo_updated_at: updatedAt });
       currentSession.user.has_profile_photo = true;
       currentSession.user.photo_updated_at = updatedAt;
     }

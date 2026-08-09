@@ -3449,6 +3449,17 @@ button:disabled,
   min-width: 0;
 }
 
+.student-identity-copy {
+  align-items: center;
+  display: flex;
+  gap: 11px;
+  min-width: 0;
+}
+
+.student-identity-copy > div:last-child {
+  min-width: 0;
+}
+
 .student-profile-photo-panel {
   border-top: 1px solid rgba(216, 138, 8, 0.22);
   padding-top: 12px;
@@ -3511,6 +3522,12 @@ button:disabled,
   width: 72px;
 }
 
+.profile-photo-identity {
+  border-radius: 10px;
+  flex-basis: 54px;
+  width: 54px;
+}
+
 .profile-photo-frame img {
   height: 100%;
   object-fit: cover;
@@ -3565,6 +3582,11 @@ button:disabled,
   .profile-photo-frame-large {
     flex-basis: 68px;
     width: 68px;
+  }
+
+  .profile-photo-identity {
+    flex-basis: 50px;
+    width: 50px;
   }
 
   .admin-student-card-heading {
