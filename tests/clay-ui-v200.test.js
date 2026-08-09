@@ -13,8 +13,8 @@ assert.notEqual(roleGridStart, -1, "roleGrid must exist");
 assert.notEqual(roleGridEnd, -1, "student login panel must follow roleGrid");
 const roleGridMarkup = html.slice(roleGridStart, roleGridEnd);
 
-test("landing role grid has five operational Clay identities", () => {
-  ["student", "warden", "guard", "monitor", "stats"].forEach((role) => {
+test("landing role grid has four operational Clay identities without public Statistics", () => {
+  ["student", "warden", "guard", "monitor"].forEach((role) => {
     assert.match(css, new RegExp(`data-role-choice=["']${role}["']`));
   });
   assert.match(css, /--clay-blue:/);
@@ -25,7 +25,7 @@ test("landing role grid has five operational Clay identities", () => {
   assert.match(css, /--clay-amber:/);
   assert.match(css, /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(css, /data-role-choice="monitor"\][^}]*grid-column:\s*2 \/ span 2/s);
-  assert.match(css, /data-role-choice="stats"\][^}]*grid-column:\s*4 \/ span 2/s);
+  assert.doesNotMatch(`${html}\n${app}\n${css}`, /data-role-choice=["']stats["']/);
 });
 
 test("landing terminology keeps LI students within the existing Pelajar role", () => {

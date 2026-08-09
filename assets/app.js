@@ -1686,15 +1686,6 @@ function setupClayRoleNav() {
     els.roleGrid.appendChild(monitorButton);
   }
 
-  if (!els.roleGrid.querySelector('[data-role-choice="stats"]')) {
-    const statsButton = document.createElement("button");
-    statsButton.className = "role-card clay-role-button";
-    statsButton.type = "button";
-    statsButton.dataset.roleChoice = "stats";
-    statsButton.innerHTML = "<strong>Statistik</strong>";
-    statsButton.addEventListener("click", openStatisticsPage);
-    els.roleGrid.appendChild(statsButton);
-  }
 }
 
 function setupStaffPinFields() {
@@ -4516,23 +4507,6 @@ function bindStudentHistoryToggles() {
   });
 }
 
-function openStatisticsPage(eventOrOptions) {
-  const intentional = isIntentionalNavigationV200(eventOrOptions);
-  stopStudentAutoRefresh();
-  stopMonitoringAutoRefresh();
-  currentSession = null;
-  if (els.statsBackButton) els.statsBackButton.textContent = "Tukar Peranan";
-  els.accessScreen.classList.add("hidden");
-  els.appWorkspace.classList.remove("active");
-  if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
-  activateStatisticsWorkspaceV200();
-  if (intentional) {
-    scheduleIntentionalScrollV200(els.statsWorkspace);
-  }
-  setupStatsFilters();
-  loadStatistics();
-}
-
 function openAdminStatisticsPageV200(eventOrOptions) {
   if (!currentSession || currentSession.role !== "admin" || !adminRuntimeCredential) {
     showError("Sesi Admin telah tamat. Sila log masuk semula.", "Akses Statistik");
@@ -6661,10 +6635,6 @@ function setupRefreshPageTrackingV152() {
       const role = button.dataset.roleChoice;
       if (role === "monitor") {
         setActiveRefreshPageV152("monitoring");
-        return;
-      }
-      if (role === "stats") {
-        setActiveRefreshPageV152("statistics");
         return;
       }
       setActiveRefreshPageV152(role === "student" ? "student" : role || "access");

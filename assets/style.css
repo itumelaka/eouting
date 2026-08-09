@@ -2494,12 +2494,6 @@ body {
   --role-orb: rgba(12, 149, 142, 0.2);
 }
 
-.role-card.clay-role-button[data-role-choice="stats"] {
-  --role-accent: var(--clay-amber);
-  --role-bg: #fff1c7;
-  --role-orb: rgba(216, 138, 8, 0.2);
-}
-
 .role-card.clay-role-button:hover {
   border-color: color-mix(in srgb, var(--role-accent) 48%, white);
   box-shadow: var(--clay-shadow-hover);
@@ -3442,9 +3436,6 @@ button:disabled,
     grid-column: 2 / span 2;
   }
 
-  .clay-role-nav .clay-role-button[data-role-choice="stats"] {
-    grid-column: 4 / span 2;
-  }
 }
 
 @media (min-width: 521px) and (max-width: 719px) {
@@ -3452,11 +3443,6 @@ button:disabled,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .clay-role-nav .clay-role-button[data-role-choice="stats"] {
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: calc(50% - 6px);
-  }
 }
 
 @media (max-width: 520px) {

@@ -176,6 +176,8 @@ test("frontend exposes a compact self summary and Admin-only individual statisti
   assert.match(appSource, /apiPost\("getAdminIndividualStats"/);
   assert.match(appSource, /Log masuk sebagai Admin untuk melihat statistik individu pelajar/);
   assert.match(appSource, /Tiada rekod SELESAI bagi bulan, tahun dan kelas yang dipilih/);
+  assert.doesNotMatch(`${indexSource}\n${appSource}`, /data-role-choice=["']stats["']/);
+  assert.doesNotMatch(appSource, /function openStatisticsPage\(/);
 });
 
 test("Admin Statistics reactivates both the shared workspace and its inner stats panel", () => {
@@ -184,7 +186,6 @@ test("Admin Statistics reactivates both the shared workspace and its inner stats
     "activateStatisticsWorkspaceV200",
     "closeStatisticsPage"
   );
-  const publicOpenSource = extractFunctionSource(appSource, "openStatisticsPage", "openAdminStatisticsPageV200");
   const adminOpenSource = extractFunctionSource(appSource, "openAdminStatisticsPageV200", "activateStatisticsWorkspaceV200");
   let workspaceActive = false;
   let panelActive = false;
@@ -204,9 +205,9 @@ test("Admin Statistics reactivates both the shared workspace and its inner stats
 
   assert.equal(workspaceActive, true);
   assert.equal(panelActive, true);
-  assert.match(publicOpenSource, /activateStatisticsWorkspaceV200\(\)/);
-  assert.match(publicOpenSource, /currentSession = null/);
   assert.match(adminOpenSource, /activateStatisticsWorkspaceV200\(\)/);
+  assert.match(adminOpenSource, /currentSession\.role !== "admin"/);
+  assert.match(adminOpenSource, /adminRuntimeCredential/);
   assert.doesNotMatch(adminOpenSource, /currentSession\s*=\s*null|adminRuntimeCredential\s*=\s*null/);
   assert.match(adminOpenSource, /Kembali ke Admin/);
 });

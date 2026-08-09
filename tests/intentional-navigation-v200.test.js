@@ -133,7 +133,6 @@ function extractEventListenerCalls(source) {
 test("first monitoring activation precedes intentional scroll and loader", () => {
   for (const name of [
     "openMonitoringPage",
-    "openStatisticsPage",
     "setupMonitoringPanel",
     "setupStatisticsPanel",
     "setupClayRoleNav",
@@ -185,14 +184,14 @@ test("intentional scrolling waits for layout and respects reduced motion", () =>
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ behavior: "auto", block: "start" }]);
 });
 
-test("all five landing navigation targets and their existing hooks remain present", () => {
+test("four public landing targets remain and Statistics is Admin-only", () => {
   for (const role of ["student", "warden", "guard"]) {
     assert.match(html, new RegExp(`data-role-choice="${role}"`));
   }
   assert.match(app, /Pemantauan Semasa/);
-  assert.match(app, /Statistik/);
   assert.match(css, /data-role-choice="monitor"/);
-  assert.match(css, /data-role-choice="stats"/);
+  assert.doesNotMatch(`${html}\n${app}\n${css}`, /data-role-choice=["']stats["']/);
+  assert.match(html, /id="adminStatisticsButton"[^>]*>Statistik<\/button>/);
   assert.match(app, /getAccessPanelForRoleV200\(roleChoice\)/);
 
   const panels = { studentLoginPanel: {}, wardenLoginPanel: {}, guardLoginPanel: {} };
@@ -211,9 +210,8 @@ test("navigation uses existing click paths without duplicate monitoring listener
   const monitoringListeners = clickListeners.filter((call) => /\bopenMonitoringPage\b/.test(call));
   const statisticsListeners = clickListeners.filter((call) => /\bopenStatisticsPage\b/.test(call));
   assert.equal(monitoringListeners.length, 1);
-  assert.equal(statisticsListeners.length, 1);
+  assert.equal(statisticsListeners.length, 0);
   assert.doesNotMatch(monitoringListeners[0], /openMonitoringPage\s*\(\s*\)/);
-  assert.doesNotMatch(statisticsListeners[0], /openStatisticsPage\s*\(\s*\)/);
 });
 
 test("compact mobile Clay navigation preserves touch targets and avoids overflow", () => {
@@ -223,19 +221,19 @@ test("compact mobile Clay navigation preserves touch targets and avoids overflow
   assert.doesNotMatch(css, /\.role-card\.clay-role-button[^}]*min-width:\s*[5-9]\d{2}px/s);
 });
 
-test("statistics scroll is intentional and scheduled only after activation", () => {
-  const source = extractFunction("openStatisticsPage");
+test("Admin statistics scroll is intentional and scheduled only after authenticated activation", () => {
+  const source = extractFunction("openAdminStatisticsPageV200");
   assert.match(
     source,
-    /^(?:(?:async\s+)?function\s+openStatisticsPage\s*\(eventOrOptions\)|(?:const|let|var)\s+openStatisticsPage\s*=)/
+    /^function\s+openAdminStatisticsPageV200\s*\(eventOrOptions\)/
   );
-  const setupSource = extractFunction("setupClayRoleNav");
   const activate = source.indexOf("activateStatisticsWorkspaceV200()");
   const scroll = source.indexOf("scheduleIntentionalScrollV200(els.statsWorkspace)");
   assert.ok(activate >= 0);
   assert.ok(scroll > activate);
   assert.match(source, /isIntentionalNavigationV200\(eventOrOptions\)/);
   assert.match(source, /const intentional = isIntentionalNavigationV200\(eventOrOptions\)/);
+  assert.match(source, /currentSession\.role !== "admin"|currentSession\.role === "admin"/);
+  assert.match(source, /adminRuntimeCredential/);
   assert.doesNotMatch(source, /\bintentionalNavigation\b/);
-  assert.match(setupSource, /openStatisticsPage/);
 });
