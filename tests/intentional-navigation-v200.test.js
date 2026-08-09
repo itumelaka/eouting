@@ -215,8 +215,9 @@ test("navigation uses existing click paths without duplicate monitoring listener
 });
 
 test("compact mobile Clay navigation preserves touch targets and avoids overflow", () => {
-  assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.role-card\.clay-role-button\s*\{[\s\S]*?min-height:\s*84px/);
+  assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.role-card\.clay-role-button\s*\{[\s\S]*?min-height:\s*72px/);
   assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.clay-role-nav\s*\{[\s\S]*?gap:\s*7px/);
+  assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.clay-role-nav\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
   assert.match(css, /\.access-panel,[\s\S]*?\.monitor-workspace,[\s\S]*?\.stats-workspace\s*\{[\s\S]*?scroll-margin-top:/);
   assert.doesNotMatch(css, /\.role-card\.clay-role-button[^}]*min-width:\s*[5-9]\d{2}px/s);
 });

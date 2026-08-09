@@ -23,8 +23,10 @@ test("landing role grid has four operational Clay identities without public Stat
   assert.match(css, /--clay-green:/);
   assert.match(css, /--clay-turquoise:/);
   assert.match(css, /--clay-amber:/);
-  assert.match(css, /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/);
-  assert.match(css, /data-role-choice="monitor"\][^}]*grid-column:\s*2 \/ span 2/s);
+  assert.match(css, /\.clay-role-nav\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)[^}]*max-width:\s*820px/s);
+  assert.doesNotMatch(css, /data-role-choice="monitor"\][^}]*grid-column/s);
+  assert.match(css, /\.role-card\.clay-role-button\s*\{[^}]*min-height:\s*82px[^}]*padding:\s*12px 48px 12px 58px/s);
+  assert.match(css, /\.role-card\.clay-role-button strong\s*\{[^}]*font-size:\s*clamp\(1\.08rem, 1\.5vw, 1\.2rem\)/s);
   assert.doesNotMatch(`${html}\n${app}\n${css}`, /data-role-choice=["']stats["']/);
 });
 
