@@ -53,6 +53,23 @@
           </button>
         </div>
 
+        <section class="landing-monitor-panel" id="publicMonitoringPanel" aria-labelledby="publicMonitoringTitle" hidden>
+          <div class="section-heading">
+            <h2 id="publicMonitoringTitle">Pemantauan Semasa</h2>
+            <p>Paparan read-only. Hanya nama, kelas dan status semasa dipaparkan.</p>
+          </div>
+          <div class="monitor-actions">
+            <button class="secondary-action" id="monitorRefreshButton" type="button">Refresh</button>
+            <small id="monitorLastUpdated"></small>
+          </div>
+          <div class="monitor-loading" id="monitorLoading" hidden>Memuatkan rekod pemantauan...</div>
+          <div class="summary-grid monitor-summary" id="monitorSummary"></div>
+          <section class="monitor-name-panel" id="monitorNamePanel">
+            <h3>Senarai Status Semasa</h3>
+            <div class="monitor-name-list" id="monitorNameList"></div>
+          </section>
+        </section>
+
         <form class="access-panel" id="studentLoginPanel">
           <h3>Masuk sebagai Pelajar</h3>
           <div class="student-class-filter">

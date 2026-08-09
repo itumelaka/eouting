@@ -5,6 +5,7 @@ const test = require("node:test");
 const vm = require("node:vm");
 
 const appSource = fs.readFileSync(path.join(__dirname, "..", "assets", "app.js"), "utf8");
+const indexSource = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 
 function extractFunction(name, nextName) {
   const asyncStart = appSource.lastIndexOf(`async function ${name}`);
@@ -28,7 +29,9 @@ test("Public Monitoring keeps one status list without detailed or overnight dupl
   const overnightSetupSource = extractFunction("ensureOvernightMonitoringSectionsV15", "ensureOvernightSectionV15");
   const overnightRenderSource = extractFunction("renderOvernightNotReturnedSectionsV15", "renderOvernightListV15");
 
-  assert.match(setupSource, /Senarai Status Semasa/);
+  assert.match(indexSource, /id="accessScreen"[\s\S]*id="roleGrid"[\s\S]*id="publicMonitoringPanel"/);
+  assert.match(indexSource, /id="publicMonitoringPanel"[\s\S]*Senarai Status Semasa/);
+  assert.doesNotMatch(`${indexSource}\n${appSource}`, /monitorWorkspace|monitorBackButton/);
   assert.doesNotMatch(setupSource, /Rekod Hari Ini|monitorRecordsList/);
   assert.doesNotMatch(renderSource, /monitorRecordCardV1612|monitorRecordsList/);
   assert.doesNotMatch(quickFilterSource, /monitorRecordsList|"monitor"/);

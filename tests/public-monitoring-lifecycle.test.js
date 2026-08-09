@@ -57,6 +57,8 @@ function createLifecycleContext(options = {}) {
     scroll: [],
     errors: [],
     intervals: 0,
+    clears: 0,
+    loginPanelsHidden: 0,
     scrollAfterActivation: false
   };
   const hadCachedData = options.hadCachedData === true;
@@ -69,9 +71,16 @@ function createLifecycleContext(options = {}) {
   const els = {
     accessScreen: { classList: fakeClassList() },
     appWorkspace: { classList: fakeClassList(["active"]) },
-    monitorWorkspace: {
+    publicMonitoringPanel: {
       classList: fakeClassList(),
+      hidden: true,
       scrollIntoView: (settings) => calls.scroll.push(settings)
+    },
+    monitorNavButton: {
+      classList: fakeClassList(),
+      setAttribute: (name, value) => {
+        if (name === "aria-pressed") calls.ariaPressed = value;
+      }
     },
     monitorLoading: { hidden: true },
     monitorSummary: { classList: fakeClassList(), innerHTML: hadCachedData ? "RINGKASAN LAMA" : "" },
@@ -105,12 +114,14 @@ function createLifecycleContext(options = {}) {
       calls.scrollAfterActivation = target.classList.contains("active");
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     },
-    setInterval: () => {
-      calls.intervals += 1;
-      return 100 + calls.intervals;
-    },
-    clearInterval: () => {},
-    window: { scrollTo: () => calls.scroll.push({ fallback: true }) }
+    hideLoginPanels: () => { calls.loginPanelsHidden += 1; },
+    window: {
+      setInterval: () => {
+        calls.intervals += 1;
+        return 100 + calls.intervals;
+      },
+      clearInterval: () => { calls.clears += 1; }
+    }
   });
 
   vm.runInContext(`
@@ -121,8 +132,10 @@ function createLifecycleContext(options = {}) {
     let monitorHasLoadedOnce = ${hadCachedData};
     let outingRecords = ${JSON.stringify(oldRecords)};
   `, context);
-  vm.runInContext(extractFinalFunction("scrollMonitoringWorkspaceToTop", "openMonitoringPage"), context);
-  vm.runInContext(extractFinalFunction("openMonitoringPage", "closeMonitoringPage"), context);
+  vm.runInContext(extractFinalFunction("stopMonitoringAutoRefresh", "updateMonitoringLastUpdated"), context);
+  vm.runInContext(extractFinalFunction("setPublicMonitoringPanelActiveV200", "deactivatePublicMonitoringPanelV200"), context);
+  vm.runInContext(extractFinalFunction("deactivatePublicMonitoringPanelV200", "openMonitoringPage"), context);
+  vm.runInContext(extractFinalFunction("openMonitoringPage", "loadPublicMonitoringRecords"), context);
   vm.runInContext(extractFinalFunction("loadPublicMonitoringRecords", "refreshMonitoringRecords"), context);
   vm.runInContext(extractFinalFunction("refreshMonitoringRecords", "setMonitorLoadingState"), context);
   vm.runInContext(extractFinalFunction("setMonitorLoadingState", "renderMonitoringPageV1612"), context);
@@ -145,8 +158,11 @@ test("first monitoring click activates before scrolling and performs one public 
 
   const firstOpen = context.openMonitoringPage({ type: "click" });
 
-  assert.equal(els.monitorWorkspace.classList.contains("active"), true);
-  assert.equal(els.accessScreen.classList.contains("hidden"), true);
+  assert.equal(els.publicMonitoringPanel.hidden, false);
+  assert.equal(els.publicMonitoringPanel.classList.contains("active"), true);
+  assert.equal(els.monitorNavButton.classList.contains("active"), true);
+  assert.equal(calls.ariaPressed, "true");
+  assert.equal(els.accessScreen.classList.contains("hidden"), false);
   assert.equal(els.appWorkspace.classList.contains("active"), false);
   assert.equal(calls.scrollAfterActivation, true);
   assert.deepEqual(JSON.parse(JSON.stringify(calls.scroll)), [{ behavior: "smooth", block: "start" }]);
@@ -175,7 +191,7 @@ test("failed first load does not mark monitoring successful or set a new timesta
   const { context, calls, els, request } = createLifecycleContext();
 
   const refresh = context.openMonitoringPage({ type: "click" });
-  assert.equal(els.monitorWorkspace.classList.contains("active"), true);
+  assert.equal(els.publicMonitoringPanel.hidden, false);
   assert.equal(els.monitorLoading.hidden, false);
   assert.equal(calls.apiGet.length, 1);
   request.reject(new Error("network unavailable"));
@@ -193,7 +209,7 @@ test("successful empty first load renders once and timestamps only after success
   const { context, calls, els, request } = createLifecycleContext();
 
   const firstOpen = context.openMonitoringPage({ type: "click" });
-  assert.equal(els.monitorWorkspace.classList.contains("active"), true);
+  assert.equal(els.publicMonitoringPanel.hidden, false);
   assert.equal(els.monitorLoading.hidden, false);
   assert.equal(calls.apiGet.length, 1);
 
@@ -214,6 +230,55 @@ test("non-intentional monitoring open does not auto-scroll", async () => {
   assert.deepEqual(calls.scroll, []);
   request.resolve([]);
   await open;
+});
+
+test("switching away stops monitoring and reopening creates no duplicate interval", async () => {
+  const firstRequest = deferred();
+  const { context, calls, els } = createLifecycleContext({ request: firstRequest });
+  const firstOpen = context.openMonitoringPage({ type: "click" });
+  firstRequest.resolve([]);
+  await firstOpen;
+
+  assert.equal(calls.intervals, 1);
+  context.deactivatePublicMonitoringPanelV200();
+  assert.equal(els.publicMonitoringPanel.hidden, true);
+  assert.equal(els.monitorNavButton.classList.contains("active"), false);
+  assert.equal(calls.ariaPressed, "false");
+  assert.equal(calls.clears, 1);
+  assert.equal(context.readMonitoringState().monitoringRefreshIntervalId, null);
+
+  const reopened = context.openMonitoringPage({ type: "click" });
+  await reopened;
+  assert.equal(calls.intervals, 2, "reopening creates one replacement interval after the old one is cleared");
+  const repeated = context.openMonitoringPage({ type: "click" });
+  await repeated;
+  assert.equal(calls.intervals, 2, "repeated active clicks must not create duplicate intervals");
+});
+
+test("Pelajar, Warden and Guard choices collapse monitoring before showing login", () => {
+  const panels = {
+    studentLoginPanel: { classList: fakeClassList() },
+    wardenLoginPanel: { classList: fakeClassList() },
+    guardLoginPanel: { classList: fakeClassList() },
+    studentLoginMessage: { textContent: "lama" }
+  };
+  let deactivations = 0;
+  const context = vm.createContext({
+    els: panels,
+    deactivatePublicMonitoringPanelV200: () => { deactivations += 1; },
+    hideLoginPanels: () => {
+      panels.studentLoginPanel.classList.remove("active");
+      panels.wardenLoginPanel.classList.remove("active");
+      panels.guardLoginPanel.classList.remove("active");
+    }
+  });
+  vm.runInContext(extractFinalFunction("showLoginPanel", "hideLoginPanels"), context);
+
+  for (const role of ["student", "warden", "guard"]) {
+    context.showLoginPanel(role);
+    assert.equal(panels[`${role}LoginPanel`].classList.contains("active"), true);
+  }
+  assert.equal(deactivations, 3);
 });
 
 test("failed cached refresh retains old records and uses the friendly refresh error", async () => {

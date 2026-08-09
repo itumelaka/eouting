@@ -7,6 +7,7 @@ const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const gasSource = fs.readFileSync(path.join(root, "gas", "Code.gs"), "utf8");
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
+const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 const requestRows = [
   {
@@ -109,7 +110,7 @@ function createFrontendRecordContext(currentSession, overrides = {}) {
     isLiveMode: true,
     outingRecords: [],
     studentLastUpdatedAt: null,
-    els: { monitorWorkspace: null },
+    els: { publicMonitoringPanel: null },
     apiGet: async () => {
       calls.get += 1;
       return [{ kelas: "A2", status: "KELUAR" }];
@@ -320,7 +321,6 @@ test("authenticated session clears anonymous records before its first render", (
       outingRecords: [{ kelas: "A2", mappedAs: "public" }],
       wardenHasLoadedOnce: true,
       els: {
-        monitorWorkspace: { classList: { remove: () => {} } },
         accessScreen: { classList: { add: () => {} } },
         appWorkspace: { classList: { add: () => {} } },
         sessionRole: { textContent: "" },
@@ -329,7 +329,7 @@ test("authenticated session clears anonymous records before its first render", (
       clearStaffLoginSuccessFeedback: () => {},
       stopStudentAutoRefresh: () => {},
       stopGuardAutoRefresh: () => {},
-      stopMonitoringAutoRefresh: () => {},
+      deactivatePublicMonitoringPanelV200: () => {},
       roleLabel: (value) => value,
       applyRoleView: () => {},
       render: () => { renderedRecords = plain(context.outingRecords); },
@@ -458,8 +458,8 @@ test("monitoring renders safe labels and keeps loading, refresh and error fallba
   assert.match(labelFunction, /record\.nama/);
   assert.doesNotMatch(labelFunction, /record\.(no_matrik|student_id|no_tel|telefon_waris|lokasi|tujuan)/);
   assert.match(setupPanel, /monitorRefreshButton/);
-  assert.match(setupPanel, /Memuatkan rekod pemantauan/);
-  assert.match(setupPanel, /Paparan read-only\. Hanya nama, kelas dan status semasa dipaparkan\./);
+  assert.match(indexSource, /id="publicMonitoringPanel"[\s\S]*Memuatkan rekod pemantauan/);
+  assert.match(indexSource, /Paparan read-only\. Hanya nama, kelas dan status semasa dipaparkan\./);
   assert.match(refreshFunction, /setMonitorLoadingState\(true/);
   assert.match(refreshFunction, /Rekod pemantauan gagal dimuat/);
   assert.match(refreshFunction, /finally/);

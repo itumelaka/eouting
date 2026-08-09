@@ -144,14 +144,16 @@ test("first monitoring activation precedes intentional scroll and loader", () =>
   assert.doesNotMatch(app, /\bconst\s+intentionalNavigation\b/);
   const source = extractFunction("openMonitoringPage");
   assert.match(source, /^(?:async )?function openMonitoringPage\(eventOrOptions\)/);
-  const activate = source.indexOf('monitorWorkspace.classList.add("active")');
-  const scroll = source.indexOf("scheduleIntentionalScrollV200(els.monitorWorkspace)");
+  const activate = source.indexOf("setPublicMonitoringPanelActiveV200(true)");
+  const scroll = source.indexOf("scheduleIntentionalScrollV200(els.publicMonitoringPanel)");
   const refresh = source.indexOf('refreshMonitoringRecords("open")');
   assert.ok(activate >= 0);
   assert.ok(scroll > activate, "monitor must be visible before scroll is scheduled");
   assert.ok(refresh > activate, "loader must start only after monitor activation");
   assert.match(source, /isIntentionalNavigationV200\(eventOrOptions\)/);
   assert.match(source, /const intentional = isIntentionalNavigationV200\(eventOrOptions\)/);
+  assert.match(source, /hideLoginPanels\(\)/);
+  assert.match(source, /els\.adminLoginPanel\.classList\.remove\("active"\)/);
   assert.match(source, /await refreshMonitoringRecords\("open"\)/);
   assert.doesNotMatch(source, /\bintentionalNavigation\b/);
 });
@@ -218,7 +220,7 @@ test("compact mobile Clay navigation preserves touch targets and avoids overflow
   assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.role-card\.clay-role-button\s*\{[\s\S]*?min-height:\s*72px/);
   assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.clay-role-nav\s*\{[\s\S]*?gap:\s*7px/);
   assert.match(css, /@media \(max-width: 520px\)[\s\S]*?\.clay-role-nav\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
-  assert.match(css, /\.access-panel,[\s\S]*?\.monitor-workspace,[\s\S]*?#adminStatisticsPanel\s*\{[\s\S]*?scroll-margin-top:/);
+  assert.match(css, /\.access-panel,[\s\S]*?\.landing-monitor-panel,[\s\S]*?#adminStatisticsPanel\s*\{[\s\S]*?scroll-margin-top:/);
   assert.doesNotMatch(css, /\.role-card\.clay-role-button[^}]*min-width:\s*[5-9]\d{2}px/s);
 });
 

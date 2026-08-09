@@ -455,6 +455,7 @@ const els = {
 document.querySelectorAll("[data-role-choice]").forEach((button) => {
   button.addEventListener("click", () => {
     if (button.dataset.roleChoice === "admin") {
+      deactivatePublicMonitoringPanelV200();
       showAdminLoginPanelV200();
       return;
     }
@@ -1678,16 +1679,21 @@ function setupClayRoleNav() {
     button.innerHTML = `<strong>${roleLabels[role] || button.textContent}</strong>`;
   });
 
-  if (!els.roleGrid.querySelector('[data-role-choice="monitor"]')) {
-    const monitorButton = document.createElement("button");
+  let monitorButton = els.roleGrid.querySelector('[data-role-choice="monitor"]');
+  if (!monitorButton) {
+    monitorButton = document.createElement("button");
     monitorButton.className = "role-card clay-role-button";
     monitorButton.type = "button";
     monitorButton.dataset.roleChoice = "monitor";
     monitorButton.innerHTML = "<strong>Pemantauan Semasa</strong>";
-    monitorButton.addEventListener("click", openMonitoringPage);
     els.roleGrid.appendChild(monitorButton);
   }
-
+  els.monitorNavButton = monitorButton;
+  if (monitorButton.dataset.ready !== "1") {
+    monitorButton.dataset.ready = "1";
+    monitorButton.setAttribute("aria-pressed", "false");
+    monitorButton.addEventListener("click", openMonitoringPage);
+  }
 }
 
 function setupStaffPinFields() {
@@ -1749,48 +1755,18 @@ function setupStaffPinFields() {
 }
 
 function setupMonitoringPanel() {
-  if (document.querySelector("#monitor")) {
+  const panel = document.querySelector("#publicMonitoringPanel");
+  if (!panel || panel.dataset.ready === "1") {
     return;
   }
-
-  const panel = document.createElement("section");
-  panel.className = "app-workspace monitor-workspace";
-  panel.id = "monitorWorkspace";
-  panel.innerHTML = `
-    <div class="session-bar">
-      <div>
-        <span>Paparan</span>
-        <strong>Pemantauan Semasa</strong>
-      </div>
-      <button class="secondary-action" id="monitorBackButton" type="button">Tukar Peranan</button>
-    </div>
-    <section class="tab-panel active" id="monitor">
-      <div class="section-heading">
-        <h2>Pemantauan Semasa</h2>
-        <p>Paparan read-only. Hanya nama, kelas dan status semasa dipaparkan.</p>
-      </div>
-      <div class="monitor-actions">
-        <button class="secondary-action" id="monitorRefreshButton" type="button">Refresh</button>
-        <small id="monitorLastUpdated"></small>
-      </div>
-      <div class="monitor-loading" id="monitorLoading" hidden>Memuatkan rekod pemantauan...</div>
-      <div class="summary-grid monitor-summary" id="monitorSummary"></div>
-      <section class="monitor-name-panel" id="monitorNamePanel">
-        <h3>Senarai Status Semasa</h3>
-        <div class="monitor-name-list" id="monitorNameList"></div>
-      </section>
-    </section>
-  `;
-  els.appShell.appendChild(panel);
-  els.monitorWorkspace = panel;
-  els.monitorBackButton = panel.querySelector("#monitorBackButton");
+  panel.dataset.ready = "1";
+  els.publicMonitoringPanel = panel;
   els.monitorRefreshButton = panel.querySelector("#monitorRefreshButton");
   els.monitorLastUpdated = panel.querySelector("#monitorLastUpdated");
   els.monitorLoading = panel.querySelector("#monitorLoading");
   els.monitorSummary = panel.querySelector("#monitorSummary");
   els.monitorNamePanel = panel.querySelector("#monitorNamePanel");
   els.monitorNameList = panel.querySelector("#monitorNameList");
-  els.monitorBackButton.addEventListener("click", closeMonitoringPage);
   els.monitorRefreshButton.addEventListener("click", refreshMonitoringRecords);
 }
 
@@ -2376,7 +2352,7 @@ async function loadTodayRecords() {
       updateStudentLastUpdated();
     }
     render();
-    if (els.monitorWorkspace && els.monitorWorkspace.classList.contains("active")) {
+    if (els.publicMonitoringPanel && !els.publicMonitoringPanel.hidden) {
       renderMonitoring();
     }
   } catch (error) {
@@ -3405,49 +3381,6 @@ function stopStudentAutoRefresh() {
   }
 }
 
-function obsoleteOpenMonitoringPageV1612(eventOrOptions) {
-  const intentional = isIntentionalNavigationV200(eventOrOptions);
-  stopStudentAutoRefresh();
-  hideLoginPanels();
-  currentSession = null;
-  els.accessScreen.classList.add("hidden");
-  els.appWorkspace.classList.remove("active");
-  if (els.monitorWorkspace) {
-    els.monitorWorkspace.classList.add("active");
-  }
-  refreshMonitoringRecords();
-  startMonitoringAutoRefresh();
-}
-
-function closeMonitoringPage() {
-  stopMonitoringAutoRefresh();
-  if (els.monitorWorkspace) {
-    els.monitorWorkspace.classList.remove("active");
-  }
-  els.accessScreen.classList.remove("hidden");
-}
-
-async function refreshMonitoringRecords() {
-  if (isLiveMode) {
-    await loadTodayRecords();
-  } else {
-    renderMonitoring();
-  }
-  monitorLastUpdatedAt = new Date();
-  updateMonitoringLastUpdated();
-}
-
-function startMonitoringAutoRefresh() {
-  stopMonitoringAutoRefresh();
-  if (!isLiveMode) {
-    return;
-  }
-
-  monitoringRefreshIntervalId = window.setInterval(() => {
-    refreshMonitoringRecords();
-  }, 30000);
-}
-
 function stopMonitoringAutoRefresh() {
   if (monitoringRefreshIntervalId) {
     window.clearInterval(monitoringRefreshIntervalId);
@@ -3780,6 +3713,7 @@ if (!student) {
 });
 
 function showLoginPanel(role) {
+  deactivatePublicMonitoringPanelV200();
   hideLoginPanels();
   els.studentLoginMessage.textContent = "";
 
@@ -3816,14 +3750,11 @@ function startSession(role, user) {
   // Mock frontend access only. Real GAS backend must validate role and identity later.
   stopStudentAutoRefresh();
   stopGuardAutoRefresh();
-  stopMonitoringAutoRefresh();
+  deactivatePublicMonitoringPanelV200();
   currentSession = { role, user };
   if (isLiveMode) {
     outingRecords = [];
     wardenHasLoadedOnce = false;
-  }
-  if (els.monitorWorkspace) {
-    els.monitorWorkspace.classList.remove("active");
   }
   els.accessScreen.classList.add("hidden");
   els.appWorkspace.classList.add("active");
@@ -4456,7 +4387,7 @@ function openAdminStatisticsPageV200(eventOrOptions) {
   const intentional = isIntentionalNavigationV200(eventOrOptions) || Boolean(eventOrOptions);
   els.accessScreen.classList.add("hidden");
   els.appWorkspace.classList.add("active");
-  if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
+  deactivatePublicMonitoringPanelV200();
   els.adminDashboard.classList.add("active");
   setAdminSectionV200("statistics");
   if (intentional) scheduleIntentionalScrollV200(els.adminStatisticsPanel);
@@ -6560,9 +6491,6 @@ function setupRefreshPageTrackingV152() {
     });
   });
 
-  if (els.monitorBackButton) {
-    els.monitorBackButton.addEventListener("click", () => setActiveRefreshPageV152("access"));
-  }
 }
 
 function setActiveRefreshPageV152(page) {
@@ -6577,7 +6505,7 @@ function setActiveRefreshPageV152(page) {
 }
 
 function getActiveRefreshPageV152() {
-  if (isWorkspaceActive(els.monitorWorkspace)) {
+  if (els.publicMonitoringPanel && !els.publicMonitoringPanel.hidden) {
     return "monitoring";
   }
 
@@ -6603,45 +6531,16 @@ function isValidStudentSessionV152() {
   return Boolean(currentSession && currentSession.role === "student" && currentSession.user);
 }
 
-async function refreshActiveMonitoringPageV152() {
-  setActiveRefreshPageV152("monitoring");
-  showMonitoringPageV152();
-
-  try {
-    if (els.monitorRecordsList) {
-      els.monitorRecordsList.innerHTML = emptyState("Memuatkan rekod pemantauan...");
-    }
-    if (els.monitorSummary) {
-      els.monitorSummary.innerHTML = emptyState("Memuatkan ringkasan...");
-    }
-  } catch (error) {
-    console.warn("Paparan loading pemantauan gagal dikemas kini.", error);
-  }
-
-  await refreshMonitoringRecords();
-  showMonitoringPageV152();
-}
-
 async function refreshStudentLoginStateV152() {
   setActiveRefreshPageV152("student");
   showStudentLoginPageV152();
   await refreshAccessScreenMasters();
 }
 
-function showMonitoringPageV152() {
-  try {
-    if (els.accessScreen) els.accessScreen.classList.add("hidden");
-    if (els.appWorkspace) els.appWorkspace.classList.remove("active");
-    if (els.monitorWorkspace) els.monitorWorkspace.classList.add("active");
-  } catch (error) {
-    console.warn("Paparan Pemantauan Semasa tidak dapat dikekalkan.", error);
-  }
-}
-
 function showStudentLoginPageV152() {
   try {
     if (els.appWorkspace) els.appWorkspace.classList.remove("active");
-    if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
+    deactivatePublicMonitoringPanelV200();
     if (els.accessScreen) els.accessScreen.classList.remove("hidden");
     hideLoginPanels();
     if (els.studentLoginPanel) els.studentLoginPanel.classList.add("active");
@@ -6731,9 +6630,7 @@ function showSignedInTab(tabName) {
       els.appWorkspace.classList.add("active");
     }
 
-    if (els.monitorWorkspace) {
-      els.monitorWorkspace.classList.remove("active");
-    }
+    deactivatePublicMonitoringPanelV200();
 
     document.querySelectorAll(".tab-button").forEach((button) => {
       button.classList.toggle("active", button.dataset.tab === tabName);
@@ -8032,57 +7929,51 @@ updatePulangBermalamFields = function updatePulangBermalamFieldsRequestTypeBridg
   updateRequestTypeFields();
 };
 
-function scrollMonitoringWorkspaceToTop() {
-  if (els.monitorWorkspace && typeof els.monitorWorkspace.scrollIntoView === "function") {
-    els.monitorWorkspace.scrollIntoView({ block: "start" });
-    return;
+function setPublicMonitoringPanelActiveV200(isActive) {
+  if (els.publicMonitoringPanel) {
+    els.publicMonitoringPanel.hidden = !isActive;
+    els.publicMonitoringPanel.classList.toggle("active", isActive);
   }
-  if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
-    window.scrollTo(0, 0);
+  if (els.monitorNavButton) {
+    els.monitorNavButton.classList.toggle("active", isActive);
+    els.monitorNavButton.setAttribute("aria-pressed", String(isActive));
   }
+}
+
+function deactivatePublicMonitoringPanelV200() {
+  if (activeRefreshPage === "monitoring") {
+    activeRefreshPage = "access";
+  }
+  stopMonitoringAutoRefresh();
+  setPublicMonitoringPanelActiveV200(false);
 }
 
 async function openMonitoringPage(eventOrOptions) {
   const intentional = isIntentionalNavigationV200(eventOrOptions);
-  activeRefreshPage = "monitor";
+  activeRefreshPage = "monitoring";
+  hideLoginPanels();
+  if (els.adminLoginPanel) {
+    els.adminLoginPanel.classList.remove("active");
+  }
   if (els.accessScreen) {
-    els.accessScreen.classList.add("hidden");
+    els.accessScreen.classList.remove("hidden");
   }
   if (els.appWorkspace) {
     els.appWorkspace.classList.remove("active");
   }
-  if (els.monitorWorkspace) {
-    els.monitorWorkspace.classList.add("active");
-  }
+  setPublicMonitoringPanelActiveV200(true);
   if (intentional) {
-    scheduleIntentionalScrollV200(els.monitorWorkspace);
+    scheduleIntentionalScrollV200(els.publicMonitoringPanel);
   }
 
   if (!monitoringRefreshIntervalId) {
-    monitoringRefreshIntervalId = setInterval(() => {
-      if (activeRefreshPage === "monitor") {
+    monitoringRefreshIntervalId = window.setInterval(() => {
+      if (activeRefreshPage === "monitoring" && els.publicMonitoringPanel && !els.publicMonitoringPanel.hidden) {
         refreshMonitoringRecords("auto");
       }
     }, 30000);
   }
   await refreshMonitoringRecords("open");
-}
-
-function closeMonitoringPage() {
-  activeRefreshPage = "access";
-  if (monitoringRefreshIntervalId) {
-    clearInterval(monitoringRefreshIntervalId);
-    monitoringRefreshIntervalId = null;
-  }
-  if (els.monitorWorkspace) {
-    els.monitorWorkspace.classList.remove("active");
-  }
-  if (els.accessScreen) {
-    els.accessScreen.classList.remove("hidden");
-  }
-  if (typeof updateFooterActionsVisibility === "function") {
-    updateFooterActionsVisibility();
-  }
 }
 
 async function loadPublicMonitoringRecords() {

@@ -212,11 +212,11 @@ test("Admin Statistics is an authenticated inline Admin panel", () => {
     els: {
       accessScreen: { classList },
       appWorkspace: { classList },
-      monitorWorkspace: { classList },
       adminDashboard: { classList },
       adminStatisticsPanel: { scrollIntoView: () => {} }
     },
     isIntentionalNavigationV200: () => true,
+    deactivatePublicMonitoringPanelV200: () => calls.push(["monitor-off"]),
     setAdminSectionV200: (section) => calls.push(["section", section]),
     scheduleIntentionalScrollV200: () => calls.push(["scroll"]),
     setupStatsFilters: () => calls.push(["filters"]),

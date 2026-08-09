@@ -1694,8 +1694,14 @@ textarea {
   font-weight: 700;
 }
 
-.monitor-workspace.active {
-  display: block;
+.landing-monitor-panel {
+  margin: 18px auto 0;
+  max-width: 820px;
+  width: 100%;
+}
+
+.landing-monitor-panel[hidden] {
+  display: none !important;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3452,7 +3458,7 @@ button:disabled,
 
 /* Intentional navigation targets account for the sticky mobile header. */
 .access-panel,
-.monitor-workspace,
+.landing-monitor-panel,
 #adminStatisticsPanel {
   scroll-margin-top: 96px;
 }
@@ -3494,7 +3500,7 @@ button:disabled,
   }
 
   .access-panel,
-  .monitor-workspace,
+  .landing-monitor-panel,
   #adminStatisticsPanel {
     scroll-margin-top: 76px;
   }
