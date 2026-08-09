@@ -2392,6 +2392,10 @@ function validateProfilePhotoViewer_(payload) {
 
 function getStudentProfilePhotos(payload) {
   const viewer = validateProfilePhotoViewer_(payload || {});
+  const variant = normalizeText_(payload && payload.photo_variant || "full");
+  if (["thumbnail", "full"].indexOf(variant) === -1) {
+    throw new Error("Varian foto profil tidak sah.");
+  }
   let requestedIds = Array.isArray(payload && payload.student_ids) ? payload.student_ids : [];
   requestedIds = requestedIds.map((id) => String(id || "").trim()).filter(Boolean);
   if (viewer.role === "student") {
@@ -2415,22 +2419,103 @@ function getStudentProfilePhotos(payload) {
   if (!Object.keys(requested).length) return { photos: [] };
 
   const folder = getProfilePhotoFolder_();
-  const photos = getRowsAsObjects_(getSheet_(SHEETS.students)).reduce((result, student) => {
+  const photoEntries = getRowsAsObjects_(getSheet_(SHEETS.students)).reduce((result, student) => {
     if (!requested[normalizeText_(student.student_id)] || !hasCellValue_(student.photo_file_id)) return result;
     const file = getVerifiedProfilePhotoFile_(student.photo_file_id, folder);
     if (!file) return result;
     const mimeType = String(file.getMimeType() || "").toLowerCase();
     if (["image/jpeg", "image/png", "image/webp"].indexOf(mimeType) === -1) return result;
-    const bytes = file.getBlob().getBytes();
+    result.push({
+      studentId: String(student.student_id || ""),
+      fileId: String(student.photo_file_id || ""),
+      file: file,
+      mimeType: mimeType,
+      photoUpdatedAt: student.photo_updated_at || ""
+    });
+    return result;
+  }, []);
+  if (variant === "thumbnail") {
+    return { photos: fetchProfilePhotoThumbnails_(photoEntries) };
+  }
+  const photos = photoEntries.reduce((result, entry) => {
+    const bytes = entry.file.getBlob().getBytes();
     if (!bytes.length || bytes.length > 800 * 1024) return result;
     result.push({
-      student_id: String(student.student_id || ""),
-      photo_data_uri: "data:" + mimeType + ";base64," + Utilities.base64Encode(bytes),
-      photo_updated_at: student.photo_updated_at || ""
+      student_id: entry.studentId,
+      photo_data_uri: "data:" + entry.mimeType + ";base64," + Utilities.base64Encode(bytes),
+      photo_updated_at: entry.photoUpdatedAt
     });
     return result;
   }, []);
   return { photos: photos };
+}
+
+function fetchProfilePhotoThumbnails_(photoEntries) {
+  if (!photoEntries.length) return [];
+  let authorization;
+  try {
+    authorization = "Bearer " + ScriptApp.getOAuthToken();
+  } catch (error) {
+    console.warn("Profile photo thumbnail authorization failed", { error_type: "AuthorizationError" });
+    return [];
+  }
+  let metadataResponses;
+  try {
+    metadataResponses = UrlFetchApp.fetchAll(photoEntries.map((entry) => ({
+      url: "https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(entry.fileId) +
+        "?fields=thumbnailLink%2Ctrashed&supportsAllDrives=true",
+      method: "get",
+      headers: { Authorization: authorization },
+      muteHttpExceptions: true
+    })));
+  } catch (error) {
+    console.warn("Profile photo thumbnail metadata request failed", { error_type: "FetchError" });
+    return [];
+  }
+
+  const thumbnailEntries = [];
+  metadataResponses.forEach((response, index) => {
+    if (response.getResponseCode() !== 200) return;
+    let metadata;
+    try {
+      metadata = JSON.parse(response.getContentText() || "{}");
+    } catch (error) {
+      return;
+    }
+    if (!metadata || metadata.trashed === true || !metadata.thumbnailLink) return;
+    thumbnailEntries.push({ entry: photoEntries[index], url: String(metadata.thumbnailLink) });
+  });
+  if (!thumbnailEntries.length) return [];
+
+  let thumbnailResponses;
+  try {
+    thumbnailResponses = UrlFetchApp.fetchAll(thumbnailEntries.map((item) => ({
+      url: item.url,
+      method: "get",
+      headers: { Authorization: authorization },
+      followRedirects: true,
+      muteHttpExceptions: true
+    })));
+  } catch (error) {
+    console.warn("Profile photo thumbnail content request failed", { error_type: "FetchError" });
+    return [];
+  }
+
+  return thumbnailResponses.reduce((result, response, index) => {
+    if (response.getResponseCode() !== 200) return result;
+    const blob = response.getBlob();
+    const mimeType = String(blob.getContentType() || "").toLowerCase();
+    const bytes = blob.getBytes();
+    if (["image/jpeg", "image/png", "image/webp"].indexOf(mimeType) === -1 ||
+        !bytes.length || bytes.length > 256 * 1024) return result;
+    const entry = thumbnailEntries[index].entry;
+    result.push({
+      student_id: entry.studentId,
+      photo_data_uri: "data:" + mimeType + ";base64," + Utilities.base64Encode(bytes),
+      photo_updated_at: entry.photoUpdatedAt
+    });
+    return result;
+  }, []);
 }
 
 function removeStudentProfilePhoto(payload) {

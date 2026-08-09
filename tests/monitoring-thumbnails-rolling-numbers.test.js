@@ -42,7 +42,7 @@ function createMonitoringContext(withPhoto) {
     formatAdminExpectedReturnV210: () => "-"
   });
   vm.runInContext("const REQUEST_TYPE_LABEL = globalThis.REQUEST_TYPE_LABEL; let adminMonitoringFilterV210 = globalThis.adminMonitoringFilterV210; let adminMonitoringV210 = globalThis.adminMonitoringV210; const els = globalThis.els;", context);
-  vm.runInContext("let studentProfilePhotos = new Map();", context);
+  vm.runInContext("let profilePhotoThumbnails = new Map(); let profilePhotoFullImages = new Map();", context);
   vm.runInContext([
     extractFunction(appSource, "profilePhotoCacheKey"),
     extractFunction(appSource, "profilePhotoInitials"),
@@ -52,7 +52,7 @@ function createMonitoringContext(withPhoto) {
     extractFunction(appSource, "renderAdminMonitoringV210")
   ].join("\n"), context);
   if (withPhoto) {
-    vm.runInContext('studentProfilePhotos.set("a2-002", { photo_data_uri: "data:image/png;base64,AAAA" });', context);
+    vm.runInContext('profilePhotoThumbnails.set("a2-002", { photo_data_uri: "data:image/png;base64,AAAA" });', context);
   }
   return context;
 }
@@ -72,7 +72,7 @@ test("Admin monitoring renders a secure clickable cached photo and an inert plac
 
 test("Admin monitoring refresh renders records before one de-duplicated authenticated photo batch", () => {
   const loadMonitoring = extractFunction(appSource, "loadAdminMonitoringV210");
-  assert.ok(loadMonitoring.indexOf("renderAdminMonitoringV210()") < loadMonitoring.indexOf("loadProfilePhotosForStudents("));
+  assert.ok(loadMonitoring.indexOf("renderAdminMonitoringV210()") < loadMonitoring.indexOf("loadProfilePhotoThumbnailsForStudents("));
   assert.match(loadMonitoring, /\.map\(\(record\) => record\.student_id\)/);
 
   const calls = [];
@@ -80,25 +80,28 @@ test("Admin monitoring refresh renders records before one de-duplicated authenti
     Map, Set, console,
     currentSession: { role: "admin" },
     isLiveMode: true,
-    studentProfilePhotos: new Map(),
-    studentProfilePhotoLoadedKeys: new Set(),
-    studentProfilePhotoPendingKeys: new Set(),
+    profilePhotoThumbnails: new Map(),
+    profilePhotoThumbnailLoadedKeys: new Set(),
+    profilePhotoThumbnailPendingKeys: new Set(),
+    profilePhotoCacheVersions: new Map(),
+    profilePhotoSessionGeneration: 0,
     profilePhotoBatchWarningAt: 0,
     profilePhotoBatchWarningType: "",
-    apiPost: async (action, payload) => { calls.push([action, payload.student_ids]); return { photos: [] }; },
+    apiPost: async (action, payload) => { calls.push([action, payload.student_ids, payload.photo_variant]); return { photos: [] }; },
     buildProfilePhotoAccessPayload: (ids) => ({ student_ids: ids }),
     renderProfilePhotoConsumers: () => {},
     warnProfilePhotoBatchFailure: () => {}
   });
-  vm.runInContext("let studentProfilePhotos = globalThis.studentProfilePhotos; let studentProfilePhotoLoadedKeys = globalThis.studentProfilePhotoLoadedKeys; let studentProfilePhotoPendingKeys = globalThis.studentProfilePhotoPendingKeys; let currentSession = globalThis.currentSession; let isLiveMode = globalThis.isLiveMode;", context);
+  vm.runInContext("let profilePhotoThumbnails = globalThis.profilePhotoThumbnails; let profilePhotoThumbnailLoadedKeys = globalThis.profilePhotoThumbnailLoadedKeys; let profilePhotoThumbnailPendingKeys = globalThis.profilePhotoThumbnailPendingKeys; let profilePhotoCacheVersions = globalThis.profilePhotoCacheVersions; let profilePhotoSessionGeneration = globalThis.profilePhotoSessionGeneration; let currentSession = globalThis.currentSession; let isLiveMode = globalThis.isLiveMode;", context);
   vm.runInContext(extractFunction(appSource, "profilePhotoCacheKey"), context);
   vm.runInContext(extractFunction(appSource, "safeProfilePhotoDataUri"), context);
-  vm.runInContext(`async ${extractFunction(appSource, "loadProfilePhotosForStudents")}`, context);
+  vm.runInContext(`async ${extractFunction(appSource, "loadProfilePhotoThumbnailsForStudents")}`, context);
 
-  return context.loadProfilePhotosForStudents(["A2-002", "A2-002", "A2-007"])
-    .then(() => context.loadProfilePhotosForStudents(["A2-002", "A2-007"]))
+  return context.loadProfilePhotoThumbnailsForStudents(["A2-002", "A2-002", "A2-007"])
+    .then(() => context.loadProfilePhotoThumbnailsForStudents(["A2-002", "A2-007"]))
     .then(() => {
-      assert.deepEqual(JSON.parse(JSON.stringify(calls)), [["getStudentProfilePhotos", ["A2-002", "A2-007"]]]);
+      assert.deepEqual(JSON.parse(JSON.stringify(calls)), [["getStudentProfilePhotos", ["A2-002", "A2-007"], "thumbnail"]]);
+      assert.equal(context.profilePhotoThumbnailLoadedKeys.size, 2);
     });
 });
 

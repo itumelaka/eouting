@@ -224,9 +224,14 @@ let adminOutingTypes = [];
 let adminEditingTypeCode = "";
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
-let studentProfilePhotos = new Map();
-let studentProfilePhotoLoadedKeys = new Set();
-let studentProfilePhotoPendingKeys = new Set();
+let profilePhotoThumbnails = new Map();
+let profilePhotoFullImages = new Map();
+let profilePhotoThumbnailLoadedKeys = new Set();
+let profilePhotoThumbnailPendingKeys = new Set();
+let profilePhotoFullLoadedKeys = new Set();
+let profilePhotoFullPendingRequests = new Map();
+let profilePhotoCacheVersions = new Map();
+let profilePhotoSessionGeneration = 0;
 let studentProfileUploadInFlight = false;
 let profilePhotoBatchWarningAt = 0;
 let profilePhotoBatchWarningType = "";
@@ -317,6 +322,8 @@ const els = {
   profilePhotoModalImage: document.querySelector("#profilePhotoModalImage"),
   profilePhotoModalName: document.querySelector("#profilePhotoModalName"),
   profilePhotoModalMeta: document.querySelector("#profilePhotoModalMeta"),
+  profilePhotoModalStatus: document.querySelector("#profilePhotoModalStatus"),
+  profilePhotoModalRetry: document.querySelector("#profilePhotoModalRetry"),
   requestTypeSelect: document.querySelector("#requestTypeSelect"),
   studentOutingTypesState: document.querySelector("#studentOutingTypesState"),
   studentOutingTypesMessage: document.querySelector("#studentOutingTypesMessage"),
@@ -810,9 +817,7 @@ function clearAdminRuntimeCredentialV200() {
   adminMasterV210 = { page: 1, total_pages: 1, total: 0, records: [] };
   adminStaffV210 = [];
   adminEditingStaffV210 = null;
-  studentProfilePhotos.clear();
-  studentProfilePhotoLoadedKeys.clear();
-  studentProfilePhotoPendingKeys.clear();
+  clearProfilePhotoSessionCaches();
   if (els.adminPinInput) els.adminPinInput.value = "";
   if (els.adminIdentityInput) els.adminIdentityInput.value = "";
   if (els.adminTypeList) els.adminTypeList.innerHTML = "";
@@ -886,7 +891,7 @@ async function loadAdminMonitoringV210() {
     els.adminMonitoringMessage.textContent = "";
     els.adminMonitoringUpdated.textContent = `Terakhir dikemas kini: ${formatDisplayDateTime(adminMonitoringV210.generated_at)}`;
     renderAdminMonitoringV210();
-    loadProfilePhotosForStudents((adminMonitoringV210.records || []).map((record) => record.student_id));
+    loadProfilePhotoThumbnailsForStudents((adminMonitoringV210.records || []).map((record) => record.student_id));
   } catch (error) {
     adminMonitoringV210 = null;
     els.adminMonitoringMessage.textContent = "Pemantauan gagal dimuatkan.";
@@ -1073,7 +1078,7 @@ async function loadAdminStudentsV200() {
       .map(normalizeAdminStudentV200);
     setAdminStudentsMessageV200("");
     renderAdminStudentsV200();
-    loadProfilePhotosForStudents(adminStudentsV200.filter((student) => student.has_profile_photo).map((student) => student.student_id));
+    loadProfilePhotoThumbnailsForStudents(adminStudentsV200.filter((student) => student.has_profile_photo).map((student) => student.student_id));
   } catch (error) {
     adminStudentsV200 = [];
     els.adminStudentList.innerHTML = `
@@ -1811,8 +1816,7 @@ async function removeAdminStudentProfilePhoto(studentId, button) {
     await apiPost("removeStudentProfilePhoto", Object.assign(buildAdminCredentialPayloadV200(), { student_id: studentId }));
     student.has_profile_photo = false;
     student.photo_updated_at = "";
-    studentProfilePhotos.delete(profilePhotoCacheKey(studentId));
-    studentProfilePhotoLoadedKeys.add(profilePhotoCacheKey(studentId));
+    invalidateProfilePhotoCaches(studentId);
     renderAdminStudentsV200();
     setAdminStudentsMessageV200("Foto profil pelajar telah dibuang.");
   } catch (error) {
@@ -2121,9 +2125,7 @@ els.logoutButton.addEventListener("click", () => {
   stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
-  studentProfilePhotos.clear();
-  studentProfilePhotoLoadedKeys.clear();
-  studentProfilePhotoPendingKeys.clear();
+  clearProfilePhotoSessionCaches();
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
   hideLoginPanels();
@@ -2580,8 +2582,8 @@ async function loadTodayRecords() {
       updateStudentLastUpdated();
     }
     render();
-    if (isAuthenticated && typeof loadProfilePhotosForStudents === "function") {
-      loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
+    if (isAuthenticated && typeof loadProfilePhotoThumbnailsForStudents === "function") {
+      loadProfilePhotoThumbnailsForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
     }
     if (els.publicMonitoringPanel && !els.publicMonitoringPanel.hidden) {
       renderMonitoring();
@@ -3275,6 +3277,28 @@ function profilePhotoCacheKey(studentId) {
   return String(studentId || "").trim().toLowerCase();
 }
 
+function invalidateProfilePhotoCaches(studentId) {
+  const key = profilePhotoCacheKey(studentId);
+  profilePhotoCacheVersions.set(key, (profilePhotoCacheVersions.get(key) || 0) + 1);
+  profilePhotoThumbnails.delete(key);
+  profilePhotoFullImages.delete(key);
+  profilePhotoThumbnailLoadedKeys.delete(key);
+  profilePhotoThumbnailPendingKeys.delete(key);
+  profilePhotoFullLoadedKeys.delete(key);
+  profilePhotoFullPendingRequests.delete(key);
+}
+
+function clearProfilePhotoSessionCaches() {
+  profilePhotoSessionGeneration += 1;
+  profilePhotoThumbnails.clear();
+  profilePhotoFullImages.clear();
+  profilePhotoThumbnailLoadedKeys.clear();
+  profilePhotoThumbnailPendingKeys.clear();
+  profilePhotoFullLoadedKeys.clear();
+  profilePhotoFullPendingRequests.clear();
+  profilePhotoCacheVersions.clear();
+}
+
 function profilePhotoInitials(name) {
   return String(name || "?").trim().split(/\s+/).slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase()).join("") || "?";
@@ -3285,8 +3309,11 @@ function safeProfilePhotoDataUri(value) {
   return /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(dataUri) ? dataUri : "";
 }
 
-function profilePhotoMarkup(studentId, studentName, extraClass = "", studentMeta = "") {
-  const photo = studentProfilePhotos.get(profilePhotoCacheKey(studentId));
+function profilePhotoMarkup(studentId, studentName, extraClass = "", studentMeta = "", preferFull = false) {
+  const key = profilePhotoCacheKey(studentId);
+  const photo = preferFull && profilePhotoFullImages.has(key)
+    ? profilePhotoFullImages.get(key)
+    : profilePhotoThumbnails.get(key);
   const dataUri = safeProfilePhotoDataUri(photo && photo.photo_data_uri);
   const className = `profile-photo-frame ${extraClass}`.trim();
   if (dataUri) {
@@ -3303,6 +3330,12 @@ function setupProfilePhotoPreview() {
 }
 
 function handleProfilePhotoPreviewClick(event) {
+  const retry = event.target.closest("#profilePhotoModalRetry");
+  if (retry && els.profilePhotoModal && !els.profilePhotoModal.hidden) {
+    const studentId = String(els.profilePhotoModal.dataset.studentId || "");
+    if (studentId) openProfilePhotoPreview(profilePhotoPreviewTrigger, { force: true });
+    return;
+  }
   const trigger = event.target.closest("[data-profile-photo-preview]");
   if (trigger) {
     openProfilePhotoPreview(trigger);
@@ -3326,16 +3359,20 @@ function handleProfilePhotoPreviewKeydown(event) {
   }
 }
 
-function openProfilePhotoPreview(trigger) {
+async function openProfilePhotoPreview(trigger, options) {
   if (!currentSession || !trigger || !els.profilePhotoModal) return;
   const studentId = String(trigger.dataset.profilePhotoPreview || "").trim();
-  const photo = studentProfilePhotos.get(profilePhotoCacheKey(studentId));
-  const dataUri = safeProfilePhotoDataUri(photo && photo.photo_data_uri);
-  if (!dataUri) return;
+  const key = profilePhotoCacheKey(studentId);
+  const thumbnail = profilePhotoThumbnails.get(key);
+  const fullPhoto = profilePhotoFullImages.get(key);
+  const thumbnailDataUri = safeProfilePhotoDataUri(thumbnail && thumbnail.photo_data_uri);
+  const fullDataUri = safeProfilePhotoDataUri(fullPhoto && fullPhoto.photo_data_uri);
+  if (!thumbnailDataUri && !fullDataUri) return;
   const studentName = String(trigger.dataset.profilePhotoName || "Pelajar").trim() || "Pelajar";
   const studentMeta = String(trigger.dataset.profilePhotoMeta || "").trim();
   profilePhotoPreviewTrigger = trigger;
-  els.profilePhotoModalImage.src = dataUri;
+  els.profilePhotoModal.dataset.studentId = key;
+  els.profilePhotoModalImage.src = fullDataUri || thumbnailDataUri;
   els.profilePhotoModalImage.alt = `Foto profil ${studentName}`;
   els.profilePhotoModalName.textContent = studentName;
   els.profilePhotoModalMeta.textContent = studentMeta;
@@ -3344,13 +3381,40 @@ function openProfilePhotoPreview(trigger) {
   document.body.style.overflow = "hidden";
   els.profilePhotoModal.hidden = false;
   els.profilePhotoModalClose.focus();
+  setProfilePhotoModalState(fullDataUri ? "" : "Memuatkan foto penuh...", false);
+  if (fullDataUri && !(options && options.force === true)) return;
+  try {
+    const loaded = await loadFullProfilePhotoForStudent(studentId, options);
+    if (els.profilePhotoModal.hidden || els.profilePhotoModal.dataset.studentId !== key) return;
+    const loadedDataUri = safeProfilePhotoDataUri(loaded && loaded.photo_data_uri);
+    if (!loadedDataUri) {
+      setProfilePhotoModalState("Foto penuh tidak tersedia.", true);
+      return;
+    }
+    els.profilePhotoModalImage.src = loadedDataUri;
+    setProfilePhotoModalState("", false);
+  } catch (error) {
+    if (!els.profilePhotoModal.hidden && els.profilePhotoModal.dataset.studentId === key) {
+      setProfilePhotoModalState("Foto penuh gagal dimuatkan.", true);
+    }
+  }
+}
+
+function setProfilePhotoModalState(message, canRetry) {
+  if (els.profilePhotoModalStatus) {
+    els.profilePhotoModalStatus.textContent = message || "";
+    els.profilePhotoModalStatus.hidden = !message;
+  }
+  if (els.profilePhotoModalRetry) els.profilePhotoModalRetry.hidden = !canRetry;
 }
 
 function closeProfilePhotoPreview() {
   if (!els.profilePhotoModal || els.profilePhotoModal.hidden) return;
   els.profilePhotoModal.hidden = true;
+  delete els.profilePhotoModal.dataset.studentId;
   els.profilePhotoModalImage.removeAttribute("src");
   els.profilePhotoModalImage.alt = "";
+  setProfilePhotoModalState("", false);
   document.body.style.overflow = profilePhotoPreviewBodyOverflow;
   const trigger = profilePhotoPreviewTrigger;
   profilePhotoPreviewTrigger = null;
@@ -3366,27 +3430,39 @@ function buildProfilePhotoAccessPayload(studentIds) {
   return Object.assign(buildTodayRecordsAccessPayload(), { student_ids: ids });
 }
 
-async function loadProfilePhotosForStudents(studentIds, options) {
+async function loadProfilePhotoThumbnailsForStudents(studentIds, options) {
   const force = Boolean(options && options.force === true);
   const ids = Array.from(new Set((studentIds || []).map((id) => String(id || "").trim()).filter(Boolean)))
     .filter((id) => {
       const key = profilePhotoCacheKey(id);
-      return !studentProfilePhotoPendingKeys.has(key) && (force || !studentProfilePhotoLoadedKeys.has(key));
+      return !profilePhotoThumbnailPendingKeys.has(key) && (force || !profilePhotoThumbnailLoadedKeys.has(key));
     });
   if (!ids.length || !currentSession || !isLiveMode) return;
-  ids.forEach((id) => studentProfilePhotoPendingKeys.add(profilePhotoCacheKey(id)));
+  const requestGeneration = profilePhotoSessionGeneration;
+  const requestVersions = new Map(ids.map((id) => {
+    const key = profilePhotoCacheKey(id);
+    return [key, profilePhotoCacheVersions.get(key) || 0];
+  }));
+  ids.forEach((id) => profilePhotoThumbnailPendingKeys.add(profilePhotoCacheKey(id)));
   try {
-    const response = await apiPost("getStudentProfilePhotos", buildProfilePhotoAccessPayload(ids));
+    const response = await apiPost("getStudentProfilePhotos", Object.assign(
+      buildProfilePhotoAccessPayload(ids), { photo_variant: "thumbnail" }
+    ));
     const photos = response && Array.isArray(response.photos) ? response.photos : [];
     ids.forEach((id) => {
       const key = profilePhotoCacheKey(id);
-      studentProfilePhotos.delete(profilePhotoCacheKey(id));
-      studentProfilePhotoLoadedKeys.add(key);
+      if (requestGeneration !== profilePhotoSessionGeneration ||
+          requestVersions.get(key) !== (profilePhotoCacheVersions.get(key) || 0)) return;
+      profilePhotoThumbnails.delete(key);
+      profilePhotoThumbnailLoadedKeys.add(key);
     });
     photos.forEach((photo) => {
+      const key = profilePhotoCacheKey(photo.student_id);
+      if (!requestVersions.has(key) || requestGeneration !== profilePhotoSessionGeneration ||
+          requestVersions.get(key) !== (profilePhotoCacheVersions.get(key) || 0)) return;
       const dataUri = safeProfilePhotoDataUri(photo.photo_data_uri);
       if (photo.student_id && dataUri) {
-        studentProfilePhotos.set(profilePhotoCacheKey(photo.student_id), {
+        profilePhotoThumbnails.set(key, {
           photo_data_uri: dataUri,
           photo_updated_at: photo.photo_updated_at || ""
         });
@@ -3398,7 +3474,47 @@ async function loadProfilePhotosForStudents(studentIds, options) {
   } catch (error) {
     warnProfilePhotoBatchFailure(error);
   } finally {
-    ids.forEach((id) => studentProfilePhotoPendingKeys.delete(profilePhotoCacheKey(id)));
+    ids.forEach((id) => {
+      const key = profilePhotoCacheKey(id);
+      if (requestGeneration === profilePhotoSessionGeneration &&
+          requestVersions.get(key) === (profilePhotoCacheVersions.get(key) || 0)) {
+        profilePhotoThumbnailPendingKeys.delete(key);
+      }
+    });
+  }
+}
+
+async function loadFullProfilePhotoForStudent(studentId, options) {
+  const id = String(studentId || "").trim();
+  const key = profilePhotoCacheKey(id);
+  const force = Boolean(options && options.force === true);
+  if (!id || !currentSession) return null;
+  if (!force && profilePhotoFullLoadedKeys.has(key)) return profilePhotoFullImages.get(key) || null;
+  if (profilePhotoFullPendingRequests.has(key)) return profilePhotoFullPendingRequests.get(key);
+  if (!isLiveMode) return profilePhotoFullImages.get(key) || profilePhotoThumbnails.get(key) || null;
+  const requestGeneration = profilePhotoSessionGeneration;
+  const requestVersion = profilePhotoCacheVersions.get(key) || 0;
+
+  const request = (async () => {
+    const response = await apiPost("getStudentProfilePhotos", Object.assign(
+      buildProfilePhotoAccessPayload([id]), { photo_variant: "full" }
+    ));
+    if (requestGeneration !== profilePhotoSessionGeneration ||
+        requestVersion !== (profilePhotoCacheVersions.get(key) || 0)) return null;
+    const photo = response && Array.isArray(response.photos) ? response.photos[0] : null;
+    const dataUri = safeProfilePhotoDataUri(photo && photo.photo_data_uri);
+    profilePhotoFullImages.delete(key);
+    profilePhotoFullLoadedKeys.add(key);
+    if (!photo || !dataUri || profilePhotoCacheKey(photo.student_id) !== key) return null;
+    const cached = { photo_data_uri: dataUri, photo_updated_at: photo.photo_updated_at || "" };
+    profilePhotoFullImages.set(key, cached);
+    return cached;
+  })();
+  profilePhotoFullPendingRequests.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (profilePhotoFullPendingRequests.get(key) === request) profilePhotoFullPendingRequests.delete(key);
   }
 }
 
@@ -3425,21 +3541,26 @@ function renderStudentProfilePhotoArea() {
   if (!els.studentProfilePhotoPreview || !currentSession || currentSession.role !== "student") return;
   const student = currentSession.user || {};
   const studentId = student.student_id || student.studentId || student.id || "";
-  const photo = studentProfilePhotos.get(profilePhotoCacheKey(studentId));
+  const key = profilePhotoCacheKey(studentId);
+  const thumbnail = profilePhotoThumbnails.get(key);
+  const fullPhoto = profilePhotoFullImages.get(key);
+  const photo = fullPhoto || thumbnail;
   const hasPhoto = Boolean(photo || student.has_profile_photo);
   if (els.studentIdentityProfilePhoto) {
     els.studentIdentityProfilePhoto.innerHTML = profilePhotoMarkup(
       studentId,
       student.name || student.nama || "Pelajar",
       "profile-photo-identity",
-      [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · ")
+      [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · "),
+      true
     );
   }
   els.studentProfilePhotoPreview.innerHTML = profilePhotoMarkup(
     studentId,
     student.name || student.nama || "Pelajar",
     "profile-photo-frame-large",
-    [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · ")
+    [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · "),
+    true
   );
   els.studentProfilePhotoTitle.textContent = hasPhoto ? "Foto Profil" : "Tiada Foto Profil";
   const updatedAt = photo && photo.photo_updated_at || student.photo_updated_at || "";
@@ -3478,11 +3599,20 @@ async function handleStudentProfilePhotoSelection(event) {
       });
       currentSession.user.has_profile_photo = true;
       currentSession.user.photo_updated_at = result.photo_updated_at || "";
-      await loadProfilePhotosForStudents([studentId], { force: true });
+      invalidateProfilePhotoCaches(studentId);
+      profilePhotoFullImages.set(profilePhotoCacheKey(studentId), {
+        photo_data_uri: compressed.dataUri,
+        photo_updated_at: result.photo_updated_at || ""
+      });
+      profilePhotoFullLoadedKeys.add(profilePhotoCacheKey(studentId));
+      await loadProfilePhotoThumbnailsForStudents([studentId], { force: true });
     } else {
       const updatedAt = new Date().toISOString();
-      studentProfilePhotos.set(profilePhotoCacheKey(studentId), { photo_data_uri: compressed.dataUri, photo_updated_at: updatedAt });
-      studentProfilePhotoLoadedKeys.add(profilePhotoCacheKey(studentId));
+      invalidateProfilePhotoCaches(studentId);
+      profilePhotoThumbnails.set(profilePhotoCacheKey(studentId), { photo_data_uri: compressed.dataUri, photo_updated_at: updatedAt });
+      profilePhotoFullImages.set(profilePhotoCacheKey(studentId), { photo_data_uri: compressed.dataUri, photo_updated_at: updatedAt });
+      profilePhotoThumbnailLoadedKeys.add(profilePhotoCacheKey(studentId));
+      profilePhotoFullLoadedKeys.add(profilePhotoCacheKey(studentId));
       currentSession.user.has_profile_photo = true;
       currentSession.user.photo_updated_at = updatedAt;
     }
@@ -3537,7 +3667,9 @@ function startStudentSession(student) {
   try {
     startSession("student", student);
     loadStudentOutingTypesV200();
-    loadProfilePhotosForStudents([student.student_id || student.studentId || student.id || ""]);
+    const studentId = student.student_id || student.studentId || student.id || "";
+    loadProfilePhotoThumbnailsForStudents([studentId]);
+    loadFullProfilePhotoForStudent(studentId).then(() => renderStudentProfilePhotoArea()).catch(() => {});
   } catch (error) {
     console.warn("Student view render warning:", error);
     if (!els.studentRecordsList || !els.studentRecordsList.innerHTML.trim()) {
@@ -4035,7 +4167,7 @@ async function refreshGuardRecords(source) {
       const records = await apiPost("getTodayRecords", buildTodayRecordsAccessPayload());
       outingRecords = records.map(mapLiveRecord);
       render();
-      loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
+      loadProfilePhotoThumbnailsForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
     } else {
       render();
     }
@@ -8855,8 +8987,8 @@ async function loadWardenRecordsOnly() {
     throw new Error("Format rekod warden tidak sah.");
   }
   outingRecords = records.map(mapLiveRecord);
-  if (typeof loadProfilePhotosForStudents === "function") {
-    loadProfilePhotosForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
+  if (typeof loadProfilePhotoThumbnailsForStudents === "function") {
+    loadProfilePhotoThumbnailsForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
   }
 }
 

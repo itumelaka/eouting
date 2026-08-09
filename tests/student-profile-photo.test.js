@@ -110,6 +110,9 @@ test("one compact authenticated batch call serves Student, Warden, Guard and Adm
   assert.match(batch, /Pelajar hanya boleh mengakses foto profil sendiri/);
   assert.match(batch, /Foto hanya boleh diakses untuk rekod operasi semasa/);
   assert.match(batch, /requestedIds\.length > 100/);
+  assert.match(batch, /photo_variant/);
+  assert.match(batch, /variant === "thumbnail"/);
+  assert.match(batch, /fetchProfilePhotoThumbnails_\(photoEntries\)/);
   assert.match(batch, /photo_data_uri/);
   assert.doesNotMatch(batch, /photo_file_id:\s*student\.photo_file_id/);
   assert.match(app, /apiPost\("getStudentProfilePhotos"/);
@@ -118,23 +121,76 @@ test("one compact authenticated batch call serves Student, Warden, Guard and Adm
   assert.match(adminLoader, /map\(\(student\) => student\.student_id\)/);
 });
 
-test("frontend cache canonicalizes every profile-photo store, read and delete", () => {
+test("Drive thumbnails are fetched server-side and expose only safe image data", () => {
+  const calls = [];
+  const context = vm.createContext({
+    Buffer, JSON, encodeURIComponent,
+    console: { warn: () => {} },
+    ScriptApp: { getOAuthToken: () => "PRIVATE-OAUTH-TOKEN" },
+    Utilities: { base64Encode: (bytes) => Buffer.from(bytes).toString("base64") },
+    UrlFetchApp: {
+      fetchAll(requests) {
+        calls.push(requests);
+        if (calls.length === 1) {
+          return requests.map(() => ({
+            getResponseCode: () => 200,
+            getContentText: () => JSON.stringify({ thumbnailLink: "https://private.example/thumb", trashed: false })
+          }));
+        }
+        return requests.map(() => ({
+          getResponseCode: () => 200,
+          getBlob: () => ({ getContentType: () => "image/jpeg", getBytes: () => [1, 2, 3, 4] })
+        }));
+      }
+    }
+  });
+  vm.runInContext(extractFunction(gas, "fetchProfilePhotoThumbnails_", "removeStudentProfilePhoto"), context);
+  const result = context.fetchProfilePhotoThumbnails_([{
+    studentId: "A2-002", fileId: "PRIVATE-FILE-ID", photoUpdatedAt: "2026-08-09"
+  }]);
+  assert.equal(calls.length, 2);
+  assert.match(calls[0][0].url, /fields=thumbnailLink/);
+  assert.equal(calls[0][0].headers.Authorization, "Bearer PRIVATE-OAUTH-TOKEN");
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), [{
+    student_id: "A2-002",
+    photo_data_uri: "data:image/jpeg;base64,AQIDBA==",
+    photo_updated_at: "2026-08-09"
+  }]);
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE-FILE-ID|thumbnailLink|private\.example|OAUTH|Bearer/i);
+});
+
+test("Drive thumbnail failure safely returns no bulk full-image fallback", () => {
+  const context = vm.createContext({
+    console: { warn: () => {} },
+    ScriptApp: { getOAuthToken: () => "token" },
+    UrlFetchApp: { fetchAll: () => { throw new Error("private details"); } }
+  });
+  const helper = extractFunction(gas, "fetchProfilePhotoThumbnails_", "removeStudentProfilePhoto");
+  vm.runInContext(helper, context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.fetchProfilePhotoThumbnails_([{ fileId: "x" }]))), []);
+  assert.doesNotMatch(helper, /\.file\.getBlob|800 \* 1024/);
+});
+
+test("frontend keeps canonicalized thumbnail and full-image caches separate", () => {
   const context = vm.createContext({});
   vm.runInContext(extractFunction(app, "profilePhotoCacheKey", "profilePhotoInitials"), context);
   assert.equal(context.profilePhotoCacheKey(" A2-002 "), "a2-002");
   assert.equal(context.profilePhotoCacheKey("a2-002"), "a2-002");
 
-  const cacheOperations = Array.from(app.matchAll(/studentProfilePhotos\.(?:get|set|delete)\(([^\n;]+)/g), (match) => match[1]);
-  assert.ok(cacheOperations.length >= 5);
-  cacheOperations.forEach((operation) => assert.match(operation, /profilePhotoCacheKey\(/));
+  const cacheOperations = Array.from(app.matchAll(/profilePhoto(?:Thumbnails|FullImages)\.(?:get|set|delete)\(([^\n;]+)/g), (match) => match[1]);
+  assert.ok(cacheOperations.length >= 10);
+  cacheOperations.forEach((operation) => assert.match(operation, /profilePhotoCacheKey\(|\bkey\b/));
+  assert.match(app, /let profilePhotoThumbnails = new Map\(\)/);
+  assert.match(app, /let profilePhotoFullImages = new Map\(\)/);
   const markup = extractFunction(app, "profilePhotoMarkup", "buildProfilePhotoAccessPayload");
   assert.match(markup, /profile-photo-placeholder/);
 });
 
 test("batch failures stay non-blocking, rate-limited and free of sensitive diagnostics", () => {
-  const loader = extractFunction(app, "loadProfilePhotosForStudents", "warnProfilePhotoBatchFailure");
+  const loader = extractFunction(app, "loadProfilePhotoThumbnailsForStudents", "loadFullProfilePhotoForStudent");
   const warning = extractFunction(app, "warnProfilePhotoBatchFailure", "renderProfilePhotoConsumers");
   assert.equal((loader.match(/apiPost\("getStudentProfilePhotos"/g) || []).length, 1);
+  assert.match(loader, /photo_variant: "thumbnail"/);
   assert.match(loader, /catch \(error\)[\s\S]*warnProfilePhotoBatchFailure\(error\)/);
   assert.doesNotMatch(loader, /throw error|showError|showToast/);
   assert.match(warning, /60000/);
@@ -179,25 +235,78 @@ test("real authorised thumbnails open an accessible cached-image preview while p
   assert.match(css, /\.profile-photo-modal-dialog img[\s\S]*?max-height:\s*82vh[\s\S]*?object-fit:\s*contain/);
 });
 
-test("preview uses the authenticated cache, shows identity, and closes accessibly without another request", () => {
+test("preview shows the thumbnail immediately, then loads one authenticated full image", () => {
   const open = extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview");
   const close = extractFunction(app, "closeProfilePhotoPreview", "buildProfilePhotoAccessPayload");
   const click = extractFunction(app, "handleProfilePhotoPreviewClick", "handleProfilePhotoPreviewKeydown");
   const keydown = extractFunction(app, "handleProfilePhotoPreviewKeydown", "openProfilePhotoPreview");
   assert.match(open, /if \(!currentSession/);
-  assert.match(open, /studentProfilePhotos\.get\(profilePhotoCacheKey\(studentId\)\)/);
-  assert.match(open, /profilePhotoModalImage\.src = dataUri/);
+  assert.match(open, /profilePhotoThumbnails\.get\(key\)/);
+  assert.match(open, /profilePhotoFullImages\.get\(key\)/);
+  assert.match(open, /profilePhotoModalImage\.src = fullDataUri \|\| thumbnailDataUri/);
+  assert.match(open, /Memuatkan foto penuh/);
+  assert.match(open, /await loadFullProfilePhotoForStudent\(studentId, options\)/);
+  assert.match(open, /Foto penuh gagal dimuatkan/);
   assert.match(open, /profilePhotoModalName\.textContent = studentName/);
   assert.match(open, /profilePhotoModalMeta\.textContent = studentMeta/);
   assert.match(open, /document\.body\.style\.overflow = "hidden"/);
-  assert.doesNotMatch(open, /apiPost|apiGet|getStudentProfilePhotos|fetch\(/);
   assert.match(click, /event\.target === els\.profilePhotoModal/);
+  assert.match(click, /#profilePhotoModalRetry/);
   assert.match(click, /profilePhotoModalClose/);
   assert.match(keydown, /event\.key === "Escape"/);
   assert.match(keydown, /event\.key === "Tab"[\s\S]*profilePhotoModalClose\.focus\(\)/);
   assert.match(close, /removeAttribute\("src"\)/);
   assert.match(close, /document\.body\.style\.overflow = profilePhotoPreviewBodyOverflow/);
   assert.match(close, /trigger\.focus\(\)/);
+});
+
+test("full-image loader requests one student once and reuses its session cache", async () => {
+  const calls = [];
+  const context = vm.createContext({
+    Map, Set,
+    currentSession: { role: "admin" },
+    isLiveMode: true,
+    profilePhotoFullImages: new Map(),
+    profilePhotoFullLoadedKeys: new Set(),
+    profilePhotoFullPendingRequests: new Map(),
+    profilePhotoCacheVersions: new Map(),
+    profilePhotoSessionGeneration: 0,
+    buildProfilePhotoAccessPayload: (ids) => ({ student_ids: ids }),
+    apiPost: async (action, payload) => {
+      calls.push([action, payload.student_ids, payload.photo_variant]);
+      return { photos: [{ student_id: "A2-002", photo_data_uri: "data:image/jpeg;base64,RlVMTA==" }] };
+    }
+  });
+  vm.runInContext("let currentSession = globalThis.currentSession; let isLiveMode = globalThis.isLiveMode; let profilePhotoFullImages = globalThis.profilePhotoFullImages; let profilePhotoFullLoadedKeys = globalThis.profilePhotoFullLoadedKeys; let profilePhotoFullPendingRequests = globalThis.profilePhotoFullPendingRequests; let profilePhotoCacheVersions = globalThis.profilePhotoCacheVersions; let profilePhotoSessionGeneration = globalThis.profilePhotoSessionGeneration;", context);
+  vm.runInContext(extractFunction(app, "profilePhotoCacheKey", "invalidateProfilePhotoCaches"), context);
+  vm.runInContext(extractFunction(app, "safeProfilePhotoDataUri", "profilePhotoMarkup"), context);
+  vm.runInContext(extractFunction(app, "loadFullProfilePhotoForStudent", "warnProfilePhotoBatchFailure"), context);
+
+  const [first, concurrent] = await Promise.all([
+    context.loadFullProfilePhotoForStudent(" A2-002 "),
+    context.loadFullProfilePhotoForStudent("A2-002")
+  ]);
+  const second = await context.loadFullProfilePhotoForStudent("A2-002");
+  assert.equal(first.photo_data_uri, "data:image/jpeg;base64,RlVMTA==");
+  assert.equal(concurrent.photo_data_uri, first.photo_data_uri);
+  assert.equal(second.photo_data_uri, first.photo_data_uri);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [["getStudentProfilePhotos", ["A2-002"], "full"]]);
+});
+
+test("operational consumers never bulk-request full images and mutations invalidate both caches", () => {
+  for (const loaderName of ["loadAdminMonitoringV210", "loadAdminStudentsV200", "loadTodayRecords", "refreshGuardRecords", "loadWardenRecords"]) {
+    const start = app.search(new RegExp(`(?:async\\s+)?function ${loaderName}`));
+    assert.notEqual(start, -1, `${loaderName} must exist`);
+    const next = app.slice(start + 1).search(/\n(?:async\s+)?function /);
+    const source = app.slice(start, next === -1 ? app.length : start + 1 + next);
+    assert.doesNotMatch(source, /loadFullProfilePhotoForStudent/);
+    if (/ProfilePhoto/.test(source)) assert.match(source, /loadProfilePhotoThumbnailsForStudents/);
+  }
+  const invalidation = extractFunction(app, "invalidateProfilePhotoCaches", "clearProfilePhotoSessionCaches");
+  assert.match(invalidation, /profilePhotoThumbnails\.delete/);
+  assert.match(invalidation, /profilePhotoFullImages\.delete/);
+  assert.match(extractFunction(app, "removeAdminStudentProfilePhoto", "setupStaffPinFields"), /invalidateProfilePhotoCaches/);
+  assert.match(extractFunction(app, "handleStudentProfilePhotoSelection", "compressStudentProfilePhoto"), /invalidateProfilePhotoCaches/);
 });
 
 test("delegated preview interaction survives Admin rerenders across every authorised role", () => {
@@ -221,7 +330,10 @@ test("delegated preview interaction survives Admin rerenders across every author
     addEventListener(type, handler) { listeners[type].push(handler); },
     contains: () => true
   };
-  const cache = new Map();
+  const thumbnailCache = new Map();
+  const fullCache = new Map();
+  const status = { hidden: true, textContent: "" };
+  const retry = { hidden: true, closest: (selector) => selector === "#profilePhotoModalRetry" ? retry : null };
   const context = vm.createContext({
     Map,
     currentSession: { role: "admin" },
@@ -231,13 +343,17 @@ test("delegated preview interaction survives Admin rerenders across every author
       profilePhotoModalClose: closeButton,
       profilePhotoModalImage: image,
       profilePhotoModalName: name,
-      profilePhotoModalMeta: meta
+      profilePhotoModalMeta: meta,
+      profilePhotoModalStatus: status,
+      profilePhotoModalRetry: retry
     },
     escapeHtml: (value) => String(value),
     openAdminStudentEditEditorV200: () => {},
     loadAdminStudentsV200: () => {},
     removeAdminStudentProfilePhoto: () => {},
-    studentProfilePhotos: cache,
+    profilePhotoThumbnails: thumbnailCache,
+    profilePhotoFullImages: fullCache,
+    loadFullProfilePhotoForStudent: async () => ({ photo_data_uri: "data:image/jpeg;base64,RlVMTA==" }),
     toggleAdminStudentStatusV200: () => {},
     profilePhotoPreviewTrigger: null,
     profilePhotoPreviewBodyOverflow: ""
@@ -261,7 +377,7 @@ test("delegated preview interaction survives Admin rerenders across every author
   assert.equal(listeners.keydown.length, 1);
 
   const dataUri = "data:image/jpeg;base64,QUJDRA==";
-  cache.set("a2-002", { photo_data_uri: dataUri });
+  thumbnailCache.set("a2-002", { photo_data_uri: dataUri });
   const createTrigger = () => ({
     dataset: {
       profilePhotoPreview: " A2-002 ",
@@ -311,17 +427,17 @@ test("delegated preview interaction survives Admin rerenders across every author
   context.currentSession = null;
   listeners.click[0]({ target: createTrigger() });
   assert.equal(modal.hidden, true, "an unauthenticated trigger cannot open a cached photo");
-  cache.delete("a2-002");
+  thumbnailCache.delete("a2-002");
   assert.doesNotMatch(context.profilePhotoMarkup("A2-002", "Tiada Foto"), /data-profile-photo-preview/);
 });
 
 test("Admin photo indicators intentionally rerender after the single asynchronous batch", () => {
   const loader = extractFunction(app, "loadAdminStudentsV200", "setAdminStudentsBusyV200");
   const consumers = extractFunction(app, "renderProfilePhotoConsumers", "renderStudentProfilePhotoArea");
-  assert.ok(loader.indexOf("renderAdminStudentsV200()") < loader.indexOf("loadProfilePhotosForStudents("));
+  assert.ok(loader.indexOf("renderAdminStudentsV200()") < loader.indexOf("loadProfilePhotoThumbnailsForStudents("));
   assert.match(loader, /filter\(\(student\) => student\.has_profile_photo\)/);
   assert.match(consumers, /currentSession\.role === "admin"[\s\S]*activeAdminSectionV200 === "students"[\s\S]*renderAdminStudentsV200\(\)/);
-  assert.equal((extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview").match(/apiPost|apiGet|fetch\(/g) || []).length, 0);
+  assert.match(extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview"), /loadFullProfilePhotoForStudent/);
 });
 
 test("preview remains absent from public monitoring and does not expose Drive identifiers", () => {

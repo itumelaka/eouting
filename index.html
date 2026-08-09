@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.1.0-preview3">
+    <link rel="stylesheet" href="assets/style.css?v=2.1.0-preview4">
   </head>
   <body>
     <header class="app-header">
@@ -624,7 +624,7 @@
     </main>
 
     <div class="profile-photo-modal" id="profilePhotoModal" role="dialog" aria-modal="true"
-      aria-labelledby="profilePhotoModalName" aria-describedby="profilePhotoModalMeta" hidden>
+      aria-labelledby="profilePhotoModalName" aria-describedby="profilePhotoModalMeta profilePhotoModalStatus" hidden>
       <div class="profile-photo-modal-dialog">
         <button class="profile-photo-modal-close" id="profilePhotoModalClose" type="button"
           aria-label="Tutup paparan foto profil">&times;</button>
@@ -633,9 +633,11 @@
           <strong id="profilePhotoModalName"></strong>
           <span id="profilePhotoModalMeta"></span>
         </div>
+        <p class="profile-photo-modal-status" id="profilePhotoModalStatus" role="status" hidden></p>
+        <button class="secondary-action compact-action" id="profilePhotoModalRetry" type="button" hidden>Cuba Lagi</button>
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.1.0-preview3"></script>
+    <script src="assets/app.js?v=2.1.0-preview4"></script>
   </body>
 </html>

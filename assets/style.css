@@ -3664,6 +3664,17 @@ button.profile-photo-frame {
   font-size: 0.9rem;
 }
 
+.profile-photo-modal-status {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 10px 0 0;
+  text-align: center;
+}
+
+#profilePhotoModalRetry {
+  margin-top: 8px;
+}
+
 @media (min-width: 720px) {
   .identity-panel {
     align-items: center;
