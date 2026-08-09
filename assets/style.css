@@ -3449,6 +3449,12 @@ button:disabled,
   min-width: 0;
 }
 
+.rolling-number {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .student-identity-copy {
   align-items: center;
   display: flex;
@@ -3804,7 +3810,9 @@ button.profile-photo-frame {
 .admin-ops-card { display:grid; gap:12px; }
 .admin-ops-card h4,.admin-staff-card h4 { margin:0 0 4px; }
 .admin-ops-card p,.admin-staff-card p { margin:0; color:var(--muted-text); }
-.admin-ops-card-heading { min-width:0; }
+.admin-ops-card-heading { align-items:center; display:flex; gap:12px; min-width:0; }
+.admin-ops-identity-copy { min-width:0; }
+.admin-monitoring-thumbnail { border-radius:10px; flex-basis:56px; width:56px; }
 .admin-ops-summary { align-items:center; color:var(--muted-text); display:flex; flex-wrap:wrap; gap:7px 10px; }
 .admin-ops-status { align-items:center; align-self:center; display:inline-flex; flex:0 0 auto; line-height:1.2; min-height:0; padding:5px 10px; white-space:nowrap; width:auto; }
 .admin-ops-status.is-out { background:#ffe1ad; color:#7b4300; }
@@ -3828,6 +3836,7 @@ button.profile-photo-frame {
   .admin-subnav { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .admin-ops-card dl,.admin-master-filters { grid-template-columns:1fr; }
   .admin-staff-card { align-items:stretch; flex-direction:column; }
+  .admin-monitoring-thumbnail { flex-basis:52px; width:52px; }
 }
 
 .tabs[hidden] {

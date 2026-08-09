@@ -225,6 +225,8 @@ let adminEditingTypeCode = "";
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
 let studentProfilePhotos = new Map();
+let studentProfilePhotoLoadedKeys = new Set();
+let studentProfilePhotoPendingKeys = new Set();
 let studentProfileUploadInFlight = false;
 let profilePhotoBatchWarningAt = 0;
 let profilePhotoBatchWarningType = "";
@@ -243,6 +245,8 @@ let studentPreviousOutingTypeCodeV200 = "";
 let studentRequestSubmissionInFlight = false;
 let studentSubmitButtonContentState = null;
 let studentAnnualSummary = null;
+const rollingNumberValues = new Map();
+const rollingNumberFrames = new Map();
 let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE ? buildMockAdminOutingTypesV200() : [];
 let mockAdminStudentsV200 = ALLOW_MOCK_MODE ? buildMockAdminStudentsV200() : [];
 let mockAdminStaffV210 = ALLOW_MOCK_MODE ? [
@@ -502,6 +506,56 @@ function prefersReducedMotionV200() {
   return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 }
 
+function setRollingNumber(element, targetValue, stateKey) {
+  if (!element) return false;
+  const target = Math.max(0, Math.round(Number(targetValue) || 0));
+  const key = stateKey || element;
+  const storedValue = rollingNumberValues.get(key);
+  const startValue = Number.isFinite(storedValue)
+    ? storedValue
+    : 0;
+  const activeFrame = rollingNumberFrames.get(key);
+  if (activeFrame !== undefined && typeof window.cancelAnimationFrame === "function") {
+    window.cancelAnimationFrame(activeFrame);
+  }
+  rollingNumberFrames.delete(key);
+  rollingNumberValues.set(key, target);
+  element.classList.add("rolling-number");
+  element.setAttribute("aria-label", String(target));
+  element.style.minWidth = `${Math.max(String(startValue).length, String(target).length)}ch`;
+
+  if (startValue === target || prefersReducedMotionV200() || typeof window.requestAnimationFrame !== "function") {
+    element.textContent = String(target);
+    return false;
+  }
+
+  element.textContent = String(startValue);
+  let startedAt = null;
+  const duration = 450;
+  const step = (timestamp) => {
+    if (startedAt === null) startedAt = timestamp;
+    const progress = Math.min(1, Math.max(0, (timestamp - startedAt) / duration));
+    const eased = 1 - Math.pow(1 - progress, 3);
+    element.textContent = String(Math.round(startValue + ((target - startValue) * eased)));
+    if (progress < 1) {
+      rollingNumberFrames.set(key, window.requestAnimationFrame(step));
+      return;
+    }
+    element.textContent = String(target);
+    rollingNumberFrames.delete(key);
+  };
+  rollingNumberFrames.set(key, window.requestAnimationFrame(step));
+  return true;
+}
+
+function animateRollingNumbers(container, namespace) {
+  if (!container) return;
+  container.querySelectorAll("[data-rolling-number]").forEach((element, index) => {
+    const itemKey = element.dataset.rollingKey || String(index);
+    setRollingNumber(element, element.dataset.rollingNumber, `${namespace}:${itemKey}`);
+  });
+}
+
 function isIntentionalNavigationV200(eventOrOptions) {
   return Boolean(eventOrOptions && (
     eventOrOptions.type === "click" || eventOrOptions.intentional === true
@@ -755,6 +809,8 @@ function clearAdminRuntimeCredentialV200() {
   adminStaffV210 = [];
   adminEditingStaffV210 = null;
   studentProfilePhotos.clear();
+  studentProfilePhotoLoadedKeys.clear();
+  studentProfilePhotoPendingKeys.clear();
   if (els.adminPinInput) els.adminPinInput.value = "";
   if (els.adminIdentityInput) els.adminIdentityInput.value = "";
   if (els.adminTypeList) els.adminTypeList.innerHTML = "";
@@ -828,6 +884,7 @@ async function loadAdminMonitoringV210() {
     els.adminMonitoringMessage.textContent = "";
     els.adminMonitoringUpdated.textContent = `Terakhir dikemas kini: ${formatDisplayDateTime(adminMonitoringV210.generated_at)}`;
     renderAdminMonitoringV210();
+    loadProfilePhotosForStudents((adminMonitoringV210.records || []).map((record) => record.student_id));
   } catch (error) {
     adminMonitoringV210 = null;
     els.adminMonitoringMessage.textContent = "Pemantauan gagal dimuatkan.";
@@ -862,15 +919,19 @@ function formatAdminMonitoringRequestV210(record) {
   return row.masa_mohon ? formatDisplayDateTime(row.masa_mohon) : formatDisplayDate(row.tarikh);
 }
 
-function renderAdminMonitoringV210() {
+function renderAdminMonitoringV210(options) {
   if (!adminMonitoringV210) return;
+  const renderOptions = options || {};
   const kpis = adminMonitoringV210.kpis || {};
   const cards = [
     ["pending", "Menunggu Kelulusan", kpis.pending], ["approved", "Diluluskan / Menunggu Keluar", kpis.approved],
     ["out", "Sedang Keluar", kpis.out], ["not_returned", "Belum Pulang", kpis.not_returned],
     ["late", "Lewat", kpis.late], ["emergency", "Kecemasan Aktif", kpis.emergency]
   ];
-  els.adminMonitoringKpis.innerHTML = cards.map(([key, label, count]) => `<button type="button" class="admin-kpi-card ${key === "late" ? "is-late" : ""} ${adminMonitoringFilterV210 === key ? "active" : ""}" data-monitor-filter="${key}"><strong>${Number(count || 0)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
+  if (renderOptions.recordsOnly !== true) {
+    els.adminMonitoringKpis.innerHTML = cards.map(([key, label, count]) => `<button type="button" class="admin-kpi-card ${key === "late" ? "is-late" : ""} ${adminMonitoringFilterV210 === key ? "active" : ""}" data-monitor-filter="${key}"><strong data-rolling-number="${Number(count || 0)}" data-rolling-key="${key}">${Number(count || 0)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
+    animateRollingNumbers(els.adminMonitoringKpis, "admin-monitoring");
+  }
   const rows = (adminMonitoringV210.records || []).filter((row) => {
     if (adminMonitoringFilterV210 === "all") return true;
     if (adminMonitoringFilterV210 === "pending") return row.status === "MENUNGGU_KELULUSAN";
@@ -884,10 +945,13 @@ function renderAdminMonitoringV210() {
     const isOut = row.status === "KELUAR";
     return `<article class="admin-ops-card ${row.lewat ? "is-late" : ""}">
       <header class="admin-ops-card-heading">
-        <h4>${escapeHtml(row.nama || "-")}</h4>
-        <div class="admin-ops-summary">
-          <span>${escapeHtml(row.kelas || "-")} · ${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</span>
-          <span class="status-badge admin-ops-status ${isOut ? "is-out" : ""}">${escapeHtml(adminMonitoringStatusLabelV210(row.status))}</span>
+        ${profilePhotoMarkup(row.student_id, row.nama, "profile-photo-thumbnail admin-monitoring-thumbnail", [row.kelas, row.no_matrik || row.student_id].filter(Boolean).join(" · "))}
+        <div class="admin-ops-identity-copy">
+          <h4>${escapeHtml(row.nama || "-")}</h4>
+          <div class="admin-ops-summary">
+            <span>${escapeHtml(row.kelas || "-")} · ${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</span>
+            <span class="status-badge admin-ops-status ${isOut ? "is-out" : ""}">${escapeHtml(adminMonitoringStatusLabelV210(row.status))}</span>
+          </div>
         </div>
       </header>
       ${row.lewat ? '<div class="admin-ops-late" role="status">Lewat · Belum pulang pada waktu dijangka</div>' : ""}
@@ -1743,6 +1807,7 @@ async function removeAdminStudentProfilePhoto(studentId, button) {
     student.has_profile_photo = false;
     student.photo_updated_at = "";
     studentProfilePhotos.delete(profilePhotoCacheKey(studentId));
+    studentProfilePhotoLoadedKeys.add(profilePhotoCacheKey(studentId));
     renderAdminStudentsV200();
     setAdminStudentsMessageV200("Foto profil pelajar telah dibuang.");
   } catch (error) {
@@ -1963,6 +2028,8 @@ els.logoutButton.addEventListener("click", () => {
   stopMonitoringAutoRefresh();
   currentSession = null;
   studentProfilePhotos.clear();
+  studentProfilePhotoLoadedKeys.clear();
+  studentProfilePhotoPendingKeys.clear();
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
   hideLoginPanels();
@@ -3205,13 +3272,23 @@ function buildProfilePhotoAccessPayload(studentIds) {
   return Object.assign(buildTodayRecordsAccessPayload(), { student_ids: ids });
 }
 
-async function loadProfilePhotosForStudents(studentIds) {
-  const ids = Array.from(new Set((studentIds || []).map((id) => String(id || "").trim()).filter(Boolean)));
+async function loadProfilePhotosForStudents(studentIds, options) {
+  const force = Boolean(options && options.force === true);
+  const ids = Array.from(new Set((studentIds || []).map((id) => String(id || "").trim()).filter(Boolean)))
+    .filter((id) => {
+      const key = profilePhotoCacheKey(id);
+      return !studentProfilePhotoPendingKeys.has(key) && (force || !studentProfilePhotoLoadedKeys.has(key));
+    });
   if (!ids.length || !currentSession || !isLiveMode) return;
+  ids.forEach((id) => studentProfilePhotoPendingKeys.add(profilePhotoCacheKey(id)));
   try {
     const response = await apiPost("getStudentProfilePhotos", buildProfilePhotoAccessPayload(ids));
     const photos = response && Array.isArray(response.photos) ? response.photos : [];
-    ids.forEach((id) => studentProfilePhotos.delete(profilePhotoCacheKey(id)));
+    ids.forEach((id) => {
+      const key = profilePhotoCacheKey(id);
+      studentProfilePhotos.delete(profilePhotoCacheKey(id));
+      studentProfilePhotoLoadedKeys.add(key);
+    });
     photos.forEach((photo) => {
       const dataUri = safeProfilePhotoDataUri(photo.photo_data_uri);
       if (photo.student_id && dataUri) {
@@ -3226,6 +3303,8 @@ async function loadProfilePhotosForStudents(studentIds) {
     renderProfilePhotoConsumers();
   } catch (error) {
     warnProfilePhotoBatchFailure(error);
+  } finally {
+    ids.forEach((id) => studentProfilePhotoPendingKeys.delete(profilePhotoCacheKey(id)));
   }
 }
 
@@ -3245,6 +3324,7 @@ function renderProfilePhotoConsumers() {
   if (currentSession.role === "warden") renderWarden();
   if (currentSession.role === "guard") renderGuard();
   if (currentSession.role === "admin" && activeAdminSectionV200 === "students") renderAdminStudentsV200();
+  if (currentSession.role === "admin" && activeAdminSectionV200 === "monitoring") renderAdminMonitoringV210({ recordsOnly: true });
 }
 
 function renderStudentProfilePhotoArea() {
@@ -3304,10 +3384,11 @@ async function handleStudentProfilePhotoSelection(event) {
       });
       currentSession.user.has_profile_photo = true;
       currentSession.user.photo_updated_at = result.photo_updated_at || "";
-      await loadProfilePhotosForStudents([studentId]);
+      await loadProfilePhotosForStudents([studentId], { force: true });
     } else {
       const updatedAt = new Date().toISOString();
       studentProfilePhotos.set(profilePhotoCacheKey(studentId), { photo_data_uri: compressed.dataUri, photo_updated_at: updatedAt });
+      studentProfilePhotoLoadedKeys.add(profilePhotoCacheKey(studentId));
       currentSession.user.has_profile_photo = true;
       currentSession.user.photo_updated_at = updatedAt;
     }
@@ -3681,7 +3762,9 @@ function renderStudentAnnualSummary() {
     els.studentAnnualSummary.textContent = `Jumlah Outing ${Number(studentAnnualSummary.year)}: Tidak dapat dimuatkan`;
     return;
   }
-  els.studentAnnualSummary.textContent = `Jumlah Outing ${Number(studentAnnualSummary.year)}: ${Number(studentAnnualSummary.total_outings || 0)} kali`;
+  const totalOutings = Number(studentAnnualSummary.total_outings || 0);
+  els.studentAnnualSummary.innerHTML = `Jumlah Outing ${Number(studentAnnualSummary.year)}: <strong data-rolling-number="${totalOutings}" data-rolling-key="annual">${totalOutings}</strong> kali`;
+  animateRollingNumbers(els.studentAnnualSummary, "student-summary");
 }
 
 function getMalaysiaYearV200() {
@@ -4936,16 +5019,18 @@ function renderStatistics(stats) {
     ["Kecemasan", totals.total_emergency],
     ["Lewat", totals.total_late],
     ["Pelajar Terlibat", totals.total_students]
-  ].map(([label, value]) => `
+  ].map(([label, value], index) => `
     <article class="summary-card stats-card">
       <span>${escapeHtml(label)}</span>
-      <strong>${Number(value || 0)}</strong>
+      <strong data-rolling-number="${Number(value || 0)}" data-rolling-key="summary-${index}">${Number(value || 0)}</strong>
     </article>
   `).join("");
+  animateRollingNumbers(els.statsSummary, "admin-statistics");
 
   els.statsClassSummary.innerHTML = stats.class_summary && stats.class_summary.length
     ? stats.class_summary.map(classSummaryCard).join("")
     : emptyState("Belum ada ringkasan kelas untuk bulan ini.");
+  animateRollingNumbers(els.statsClassSummary, "admin-statistics-class");
 
   const statusOrder = ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "DITOLAK_WARDEN", "KELUAR", "SELESAI"];
   const statusMap = {};
@@ -4953,8 +5038,9 @@ function renderStatistics(stats) {
     statusMap[item.status] = item.count;
   });
   els.statsStatusSummary.innerHTML = statusOrder.map((status) => `
-    <span class="status-pill ${badgeClass(mapLiveStatus(status))}">${escapeHtml(status)} <strong>${Number(statusMap[status] || 0)}</strong></span>
+    <span class="status-pill ${badgeClass(mapLiveStatus(status))}">${escapeHtml(status)} <strong data-rolling-number="${Number(statusMap[status] || 0)}" data-rolling-key="${escapeHtml(status)}">${Number(statusMap[status] || 0)}</strong></span>
   `).join("");
+  animateRollingNumbers(els.statsStatusSummary, "admin-statistics-status");
 }
 
 function renderAdminIndividualStatsV200(stats) {
@@ -5048,15 +5134,15 @@ function formatOutingDurationClientV200(totalMinutes) {
   return parts.join(" ");
 }
 
-function classSummaryCard(item) {
+function classSummaryCard(item, index) {
   return `
     <article class="class-summary-card">
       <strong>${escapeHtml(item.kelas || "-")}</strong>
-      <span>Jumlah: ${Number(item.total_requests || 0)}</span>
-      <span>Selesai: ${Number(item.completed || 0)}</span>
-      <span>Kecemasan: ${Number(item.emergency || 0)}</span>
-      <span>Lewat: ${Number(item.late || 0)}</span>
-      <span>Pelajar: ${Number(item.total_students || 0)}</span>
+      <span>Jumlah: <span data-rolling-number="${Number(item.total_requests || 0)}" data-rolling-key="${index}-total">${Number(item.total_requests || 0)}</span></span>
+      <span>Selesai: <span data-rolling-number="${Number(item.completed || 0)}" data-rolling-key="${index}-completed">${Number(item.completed || 0)}</span></span>
+      <span>Kecemasan: <span data-rolling-number="${Number(item.emergency || 0)}" data-rolling-key="${index}-emergency">${Number(item.emergency || 0)}</span></span>
+      <span>Lewat: <span data-rolling-number="${Number(item.late || 0)}" data-rolling-key="${index}-late">${Number(item.late || 0)}</span></span>
+      <span>Pelajar: <span data-rolling-number="${Number(item.total_students || 0)}" data-rolling-key="${index}-students">${Number(item.total_students || 0)}</span></span>
     </article>
   `;
 }
@@ -5469,17 +5555,17 @@ function renderGuard() {
 
 function renderDashboard() {
   const now = new Date();
-  els.countPending.textContent = countByStatus(STATUS.pending);
-  els.countApproved.textContent = countByStatus(STATUS.approved);
-  els.countOut.textContent = countByStatus(STATUS.out);
-  els.countReturned.textContent = countByStatus(STATUS.returned);
-  els.countLate.textContent = outingRecords.filter((record) => record.lewat).length;
-  els.countNotReturned.textContent = outingRecords.filter((record) => (
+  setRollingNumber(els.countPending, countByStatus(STATUS.pending), "dashboard:pending");
+  setRollingNumber(els.countApproved, countByStatus(STATUS.approved), "dashboard:approved");
+  setRollingNumber(els.countOut, countByStatus(STATUS.out), "dashboard:out");
+  setRollingNumber(els.countReturned, countByStatus(STATUS.returned), "dashboard:returned");
+  setRollingNumber(els.countLate, outingRecords.filter((record) => record.lewat).length, "dashboard:late");
+  setRollingNumber(els.countNotReturned, outingRecords.filter((record) => (
     record.status === STATUS.out && isAfterReturnLimit(now, record)
-  )).length;
-  els.countEmergency.textContent = outingRecords.filter((record) => (
+  )).length, "dashboard:not-returned");
+  setRollingNumber(els.countEmergency, outingRecords.filter((record) => (
     record.jenis_permohonan === REQUEST_TYPE.emergency
-  )).length;
+  )).length, "dashboard:emergency");
 
   els.allRecordsList.innerHTML = outingRecords.length
     ? outingRecords.map((record) => recordCard(record, "dashboard")).join("")
@@ -8392,6 +8478,7 @@ function renderMonitoringPageV1612() {
       monitorSummaryCardV1612("Belum Masuk", counts.notReturned, ""),
       monitorSummaryCardV1612("Kecemasan", counts.emergency, "")
     ].join("");
+    animateRollingNumbers(els.monitorSummary, "public-monitoring");
   }
   renderMonitorNameListV1613(records);
 }
@@ -8484,7 +8571,7 @@ function monitorSummaryCardV1612(label, count, className, icon) {
   return `
     <article class="summary-card monitor-status-card ${className || ""} ${activeClass}">
       <span>${iconHtml}${escapeHtml(label)}</span>
-      <strong>${count}</strong>
+      <strong data-rolling-number="${Number(count || 0)}" data-rolling-key="${escapeHtml(label)}">${Number(count || 0)}</strong>
     </article>
   `;
 }
