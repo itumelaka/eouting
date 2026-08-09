@@ -118,6 +118,12 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "updateOutingType",
   "toggleOutingType",
   "getAdminIndividualStats",
+  "getAdminMonitoring",
+  "searchAdminMasterRecords",
+  "getAdminStaff",
+  "createStaff",
+  "updateStaff",
+  "toggleStaffStatus",
   "getAdminStudents",
   "createStudent",
   "updateStudent",
@@ -217,6 +223,11 @@ let adminEditingTypeCode = "";
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
 let activeAdminSectionV200 = "outing";
+let adminMonitoringV210 = null;
+let adminMonitoringFilterV210 = "all";
+let adminMasterV210 = { page: 1, total_pages: 1, total: 0, records: [] };
+let adminStaffV210 = [];
+let adminEditingStaffV210 = null;
 let studentOutingTypesV200 = buildLegacyStudentOutingTypesV200();
 let studentOutingTypesLoadingV200 = false;
 let studentOutingTypesUsingFallbackV200 = true;
@@ -226,6 +237,10 @@ let studentSubmitButtonContentState = null;
 let studentAnnualSummary = null;
 let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE ? buildMockAdminOutingTypesV200() : [];
 let mockAdminStudentsV200 = ALLOW_MOCK_MODE ? buildMockAdminStudentsV200() : [];
+let mockAdminStaffV210 = ALLOW_MOCK_MODE ? [
+  { staff_id: "W001", nama: "Warden Mock", role: "WARDEN", status: "Aktif", email: "", no_tel: "", catatan: "", pin_configured: true },
+  { staff_id: "G001", nama: "Guard Mock", role: "GUARD", status: "Aktif", email: "", no_tel: "", catatan: "", pin_configured: true }
+] : [];
 let mockAdminReadErrorPendingV200 = ALLOW_MOCK_MODE
   && new URLSearchParams(window.location.search).get("mockAdminError") === "1";
 let mockAdminConflictPendingV200 = ALLOW_MOCK_MODE
@@ -330,8 +345,14 @@ const els = {
   adminStatisticsButton: document.querySelector("#adminStatisticsButton"),
   adminOutingTab: document.querySelector("#adminOutingTab"),
   adminStudentsTab: document.querySelector("#adminStudentsTab"),
+  adminMonitoringTab: document.querySelector("#adminMonitoringTab"),
+  adminMasterTab: document.querySelector("#adminMasterTab"),
+  adminStaffTab: document.querySelector("#adminStaffTab"),
   adminOutingSettingsPanel: document.querySelector("#adminOutingSettingsPanel"),
   adminStudentManagementPanel: document.querySelector("#adminStudentManagementPanel"),
+  adminMonitoringPanel: document.querySelector("#adminMonitoringPanel"),
+  adminMasterPanel: document.querySelector("#adminMasterPanel"),
+  adminStaffPanel: document.querySelector("#adminStaffPanel"),
   adminDashboardMessage: document.querySelector("#adminDashboardMessage"),
   adminTypeList: document.querySelector("#adminTypeList"),
   adminRefreshButton: document.querySelector("#adminRefreshButton"),
@@ -387,6 +408,43 @@ const els = {
   adminStudentNoteInput: document.querySelector("#adminStudentNoteInput"),
   adminStudentEditorMessage: document.querySelector("#adminStudentEditorMessage"),
   adminSaveStudentButton: document.querySelector("#adminSaveStudentButton"),
+  adminMonitoringRefreshButton: document.querySelector("#adminMonitoringRefreshButton"),
+  adminMonitoringMessage: document.querySelector("#adminMonitoringMessage"),
+  adminMonitoringUpdated: document.querySelector("#adminMonitoringUpdated"),
+  adminMonitoringKpis: document.querySelector("#adminMonitoringKpis"),
+  adminMonitoringList: document.querySelector("#adminMonitoringList"),
+  adminMasterRefreshButton: document.querySelector("#adminMasterRefreshButton"),
+  adminMasterSearch: document.querySelector("#adminMasterSearch"),
+  adminMasterMonth: document.querySelector("#adminMasterMonth"),
+  adminMasterYear: document.querySelector("#adminMasterYear"),
+  adminMasterClass: document.querySelector("#adminMasterClass"),
+  adminMasterType: document.querySelector("#adminMasterType"),
+  adminMasterStatus: document.querySelector("#adminMasterStatus"),
+  adminMasterMessage: document.querySelector("#adminMasterMessage"),
+  adminMasterBody: document.querySelector("#adminMasterBody"),
+  adminMasterPrev: document.querySelector("#adminMasterPrev"),
+  adminMasterNext: document.querySelector("#adminMasterNext"),
+  adminMasterPage: document.querySelector("#adminMasterPage"),
+  adminStaffRefreshButton: document.querySelector("#adminStaffRefreshButton"),
+  adminStaffAddButton: document.querySelector("#adminStaffAddButton"),
+  adminStaffSearch: document.querySelector("#adminStaffSearch"),
+  adminStaffMessage: document.querySelector("#adminStaffMessage"),
+  adminStaffList: document.querySelector("#adminStaffList"),
+  adminStaffEditor: document.querySelector("#adminStaffEditor"),
+  adminStaffEditorTitle: document.querySelector("#adminStaffEditorTitle"),
+  adminStaffCancelButton: document.querySelector("#adminStaffCancelButton"),
+  adminStaffForm: document.querySelector("#adminStaffForm"),
+  adminStaffId: document.querySelector("#adminStaffId"),
+  adminStaffRole: document.querySelector("#adminStaffRole"),
+  adminStaffName: document.querySelector("#adminStaffName"),
+  adminStaffEmail: document.querySelector("#adminStaffEmail"),
+  adminStaffPhone: document.querySelector("#adminStaffPhone"),
+  adminStaffPin: document.querySelector("#adminStaffPin"),
+  adminStaffPinHint: document.querySelector("#adminStaffPinHint"),
+  adminStaffStatus: document.querySelector("#adminStaffStatus"),
+  adminStaffNote: document.querySelector("#adminStaffNote"),
+  adminStaffEditorMessage: document.querySelector("#adminStaffEditorMessage"),
+  adminStaffSaveButton: document.querySelector("#adminStaffSaveButton"),
   appVersionText: document.querySelector("#appVersionText"),
   betaApiIndicator: document.querySelector("#betaApiIndicator"),
   dataModeIndicator: null,
@@ -529,6 +587,28 @@ function setupAdminDashboardV200() {
   if (els.adminStudentsTab) {
     els.adminStudentsTab.addEventListener("click", () => setAdminSectionV200("students"));
   }
+  if (els.adminMonitoringTab) els.adminMonitoringTab.addEventListener("click", () => setAdminSectionV200("monitoring"));
+  if (els.adminMasterTab) els.adminMasterTab.addEventListener("click", () => setAdminSectionV200("master"));
+  if (els.adminStaffTab) els.adminStaffTab.addEventListener("click", () => setAdminSectionV200("staff"));
+  if (els.adminMonitoringRefreshButton) els.adminMonitoringRefreshButton.addEventListener("click", loadAdminMonitoringV210);
+  if (els.adminMonitoringKpis) els.adminMonitoringKpis.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-monitor-filter]");
+    if (button) { adminMonitoringFilterV210 = button.dataset.monitorFilter; renderAdminMonitoringV210(); }
+  });
+  if (els.adminMasterRefreshButton) els.adminMasterRefreshButton.addEventListener("click", () => loadAdminMasterV210(1));
+  if (els.adminMasterPrev) els.adminMasterPrev.addEventListener("click", () => loadAdminMasterV210(adminMasterV210.page - 1));
+  if (els.adminMasterNext) els.adminMasterNext.addEventListener("click", () => loadAdminMasterV210(adminMasterV210.page + 1));
+  if (els.adminMasterSearch) els.adminMasterSearch.addEventListener("keydown", (event) => { if (event.key === "Enter") loadAdminMasterV210(1); });
+  if (els.adminMasterBody) els.adminMasterBody.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-master-details]");
+    if (button) document.querySelector(`#admin-master-details-${CSS.escape(button.dataset.masterDetails)}`).hidden = !document.querySelector(`#admin-master-details-${CSS.escape(button.dataset.masterDetails)}`).hidden;
+  });
+  if (els.adminStaffRefreshButton) els.adminStaffRefreshButton.addEventListener("click", loadAdminStaffV210);
+  if (els.adminStaffAddButton) els.adminStaffAddButton.addEventListener("click", () => openAdminStaffEditorV210());
+  if (els.adminStaffCancelButton) els.adminStaffCancelButton.addEventListener("click", closeAdminStaffEditorV210);
+  if (els.adminStaffSearch) els.adminStaffSearch.addEventListener("input", renderAdminStaffV210);
+  if (els.adminStaffForm) els.adminStaffForm.addEventListener("submit", saveAdminStaffV210);
+  if (els.adminStaffList) els.adminStaffList.addEventListener("click", handleAdminStaffActionV210);
   if (els.adminStudentsRefreshButton) {
     els.adminStudentsRefreshButton.addEventListener("click", loadAdminStudentsV200);
   }
@@ -634,7 +714,7 @@ function startAdminSessionV200(admin) {
   els.sessionName.textContent = admin.nama_admin || admin.admin_id || "Admin";
   closeAdminEditorV200();
   closeAdminStudentEditorV200();
-  setAdminSectionV200("outing");
+  setAdminSectionV200("monitoring");
   loadAdminOutingTypesV200();
 }
 
@@ -644,7 +724,11 @@ function clearAdminRuntimeCredentialV200() {
   adminEditingTypeCode = "";
   adminStudentsV200 = [];
   adminEditingStudentIdV200 = "";
-  activeAdminSectionV200 = "outing";
+  activeAdminSectionV200 = "monitoring";
+  adminMonitoringV210 = null;
+  adminMasterV210 = { page: 1, total_pages: 1, total: 0, records: [] };
+  adminStaffV210 = [];
+  adminEditingStaffV210 = null;
   if (els.adminPinInput) els.adminPinInput.value = "";
   if (els.adminIdentityInput) els.adminIdentityInput.value = "";
   if (els.adminTypeList) els.adminTypeList.innerHTML = "";
@@ -685,22 +769,145 @@ function buildAdminCredentialPayloadV200() {
 }
 
 function setAdminSectionV200(section) {
-  const nextSection = section === "students" ? "students" : "outing";
+  const allowed = ["monitoring", "master", "students", "staff", "outing"];
+  const nextSection = allowed.indexOf(section) === -1 ? "monitoring" : section;
   activeAdminSectionV200 = nextSection;
-  const isOuting = nextSection === "outing";
-  if (els.adminOutingTab) {
-    els.adminOutingTab.classList.toggle("active", isOuting);
-    els.adminOutingTab.setAttribute("aria-selected", String(isOuting));
+  const map = [
+    ["monitoring", els.adminMonitoringTab, els.adminMonitoringPanel],
+    ["master", els.adminMasterTab, els.adminMasterPanel],
+    ["students", els.adminStudentsTab, els.adminStudentManagementPanel],
+    ["staff", els.adminStaffTab, els.adminStaffPanel],
+    ["outing", els.adminOutingTab, els.adminOutingSettingsPanel]
+  ];
+  map.forEach(([name, tab, panel]) => {
+    if (tab) { tab.classList.toggle("active", name === nextSection); tab.setAttribute("aria-selected", String(name === nextSection)); }
+    if (panel) panel.hidden = name !== nextSection;
+  });
+  if (nextSection === "monitoring" && !adminMonitoringV210) loadAdminMonitoringV210();
+  if (nextSection === "master" && !adminMasterV210.records.length) loadAdminMasterV210(1);
+  if (nextSection === "students" && !adminStudentsV200.length) loadAdminStudentsV200();
+  if (nextSection === "staff" && !adminStaffV210.length) loadAdminStaffV210();
+  if (nextSection === "outing" && !adminOutingTypes.length) loadAdminOutingTypesV200();
+}
+
+async function loadAdminMonitoringV210() {
+  if (!currentSession || currentSession.role !== "admin") return;
+  els.adminMonitoringRefreshButton.disabled = true;
+  els.adminMonitoringMessage.textContent = "Memuatkan pemantauan semasa...";
+  els.adminMonitoringList.innerHTML = '<div class="empty-state">Memuatkan rekod...</div>';
+  try {
+    adminMonitoringV210 = await apiPost("getAdminMonitoring", buildAdminCredentialPayloadV200());
+    els.adminMonitoringMessage.textContent = "";
+    els.adminMonitoringUpdated.textContent = `Terakhir dikemas kini: ${formatDisplayDateTime(adminMonitoringV210.generated_at)}`;
+    renderAdminMonitoringV210();
+  } catch (error) {
+    adminMonitoringV210 = null;
+    els.adminMonitoringMessage.textContent = "Pemantauan gagal dimuatkan.";
+    els.adminMonitoringMessage.classList.add("error");
+    els.adminMonitoringList.innerHTML = '<div class="empty-state"><button class="secondary-action" type="button" onclick="loadAdminMonitoringV210()">Cuba Lagi</button></div>';
+  } finally {
+    els.adminMonitoringRefreshButton.disabled = false;
   }
-  if (els.adminStudentsTab) {
-    els.adminStudentsTab.classList.toggle("active", !isOuting);
-    els.adminStudentsTab.setAttribute("aria-selected", String(!isOuting));
-  }
-  if (els.adminOutingSettingsPanel) els.adminOutingSettingsPanel.hidden = !isOuting;
-  if (els.adminStudentManagementPanel) els.adminStudentManagementPanel.hidden = isOuting;
-  if (!isOuting && currentSession && currentSession.role === "admin" && !adminStudentsV200.length) {
-    loadAdminStudentsV200();
-  }
+}
+
+function renderAdminMonitoringV210() {
+  if (!adminMonitoringV210) return;
+  const kpis = adminMonitoringV210.kpis || {};
+  const cards = [
+    ["pending", "Menunggu Kelulusan", kpis.pending], ["approved", "Diluluskan / Menunggu Keluar", kpis.approved],
+    ["out", "Sedang Keluar", kpis.out], ["not_returned", "Belum Pulang", kpis.not_returned],
+    ["late", "Lewat", kpis.late], ["emergency", "Kecemasan Aktif", kpis.emergency]
+  ];
+  els.adminMonitoringKpis.innerHTML = cards.map(([key, label, count]) => `<button type="button" class="admin-kpi-card ${key === "late" ? "is-late" : ""} ${adminMonitoringFilterV210 === key ? "active" : ""}" data-monitor-filter="${key}"><strong>${Number(count || 0)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
+  const rows = (adminMonitoringV210.records || []).filter((row) => {
+    if (adminMonitoringFilterV210 === "all") return true;
+    if (adminMonitoringFilterV210 === "pending") return row.status === "MENUNGGU_KELULUSAN";
+    if (adminMonitoringFilterV210 === "approved") return row.status === "DILULUSKAN_WARDEN";
+    if (adminMonitoringFilterV210 === "out" || adminMonitoringFilterV210 === "not_returned") return row.status === "KELUAR";
+    if (adminMonitoringFilterV210 === "late") return row.lewat === true;
+    if (adminMonitoringFilterV210 === "emergency") return row.jenis_permohonan === "KECEMASAN";
+    return true;
+  });
+  els.adminMonitoringList.innerHTML = rows.length ? rows.map((row) => `<article class="admin-ops-card ${row.lewat ? "is-late" : ""}"><div><h4>${escapeHtml(row.nama || "-")}</h4><p>${escapeHtml(row.kelas || "-")} · ${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</p></div><span class="status-badge ${row.lewat ? "late" : ""}">${row.lewat ? "LEWAT · " : ""}${escapeHtml(row.status)}</span><dl><div><dt>Tarikh / Mohon</dt><dd>${escapeHtml(formatDisplayDateTime(row.masa_mohon || row.tarikh))}</dd></div><div><dt>Keluar sebenar</dt><dd>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "Belum keluar")}</dd></div><div><dt>Jangka pulang</dt><dd>${escapeHtml([row.tarikh_balik, row.masa_balik_dijangka].filter(Boolean).join(" ") || "22:00")}</dd></div></dl></article>`).join("") : '<div class="empty-state">Tiada rekod untuk kategori ini.</div>';
+}
+
+async function loadAdminMasterV210(page) {
+  if (!currentSession || currentSession.role !== "admin" || page < 1) return;
+  const payload = Object.assign(buildAdminCredentialPayloadV200(), {
+    search: els.adminMasterSearch.value.trim(), month: els.adminMasterMonth.value, year: els.adminMasterYear.value,
+    kelas: els.adminMasterClass.value, jenis_permohonan: els.adminMasterType.value, status: els.adminMasterStatus.value,
+    page: page, page_size: 50
+  });
+  els.adminMasterRefreshButton.disabled = true;
+  els.adminMasterMessage.textContent = "Mencari rekod...";
+  try {
+    adminMasterV210 = await apiPost("searchAdminMasterRecords", payload);
+    renderAdminMasterV210();
+    els.adminMasterMessage.textContent = `${adminMasterV210.total || 0} rekod ditemui.`;
+  } catch (error) {
+    els.adminMasterBody.innerHTML = '<tr><td colspan="9">Rekod gagal dimuatkan. Cuba lagi.</td></tr>';
+    els.adminMasterMessage.textContent = "Carian rekod gagal.";
+    els.adminMasterMessage.classList.add("error");
+  } finally { els.adminMasterRefreshButton.disabled = false; }
+}
+
+function renderAdminMasterV210() {
+  const rows = adminMasterV210.records || [];
+  els.adminMasterBody.innerHTML = rows.length ? rows.map((row) => {
+    const id = String(row.request_id || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+    return `<tr><td><strong>${escapeHtml(row.nama)}</strong><small>${escapeHtml(row.no_matrik || row.student_id || "")}</small></td><td>${escapeHtml(row.kelas)}</td><td>${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</td><td>${escapeHtml(formatDisplayDate(row.tarikh || row.masa_mohon))}</td><td>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</td><td>${escapeHtml(row.masa_masuk ? formatDisplayDateTime(row.masa_masuk) : "-")}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.duration || "-")}</td><td><button class="secondary-action compact-action" type="button" data-master-details="${id}">Lihat Butiran</button></td></tr><tr class="admin-master-details" id="admin-master-details-${id}" hidden><td colspan="9"><strong>${escapeHtml(row.request_id)}</strong> · Tujuan: ${escapeHtml(row.tujuan || "-")} · Lokasi: ${escapeHtml(row.lokasi || "-")} · Kenderaan: ${escapeHtml([row.jenis_kenderaan, row.butiran_kenderaan].filter(Boolean).join(" / ") || "-")} · Warden: ${escapeHtml(row.warden_approve_by || "-")} · Keluar oleh: ${escapeHtml(row.guard_keluar_by || "-")} · Masuk oleh: ${escapeHtml(row.guard_masuk_by || "-")}</td></tr>`;
+  }).join("") : '<tr><td colspan="9">Tiada rekod sepadan.</td></tr>';
+  els.adminMasterPage.textContent = `Halaman ${adminMasterV210.page || 1} daripada ${adminMasterV210.total_pages || 1}`;
+  els.adminMasterPrev.disabled = (adminMasterV210.page || 1) <= 1;
+  els.adminMasterNext.disabled = (adminMasterV210.page || 1) >= (adminMasterV210.total_pages || 1);
+}
+
+async function loadAdminStaffV210() {
+  if (!currentSession || currentSession.role !== "admin") return;
+  els.adminStaffRefreshButton.disabled = true;
+  els.adminStaffMessage.textContent = "Memuatkan staff...";
+  try { adminStaffV210 = await apiPost("getAdminStaff", buildAdminCredentialPayloadV200()); els.adminStaffMessage.textContent = ""; renderAdminStaffV210(); }
+  catch (error) { adminStaffV210 = []; els.adminStaffMessage.textContent = "Senarai staff gagal dimuatkan."; els.adminStaffMessage.classList.add("error"); els.adminStaffList.innerHTML = '<div class="empty-state">Tekan Refresh untuk cuba lagi.</div>'; }
+  finally { els.adminStaffRefreshButton.disabled = false; }
+}
+
+function renderAdminStaffV210() {
+  const query = String(els.adminStaffSearch.value || "").toLowerCase();
+  const rows = adminStaffV210.filter((staff) => !query || [staff.staff_id, staff.nama, staff.role].some((value) => String(value || "").toLowerCase().includes(query)));
+  els.adminStaffList.innerHTML = rows.length ? rows.map((staff) => { const active = String(staff.status).toLowerCase() === "aktif"; return `<article class="admin-staff-card ${active ? "" : "is-inactive"}"><div><span class="clay-status-badge ${active ? "is-active" : "is-inactive"}">${active ? "Aktif" : "Tidak Aktif"}</span><h4>${escapeHtml(staff.nama)}</h4><p>${escapeHtml(staff.staff_id)} · ${escapeHtml(staff.role)} · PIN ${staff.pin_configured ? "ditetapkan" : "belum ditetapkan"}</p></div><div class="admin-student-actions"><button class="secondary-action" type="button" data-staff-edit="${escapeHtml(staff.role)}:${escapeHtml(staff.staff_id)}">Edit / Reset PIN</button><button class="${active ? "danger-action" : "success-action"}" type="button" data-staff-toggle="${escapeHtml(staff.role)}:${escapeHtml(staff.staff_id)}" data-next-active="${!active}">${active ? "Nyahaktif" : "Aktifkan"}</button></div></article>`; }).join("") : '<div class="empty-state">Tiada staff sepadan.</div>';
+}
+
+function openAdminStaffEditorV210(staff) {
+  adminEditingStaffV210 = staff || null; els.adminStaffForm.reset();
+  els.adminStaffEditorTitle.textContent = staff ? "Edit Staff / Reset PIN" : "Tambah Staff";
+  els.adminStaffId.value = staff ? staff.staff_id : ""; els.adminStaffId.readOnly = Boolean(staff);
+  els.adminStaffRole.value = staff ? staff.role : "WARDEN"; els.adminStaffRole.disabled = Boolean(staff);
+  els.adminStaffName.value = staff ? staff.nama : ""; els.adminStaffEmail.value = staff ? staff.email : ""; els.adminStaffPhone.value = staff ? staff.no_tel : "";
+  els.adminStaffStatus.value = staff ? staff.status : "Aktif"; els.adminStaffNote.value = staff ? staff.catatan : ""; els.adminStaffPin.required = !staff;
+  els.adminStaffPinHint.textContent = staff ? "(biarkan kosong jika tidak mahu reset)" : "(wajib untuk staff baharu)";
+  els.adminStaffEditor.hidden = false; els.adminStaffName.focus();
+}
+
+function closeAdminStaffEditorV210() { adminEditingStaffV210 = null; els.adminStaffForm.reset(); els.adminStaffEditor.hidden = true; els.adminStaffRole.disabled = false; els.adminStaffId.readOnly = false; els.adminStaffEditorMessage.textContent = ""; }
+
+async function saveAdminStaffV210(event) {
+  event.preventDefault();
+  const staff = { staff_id: els.adminStaffId.value.trim(), role: els.adminStaffRole.value, nama: els.adminStaffName.value.trim(), email: els.adminStaffEmail.value.trim(), no_tel: els.adminStaffPhone.value.trim(), pin: els.adminStaffPin.value.trim(), status: els.adminStaffStatus.value, catatan: els.adminStaffNote.value.trim() };
+  if (!window.confirm(`Sahkan simpan staff ${staff.nama}?`)) return;
+  els.adminStaffSaveButton.disabled = true; els.adminStaffEditorMessage.textContent = "Menyimpan...";
+  try { const action = adminEditingStaffV210 ? "updateStaff" : "createStaff"; await apiPost(action, Object.assign(buildAdminCredentialPayloadV200(), { role: staff.role, staff_id: staff.staff_id, staff })); closeAdminStaffEditorV210(); await loadAdminStaffV210(); els.adminStaffMessage.textContent = "Staff berjaya disimpan."; }
+  catch (error) { els.adminStaffEditorMessage.textContent = error.message || "Staff gagal disimpan."; els.adminStaffEditorMessage.classList.add("error"); }
+  finally { els.adminStaffSaveButton.disabled = false; }
+}
+
+function handleAdminStaffActionV210(event) {
+  const edit = event.target.closest("[data-staff-edit]"); const toggle = event.target.closest("[data-staff-toggle]");
+  const token = edit ? edit.dataset.staffEdit : toggle ? toggle.dataset.staffToggle : ""; if (!token) return;
+  const separator = token.indexOf(":"); const role = token.slice(0, separator); const staffId = token.slice(separator + 1);
+  const staff = adminStaffV210.find((item) => item.role === role && item.staff_id === staffId); if (!staff) return;
+  if (edit) { openAdminStaffEditorV210(staff); return; }
+  const active = toggle.dataset.nextActive === "true"; if (!window.confirm(`Sahkan ${active ? "aktifkan" : "nyahaktifkan"} ${staff.nama}?`)) return;
+  toggle.disabled = true; apiPost("toggleStaffStatus", Object.assign(buildAdminCredentialPayloadV200(), { role, staff_id: staffId, active })).then(loadAdminStaffV210).catch((error) => { els.adminStaffMessage.textContent = error.message || "Status staff gagal dikemas kini."; els.adminStaffMessage.classList.add("error"); }).finally(() => { toggle.disabled = false; });
 }
 
 function normalizeAdminStudentV200(student) {
@@ -1954,6 +2161,24 @@ async function mockAdminApiPostV200(action, payload) {
   }
   if (action === "getAdminIndividualStats") {
     return buildMockAdminIndividualStatsV200(request);
+  }
+  if (action === "getAdminMonitoring") {
+    return { generated_at: new Date().toISOString(), kpis: { pending: 0, approved: 0, out: 0, not_returned: 0, late: 0, emergency: 0 }, records: [] };
+  }
+  if (action === "searchAdminMasterRecords") {
+    return { generated_at: new Date().toISOString(), page: Number(request.page || 1), page_size: 50, total: 0, total_pages: 1, records: [] };
+  }
+  if (action === "getAdminStaff") return cloneMockAdminValueV200(mockAdminStaffV210);
+  if (action === "createStaff") {
+    const staff = { ...request.staff, pin_configured: Boolean(request.staff && request.staff.pin) }; delete staff.pin; mockAdminStaffV210.push(staff); return cloneMockAdminValueV200(staff);
+  }
+  if (action === "updateStaff") {
+    const index = mockAdminStaffV210.findIndex((staff) => staff.role === request.role && staff.staff_id === request.staff_id);
+    if (index < 0) throw new Error("Staff tidak ditemui.");
+    mockAdminStaffV210[index] = { ...mockAdminStaffV210[index], ...request.staff, pin_configured: mockAdminStaffV210[index].pin_configured || Boolean(request.staff.pin) }; delete mockAdminStaffV210[index].pin; return cloneMockAdminValueV200(mockAdminStaffV210[index]);
+  }
+  if (action === "toggleStaffStatus") {
+    const staff = mockAdminStaffV210.find((item) => item.role === request.role && item.staff_id === request.staff_id); if (!staff) throw new Error("Staff tidak ditemui."); staff.status = request.active ? "Aktif" : "Tidak Aktif"; return cloneMockAdminValueV200(staff);
   }
   if (action === "getAdminStudents") {
     return cloneMockAdminValueV200(mockAdminStudentsV200);

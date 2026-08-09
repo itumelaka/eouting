@@ -152,3 +152,14 @@ student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | cata
 ```
 
 `kelas` dibenarkan ialah A2, A3 atau LI; LI bermaksud Pelajar Latihan Industri (LI). `student_id` immutable dan unik, manakala `no_matrik` juga unik. Nilai no. matrik dan no. telefon dirawat sebagai teks untuk mengekalkan sifar di hadapan. Tiada kolum version ditambah; write serentak dilindungi dengan `LockService` dan duplicate recheck.
+
+## WARDENS dan GUARDS
+
+Pengurusan staff Admin menggunakan schema sedia ada tanpa migration:
+
+```text
+WARDENS: warden_id | nama_warden | email | no_tel | pin | status | catatan
+GUARDS:  guard_id  | nama_guard  | email | no_tel | pin | status | catatan
+```
+
+Role menentukan tab dan nama medan identiti; ID tidak boleh ditukar selepas create. API senarai memulangkan `pin_configured` sahaja dan tidak pernah memulangkan nilai `pin`.

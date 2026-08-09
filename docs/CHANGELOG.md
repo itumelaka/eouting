@@ -2,6 +2,9 @@
 
 ## v2.1.0 — 2026-08-09
 
+- **Admin operations:** menambah Pemantauan Semasa baca sahaja, Rekod Master dengan carian/filter/pagination dan Pengurusan Warden & Guard.
+- **Staff:** menggunakan tab `WARDENS`/`GUARDS` sedia ada tanpa migration, menyokong create/edit/aktif/nyahaktif/reset PIN dan audit tanpa plaintext PIN.
+- **Security:** semua dataset dan write baharu ialah POST-only serta memanggil `validateAdminCredentials_()`; senarai staff hanya mendedahkan `pin_configured`.
 - **Guard:** membezakan aliran keluar/masuk, memperkemas hierarchy operasi dan menjadikan kad Sahkan Masuk lebih kompak.
 - **Pelajar:** menambah jumlah outing tahunan berdasarkan rekod raw-status `SELESAI` milik pelajar sendiri.
 - **Admin:** menambah statistik individu berautentikasi mengikut bulan, tahun dan kelas serta membaiki rendering workspace Statistik Admin.

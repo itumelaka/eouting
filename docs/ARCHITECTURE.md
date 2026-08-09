@@ -200,3 +200,9 @@ OUTING_CONFIG_V2_ENABLED === "true"
 ```
 
 Frontend tidak menentukan authorization atau validation akhir. Config yang dihantar client tidak dipercayai; resolver sentiasa membaca `OUTING_TYPES`. Sheet hilang, jenis hilang/inactive atau config malformed gagal tertutup. Feature flag kekal `false`, maka flow production semasa masih melalui validator legacy.
+
+## Operasi Admin
+
+Pemantauan Admin menggunakan satu POST `getAdminMonitoring` untuk KPI dan rekod operasi aktif. Rekod Master menggunakan satu POST `searchAdminMasterRecords` dengan carian, filter dan pagination maksimum 50 rekod. Pengurusan staff menggunakan `getAdminStaff` serta write `createStaff`, `updateStaff` dan `toggleStaffStatus`; semua endpoint memanggil `validateAdminCredentials_()`.
+
+`WARDENS` dan `GUARDS` kekal source of truth serta login Warden/Guard sedia ada terus membaca PIN dari tab masing-masing. Write staff dilindungi `LockService`; tiada model authentication atau sheet baharu diperkenalkan.

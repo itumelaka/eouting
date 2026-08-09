@@ -193,6 +193,12 @@ function doPost(e) {
     if (action === "getTodayRecords") return jsonResponse(getOperationalTodayRecords(payload));
     if (action === "getStudentAnnualSummary") return jsonResponse(getStudentAnnualSummary(payload));
     if (action === "getAdminIndividualStats") return jsonResponse(getAdminIndividualStats(payload));
+    if (action === "getAdminMonitoring") return jsonResponse(getAdminMonitoring(payload));
+    if (action === "searchAdminMasterRecords") return jsonResponse(searchAdminMasterRecords(payload));
+    if (action === "getAdminStaff") return jsonResponse(getAdminStaff(payload));
+    if (action === "createStaff") return jsonResponse(createStaff(payload));
+    if (action === "updateStaff") return jsonResponse(updateStaff(payload));
+    if (action === "toggleStaffStatus") return jsonResponse(toggleStaffStatus(payload));
     if (action === "getAdminOutingTypes") return jsonResponse(getAdminOutingTypes(payload));
     if (action === "createOutingType") return jsonResponse(createOutingType(payload));
     if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
@@ -1160,6 +1166,151 @@ function toggleStudentStatus(payload) {
       current.student_id
     );
     return normalizeStudentRecord_({ ...current, status: requestedStatus });
+  });
+}
+
+function normalizeStaffRole_(value) {
+  const role = String(value || "").trim().toUpperCase();
+  if (role !== "WARDEN" && role !== "GUARD") {
+    throw new Error("role staff mesti WARDEN atau GUARD.");
+  }
+  return role;
+}
+
+function getStaffSheetConfig_(role) {
+  const normalizedRole = normalizeStaffRole_(role);
+  return normalizedRole === "WARDEN"
+    ? { role: normalizedRole, sheetName: SHEETS.wardens, headers: HEADERS.WARDENS, idField: "warden_id", nameField: "nama_warden" }
+    : { role: normalizedRole, sheetName: SHEETS.guards, headers: HEADERS.GUARDS, idField: "guard_id", nameField: "nama_guard" };
+}
+
+function normalizeStaffStatus_(value, useDefault) {
+  const text = String(value === undefined || value === null ? "" : value).trim().toUpperCase().replace(/_/g, " ");
+  if (!text && useDefault) return "Aktif";
+  if (text === "AKTIF") return "Aktif";
+  if (text === "TIDAK AKTIF") return "Tidak Aktif";
+  throw new Error("status staff mesti Aktif atau Tidak Aktif.");
+}
+
+function toSafeAdminStaff_(row, config) {
+  return {
+    staff_id: String(row[config.idField] || "").trim(),
+    nama: String(row[config.nameField] || "").trim(),
+    role: config.role,
+    status: normalizeStaffStatus_(row.status, true),
+    email: String(row.email || "").trim(),
+    no_tel: String(row.no_tel || "").trim(),
+    catatan: String(row.catatan || "").trim(),
+    pin_configured: Boolean(String(row.pin === undefined || row.pin === null ? "" : row.pin).trim())
+  };
+}
+
+function findStaffRowById_(sheet, config, staffId) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+  const headers = values[0].map((header) => String(header).trim());
+  const idIndex = headers.indexOf(config.idField);
+  if (idIndex === -1) return null;
+  for (let index = 1; index < values.length; index += 1) {
+    if (normalizeText_(values[index][idIndex]) === normalizeText_(staffId)) {
+      const record = {};
+      headers.forEach((header, columnIndex) => { record[header] = values[index][columnIndex]; });
+      return { sheet: sheet, rowNumber: index + 1, record: record };
+    }
+  }
+  return null;
+}
+
+function validateStaffInput_(input, config, options) {
+  const source = input || {};
+  const settings = options || {};
+  const staffId = String(settings.staffId || source.staff_id || source[config.idField] || "").trim();
+  const nama = String(source.nama || source[config.nameField] || "").trim();
+  const pin = String(source.pin === undefined || source.pin === null ? "" : source.pin).trim();
+  if (!staffId || staffId.length > 100) throw new Error("staff_id diperlukan dan mesti sah.");
+  if (!nama || nama.length > 200) throw new Error("nama staff diperlukan dan mesti sah.");
+  if (settings.requirePin && !pin) throw new Error("PIN diperlukan untuk staff baharu.");
+  if (pin && (!/^\d{4,12}$/.test(pin))) throw new Error("PIN staff mesti 4 hingga 12 digit.");
+  return {
+    staff_id: staffId,
+    nama: nama,
+    email: String(source.email || "").trim(),
+    no_tel: String(source.no_tel || "").trim(),
+    pin: pin,
+    status: normalizeStaffStatus_(source.status, Boolean(settings.defaultActive)),
+    catatan: String(source.catatan || "").trim()
+  };
+}
+
+function getAdminStaff(payload) {
+  validateAdminCredentials_(payload);
+  const rows = [];
+  ["WARDEN", "GUARD"].forEach((role) => {
+    const config = getStaffSheetConfig_(role);
+    getRowsAsObjects_(getSheet_(config.sheetName)).forEach((row) => rows.push(toSafeAdminStaff_(row, config)));
+  });
+  return rows.sort((left, right) => left.role.localeCompare(right.role) || left.nama.localeCompare(right.nama, "ms", { sensitivity: "base" }));
+}
+
+function createStaff(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const input = payload && payload.staff && typeof payload.staff === "object" ? payload.staff : payload || {};
+  const config = getStaffSheetConfig_(input.role || payload.role);
+  return withScriptLock_(function () {
+    const sheet = getSheet_(config.sheetName);
+    ensureHeaders_(sheet, config.headers);
+    const validated = validateStaffInput_(input, config, { defaultActive: true, requirePin: true });
+    if (findStaffRowById_(sheet, config, validated.staff_id)) throw new Error("staff_id telah wujud untuk role ini.");
+    const duplicateName = getRowsAsObjects_(sheet).some((row) => normalizeText_(row[config.nameField]) === normalizeText_(validated.nama));
+    if (duplicateName) throw new Error("Nama staff telah wujud untuk role ini.");
+    const record = { email: validated.email, no_tel: validated.no_tel, pin: validated.pin, status: validated.status, catatan: validated.catatan };
+    record[config.idField] = validated.staff_id;
+    record[config.nameField] = validated.nama;
+    appendObjectRow_(sheet, config.headers, record);
+    appendAuditLog("CREATE_STAFF", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role, status: validated.status }), "STAFF", config.role + ":" + validated.staff_id);
+    return toSafeAdminStaff_(record, config);
+  });
+}
+
+function updateStaff(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const input = payload && payload.staff && typeof payload.staff === "object" ? payload.staff : payload || {};
+  const config = getStaffSheetConfig_(payload.role || input.role);
+  const staffId = String(payload.staff_id || input.staff_id || "").trim();
+  if (!staffId) throw new Error("staff_id diperlukan.");
+  return withScriptLock_(function () {
+    const sheet = getSheet_(config.sheetName);
+    const found = findStaffRowById_(sheet, config, staffId);
+    if (!found) throw new Error("Staff tidak dijumpai.");
+    const current = toSafeAdminStaff_(found.record, config);
+    const validated = validateStaffInput_({ ...current, ...input, pin: input.pin || "", status: input.status || current.status }, config, { staffId: staffId });
+    const duplicateName = getRowsAsObjects_(sheet).some((row) => normalizeText_(row[config.idField]) !== normalizeText_(staffId) && normalizeText_(row[config.nameField]) === normalizeText_(validated.nama));
+    if (duplicateName) throw new Error("Nama staff telah wujud untuk role ini.");
+    const updates = { email: validated.email, no_tel: validated.no_tel, status: validated.status, catatan: validated.catatan };
+    updates[config.nameField] = validated.nama;
+    if (validated.pin) updates.pin = validated.pin;
+    updateRowByHeaders_(sheet, found.rowNumber, updates);
+    const changedFields = Object.keys(updates).filter((field) => field !== "pin" && String(found.record[field] || "") !== String(updates[field] || ""));
+    appendAuditLog("UPDATE_STAFF", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role, changed_fields: changedFields }), "STAFF", config.role + ":" + staffId);
+    if (validated.pin) appendAuditLog("RESET_STAFF_PIN", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role }), "STAFF", config.role + ":" + staffId);
+    return toSafeAdminStaff_({ ...found.record, ...updates }, config);
+  });
+}
+
+function toggleStaffStatus(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const config = getStaffSheetConfig_(payload && payload.role);
+  const staffId = String(payload && payload.staff_id || "").trim();
+  const active = requireBoolean_(payload && payload.active, "active");
+  return withScriptLock_(function () {
+    const sheet = getSheet_(config.sheetName);
+    const found = findStaffRowById_(sheet, config, staffId);
+    if (!found) throw new Error("Staff tidak dijumpai.");
+    const status = active ? "Aktif" : "Tidak Aktif";
+    if (isActive_(found.record.status) === active) throw new Error(active ? "Staff sudah aktif." : "Staff sudah tidak aktif.");
+    updateRowByHeaders_(sheet, found.rowNumber, { status: status });
+    appendAuditLog(active ? "ACTIVATE_STAFF" : "DEACTIVATE_STAFF", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role, status: status }), "STAFF", config.role + ":" + staffId);
+    return toSafeAdminStaff_({ ...found.record, status: status }, config);
   });
 }
 
@@ -2149,6 +2300,103 @@ function isOpenHostelReturnStatus_(status) {
 
 function isDateValueToday_(value, todayKey) {
   return normalizeDateKey_(value) === todayKey;
+}
+
+function isAdminRecordOverdue_(row, now) {
+  if (String(row && row.lewat || "").trim().toLowerCase() === "ya") return true;
+  if (!row || String(row.status || "") !== STATUS.out) return false;
+  if (isHostelReturnRequest_(row)) return isHostelReturnLate_(now, row);
+  const outingDate = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_keluar);
+  const today = formatDate_(now);
+  return Boolean(outingDate) && (outingDate < today || (outingDate === today && isLate_(now)));
+}
+
+function toAdminOperationalRecord_(row, now) {
+  const overdue = isAdminRecordOverdue_(row, now);
+  return {
+    request_id: row.request_id || "",
+    student_id: row.student_id || "",
+    no_matrik: row.no_matrik || "",
+    nama: row.nama || "",
+    kelas: row.kelas || "",
+    jenis_permohonan: row.jenis_permohonan || "",
+    status: row.status || "",
+    tarikh: row.tarikh || "",
+    masa_mohon: row.masa_mohon || "",
+    masa_keluar: row.masa_keluar || "",
+    masa_masuk: row.masa_masuk || "",
+    tarikh_balik: row.tarikh_balik || "",
+    masa_balik_dijangka: row.masa_balik_dijangka || "",
+    lewat: overdue,
+    tujuan: row.tujuan || "",
+    lokasi: row.lokasi || "",
+    jenis_kenderaan: row.jenis_kenderaan || "",
+    butiran_kenderaan: row.butiran_kenderaan || "",
+    warden_approve_by: row.warden_approve_by || "",
+    masa_approve: row.masa_approve || "",
+    guard_keluar_by: row.guard_keluar_by || "",
+    guard_masuk_by: row.guard_masuk_by || "",
+    duration_minutes: calculateOutingDurationMinutes_(row),
+    duration: calculateOutingDurationMinutes_(row) > 0 ? formatOutingDuration_(calculateOutingDurationMinutes_(row)) : ""
+  };
+}
+
+function getAdminMonitoring(payload) {
+  validateAdminCredentials_(payload);
+  const now = new Date();
+  const activeStatuses = [STATUS.pending, STATUS.approved, STATUS.out];
+  const records = getRowsAsObjects_(getSheet_(SHEETS.requests))
+    .filter((row) => activeStatuses.indexOf(String(row.status || "")) !== -1)
+    .map((row) => toAdminOperationalRecord_(row, now))
+    .sort((left, right) => (parseDateForSort_(right.masa_mohon || right.tarikh) || new Date(0)) - (parseDateForSort_(left.masa_mohon || left.tarikh) || new Date(0)));
+  const kpis = {
+    pending: records.filter((row) => row.status === STATUS.pending).length,
+    approved: records.filter((row) => row.status === STATUS.approved).length,
+    out: records.filter((row) => row.status === STATUS.out).length,
+    not_returned: records.filter((row) => row.status === STATUS.out).length,
+    late: records.filter((row) => row.lewat).length,
+    emergency: records.filter((row) => row.jenis_permohonan === REQUEST_TYPE.emergency).length
+  };
+  return { generated_at: now_(), kpis: kpis, records: records };
+}
+
+function searchAdminMasterRecords(payload) {
+  validateAdminCredentials_(payload);
+  const data = payload || {};
+  const query = normalizeText_(data.search || data.query || "");
+  const month = data.month === "" || data.month === undefined ? 0 : Number(data.month);
+  const year = data.year === "" || data.year === undefined ? 0 : Number(data.year);
+  const kelas = normalizeText_(data.kelas || "");
+  const type = normalizeText_(data.jenis_permohonan || data.request_type || "");
+  const status = normalizeText_(data.status || "");
+  const page = Math.max(1, Math.floor(Number(data.page) || 1));
+  const pageSize = Math.min(50, Math.max(1, Math.floor(Number(data.page_size) || 50)));
+  if (month && (!Number.isInteger(month) || month < 1 || month > 12)) throw new Error("Bulan tidak sah.");
+  if (year && (!Number.isInteger(year) || year < 2000 || year > 2200)) throw new Error("Tahun tidak sah.");
+  const now = new Date();
+  const filtered = getRowsAsObjects_(getSheet_(SHEETS.requests))
+    .filter((row) => !query || [row.nama, row.no_matrik, row.student_id, row.request_id].some((value) => normalizeText_(value).indexOf(query) !== -1))
+    .filter((row) => !kelas || normalizeText_(row.kelas) === kelas)
+    .filter((row) => !type || normalizeText_(row.jenis_permohonan) === type)
+    .filter((row) => !status || normalizeText_(row.status) === status)
+    .filter((row) => {
+      if (!month && !year) return true;
+      const dateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
+      if (!dateKey) return false;
+      const parts = dateKey.split("-");
+      return (!year || Number(parts[0]) === year) && (!month || Number(parts[1]) === month);
+    })
+    .sort((left, right) => (parseDateForSort_(right.masa_mohon || right.tarikh) || new Date(0)) - (parseDateForSort_(left.masa_mohon || left.tarikh) || new Date(0)));
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  return {
+    generated_at: now_(),
+    page: page,
+    page_size: pageSize,
+    total: total,
+    total_pages: Math.max(1, Math.ceil(total / pageSize)),
+    records: filtered.slice(start, start + pageSize).map((row) => toAdminOperationalRecord_(row, now))
+  };
 }
 
 function getOutingStats(payload) {

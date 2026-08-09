@@ -147,6 +147,12 @@ node --check service-worker.js
 Get-Content gas/Code.gs -Raw | node --check -
 ```
 
+## Modul Operasi Admin v2.1.0
+
+Dashboard Admin kini mempunyai Pemantauan baca sahaja, Rekod Master berfilter/pagination, Pengurusan Pelajar, Pengurusan Warden & Guard, Statistik dan Tetapan Outing. Endpoint `getAdminMonitoring`, `searchAdminMasterRecords`, `getAdminStaff`, `createStaff`, `updateStaff` dan `toggleStaffStatus` hanya tersedia melalui POST dan mengesahkan credential menggunakan `validateAdminCredentials_()` pada setiap permintaan.
+
+Identiti staff kekal menggunakan tab `WARDENS` dan `GUARDS` sedia ada; tiada tab atau migration baharu diperlukan. Admin boleh menetapkan PIN semasa create atau reset melalui edit, tetapi PIN sedia ada tidak pernah dipulangkan ke frontend atau dimasukkan dalam audit. Perubahan staff direkod sebagai `CREATE_STAFF`, `UPDATE_STAFF`, `ACTIVATE_STAFF`, `DEACTIVATE_STAFF` dan `RESET_STAFF_PIN`.
+
 ## Deployment Ringkas
 
 Frontend-only:

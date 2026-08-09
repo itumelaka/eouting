@@ -202,3 +202,11 @@ Selfie dihantar sebagai foto sebenar melalui Telegram `sendPhoto`. Pentadbir ata
 - Create/update/toggle menggunakan `LockService`; semakan keunikan `student_id` dan `no_matrik` diulang dalam lock.
 - Audit menyimpan identiti Admin, `student_id`, tindakan dan ringkasan medan berubah sahaja.
 - Nyahaktif tidak memadam pelajar atau rekod outing lama; public `getStudents` memang menapis rekod tidak aktif.
+
+## Modul Operasi Admin
+
+- Pemantauan, Rekod Master dan Pengurusan Warden & Guard ialah POST-only dan memerlukan credential Admin aktif pada setiap request.
+- Public GET kekal aggregate/safe projection dan tidak mendapat akses kepada dataset Admin.
+- Senarai staff tidak memulangkan PIN; reset PIN hanya diterima pada write individu dan tidak dicatat dalam audit.
+- Rekod Master mengecualikan nombor telefon waris daripada list serta butiran yang dikembangkan.
+- Write staff menggunakan lock, validasi role `WARDEN`/`GUARD`, pencegahan ID/nama pendua dan confirmation UI untuk nyahaktif.
