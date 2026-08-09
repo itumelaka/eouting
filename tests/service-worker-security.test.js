@@ -10,6 +10,7 @@ const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
 const EXPECTED_VERSION = "2.1.0";
+const EXPECTED_ASSET_REVISION = "2.1.0-preview1";
 const EXPECTED_RELEASE_DATE = "2026-08-04";
 const EXPECTED_RELEASE_NOTE = "eOuting v2.1.0 memperkemas operasi Guard, menambah jumlah outing tahunan Pelajar dan statistik individu Admin yang selamat dengan tempoh outing sebenar.";
 
@@ -154,29 +155,29 @@ test("static app shell and assets remain cached", async () => {
   await installation;
 
   assert.ok(worker.calls.add.includes("./index.html"));
-  assert.ok(worker.calls.add.includes(`./assets/app.js?v=${EXPECTED_VERSION}`));
-  assert.ok(worker.calls.add.includes(`./assets/style.css?v=${EXPECTED_VERSION}`));
+  assert.ok(worker.calls.add.includes(`./assets/app.js?v=${EXPECTED_ASSET_REVISION}`));
+  assert.ok(worker.calls.add.includes(`./assets/style.css?v=${EXPECTED_ASSET_REVISION}`));
 
   await dispatchFetch(worker, {
     method: "GET",
     mode: "cors",
-    url: `https://eouting.example.test/assets/app.js?v=${EXPECTED_VERSION}`
+    url: `https://eouting.example.test/assets/app.js?v=${EXPECTED_ASSET_REVISION}`
   });
   assert.equal(worker.calls.put.length, 1, "successful static assets must remain cacheable");
 });
 
-test("runtime version, cache name, asset URLs, footer and release notes are consistent", () => {
+test("display version stays stable while the frontend cache revision is consistent", () => {
   const appVersion = appSource.match(/const APP_VERSION = "([^"]+)"/)[1];
   const cacheVersion = workerSource.match(/const CACHE_NAME = "eouting-cache-v([^"]+)"/)[1];
 
   assert.equal(versionInfo.version, EXPECTED_VERSION);
   assert.equal(appVersion, EXPECTED_VERSION);
-  assert.equal(cacheVersion, EXPECTED_VERSION);
-  assert.match(indexSource, new RegExp(`style\\.css\\?v=${EXPECTED_VERSION}`));
-  assert.match(indexSource, new RegExp(`app\\.js\\?v=${EXPECTED_VERSION}`));
+  assert.equal(cacheVersion, EXPECTED_ASSET_REVISION);
+  assert.match(indexSource, new RegExp(`style\\.css\\?v=${EXPECTED_ASSET_REVISION}`));
+  assert.match(indexSource, new RegExp(`app\\.js\\?v=${EXPECTED_ASSET_REVISION}`));
   assert.match(indexSource, new RegExp(`eOuting ITU • v${EXPECTED_VERSION}`));
-  assert.match(workerSource, new RegExp(`style\\.css\\?v=${EXPECTED_VERSION}`));
-  assert.match(workerSource, new RegExp(`app\\.js\\?v=${EXPECTED_VERSION}`));
+  assert.match(workerSource, new RegExp(`style\\.css\\?v=${EXPECTED_ASSET_REVISION}`));
+  assert.match(workerSource, new RegExp(`app\\.js\\?v=${EXPECTED_ASSET_REVISION}`));
   assert.equal(versionInfo.releasedAt, EXPECTED_RELEASE_DATE);
   assert.equal(versionInfo.notes, EXPECTED_RELEASE_NOTE);
 });

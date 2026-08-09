@@ -200,6 +200,130 @@ test("preview uses the authenticated cache, shows identity, and closes accessibl
   assert.match(close, /trigger\.focus\(\)/);
 });
 
+test("delegated preview interaction survives Admin rerenders across every authorised role", () => {
+  const listeners = { click: [], keydown: [] };
+  const modal = { hidden: true, dataset: {}, closest: () => null };
+  const closeButton = {
+    focused: false,
+    closest: (selector) => selector === "#profilePhotoModalClose" ? closeButton : null,
+    focus() { this.focused = true; }
+  };
+  const image = {
+    alt: "",
+    src: "",
+    removeAttribute(name) { if (name === "src") this.src = ""; }
+  };
+  const name = { textContent: "" };
+  const meta = { hidden: false, textContent: "" };
+  const body = { style: { overflow: "" } };
+  const documentMock = {
+    body,
+    addEventListener(type, handler) { listeners[type].push(handler); },
+    contains: () => true
+  };
+  const cache = new Map();
+  const context = vm.createContext({
+    Map,
+    currentSession: { role: "admin" },
+    document: documentMock,
+    els: {
+      profilePhotoModal: modal,
+      profilePhotoModalClose: closeButton,
+      profilePhotoModalImage: image,
+      profilePhotoModalName: name,
+      profilePhotoModalMeta: meta
+    },
+    escapeHtml: (value) => String(value),
+    openAdminStudentEditEditorV200: () => {},
+    loadAdminStudentsV200: () => {},
+    removeAdminStudentProfilePhoto: () => {},
+    studentProfilePhotos: cache,
+    toggleAdminStudentStatusV200: () => {},
+    profilePhotoPreviewTrigger: null,
+    profilePhotoPreviewBodyOverflow: ""
+  });
+  vm.runInContext([
+    extractFunction(app, "profilePhotoCacheKey", "profilePhotoInitials"),
+    extractFunction(app, "profilePhotoInitials", "safeProfilePhotoDataUri"),
+    extractFunction(app, "safeProfilePhotoDataUri", "profilePhotoMarkup"),
+    extractFunction(app, "profilePhotoMarkup", "setupProfilePhotoPreview"),
+    extractFunction(app, "setupProfilePhotoPreview", "handleProfilePhotoPreviewClick"),
+    extractFunction(app, "handleProfilePhotoPreviewClick", "handleProfilePhotoPreviewKeydown"),
+    extractFunction(app, "handleProfilePhotoPreviewKeydown", "openProfilePhotoPreview"),
+    extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview"),
+    extractFunction(app, "closeProfilePhotoPreview", "buildProfilePhotoAccessPayload"),
+    extractFunction(app, "handleAdminStudentListActionV200", "openAdminStudentCreateEditorV200")
+  ].join("\n"), context);
+
+  context.setupProfilePhotoPreview();
+  context.setupProfilePhotoPreview();
+  assert.equal(listeners.click.length, 1, "preview delegation must be installed exactly once");
+  assert.equal(listeners.keydown.length, 1);
+
+  const dataUri = "data:image/jpeg;base64,QUJDRA==";
+  cache.set("a2-002", { photo_data_uri: dataUri });
+  const createTrigger = () => ({
+    dataset: {
+      profilePhotoPreview: " A2-002 ",
+      profilePhotoName: "Pelajar Admin",
+      profilePhotoMeta: "A2 · A2-002"
+    },
+    focused: false,
+    closest(selector) { return selector === "[data-profile-photo-preview]" ? this : null; },
+    focus() { this.focused = true; }
+  });
+
+  const firstTrigger = createTrigger();
+  const firstImage = { closest: (selector) => selector === "[data-profile-photo-preview]" ? firstTrigger : null };
+  const adminEvent = { target: firstImage };
+  context.handleAdminStudentListActionV200(adminEvent);
+  listeners.click[0](adminEvent);
+  assert.equal(modal.hidden, false);
+  assert.equal(image.src, dataUri);
+  assert.equal(name.textContent, "Pelajar Admin");
+  assert.equal(meta.textContent, "A2 · A2-002");
+  assert.equal(body.style.overflow, "hidden");
+
+  listeners.click[0]({ target: closeButton });
+  assert.equal(modal.hidden, true);
+  assert.equal(image.src, "");
+  assert.equal(firstTrigger.focused, true);
+
+  const rerenderedMarkup = context.profilePhotoMarkup("A2-002", "Pelajar Admin", "profile-photo-thumbnail", "A2 · A2-002");
+  assert.match(rerenderedMarkup, /data-profile-photo-preview="A2-002"/);
+  const rerenderedTrigger = createTrigger();
+  listeners.click[0]({ target: rerenderedTrigger });
+  assert.equal(modal.hidden, false, "a newly rendered Admin trigger must use the same delegated listener");
+
+  listeners.keydown[0]({ key: "Escape", preventDefault() {} });
+  assert.equal(modal.hidden, true);
+  listeners.click[0]({ target: rerenderedTrigger });
+  listeners.click[0]({ target: modal });
+  assert.equal(modal.hidden, true, "backdrop click must close the modal");
+
+  for (const role of ["student", "warden", "guard"]) {
+    context.currentSession = { role };
+    listeners.click[0]({ target: createTrigger() });
+    assert.equal(modal.hidden, false, `${role} must retain authorised cached preview behavior`);
+    context.closeProfilePhotoPreview();
+  }
+
+  context.currentSession = null;
+  listeners.click[0]({ target: createTrigger() });
+  assert.equal(modal.hidden, true, "an unauthenticated trigger cannot open a cached photo");
+  cache.delete("a2-002");
+  assert.doesNotMatch(context.profilePhotoMarkup("A2-002", "Tiada Foto"), /data-profile-photo-preview/);
+});
+
+test("Admin photo indicators intentionally rerender after the single asynchronous batch", () => {
+  const loader = extractFunction(app, "loadAdminStudentsV200", "setAdminStudentsBusyV200");
+  const consumers = extractFunction(app, "renderProfilePhotoConsumers", "renderStudentProfilePhotoArea");
+  assert.ok(loader.indexOf("renderAdminStudentsV200()") < loader.indexOf("loadProfilePhotosForStudents("));
+  assert.match(loader, /filter\(\(student\) => student\.has_profile_photo\)/);
+  assert.match(consumers, /currentSession\.role === "admin"[\s\S]*activeAdminSectionV200 === "students"[\s\S]*renderAdminStudentsV200\(\)/);
+  assert.equal((extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview").match(/apiPost|apiGet|fetch\(/g) || []).length, 0);
+});
+
 test("preview remains absent from public monitoring and does not expose Drive identifiers", () => {
   const publicMonitoring = extractFunction(gas, "getTodayRecords", "getOperationalTodayRecords");
   const frontendPreview = [
