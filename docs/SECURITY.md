@@ -28,7 +28,7 @@ Nama dibenarkan pada Public Monitoring read-only v1.6.25. PII dan metadata berik
 - `selfie_status`, `selfie_file_id`, `selfie_url`, `masa_selfie` dan `selfie_telegram_message_id`;
 - PIN, credential dan secret.
 
-Public `getOutingStats` hanya menyediakan aggregated counts, bukan row mentah atau leaderboard individu.
+Endpoint compatibility `getOutingStats` hanya menyediakan aggregated counts, bukan row mentah atau leaderboard individu. Landing awam tidak menyediakan kad atau navigasi Statistik; UI Statistik dan data individu hanya tersedia dalam sesi Admin authenticated.
 
 ## Authenticated Operational Records
 
@@ -97,6 +97,8 @@ Gambar disimpan dalam folder Google Drive private. `LockService` merangkumi sema
 - MIME dibenarkan hanya JPEG, PNG dan WebP; SVG, bukan-imej dan payload berlebihan ditolak pada client dan GAS.
 - `PROFILE_PHOTO_FOLDER_ID` menunjuk ke folder private yang berasingan daripada `SELFIE_FOLDER_ID`; code tidak memanggil `setSharing` atau menghasilkan URL public.
 - API operasi memulangkan indikator sahaja. Byte foto kompak diperoleh melalui satu POST batch yang mengesahkan Student, Warden/HEP, Guard atau Admin. Pelajar dihadkan kepada ID sendiri.
+- Thumbnail sebenar ialah trigger preview hanya selepas byte selamat wujud dalam cache authenticated. Modal menggunakan data URI stored-compressed yang sama dan tidak membuat request tambahan, meminta file ID atau membina URL Drive.
+- Preview memaparkan hanya nama serta kelas/ID yang sudah tersedia secara sah kepada viewer tersebut. Initials placeholder tidak interactive dan Public Monitoring tidak merender trigger preview.
 - Public Monitoring/GET tidak menerima foto, file ID, data URI atau masa kemas kini foto.
 - Semasa replacement, fail baharu dicipta dan metadata Sheet disimpan dahulu. Fail lama hanya ditrash selepas disahkan mempunyai parent folder profil yang dikonfigurasi. Kegagalan sebelum metadata baharu disimpan mengekalkan foto lama.
 - Admin removal memerlukan credential aktif, pengesahan UI, mengosongkan metadata, mengehadkan trash kepada folder profil dan menulis `REMOVE_STUDENT_PROFILE_PHOTO` tanpa byte imej.
@@ -217,7 +219,7 @@ Selfie dihantar sebagai foto sebenar melalui Telegram `sendPhoto`. Pentadbir ata
 
 ## Modul Operasi Admin
 
-- Pemantauan, Rekod Master dan Pengurusan Warden & Guard ialah POST-only dan memerlukan credential Admin aktif pada setiap request.
+- Pemantauan, Statistik individu, Rekod Master, Warden/HEP/Guard dan Tetapan Pelajar ialah modul inline Admin; data sensitifnya menggunakan POST-only dan memerlukan credential Admin aktif pada setiap request.
 - Public GET kekal aggregate/safe projection dan tidak mendapat akses kepada dataset Admin.
 - Senarai staff tidak memulangkan PIN; reset PIN hanya diterima pada write individu dan tidak dicatat dalam audit.
 - Rekod Master mengecualikan nombor telefon waris daripada list serta butiran yang dikembangkan.

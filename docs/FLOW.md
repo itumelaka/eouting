@@ -134,11 +134,13 @@ Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown me
 
 Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords`. Active request menghalang permohonan baharu sehingga selesai atau ditolak.
 
+Pelajar boleh upload/ganti foto profil sendiri. Satu batch authenticated memuatkan foto stored-compressed ke cache selepas sesi dibuka. Thumbnail sebenar pada identiti Pelajar boleh membuka modal besar daripada cache yang sama; initials tidak mempunyai tindakan klik.
+
 Selepas Guard mengesahkan masuk, bukti selfie pulang diwajibkan untuk kelima-lima jenis permohonan. Sebelum submission, dashboard menunjukkan `Bukti Selfie Belum Dihantar`. Selepas berjaya, action upload hilang dan dashboard menunjukkan `Bukti Selfie Dihantar` bersama `Masa Bukti`.
 
-## Warden
+## Warden / HEP
 
-Warden login menggunakan nama + PIN. PIN yang ditaip disimpan dalam runtime session untuk request operasi semasa; flow remember-device sedia ada kekal berfungsi.
+Warden dan HEP berkongsi role backend `warden`. Login menggunakan nama + PIN; PIN yang ditaip disimpan dalam runtime session untuk request operasi semasa dan flow remember-device sedia ada kekal berfungsi.
 
 Warden boleh:
 
@@ -148,6 +150,8 @@ Warden boleh:
 - salin senarai nama dengan emoji status.
 
 Checklist memaparkan semua jenis permohonan. Ikon dan label menggunakan status kontekstual pusat.
+
+Kad Warden/HEP dan Guard memuat thumbnail melalui satu batch authenticated bagi ID operasi yang dibenarkan. Klik foto sebenar membuka data URI cached dalam modal; tiada request per kad atau per preview, dan butang approve/reject/confirm kekal berasingan serta boleh digunakan.
 
 ## Guard
 
@@ -204,9 +208,9 @@ Public Monitoring menggunakan GET awam `getTodayRecords`, tidak kira sama ada br
 Flow pembukaan:
 
 ```text
-aktifkan monitorWorkspace
-  -> sembunyikan workspace lain
-  -> scroll ke permulaan workspace
+aktifkan panel monitoring inline pada shell landing
+  -> sembunyikan panel login lain
+  -> scroll ke permulaan panel
   -> tunjuk loading
   -> GET awam khusus
   -> mapPublicMonitoringRecord
@@ -218,11 +222,11 @@ aktifkan monitorWorkspace
 
 Single-flight guard menghalang request bertindih. First-load gagal menunjukkan ralat jelas. Refresh gagal selepas kejayaan mengekalkan data lama dan timestamp lama.
 
-Paparan hanya mempunyai kad ringkasan dan `Senarai Status Semasa`. Setiap baris menunjukkan nama, kelas, jenis permohonan, ikon dan label kontekstual. Ia tidak mempunyai action approve/reject atau confirm keluar/masuk.
+Paparan hanya mempunyai kad ringkasan dan `Senarai Status Semasa`. Setiap baris menunjukkan nama, kelas, jenis permohonan, ikon dan label kontekstual. Ia tidak mempunyai action approve/reject, confirm keluar/masuk, thumbnail atau preview foto profil.
 
 ## Statistik
 
-`getOutingStats` memulangkan agregat sahaja. Statistik tidak memaparkan leaderboard individu atau row rekod mentah.
+Public Statistik tidak mempunyai kad atau navigasi. Admin memilih tab `Statistik` dalam shell Admin yang sama; filter bulan/tahun/kelas, Jana Statistik, Refresh, KPI, statistik individu, ringkasan kelas dan pecahan status dimuat melalui credential Admin tanpa logout atau workspace kedua. Endpoint agregat lama boleh kekal untuk compatibility tetapi tidak didedahkan melalui UI awam.
 
 ## Local Mock QA Admin
 
@@ -246,6 +250,8 @@ Tanpa `mock=1`, cabang mock tidak boleh dicapai dan `apiPost` meneruskan request
 - API/GAS tidak dicache oleh service worker.
 - Imej selfie dan metadata private tidak dipaparkan oleh Public Monitoring atau dicache sebagai response sensitif.
 
-## Admin — Pengurusan Pelajar Beta
+## Admin Inline
 
-`Admin login -> Pengurusan Pelajar -> getAdminStudents/createStudent/updateStudent/toggleStudentStatus` menggunakan POST dan credential Admin runtime sedia ada. Tetapan Outing kekal pada sub-tab berasingan. Status `TIDAK AKTIF` menyebabkan rekod tidak lagi dipulangkan oleh public `getStudents`, tanpa mengubah `OUTING_REQUESTS` atau sejarah outing. LI ialah nilai `kelas` dalam STUDENTS, bukan role login baharu.
+Selepas login, identiti sesi, tajuk `Admin eOuting` dan navigasi kekal visible. Enam panel inline ialah `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`.
+
+`Admin login -> Tetapan Pelajar -> getAdminStudents/createStudent/updateStudent/toggleStudentStatus` menggunakan POST dan credential Admin runtime sedia ada. Status `TIDAK AKTIF` menyebabkan rekod tidak lagi dipulangkan oleh public `getStudents`, tanpa mengubah `OUTING_REQUESTS` atau sejarah outing. LI ialah nilai `kelas` dalam STUDENTS, bukan role login baharu. Thumbnail sebenar Admin boleh dipreview daripada batch authenticated yang sama; removal kekal tindakan berasingan dan ber-audit.

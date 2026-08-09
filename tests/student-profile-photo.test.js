@@ -165,6 +165,52 @@ test("Student identity header reuses the self-photo cache with an initials fallb
   assert.match(extractFunction(app, "profilePhotoMarkup", "buildProfilePhotoAccessPayload"), /profilePhotoInitials/);
 });
 
+test("real authorised thumbnails open an accessible cached-image preview while placeholders stay inert", () => {
+  const markup = extractFunction(app, "profilePhotoMarkup", "setupProfilePhotoPreview");
+  assert.match(markup, /<button class="\$\{className\} profile-photo-preview-trigger"/);
+  assert.match(markup, /data-profile-photo-preview/);
+  assert.match(markup, /aria-label="Lihat foto profil/);
+  assert.match(markup, /<span class="\$\{className\} profile-photo-placeholder"/);
+  assert.doesNotMatch(markup.slice(markup.indexOf("profile-photo-placeholder")), /data-profile-photo-preview/);
+
+  assert.match(html, /id="profilePhotoModal"[^>]*role="dialog"[^>]*aria-modal="true"/s);
+  assert.match(html, /id="profilePhotoModalClose"[^>]*aria-label="Tutup paparan foto profil"/s);
+  assert.match(css, /\.profile-photo-modal[\s\S]*?background:\s*rgba\(3, 14, 30, 0\.82\)/);
+  assert.match(css, /\.profile-photo-modal-dialog img[\s\S]*?max-height:\s*82vh[\s\S]*?object-fit:\s*contain/);
+});
+
+test("preview uses the authenticated cache, shows identity, and closes accessibly without another request", () => {
+  const open = extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview");
+  const close = extractFunction(app, "closeProfilePhotoPreview", "buildProfilePhotoAccessPayload");
+  const click = extractFunction(app, "handleProfilePhotoPreviewClick", "handleProfilePhotoPreviewKeydown");
+  const keydown = extractFunction(app, "handleProfilePhotoPreviewKeydown", "openProfilePhotoPreview");
+  assert.match(open, /if \(!currentSession/);
+  assert.match(open, /studentProfilePhotos\.get\(profilePhotoCacheKey\(studentId\)\)/);
+  assert.match(open, /profilePhotoModalImage\.src = dataUri/);
+  assert.match(open, /profilePhotoModalName\.textContent = studentName/);
+  assert.match(open, /profilePhotoModalMeta\.textContent = studentMeta/);
+  assert.match(open, /document\.body\.style\.overflow = "hidden"/);
+  assert.doesNotMatch(open, /apiPost|apiGet|getStudentProfilePhotos|fetch\(/);
+  assert.match(click, /event\.target === els\.profilePhotoModal/);
+  assert.match(click, /profilePhotoModalClose/);
+  assert.match(keydown, /event\.key === "Escape"/);
+  assert.match(keydown, /event\.key === "Tab"[\s\S]*profilePhotoModalClose\.focus\(\)/);
+  assert.match(close, /removeAttribute\("src"\)/);
+  assert.match(close, /document\.body\.style\.overflow = profilePhotoPreviewBodyOverflow/);
+  assert.match(close, /trigger\.focus\(\)/);
+});
+
+test("preview remains absent from public monitoring and does not expose Drive identifiers", () => {
+  const publicMonitoring = extractFunction(gas, "getTodayRecords", "getOperationalTodayRecords");
+  const frontendPreview = [
+    extractFunction(app, "profilePhotoMarkup", "setupProfilePhotoPreview"),
+    extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview")
+  ].join("\n");
+  assert.doesNotMatch(publicMonitoring, /profile-photo-preview|photo_data_uri|photo_file_id|drive/i);
+  assert.doesNotMatch(frontendPreview, /photo_file_id|drive\.google|drive\/d\/|file_id/);
+  assert.doesNotMatch(html.slice(html.indexOf('id="publicMonitoringPanel"'), html.indexOf('id="appWorkspace"')), /profilePhoto|profile-photo-preview/i);
+});
+
 test("Warden and Guard operational cards render compact photos and neutral placeholders", () => {
   const card = extractFunction(app, "recordCard", "guardReturnCard");
   const guardReturn = extractFunction(app, "guardReturnCard", "getGuardReturnTiming");
@@ -175,6 +221,8 @@ test("Warden and Guard operational cards render compact photos and neutral place
   assert.match(css, /flex:\s*0 0 64px/);
   assert.match(css, /object-fit:\s*cover/);
   assert.match(css, /#guardOvernightNotReturnedSection[\s\S]*?repeat\(2/);
+  assert.match(card, /\$\{actions\}/);
+  assert.match(guardReturn, /\$\{actions\}/);
 });
 
 test("Admin thumbnail removal requires confirmation, authentication and a safe audit", () => {

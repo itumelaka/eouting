@@ -15,6 +15,8 @@ student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | cata
 - `no_matrik` dan `no_tel` hendaklah berformat Plain text.
 - `photo_file_id` ialah ID fail private dalam folder foto profil yang dikonfigurasi; ia tidak dipulangkan oleh GET awam.
 - `photo_updated_at` ialah masa kemas kini berjaya dalam zon Asia/Kuala_Lumpur. Base64 tidak disimpan dalam Sheet.
+- Admin list menerima hanya `has_profile_photo` dan `photo_updated_at`; `photo_file_id` tidak dihantar. Byte imej dibaca daripada fail private hanya oleh POST batch authenticated dan dipetakan menggunakan `student_id` yang dinormalisasi.
+- Preview besar tidak menambah schema atau menyimpan data baharu. Ia menggunakan data URI compressed yang sudah berada dalam cache frontend selepas batch authorised.
 
 Public `getStudents` hanya mengeluarkan:
 
@@ -94,7 +96,7 @@ Operational POST `getTodayRecords` kekal berasingan. Selepas credential disahkan
 
 ## Statistik
 
-`getOutingStats` mengira statistik daripada `OUTING_REQUESTS` dan memulangkan aggregated counts sahaja. Ia tidak mengeluarkan row mentah, nama pelajar, nombor matrik atau leaderboard individu.
+`getOutingStats` mengira aggregated counts daripada `OUTING_REQUESTS` dan boleh kekal sebagai endpoint compatibility tanpa row mentah, nama pelajar atau nombor matrik. UI awam tidak menyediakan navigasi Statistik. Modul Statistik inline Admin menggunakan laluan authenticated berasingan untuk statistik individu.
 
 ## `OUTING_TYPES` — staging v2.0
 

@@ -23,7 +23,7 @@ Fail utama:
 - `service-worker.js`
 - `version.json`
 
-Frontend mengurus pemilihan role, borang Pelajar, Dashboard Warden/Guard, Public Monitoring read-only, statistik agregat, update PWA serta input kamera/file untuk foto profil dan bukti pulang. Foto profil dipotong 3:4 dan dikecilkan kepada maksimum kira-kira 600×800; selfie kekal pada resize sisi terpanjang kira-kira 1280px. Frontend role hiding bukan boundary keselamatan.
+Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP dan Guard, Public Monitoring read-only yang dibuka inline, enam modul Admin inline, update PWA serta input kamera/file untuk foto profil dan bukti pulang. Statistik tidak mempunyai laluan awam dan kekal di dalam shell Admin. Foto profil dipotong 3:4 dan dikecilkan kepada maksimum kira-kira 600×800; selfie kekal pada resize sisi terpanjang kira-kira 1280px. Frontend role hiding bukan boundary keselamatan.
 
 ### GAS Router
 
@@ -119,13 +119,14 @@ Warden login -> POST getTodayRecords -> approve/reject
 Guard login -> POST getTodayRecords -> confirmOut/confirmIn
   -> Telegram pergerakan
 Pelajar login -> compress 3:4 -> submitStudentProfilePhoto -> STUDENTS metadata
-Warden/Guard/Admin -> POST getStudentProfilePhotos (batch authenticated) -> compact data URI
+Student/Warden/Guard/Admin -> POST getStudentProfilePhotos (batch authenticated) -> stored compressed data URI
+Authorised thumbnail click -> cached data URI -> accessible large modal (no extra request)
 Pelajar selepas confirmIn -> kamera/preview/compress -> submitReturnSelfie
   -> LockService -> Drive private -> Telegram sendPhoto -> metadata Sheet
 Public Monitoring -> GET getTodayRecords -> mapPublicMonitoringRecord
 ```
 
-`getOperationalTodayRecords` menambah hanya `has_profile_photo` dan masa kemas kini. Selepas kad operasi dirender dengan placeholder, frontend membuat satu batch request bagi semua ID yang diperlukan. Kegagalan batch tidak menghalang approve, reject, confirm out atau confirm in. `getTodayRecords` awam kekal pada projection enam medan tanpa metadata foto.
+`getOperationalTodayRecords` menambah hanya `has_profile_photo` dan masa kemas kini. Selepas kad operasi dirender dengan placeholder, frontend membuat satu batch request bagi semua ID yang diperlukan. Response mengandungi imej stored-compressed kira-kira 600×800 sebagai data URI; thumbnail kekal kecil, manakala preview besar menggunakan byte cache yang sama tanpa N+1 atau panggilan on-demand. Hanya thumbnail sebenar ialah button; initials kekal inert. Kegagalan batch tidak menghalang approve, reject, confirm out atau confirm in. `getTodayRecords` awam kekal pada projection enam medan tanpa metadata atau trigger foto.
 
 ## Status Bukti Selfie
 
@@ -169,13 +170,13 @@ Kiraan dan filter operasi terus menggunakan nilai `record.status`, termasuk satu
 
 ## Warden dan Guard
 
-Warden menerima rekod operasi penuh melalui POST authenticated untuk Dashboard, approve/reject dan Checklist Permohonan. Checklist menggunakan ikon status kontekstual dan `Copy Senarai Nama`.
+Warden dan HEP berkongsi role backend `warden`. Mereka menerima rekod operasi penuh melalui POST authenticated untuk Dashboard, approve/reject dan Checklist Permohonan. Checklist menggunakan ikon status kontekstual dan `Copy Senarai Nama`; kad operasi mempunyai identifikasi foto authenticated.
 
 Guard menerima rekod operasi penuh melalui POST authenticated. Quick filter Guard ialah Semua, Outing Harian, Pulang Bermalam, Cuti Semester, Kecemasan dan Lewat, dan digunakan pada `Sedia Untuk Keluar` serta `Sedang Keluar`.
 
 ## Public Monitoring
 
-Public Monitoring v1.6.25 sentiasa menggunakan GET awam khusus, walaupun sesi Warden/Guard wujud. Lifecycle menggunakan scroll-to-workspace, loading jelas dan single-flight guard. Satu response menghasilkan satu render; timestamp dan `monitorHasLoadedOnce` hanya dikemas kini selepas berjaya.
+Public Monitoring v1.6.25 sentiasa menggunakan GET awam khusus dan dirender inline dalam shell landing, walaupun sesi Warden/Guard wujud. Lifecycle menggunakan scroll sasaran, loading jelas dan single-flight guard. Satu response menghasilkan satu render; timestamp dan `monitorHasLoadedOnce` hanya dikemas kini selepas berjaya.
 
 Paparan terdiri daripada:
 
@@ -183,6 +184,8 @@ Paparan terdiri daripada:
 - `Senarai Status Semasa` dengan nama, kelas, jenis permohonan, ikon dan status kontekstual.
 
 Tiada kad `Rekod Hari Ini`, quick filter monitoring atau seksyen pendua `Belum Pulang Ke Asrama`.
+
+Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau preview trigger.
 
 ## PWA dan Cache
 
@@ -209,6 +212,8 @@ Frontend tidak menentukan authorization atau validation akhir. Config yang dihan
 
 ## Operasi Admin
 
-Pemantauan Admin menggunakan satu POST `getAdminMonitoring` untuk KPI dan rekod operasi aktif. Rekod Master menggunakan satu POST `searchAdminMasterRecords` dengan carian, filter dan pagination maksimum 50 rekod. Pengurusan staff menggunakan `getAdminStaff` serta write `createStaff`, `updateStaff` dan `toggleStaffStatus`; semua endpoint memanggil `validateAdminCredentials_()`.
+Shell Admin dan identiti sesi kekal visible apabila enam modul inline bertukar: `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`. Statistik menggunakan active-tab yang sama seperti modul lain dan tidak lagi mempunyai workspace atau butang kembali berasingan.
+
+Pemantauan Admin menggunakan satu POST `getAdminMonitoring` untuk KPI dan rekod operasi aktif. Rekod Master menggunakan satu POST `searchAdminMasterRecords` dengan carian, filter dan pagination maksimum 50 rekod. Statistik individu menggunakan `getAdminIndividualStats` selepas credential Admin disahkan. Pengurusan staff menggunakan `getAdminStaff` serta write `createStaff`, `updateStaff` dan `toggleStaffStatus`; semua endpoint memanggil `validateAdminCredentials_()`.
 
 `WARDENS` dan `GUARDS` kekal source of truth serta login Warden/Guard sedia ada terus membaca PIN dari tab masing-masing. Write staff dilindungi `LockService`; tiada model authentication atau sheet baharu diperkenalkan.

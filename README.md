@@ -14,7 +14,9 @@ Versi repo semasa: **v2.1.0 — Statistik Selamat dan Operasi Guard Diperkemas**
 
 Frontend production v2.1.0 diterbitkan melalui commit `chore: bump eOuting version to 2.1.0` (commit release ini). Production berada di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS sedia ada.
 
-Backend production yang disahkan sebelum perubahan foto profil menggunakan GAS **Version 29**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Release ini merangkumi UI Guard keluar/masuk yang diperkemas, kad Sahkan Masuk kompak, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh sebenar `masa_keluar` → `masa_masuk`, hygiene sumber GAS/clasp dan pembaikan rendering Statistik Admin. `gas/Code.gs` kekal source GAS executable kanonik.
+Backend production semasa menggunakan GAS **Version 31**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` kekal source GAS executable kanonik dan `.claspignore` mengehadkan push kepada source GAS serta manifest yang dibenarkan.
+
+Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
 ## Architecture Ringkas
 
@@ -32,7 +34,7 @@ Frontend mengurus paparan, kamera dan pemampatan gambar. GAS menguatkuasakan log
 ## Role
 
 - **Pelajar:** pilih nama, masukkan nombor matrik, hantar permohonan dan lihat rekod sendiri.
-- **Warden:** login nama + PIN, refresh rekod, approve/reject, guna Checklist Permohonan dan salin senarai nama.
+- **Warden/HEP:** berkongsi role backend `warden`, login nama + PIN, refresh rekod, approve/reject, guna Checklist Permohonan dan salin senarai nama.
 - **Guard:** login nama + PIN, lihat `Sedia Untuk Keluar` dan `Sedang Keluar`, kemudian sahkan keluar/masuk.
 - **Public Monitoring read-only:** lihat ringkasan dan `Senarai Status Semasa` tanpa tindakan operasi.
 
@@ -75,6 +77,8 @@ Pelajar berautentikasi boleh menambah atau mengganti foto profil sendiri. Fronte
 
 Warden/HEP, Guard dan Admin mengambil foto kompak melalui satu POST batch berautentikasi. API operasi hanya membawa indikator `has_profile_photo`; Public Monitoring dan semua GET awam tidak menerima foto, Drive ID atau metadata foto. Fail berada dalam folder private `eOuting - Foto Profil Pelajar` yang ditetapkan melalui `PROFILE_PHOTO_FOLDER_ID`. Foto profil tidak menggunakan field, folder atau Telegram workflow bukti selfie pulang.
 
+Thumbnail sebenar boleh dibuka sebagai preview besar oleh Pelajar sendiri, Warden/HEP, Guard dan Admin yang telah dibenarkan. Preview menggunakan data URI 600×800-ish yang sudah berada dalam cache authenticated, tidak membuat request tambahan, tidak membuka tab baharu dan tidak mendedahkan URL atau ID Drive. Placeholder initials tidak boleh diklik. Modal menyokong butang tutup, klik backdrop, kekunci Escape, scroll lock dan pemulangan fokus.
+
 Backend menyimpan nilai status asal seperti `KELUAR`. Frontend memaparkan label kontekstual:
 
 | Keadaan | Paparan UI |
@@ -91,7 +95,7 @@ Status lewat mempunyai precedence paparan tetapi tidak menggantikan nilai lifecy
 
 ## Public Monitoring v1.6.25
 
-Sekali tekan `Pemantauan Semasa`, frontend:
+Sekali tekan `Pemantauan Semasa`, frontend membukanya inline dalam shell landing dan:
 
 1. mengaktifkan workspace dan menyembunyikan workspace lain;
 2. scroll ke permulaan workspace;
@@ -155,7 +159,7 @@ Get-Content gas/Code.gs -Raw | node --check -
 
 ## Modul Operasi Admin v2.1.0
 
-Dashboard Admin kini mempunyai Pemantauan baca sahaja, Rekod Master berfilter/pagination, Pengurusan Pelajar, Pengurusan Warden & Guard, Statistik dan Tetapan Outing. Endpoint `getAdminMonitoring`, `searchAdminMasterRecords`, `getAdminStaff`, `createStaff`, `updateStaff` dan `toggleStaffStatus` hanya tersedia melalui POST dan mengesahkan credential menggunakan `validateAdminCredentials_()` pada setiap permintaan.
+Dashboard Admin mengekalkan shell dan enam modul inline dalam urutan dua baris: `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`. Statistik tidak mempunyai workspace awam atau shell berasingan; agregat, filter bulan/tahun/kelas dan statistik individu hanya dimuat melalui sesi Admin. Rekod Master menyediakan carian/filter/pagination, Pemantauan ialah paparan operasi baca sahaja, dan jumlah outing tahunan turut dipaparkan kepada Pelajar. Endpoint Admin mengesahkan credential menggunakan `validateAdminCredentials_()` pada setiap permintaan.
 
 Identiti staff kekal menggunakan tab `WARDENS` dan `GUARDS` sedia ada; tiada tab atau migration baharu diperlukan. Admin boleh menetapkan PIN semasa create atau reset melalui edit, tetapi PIN sedia ada tidak pernah dipulangkan ke frontend atau dimasukkan dalam audit. Perubahan staff direkod sebagai `CREATE_STAFF`, `UPDATE_STAFF`, `ACTIVATE_STAFF`, `DEACTIVATE_STAFF` dan `RESET_STAFF_PIN`.
 
@@ -170,14 +174,14 @@ Frontend-only:
 
 Backend GAS:
 
-1. kemas kini source kanonik `gas/Code.gs`;
-2. jalankan `setupSelfieProofV170()` sekali dan sahkan `SELFIE_FOLDER_ID`;
-3. jalankan `setupStudentProfilePhotos()` sekali dan sahkan `PROFILE_PHOTO_FOLDER_ID`;
-4. sahkan Script Properties Telegram;
-5. deploy Web App version baharu sambil mengekalkan URL;
-6. publish frontend dan semak footer/popup versi semasa;
-7. jalankan ujian hujung-ke-hujung.
+1. semak Git diff dan jalankan suite/syntax checks;
+2. semak whitelist dengan `clasp show-file-status`;
+3. commit dan push source yang telah disahkan;
+4. jalankan `clasp push` secara manual;
+5. jalankan setup helper hanya jika schema atau konfigurasi memerlukannya;
+6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
+7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24** dan telah melalui smoke test Spreadsheet serta login Admin. Deployment yang disahkan sebelum ciri foto profil ialah **Version 29**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production semasa ialah **Version 31**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan. Preview foto dalam perubahan semasa ialah frontend-only dan tidak memerlukan setup helper atau deployment GAS baharu.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

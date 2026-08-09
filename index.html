@@ -623,6 +623,19 @@
       </footer>
     </main>
 
+    <div class="profile-photo-modal" id="profilePhotoModal" role="dialog" aria-modal="true"
+      aria-labelledby="profilePhotoModalName" aria-describedby="profilePhotoModalMeta" hidden>
+      <div class="profile-photo-modal-dialog">
+        <button class="profile-photo-modal-close" id="profilePhotoModalClose" type="button"
+          aria-label="Tutup paparan foto profil">&times;</button>
+        <img id="profilePhotoModalImage" alt="">
+        <div class="profile-photo-modal-identity">
+          <strong id="profilePhotoModalName"></strong>
+          <span id="profilePhotoModalMeta"></span>
+        </div>
+      </div>
+    </div>
+
     <script src="assets/app.js?v=2.1.0"></script>
   </body>
 </html>

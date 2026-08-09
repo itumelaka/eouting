@@ -1,6 +1,6 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v2.1.0**. Backend production yang disahkan sebelum ciri foto profil ialah GAS **Version 29**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
+Versi repo semasa: **v2.1.0**. Backend production semasa ialah GAS **Version 31**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Preview foto profil semasa ialah frontend-only; tiada deployment GAS diperlukan untuk ciri itu.
 
 ## Release Production v2.1.0 — 9 Ogos 2026
 
@@ -60,15 +60,16 @@ Gunakan flow ini apabila `gas/Code.gs` berubah:
 
 `gas/Code.gs` ialah satu-satunya source GAS executable kanonik. `.claspignore` mesti kekal sebagai whitelist untuk `Code.gs` dan `appsscript.json`; snapshot arkib tidak boleh berada dalam skop `rootDir` tanpa ignore yang eksplisit.
 
-1. semak syntax GAS secara local;
-2. jalankan `clasp push`;
-3. buka Apps Script: `Deploy -> Manage deployments -> Edit`;
-4. pilih `New version`, kemudian `Deploy`;
-5. kekalkan deployment URL sedia ada;
-6. uji endpoint live `/exec?action=getTodayRecords`;
-7. uji flow authenticated POST yang terlibat;
-8. rekod Git SHA, Apps Script version, deployment ID/URL, Spreadsheet ID, description dan tarikh release;
-9. kemudian commit dan push repo.
+1. semak Git diff dan syntax GAS secara local;
+2. jalankan focused/full tests serta `git diff --check`;
+3. semak whitelist dengan `clasp show-file-status`;
+4. commit dan push Git source yang telah disahkan;
+5. jalankan `clasp push` secara manual;
+6. jalankan setup helper hanya jika schema atau Script Property memerlukannya;
+7. buka Apps Script: `Deploy -> Manage deployments -> Edit`;
+8. pilih `New version`, kekalkan deployment URL sedia ada, kemudian `Deploy`;
+9. smoke-test endpoint public dan POST authenticated yang terlibat;
+10. rekod Git SHA, Apps Script version, deployment ID/URL, Spreadsheet ID, description dan tarikh release.
 
 `clasp push` sahaja tidak menjamin deployment `/exec` menggunakan code baharu. Deployment version baharu tetap diperlukan.
 
@@ -122,9 +123,9 @@ Jangan isi akaun Admin, mengaktifkan feature flag atau menganggap schema staging
 
 Rollout v1.7.0 melalui urutan ini menggunakan GAS Version 21. Pull Request #1 telah digabungkan ke `main` melalui merge commit `beec1e0`.
 
-## Urutan Manual Foto Profil Pelajar (selepas merge)
+## Rekod Deployment Foto Profil Pelajar
 
-Perubahan ini tidak menjalankan clasp atau deployment. Production yang disahkan bermula pada GAS Version 29. Untuk mengaktifkan ciri:
+Foto profil telah beroperasi pada production GAS Version 31. Urutan Version 30 di bawah ialah rekod rollout asal dan tidak perlu diulang untuk preview frontend semasa:
 
 1. Jalankan semula semua ujian pada commit release.
 2. Jalankan `clasp push` secara manual daripada source kanonik `gas/Code.gs`.
@@ -135,7 +136,7 @@ Perubahan ini tidak menjalankan clasp atau deployment. Production yang disahkan 
 7. Smoke-test upload/ganti Pelajar, kad Warden/HEP, ketiga-tiga kad Guard, thumbnail/removal Admin dan audit log.
 8. Sahkan GET Public Monitoring tidak mengandungi sebarang field atau byte foto profil.
 
-Jangan deploy frontend yang memanggil action foto baharu sebelum GAS Version 30 tersedia; flow operasi sedia ada kekal serasi tetapi foto tidak akan dimuatkan.
+Deployment Version 30/31 dan setup schema telah selesai. Jangan jalankan semula helper kecuali header/property benar-benar perlu dibaiki dan perubahan itu diluluskan.
 
 ## Semakan Release
 

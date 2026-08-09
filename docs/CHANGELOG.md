@@ -5,7 +5,10 @@
 - **Foto profil Pelajar:** upload/ganti sendiri dengan compression JPEG 3:4, metadata `STUDENTS.photo_file_id` dan `photo_updated_at`, serta folder Drive private berasingan.
 - **Operasi:** thumbnail kompak dengan placeholder pada kad Warden/HEP dan Guard; Tetapan Pelajar Admin menyokong thumbnail dan confirmed removal ber-audit.
 - **Privasi:** foto dihantar melalui POST batch berautentikasi tanpa Drive ID/URL pada response awam; Public Monitoring kekal tanpa foto dan workflow selfie/Telegram tidak berubah.
-- **Production manual:** selepas merge perlu `clasp push`, `setupStudentProfilePhotos()` dan deployment GAS Version 30; langkah tersebut tidak dijalankan oleh perubahan ini.
+- **Preview:** thumbnail sebenar Pelajar, Warden/HEP, Guard dan Admin membuka modal portrait besar; initials kekal inert, dan close button/backdrop/Escape/scroll lock/focus return disokong.
+- **Performance:** preview menggunakan data URI stored-compressed kira-kira 600×800 daripada cache batch authenticated yang sama tanpa request tambahan atau N+1.
+- **Documentation:** current-state docs diselaraskan kepada aplikasi v2.1.0, production GAS Version 31, landing 2×2, Public Monitoring inline, Statistik Admin inline, enam modul Admin serta foto profil/selfie yang berasingan.
+- **Production:** ciri foto profil telah operational pada GAS Version 31. Preview semasa tidak mengubah GAS, schema atau service worker dan tidak memerlukan deployment backend baharu.
 
 ## v2.1.0 — 2026-08-09
 

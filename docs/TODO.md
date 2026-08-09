@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja selepas release **v2.0.0**.
+Senarai kerja semasa selepas release **v2.1.0**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
@@ -57,9 +57,11 @@ Senarai kerja selepas release **v2.0.0**.
 - [x] Authenticated operational records untuk Pelajar, Warden dan Guard.
 - [x] Tiada fallback authenticated POST kepada public GET.
 - [x] Public Monitoring data minimisation kepada enam field.
-- [x] Statistik individu/leaderboard sensitif dibuang.
+- [x] Statistik individu/leaderboard dibuang daripada public dan disediakan semula hanya dalam modul Admin authenticated.
 - [x] API/GAS dikecualikan daripada Cache Storage dan cache lama dibersihkan.
 - [x] Staff runtime credential restoration selepas fresh login.
+- [x] Foto profil private dengan batch authenticated, initials fallback dan Admin removal ber-audit.
+- [x] Preview besar foto profil authorised menggunakan cache sedia ada tanpa Drive URL/ID atau N+1 request.
 
 ### Status dan Guard UX
 
@@ -144,7 +146,7 @@ Senarai kerja selepas release **v2.0.0**.
 - [ ] Review GAS Web App deployment permission.
 - [ ] Decide SOP for changing Warden/Guard PIN.
 - [ ] Review role-based access hardening.
-- [ ] Restrict Statistik/Pemantauan to Warden/HEP if required.
+- [x] Buang Public Statistik dan kekalkan Statistik individu hanya dalam Admin authenticated.
 
 ## Future Enhancements
 

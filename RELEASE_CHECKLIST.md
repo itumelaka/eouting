@@ -2,6 +2,8 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
+> Catatan semasa (9 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.1.0, menggunakan GAS Version 31, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Source backend kanonik ialah `gas/Code.gs`; lihat `docs/DEPLOYMENT.md` untuk urutan release semasa dan hygiene `clasp show-file-status`/`.claspignore`.
+
 ## Keputusan Semasa
 
 - Status code: rollout production selesai dan disahkan pada 4 Ogos 2026.

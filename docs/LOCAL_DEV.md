@@ -127,6 +127,7 @@ Suite utama:
 - `tests/public-monitoring-compact-layout.test.js`: layout ringkas, `Senarai Status Semasa`, ringkasan dan isolation Warden/Guard.
 - `tests/service-worker-security.test.js`: API network-only, cache cleanup, static cache dan version consistency.
 - `tests/selfie-proof-v170.test.js`: eligibility keempat-empat jenis, mapping/private projection, compression/upload, backend validation, duplicate protection, migration, confirmIn, cleanup dan audit failure selepas transaksi berjaya.
+- `tests/student-profile-photo.test.js`: metadata private, batch authorization, cache normalization, upload/removal, modal preview, keyboard/backdrop close, no N+1 dan isolation Public Monitoring.
 
 Jalankan satu fail:
 
@@ -157,6 +158,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 7. Selepas Guard confirm masuk, semak badge `Bukti Selfie Belum Dihantar`.
 8. Uji capture/pilih gambar, preview, ambil semula dan `Hantar Bukti`.
 9. Dalam mock mode, sahkan badge bertukar kepada `Bukti Selfie Dihantar` tanpa request Drive/Telegram.
+10. Jika foto profil sebenar tersedia, klik thumbnail identiti dan panel foto; sahkan modal menunjukkan nama/kelas-ID, Escape/backdrop/close berfungsi dan fokus kembali. Initials tidak boleh diklik.
 
 ## Smoke Test Warden
 
@@ -166,6 +168,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 4. Refresh Permohonan.
 5. Uji approve/reject dan Telegram.
 6. Pastikan credential hilang menghasilkan error, bukan data Public Monitoring.
+7. Klik foto sebenar pada kad Warden/HEP dan sahkan preview tidak mengganggu approve/reject atau membuat request foto tambahan.
 
 ## Smoke Test Guard
 
@@ -174,6 +177,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 3. Uji filter Semua, Outing Harian, Pulang Bermalam, Cuti Semester, Kecemasan dan Lewat.
 4. Pastikan Outing Harian tidak menangkap Kecemasan.
 5. Uji confirm keluar/masuk dan Telegram.
+6. Klik foto sebenar pada setiap jenis kad Guard dan sahkan preview tidak mengganggu `Sahkan Keluar`/`Sahkan Masuk`; initials kekal inert.
 
 ## Smoke Test Public Monitoring
 
@@ -185,6 +189,14 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 6. Pastikan `Rekod Hari Ini`, quick filter monitor dan `Belum Pulang Ke Asrama` tidak wujud.
 7. Klik refresh berulang semasa request aktif dan pastikan tiada overlap.
 8. Simulasi refresh gagal dan pastikan data/timestamp lama kekal.
+9. Pastikan tiada thumbnail, preview trigger, data URI atau metadata foto profil muncul.
+
+## Smoke Test Admin
+
+1. Login Admin dan pastikan identiti, tajuk serta enam tab inline kekal visible ketika bertukar panel.
+2. Pastikan `Statistik` aktif inline dan filter/KPI/statistik individu dimuat tanpa butang `Kembali ke Admin`.
+3. Dalam `Tetapan Pelajar`, klik thumbnail sebenar dan sahkan preview menggunakan cache batch yang sama; `Buang Foto` kekal tindakan berasingan dengan confirmation.
+4. Semak Rekod Master search/filter/pagination, Pemantauan dan pengurusan Warden/HEP/Guard masih boleh ditukar tanpa login semula.
 
 ## PWA dan Cache
 

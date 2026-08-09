@@ -3517,6 +3517,26 @@ button:disabled,
   width: 64px;
 }
 
+button.profile-photo-frame {
+  appearance: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.profile-photo-preview-trigger {
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.profile-photo-preview-trigger:hover {
+  box-shadow: 6px 6px 14px rgba(3, 18, 47, 0.18), -4px -4px 10px rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.profile-photo-preview-trigger:focus-visible {
+  box-shadow: 0 0 0 4px rgba(23, 134, 109, 0.28), 4px 4px 10px rgba(3, 18, 47, 0.12);
+  outline: 0;
+}
+
 .profile-photo-frame-large {
   flex-basis: 72px;
   width: 72px;
@@ -3559,6 +3579,85 @@ button:disabled,
   font-weight: 700;
 }
 
+.profile-photo-modal[hidden] {
+  display: none;
+}
+
+.profile-photo-modal {
+  align-items: center;
+  background: rgba(3, 14, 30, 0.82);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: clamp(16px, 4vw, 40px);
+  position: fixed;
+  z-index: 10000;
+}
+
+.profile-photo-modal-dialog {
+  align-items: center;
+  background: #f8fbfd;
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+  max-width: min(92vw, 720px);
+  padding: 46px 18px 18px;
+  position: relative;
+  width: fit-content;
+}
+
+.profile-photo-modal-dialog img {
+  border-radius: 14px;
+  display: block;
+  max-height: 82vh;
+  max-width: min(84vw, 640px);
+  object-fit: contain;
+}
+
+.profile-photo-modal-close {
+  align-items: center;
+  background: #ffffff;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 3px 12px rgba(3, 18, 47, 0.18);
+  color: #132f46;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 1.75rem;
+  height: 38px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0 0 3px;
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  width: 38px;
+}
+
+.profile-photo-modal-close:focus-visible {
+  box-shadow: 0 0 0 4px rgba(23, 134, 109, 0.3), 0 3px 12px rgba(3, 18, 47, 0.18);
+  outline: 0;
+}
+
+.profile-photo-modal-identity {
+  display: grid;
+  gap: 3px;
+  padding-top: 12px;
+  text-align: center;
+}
+
+.profile-photo-modal-identity strong {
+  color: #102c44;
+  font-size: 1.05rem;
+}
+
+.profile-photo-modal-identity span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 @media (min-width: 720px) {
   .identity-panel {
     align-items: center;
@@ -3587,6 +3686,20 @@ button:disabled,
   .profile-photo-identity {
     flex-basis: 50px;
     width: 50px;
+  }
+
+  .profile-photo-modal {
+    padding: 12px;
+  }
+
+  .profile-photo-modal-dialog {
+    max-width: 96vw;
+    padding: 44px 12px 14px;
+  }
+
+  .profile-photo-modal-dialog img {
+    max-height: 80vh;
+    max-width: calc(96vw - 24px);
   }
 
   .admin-student-card-heading {

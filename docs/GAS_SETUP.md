@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.1.0 yang disahkan sebelum ciri foto profil menggunakan GAS Web App **Version 29**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.1.0 semasa menggunakan GAS Web App **Version 31**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Source backend kanonik ialah `gas/Code.gs`.
 
 ## Tanggungjawab Backend
 
@@ -13,6 +13,7 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - menulis `AUDIT_LOG`;
 - menghantar notifikasi Telegram;
 - mengesahkan, menyimpan dan menghantar bukti selfie pulang.
+- mengesahkan upload/removal foto profil serta penghantaran batch private kepada viewer yang dibenarkan.
 
 ## Router Public GET
 
@@ -125,10 +126,10 @@ Akaun yang menjalankan setup dan deployment perlu meluluskan scope berkaitan seb
 
 ## `clasp` Workflow
 
-Semak project:
+Semak whitelist sebenar sebelum push:
 
 ```powershell
-clasp status
+clasp show-file-status
 ```
 
 Semak syntax GAS:
@@ -165,8 +166,9 @@ Kekalkan URL deployment sedia ada. `clasp push` tidak menggantikan langkah deplo
 8. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
 9. Sahkan Public Monitoring tidak mengandungi metadata selfie.
 10. Uji tambah/ganti foto Pelajar, batch thumbnail Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
-11. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at` atau data URI.
-12. Jalankan regression suite repo dan pastikan semua ujian lulus.
+11. Uji klik preview pada Pelajar, Warden/HEP, Guard dan Admin; sahkan ia menggunakan data URI batch sedia ada tanpa request tambahan atau URL/ID Drive.
+12. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at`, data URI atau trigger preview.
+13. Jalankan regression suite repo dan pastikan semua ujian lulus.
 
 Jika `/exec` masih memulangkan behavior lama selepas `clasp push`, semak Manage deployments dan pastikan version baharu telah dipilih.
 

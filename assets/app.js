@@ -228,6 +228,8 @@ let studentProfilePhotos = new Map();
 let studentProfileUploadInFlight = false;
 let profilePhotoBatchWarningAt = 0;
 let profilePhotoBatchWarningType = "";
+let profilePhotoPreviewTrigger = null;
+let profilePhotoPreviewBodyOverflow = "";
 let activeAdminSectionV200 = "outing";
 let adminMonitoringV210 = null;
 let adminMonitoringFilterV210 = "all";
@@ -306,6 +308,11 @@ const els = {
   studentProfilePhotoPicker: document.querySelector("#studentProfilePhotoPicker"),
   studentProfilePhotoInput: document.querySelector("#studentProfilePhotoInput"),
   studentProfilePhotoMessage: document.querySelector("#studentProfilePhotoMessage"),
+  profilePhotoModal: document.querySelector("#profilePhotoModal"),
+  profilePhotoModalClose: document.querySelector("#profilePhotoModalClose"),
+  profilePhotoModalImage: document.querySelector("#profilePhotoModalImage"),
+  profilePhotoModalName: document.querySelector("#profilePhotoModalName"),
+  profilePhotoModalMeta: document.querySelector("#profilePhotoModalMeta"),
   requestTypeSelect: document.querySelector("#requestTypeSelect"),
   studentOutingTypesState: document.querySelector("#studentOutingTypesState"),
   studentOutingTypesMessage: document.querySelector("#studentOutingTypesMessage"),
@@ -524,6 +531,7 @@ function setupAccessEnhancements() {
   setupStatisticsPanel();
   setupAdminDashboardV200();
   setupStudentProfilePhotoControls();
+  setupProfilePhotoPreview();
 }
 
 function setupStudentLiClassV200() {
@@ -763,6 +771,7 @@ function clearAdminRuntimeCredentialV200() {
 }
 
 function exitAdminSessionV200() {
+  closeProfilePhotoPreview();
   clearAdminRuntimeCredentialV200();
   currentSession = null;
   els.appWorkspace.classList.remove("active");
@@ -1068,7 +1077,7 @@ function adminStudentCardV200(student) {
     <article class="admin-student-card ${isActive ? "is-active" : "is-inactive"}">
       <div class="admin-student-card-heading">
         <div class="admin-student-identity">
-          ${profilePhotoMarkup(student.student_id, student.nama, "profile-photo-thumbnail")}
+          ${profilePhotoMarkup(student.student_id, student.nama, "profile-photo-thumbnail", [student.kelas, student.student_id].filter(Boolean).join(" · "))}
           <div>
             <div class="admin-student-code-row">
               <span class="admin-student-id">${escapeHtml(student.student_id)}</span>
@@ -1946,6 +1955,7 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
 });
 
 els.logoutButton.addEventListener("click", () => {
+  closeProfilePhotoPreview();
   clearSavedSession();
   stopWardenAutoRefresh();
   stopStudentAutoRefresh();
@@ -3114,14 +3124,76 @@ function safeProfilePhotoDataUri(value) {
   return /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(dataUri) ? dataUri : "";
 }
 
-function profilePhotoMarkup(studentId, studentName, extraClass = "") {
+function profilePhotoMarkup(studentId, studentName, extraClass = "", studentMeta = "") {
   const photo = studentProfilePhotos.get(profilePhotoCacheKey(studentId));
   const dataUri = safeProfilePhotoDataUri(photo && photo.photo_data_uri);
   const className = `profile-photo-frame ${extraClass}`.trim();
   if (dataUri) {
-    return `<span class="${className}"><img src="${escapeHtml(dataUri)}" alt="Foto profil ${escapeHtml(studentName || "pelajar")}"></span>`;
+    return `<button class="${className} profile-photo-preview-trigger" type="button" data-profile-photo-preview="${escapeHtml(studentId)}" data-profile-photo-name="${escapeHtml(studentName || "Pelajar")}" data-profile-photo-meta="${escapeHtml(studentMeta)}" aria-label="Lihat foto profil ${escapeHtml(studentName || "pelajar")}"><img src="${escapeHtml(dataUri)}" alt=""></button>`;
   }
   return `<span class="${className} profile-photo-placeholder" aria-label="Tiada foto profil">${escapeHtml(profilePhotoInitials(studentName))}</span>`;
+}
+
+function setupProfilePhotoPreview() {
+  if (!els.profilePhotoModal || els.profilePhotoModal.dataset.ready === "1") return;
+  els.profilePhotoModal.dataset.ready = "1";
+  document.addEventListener("click", handleProfilePhotoPreviewClick);
+  document.addEventListener("keydown", handleProfilePhotoPreviewKeydown);
+}
+
+function handleProfilePhotoPreviewClick(event) {
+  const trigger = event.target.closest("[data-profile-photo-preview]");
+  if (trigger) {
+    openProfilePhotoPreview(trigger);
+    return;
+  }
+  if (!els.profilePhotoModal || els.profilePhotoModal.hidden) return;
+  if (event.target === els.profilePhotoModal || event.target.closest("#profilePhotoModalClose")) {
+    closeProfilePhotoPreview();
+  }
+}
+
+function handleProfilePhotoPreviewKeydown(event) {
+  if (event.key === "Escape" && els.profilePhotoModal && !els.profilePhotoModal.hidden) {
+    event.preventDefault();
+    closeProfilePhotoPreview();
+    return;
+  }
+  if (event.key === "Tab" && els.profilePhotoModal && !els.profilePhotoModal.hidden) {
+    event.preventDefault();
+    els.profilePhotoModalClose.focus();
+  }
+}
+
+function openProfilePhotoPreview(trigger) {
+  if (!currentSession || !trigger || !els.profilePhotoModal) return;
+  const studentId = String(trigger.dataset.profilePhotoPreview || "").trim();
+  const photo = studentProfilePhotos.get(profilePhotoCacheKey(studentId));
+  const dataUri = safeProfilePhotoDataUri(photo && photo.photo_data_uri);
+  if (!dataUri) return;
+  const studentName = String(trigger.dataset.profilePhotoName || "Pelajar").trim() || "Pelajar";
+  const studentMeta = String(trigger.dataset.profilePhotoMeta || "").trim();
+  profilePhotoPreviewTrigger = trigger;
+  els.profilePhotoModalImage.src = dataUri;
+  els.profilePhotoModalImage.alt = `Foto profil ${studentName}`;
+  els.profilePhotoModalName.textContent = studentName;
+  els.profilePhotoModalMeta.textContent = studentMeta;
+  els.profilePhotoModalMeta.hidden = !studentMeta;
+  profilePhotoPreviewBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+  els.profilePhotoModal.hidden = false;
+  els.profilePhotoModalClose.focus();
+}
+
+function closeProfilePhotoPreview() {
+  if (!els.profilePhotoModal || els.profilePhotoModal.hidden) return;
+  els.profilePhotoModal.hidden = true;
+  els.profilePhotoModalImage.removeAttribute("src");
+  els.profilePhotoModalImage.alt = "";
+  document.body.style.overflow = profilePhotoPreviewBodyOverflow;
+  const trigger = profilePhotoPreviewTrigger;
+  profilePhotoPreviewTrigger = null;
+  if (trigger && document.contains(trigger)) trigger.focus();
 }
 
 function buildProfilePhotoAccessPayload(studentIds) {
@@ -3185,10 +3257,16 @@ function renderStudentProfilePhotoArea() {
     els.studentIdentityProfilePhoto.innerHTML = profilePhotoMarkup(
       studentId,
       student.name || student.nama || "Pelajar",
-      "profile-photo-identity"
+      "profile-photo-identity",
+      [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · ")
     );
   }
-  els.studentProfilePhotoPreview.innerHTML = profilePhotoMarkup(studentId, student.name || student.nama || "Pelajar", "profile-photo-frame-large");
+  els.studentProfilePhotoPreview.innerHTML = profilePhotoMarkup(
+    studentId,
+    student.name || student.nama || "Pelajar",
+    "profile-photo-frame-large",
+    [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · ")
+  );
   els.studentProfilePhotoTitle.textContent = hasPhoto ? "Foto Profil" : "Tiada Foto Profil";
   const updatedAt = photo && photo.photo_updated_at || student.photo_updated_at || "";
   els.studentProfilePhotoUpdated.textContent = updatedAt ? `Dikemas kini: ${formatDisplayDateTime(updatedAt)}` : "";
@@ -5759,7 +5837,7 @@ function recordCard(record, mode) {
     <article class="${cardClass}" ${cardAttrs}>
       <div class="record-top">
         <div class="record-person">
-          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail")}
+          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail", [record.className || record.kelas, record.student_id || record.studentId].filter(Boolean).join(" · "))}
           <div>
             <h3>${escapeHtml(record.studentName)}</h3>
             <div class="record-meta">${escapeHtml(record.id)} | ${escapeHtml(record.className)}</div>
@@ -5806,7 +5884,7 @@ function guardReturnCard(record, actions) {
     <article class="${cardClass}" ${recordDataAttributes(record)}>
       <div class="guard-return-top">
         <div class="record-person">
-          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail")}
+          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail", [record.className || record.kelas, record.student_id || record.studentId].filter(Boolean).join(" · "))}
           <div>
             <h3>${escapeHtml(record.studentName || record.nama || "-")}</h3>
             <div class="record-meta">${escapeHtml(record.className || record.kelas || "-")} · ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}</div>
