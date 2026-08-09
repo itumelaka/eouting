@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.1.0 semasa menggunakan GAS Web App **Version 31**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Source backend kanonik ialah `gas/Code.gs`.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.2.0 menggunakan GAS Web App **Version 32**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp.
 
 ## Tanggungjawab Backend
 
@@ -13,7 +13,7 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - menulis `AUDIT_LOG`;
 - menghantar notifikasi Telegram;
 - mengesahkan, menyimpan dan menghantar bukti selfie pulang.
-- mengesahkan upload/removal foto profil serta penghantaran batch private kepada viewer yang dibenarkan.
+- mengesahkan upload/removal foto profil serta penghantaran thumbnail batch/full on-demand private kepada viewer yang dibenarkan.
 
 ## Router Public GET
 
@@ -121,6 +121,7 @@ Authorization Apps Script diperlukan untuk:
 - Spreadsheet (`SpreadsheetApp`) bagi membaca/menulis rekod;
 - Google Drive (`DriveApp`) bagi folder dan fail selfie;
 - external request (`UrlFetchApp`) bagi Telegram Bot API.
+- token Apps Script + `UrlFetchApp` bagi metadata Drive API v3 dan server-side thumbnail download; `thumbnailLink` tidak dihantar ke browser.
 
 Akaun yang menjalankan setup dan deployment perlu meluluskan scope berkaitan sebelum ujian production.
 
@@ -165,8 +166,8 @@ Kekalkan URL deployment sedia ada. `clasp push` tidak menggantikan langkah deplo
 7. Semak Telegram tanpa mendedahkan token dalam log.
 8. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
 9. Sahkan Public Monitoring tidak mengandungi metadata selfie.
-10. Uji tambah/ganti foto Pelajar, batch thumbnail Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
-11. Uji klik preview pada Pelajar, Warden/HEP, Guard dan Admin; sahkan ia menggunakan data URI batch sedia ada tanpa request tambahan atau URL/ID Drive.
+10. Uji tambah/ganti foto Pelajar, `photo_variant = "thumbnail"` pada Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
+11. Uji klik preview pada Pelajar, Warden/HEP, Guard dan Admin; sahkan modal membuat maksimum satu `photo_variant = "full"` bagi student yang belum dicache, pembukaan kedua menggunakan cache, dan tiada URL/ID Drive didedahkan.
 12. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at`, data URI atau trigger preview.
 13. Jalankan regression suite repo dan pastikan semua ujian lulus.
 

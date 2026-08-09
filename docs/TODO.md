@@ -1,8 +1,18 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas release **v2.1.0**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 32** pada 9 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### eOuting v2.2.0 Production Close-out
+
+- [x] Enam modul Admin inline: Pemantauan, Statistik, Rekod Master, Warden/HEP/Guard, Tetapan Pelajar dan Tetapan Outing.
+- [x] Pengurusan staff, pelajar dan outing type serta Rekod Master search/filter/pagination.
+- [x] Foto profil private: self-upload, crop/compression, metadata STUDENTS, Admin removal dan initials fallback.
+- [x] Two-tier photo delivery: unique-ID thumbnail batch, server-side Drive thumbnail, one-student full preview, cache sesi, duplicate suppression dan safe failure.
+- [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
+- [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
+- [x] GAS Version 32, endpoint lama, GitHub Pages/cache delivery dan smoke test production disahkan.
 
 ### eOuting v2.0 — Fasa 2 Schema dan Migration
 
@@ -61,7 +71,7 @@ Senarai kerja semasa selepas release **v2.1.0**. Rekod fasa terdahulu dikekalkan
 - [x] API/GAS dikecualikan daripada Cache Storage dan cache lama dibersihkan.
 - [x] Staff runtime credential restoration selepas fresh login.
 - [x] Foto profil private dengan batch authenticated, initials fallback dan Admin removal ber-audit.
-- [x] Preview besar foto profil authorised menggunakan cache sedia ada tanpa Drive URL/ID atau N+1 request.
+- [x] Preview besar foto profil authorised menggunakan full-image on-demand satu pelajar, cache sesi dan retry selamat tanpa Drive URL/ID atau N+1 list request.
 
 ### Status dan Guard UX
 
@@ -126,7 +136,6 @@ Senarai kerja semasa selepas release **v2.1.0**. Rekod fasa terdahulu dikekalkan
 - [x] Bina `getOutingTypes` dengan kontrak public projection selamat.
 - [x] Bina CRUD backend dan Dashboard Admin pada fasa berasingan.
 - [ ] Aktifkan config-driven submission hanya selepas live migration, feature flag dan rollback diuji/diluluskan.
-- [ ] Bump metadata secara atomik kepada `v2.0.0-beta.1` hanya apabila beta hendak diterbitkan.
 - [ ] Sediakan persekitaran beta berasingan atau kelulusan khusus jika menggunakan data production.
 - [ ] Sambungkan `require_selfie` kepada lifecycle sebelum membenarkannya sebagai tetapan operasi.
 - [ ] Jadikan statistik dan label Telegram config-aware sebelum jenis custom dibuka secara umum.

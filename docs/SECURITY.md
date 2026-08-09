@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan repo semasa **v2.1.0**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan production **v2.2.0 / GAS Version 32**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -63,7 +63,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache semasa ialah `eouting-cache-v2.1.0`.
+- Cache semasa ialah `eouting-cache-v2.2.0`; revision preview tidak aktif.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -96,13 +96,17 @@ Gambar disimpan dalam folder Google Drive private. `LockService` merangkumi sema
 - Upload mengesahkan semula `student_id` + `no_matrik` pelajar aktif dan hanya mengemas kini row pelajar tersebut.
 - MIME dibenarkan hanya JPEG, PNG dan WebP; SVG, bukan-imej dan payload berlebihan ditolak pada client dan GAS.
 - `PROFILE_PHOTO_FOLDER_ID` menunjuk ke folder private yang berasingan daripada `SELFIE_FOLDER_ID`; code tidak memanggil `setSharing` atau menghasilkan URL public.
-- API operasi memulangkan indikator sahaja. Byte foto kompak diperoleh melalui satu POST batch yang mengesahkan Student, Warden/HEP, Guard atau Admin. Pelajar dihadkan kepada ID sendiri.
-- Thumbnail sebenar ialah trigger preview hanya selepas byte selamat wujud dalam cache authenticated. Modal menggunakan data URI stored-compressed yang sama dan tidak membuat request tambahan, meminta file ID atau membina URL Drive.
+- API operasi memulangkan indikator sahaja. Byte foto kompak diperoleh melalui satu POST batch `photo_variant = "thumbnail"` yang mengesahkan Student, Warden/HEP, Guard atau Admin. Pelajar dihadkan kepada ID sendiri; staff operasi dihadkan kepada student operasi semasa.
+- Selepas authorization, GAS menyelesaikan fail private, mendapatkan Drive API v3 `thumbnailLink` dan memuat turun thumbnail menggunakan OAuth Apps Script. Response hanya mengandungi data URI selamat; file ID, Drive URL, `thumbnailLink` dan token tidak dihantar.
+- Thumbnail sebenar ialah trigger preview hanya selepas byte selamat wujud dalam cache authenticated. Modal meminta `photo_variant = "full"` untuk satu pelajar jika full cache kosong, menunjukkan loading/error/retry selamat dan menggunakan cache sesi pada pembukaan seterusnya.
+- Cache thumbnail/full, loaded/negative state dan concurrent requests adalah berasingan serta diinvalidasi bersama selepas replacement/removal. Kegagalan thumbnail tidak membuat fallback bulk kepada imej stored 600×800.
 - Preview memaparkan hanya nama serta kelas/ID yang sudah tersedia secara sah kepada viewer tersebut. Initials placeholder tidak interactive dan Public Monitoring tidak merender trigger preview.
 - Public Monitoring/GET tidak menerima foto, file ID, data URI atau masa kemas kini foto.
 - Semasa replacement, fail baharu dicipta dan metadata Sheet disimpan dahulu. Fail lama hanya ditrash selepas disahkan mempunyai parent folder profil yang dikonfigurasi. Kegagalan sebelum metadata baharu disimpan mengekalkan foto lama.
 - Admin removal memerlukan credential aktif, pengesahan UI, mengosongkan metadata, mengehadkan trash kepada folder profil dan menulis `REMOVE_STUDENT_PROFILE_PHOTO` tanpa byte imej.
 - Foto profil tidak dihantar ke Telegram dan tidak menggunakan mana-mana field `selfie_*`.
+
+Authorization tetap dijalankan pada setiap thumbnail/full request; cache tidak menyimpan keputusan authorization. Manifest tidak menambah explicit OAuth scope baharu kerana Drive dan external-request sudah digunakan oleh backend. `.claspignore` mesti mengehadkan deploy kepada `gas/appsscript.json` dan source kanonik `gas/Code.gs`; snapshot GAS lama tidak boleh berada dalam payload deploy.
 
 Frontend role hiding, button visibility, PWA install dan local state bukan security enforcement.
 

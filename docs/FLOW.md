@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow repo semasa **v2.1.0**.
+Dokumen ini menerangkan flow production semasa **v2.2.0** dengan GAS Version 32.
 
 ## Backend Config API v2.0
 
@@ -134,7 +134,7 @@ Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown me
 
 Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords`. Active request menghalang permohonan baharu sehingga selesai atau ditolak.
 
-Pelajar boleh upload/ganti foto profil sendiri. Satu batch authenticated memuatkan foto stored-compressed ke cache selepas sesi dibuka. Thumbnail sebenar pada identiti Pelajar boleh membuka modal besar daripada cache yang sama; initials tidak mempunyai tindakan klik.
+Pelajar boleh upload/ganti foto profil sendiri. Identity/editor memuatkan thumbnail melalui batch authenticated dan editor sendiri boleh menggunakan imej penuh. Klik thumbnail membuka modal; jika full cache belum tersedia, satu request authenticated `photo_variant = "full"` dibuat untuk pelajar itu sahaja. Initials tidak mempunyai tindakan klik.
 
 Selepas Guard mengesahkan masuk, bukti selfie pulang diwajibkan untuk kelima-lima jenis permohonan. Sebelum submission, dashboard menunjukkan `Bukti Selfie Belum Dihantar`. Selepas berjaya, action upload hilang dan dashboard menunjukkan `Bukti Selfie Dihantar` bersama `Masa Bukti`.
 
@@ -151,7 +151,7 @@ Warden boleh:
 
 Checklist memaparkan semua jenis permohonan. Ikon dan label menggunakan status kontekstual pusat.
 
-Kad Warden/HEP dan Guard memuat thumbnail melalui satu batch authenticated bagi ID operasi yang dibenarkan. Klik foto sebenar membuka data URI cached dalam modal; tiada request per kad atau per preview, dan butang approve/reject/confirm kekal berasingan serta boleh digunakan.
+Kad Warden/HEP dan Guard memuat `photo_variant = "thumbnail"` melalui satu batch authenticated bagi ID operasi unik yang dibenarkan. Request serentak/duplicate ditekan dan kegagalan menggunakan initials. Klik foto sebenar membuka thumbnail/loading modal lalu memuat satu `photo_variant = "full"` jika belum dicache; butang approve/reject/confirm kekal berasingan serta explicit.
 
 ## Guard
 
@@ -161,6 +161,8 @@ Seksyen utama:
 
 - `Sedia Untuk Keluar`;
 - `Sedang Keluar`.
+
+Tindakan `Sahkan Keluar` menggunakan penegasan oren dan `Sahkan Masuk` menggunakan penegasan hijau. Kedua-duanya kekal pada handler `confirmOut`/`confirmIn` sedia ada dan tidak dicetuskan oleh shortcut Enter generik.
 
 Quick filter Guard:
 
@@ -255,3 +257,27 @@ Tanpa `mock=1`, cabang mock tidak boleh dicapai dan `apiPost` meneruskan request
 Selepas login, identiti sesi, tajuk `Admin eOuting` dan navigasi kekal visible. Enam panel inline ialah `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`.
 
 `Admin login -> Tetapan Pelajar -> getAdminStudents/createStudent/updateStudent/toggleStudentStatus` menggunakan POST dan credential Admin runtime sedia ada. Status `TIDAK AKTIF` menyebabkan rekod tidak lagi dipulangkan oleh public `getStudents`, tanpa mengubah `OUTING_REQUESTS` atau sejarah outing. LI ialah nilai `kelas` dalam STUDENTS, bukan role login baharu. Thumbnail sebenar Admin boleh dipreview daripada batch authenticated yang sama; removal kekal tindakan berasingan dan ber-audit.
+
+## Foto Profil Dua Peringkat
+
+```text
+Operational/list render -> initials segera
+  -> POST getStudentProfilePhotos photo_variant=thumbnail (ID unik, batch)
+  -> authorize viewer -> Drive API v3 metadata -> server-side OAuth thumbnail fetch
+  -> safe data URI sahaja -> thumbnail session cache
+
+Klik thumbnail -> semak full-image session cache
+  -> cache hit: buka terus
+  -> cache miss: modal thumbnail/loading
+       -> POST getStudentProfilePhotos photo_variant=full (satu student_id)
+       -> full image menggantikan thumbnail -> cache sesi
+       -> failure: error/retry selamat
+```
+
+`thumbnailLink`, Drive file ID/URL dan OAuth token tidak meninggalkan GAS. Thumbnail gagal tidak menyebabkan bulk fallback imej 600×800. Public Pemantauan tidak memanggil endpoint atau merender metadata foto.
+
+## Keyboard dan Rolling KPI
+
+Enter menghantar login Pelajar, Warden/HEP, Guard dan Admin serta editor Admin biasa apabila fokus pada input/select satu baris. Submit menggunakan handler/button sedia ada dan lock loading; textarea kekal newline. Tiada shortcut global atau Enter untuk approve, reject, sahkan keluar/masuk, nyahaktif, reset PIN, buang foto atau logout.
+
+KPI yang sesuai bergerak daripada nilai sebelumnya kepada integer akhir tepat dalam kira-kira 450 ms. Nilai sama tidak replay dan reduced-motion memaparkan nilai akhir terus. ID, tarikh, masa, telefon, pagination dan duration string tidak dianimasikan.

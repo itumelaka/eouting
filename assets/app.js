@@ -1,4 +1,4 @@
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200 = "https://script.google.com/macros/s/AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1/exec";
 const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
@@ -7637,11 +7637,11 @@ function toggleReleaseNotesV15() {
     panel.innerHTML = `
       <h3>Apa yang baharu v${APP_VERSION}</h3>
       <ul>
-        <li>Bukti selfie pulang asrama untuk semua jenis permohonan</li>
-        <li>Kamera depan dan preview gambar sebelum dihantar</li>
-        <li>Gambar disimpan ke Google Drive</li>
-        <li>Bukti gambar dihantar ke Telegram</li>
-        <li>Status bukti dipaparkan kepada pelajar</li>
+        <li>Modul Admin disusun dalam satu dashboard dengan Statistik bersepadu</li>
+        <li>Foto profil private menggunakan thumbnail pantas dan preview penuh apabila diminta</li>
+        <li>Pemantauan Warden dan Guard memaparkan foto bagi pengguna yang sah</li>
+        <li>KPI tahunan bergerak dan penghantaran borang selamat melalui kekunci Enter</li>
+        <li>Bukti selfie outing kekal berasingan daripada foto profil pelajar</li>
       </ul>
       <h3>Sejarah v1.6.26</h3>
       <ul>

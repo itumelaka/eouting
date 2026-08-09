@@ -2,7 +2,7 @@
 
 eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Versi repo semasa: **v2.1.0 — Statistik Selamat dan Operasi Guard Diperkemas**.
+Versi repo semasa: **v2.2.0 — Operasi Bersepadu dan Foto Profil Private Dua Peringkat**.
 
 - Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
 - Backend: Google Apps Script (GAS) Web App
@@ -10,13 +10,13 @@ Versi repo semasa: **v2.1.0 — Statistik Selamat dan Operasi Guard Diperkemas**
 - Notifikasi: Telegram Bot melalui GAS
 - Repo: [itumelaka/eouting](https://github.com/itumelaka/eouting)
 
-## Status Production v2.1.0
+## Status Production v2.2.0
 
-Frontend production v2.1.0 diterbitkan melalui commit `chore: bump eOuting version to 2.1.0` (commit release ini). Production berada di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS sedia ada.
+Frontend production v2.2.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Backend production semasa menggunakan GAS **Version 31**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` kekal source GAS executable kanonik dan `.claspignore` mengehadkan push kepada source GAS serta manifest yang dibenarkan.
+Backend production semasa menggunakan GAS **Version 32**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
-Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
+Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
 ## Architecture Ringkas
 
@@ -75,9 +75,11 @@ Backend menyemak pemilikan melalui `student_id` + `no_matrik`, status `SELESAI`,
 
 Pelajar berautentikasi boleh menambah atau mengganti foto profil sendiri. Frontend menerima JPEG, PNG atau WebP sehingga 2 MB, memotong paparan tengah kepada nisbah 3:4 dan mengecilkan kepada maksimum kira-kira 600×800 sebelum menghantar JPEG termampat. Metadata private disimpan pada `STUDENTS.photo_file_id` dan `STUDENTS.photo_updated_at`; base64 tidak disimpan dalam Sheet.
 
-Warden/HEP, Guard dan Admin mengambil foto kompak melalui satu POST batch berautentikasi. API operasi hanya membawa indikator `has_profile_photo`; Public Monitoring dan semua GET awam tidak menerima foto, Drive ID atau metadata foto. Fail berada dalam folder private `eOuting - Foto Profil Pelajar` yang ditetapkan melalui `PROFILE_PHOTO_FOLDER_ID`. Foto profil tidak menggunakan field, folder atau Telegram workflow bukti selfie pulang.
+Satu foto aktif dimaksudkan bagi setiap pelajar. Semasa replacement, fail baharu dicipta dan metadata Sheet di-commit/flush dahulu; hanya selepas itu fail lama yang disahkan berada dalam folder profil ditrash. Admin boleh membuang foto melalui tindakan confirmed berautentikasi.
 
-Thumbnail sebenar boleh dibuka sebagai preview besar oleh Pelajar sendiri, Warden/HEP, Guard dan Admin yang telah dibenarkan. Preview menggunakan data URI 600×800-ish yang sudah berada dalam cache authenticated, tidak membuat request tambahan, tidak membuka tab baharu dan tidak mendedahkan URL atau ID Drive. Placeholder initials tidak boleh diklik. Modal menyokong butang tutup, klik backdrop, kekunci Escape, scroll lock dan pemulangan fokus.
+Warden/HEP, Guard dan Admin mengambil foto kompak melalui satu POST batch berautentikasi dengan `photo_variant = "thumbnail"`. GAS mengesahkan viewer dahulu, mendapatkan `thumbnailLink` melalui Drive API v3 dan memuat turun thumbnail menggunakan OAuth Apps Script pada server. Browser hanya menerima data URI imej selamat; file ID, URL Drive, `thumbnailLink` dan token tidak pernah dipulangkan. API operasi hanya membawa indikator `has_profile_photo`; Public Monitoring dan semua GET awam tidak menerima foto atau metadata foto. Fail berada dalam folder private `eOuting - Foto Profil Pelajar` yang ditetapkan melalui `PROFILE_PHOTO_FOLDER_ID`.
+
+Thumbnail sebenar boleh dibuka sebagai preview besar oleh Pelajar sendiri, Warden/HEP, Guard dan Admin yang telah dibenarkan. Jika imej penuh belum dicache, modal menunjukkan thumbnail/loading kemudian membuat satu request `photo_variant = "full"` untuk pelajar tersebut sahaja. Imej penuh menggantikan thumbnail dan dicache sepanjang sesi; pembukaan kedua tidak membuat request semula. Kegagalan menunjukkan retry selamat. Placeholder initials tidak boleh diklik. Modal menyokong butang tutup, klik backdrop, kekunci Escape, scroll lock dan pemulangan fokus.
 
 Backend menyimpan nilai status asal seperti `KELUAR`. Frontend memaparkan label kontekstual:
 
@@ -157,11 +159,15 @@ node --check service-worker.js
 Get-Content gas/Code.gs -Raw | node --check -
 ```
 
-## Modul Operasi Admin v2.1.0
+## Modul Operasi Admin v2.2.0
 
 Dashboard Admin mengekalkan shell dan enam modul inline dalam urutan dua baris: `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`. Statistik tidak mempunyai workspace awam atau shell berasingan; agregat, filter bulan/tahun/kelas dan statistik individu hanya dimuat melalui sesi Admin. Rekod Master menyediakan carian/filter/pagination, Pemantauan ialah paparan operasi baca sahaja, dan jumlah outing tahunan turut dipaparkan kepada Pelajar. Endpoint Admin mengesahkan credential menggunakan `validateAdminCredentials_()` pada setiap permintaan.
 
 Identiti staff kekal menggunakan tab `WARDENS` dan `GUARDS` sedia ada; tiada tab atau migration baharu diperlukan. Admin boleh menetapkan PIN semasa create atau reset melalui edit, tetapi PIN sedia ada tidak pernah dipulangkan ke frontend atau dimasukkan dalam audit. Perubahan staff direkod sebagai `CREATE_STAFF`, `UPDATE_STAFF`, `ACTIVATE_STAFF`, `DEACTIVATE_STAFF` dan `RESET_STAFF_PIN`.
+
+KPI menggunakan animasi count-up halus kira-kira 450 ms daripada nilai sebelumnya kepada integer tepat. Nilai yang tidak berubah tidak dimainkan semula dan `prefers-reduced-motion` dihormati. Animasi tidak digunakan pada ID, tarikh, masa, telefon, pagination atau string tempoh.
+
+Enter menghantar borang login Pelajar, Warden/HEP, Guard dan Admin serta borang tambah/edit Admin yang selamat. Handler menggunakan submit form sedia ada dengan lock disabled/loading; tiada shortcut Enter global. Enter dalam textarea kekal newline, manakala tindakan operasi atau destructive seperti approve, reject, sahkan keluar/masuk, reset PIN dan buang foto kekal explicit.
 
 ## Deployment Ringkas
 
@@ -182,6 +188,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production semasa ialah **Version 31**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan. Preview foto dalam perubahan semasa ialah frontend-only dan tidak memerlukan setup helper atau deployment GAS baharu.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 32** dan telah disahkan pada 9 Ogos 2026; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

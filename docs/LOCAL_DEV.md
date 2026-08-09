@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.1.0**.
+Panduan ini merujuk eOuting ITU **v2.2.0** dan production GAS Version 32.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline release v2.0.0 ialah **177/177 lulus**.
+Baseline release v2.2.0 ialah **246/246 lulus** semasa close-out 9 Ogos 2026.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -158,7 +158,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 7. Selepas Guard confirm masuk, semak badge `Bukti Selfie Belum Dihantar`.
 8. Uji capture/pilih gambar, preview, ambil semula dan `Hantar Bukti`.
 9. Dalam mock mode, sahkan badge bertukar kepada `Bukti Selfie Dihantar` tanpa request Drive/Telegram.
-10. Jika foto profil sebenar tersedia, klik thumbnail identiti dan panel foto; sahkan modal menunjukkan nama/kelas-ID, Escape/backdrop/close berfungsi dan fokus kembali. Initials tidak boleh diklik.
+10. Jika foto profil sebenar tersedia, sahkan identity menggunakan thumbnail, klik foto dan pastikan modal menunjukkan thumbnail/loading sebelum full image jika cache kosong; pembukaan kedua menggunakan full-image cache. Escape/backdrop/close dan fokus kembali mesti berfungsi. Initials tidak boleh diklik.
 
 ## Smoke Test Warden
 
@@ -168,7 +168,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 4. Refresh Permohonan.
 5. Uji approve/reject dan Telegram.
 6. Pastikan credential hilang menghasilkan error, bukan data Public Monitoring.
-7. Klik foto sebenar pada kad Warden/HEP dan sahkan preview tidak mengganggu approve/reject atau membuat request foto tambahan.
+7. Klik foto sebenar pada kad Warden/HEP dan sahkan list menggunakan satu batch thumbnail, preview membuat hanya satu request full jika belum dicache, dan approve/reject tidak terganggu.
 
 ## Smoke Test Guard
 
@@ -177,7 +177,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 3. Uji filter Semua, Outing Harian, Pulang Bermalam, Cuti Semester, Kecemasan dan Lewat.
 4. Pastikan Outing Harian tidak menangkap Kecemasan.
 5. Uji confirm keluar/masuk dan Telegram.
-6. Klik foto sebenar pada setiap jenis kad Guard dan sahkan preview tidak mengganggu `Sahkan Keluar`/`Sahkan Masuk`; initials kekal inert.
+6. Klik foto sebenar pada setiap jenis kad Guard dan sahkan satu batch thumbnail digunakan, full preview dimuat on-demand/cached dan tidak mengganggu `Sahkan Keluar`/`Sahkan Masuk`; initials kekal inert.
 
 ## Smoke Test Public Monitoring
 
@@ -195,16 +195,24 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 1. Login Admin dan pastikan identiti, tajuk serta enam tab inline kekal visible ketika bertukar panel.
 2. Pastikan `Statistik` aktif inline dan filter/KPI/statistik individu dimuat tanpa butang `Kembali ke Admin`.
-3. Dalam `Tetapan Pelajar`, klik thumbnail sebenar dan sahkan preview menggunakan cache batch yang sama; `Buang Foto` kekal tindakan berasingan dengan confirmation.
+3. Dalam `Tetapan Pelajar`, sahkan list menggunakan thumbnail cache, klik foto dan pastikan satu full image dimuat on-demand lalu dicache; `Buang Foto` kekal tindakan berasingan dengan confirmation serta invalidasi kedua-dua cache.
 4. Semak Rekod Master search/filter/pagination, Pemantauan dan pengurusan Warden/HEP/Guard masih boleh ditukar tanpa login semula.
 
 ## PWA dan Cache
 
-- Semak footer v2.1.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.1.0`.
+- Semak footer v2.2.0 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v2.2.0` tanpa revision preview aktif.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.
+
+## Keyboard dan KPI QA
+
+- Tekan Enter pada login Pelajar, PIN Warden/HEP, PIN Guard dan PIN Admin; pastikan handler login biasa dipanggil sekali sahaja.
+- Tekan Enter pada input/select editor Admin biasa; pastikan Save dihantar sekali dan disabled/loading lock dihormati.
+- Tekan Enter dalam textarea; pastikan newline terbentuk dan form tidak dihantar.
+- Pastikan tiada Enter generik mencetuskan approve/reject, `Sahkan Keluar`, `Sahkan Masuk`, reset PIN, nyahaktif, buang foto atau logout.
+- Semak KPI count-up kira-kira 450 ms, exact integer akhir, previous-to-new, tiada replay apabila nilai sama dan reduced-motion bypass.
 
 ## Workflow Git
 

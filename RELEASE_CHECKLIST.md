@@ -2,7 +2,20 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (9 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.1.0, menggunakan GAS Version 31, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Source backend kanonik ialah `gas/Code.gs`; lihat `docs/DEPLOYMENT.md` untuk urutan release semasa dan hygiene `clasp show-file-status`/`.claspignore`.
+> Catatan semasa (9 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan GAS Version 32, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy. Lihat `docs/DEPLOYMENT.md` untuk urutan release semasa dan hygiene `clasp show-file-status`/`.claspignore`.
+
+## Close-out Production v2.2.0 — 9 Ogos 2026
+
+- [x] GAS Version 32 dideploy pada deployment Web App sedia ada tanpa menukar URL/access settings.
+- [x] Flow Pelajar, Warden/HEP, Guard dan enam modul Admin telah melalui smoke test production.
+- [x] Foto profil private, batch thumbnail dan full preview on-demand disahkan live.
+- [x] Public Pemantauan kekal photo-free dan Public Statistik tidak tersedia.
+- [x] Enter UX, rolling KPI dan cache/service-worker delivery disahkan.
+- [x] `APP_VERSION`, `version.json`, footer, asset query strings dan `CACHE_NAME` diselaraskan kepada `2.2.0`.
+- [x] `clasp show-file-status`/`.claspignore` mengehadkan source deploy kepada `gas/appsscript.json` dan `gas/Code.gs`.
+- [x] Dokumentasi current-state dan changelog disatukan untuk release v2.2.0.
+
+Urutan release seterusnya kekal: jalankan tests dan diff/status checks; semak `clasp show-file-status`; jalankan `clasp push` hanya jika GAS berubah; edit deployment Web App sedia ada kepada `New version`; kekalkan URL/access; authorize jika diminta; smoke-test production dan GitHub Pages/cache; kemudian tutup metadata frontend selepas backend production disahkan.
 
 ## Keputusan Semasa
 

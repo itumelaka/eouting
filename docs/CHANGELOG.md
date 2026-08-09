@@ -2,13 +2,22 @@
 
 ## Unreleased
 
-- **Foto profil Pelajar:** upload/ganti sendiri dengan compression JPEG 3:4, metadata `STUDENTS.photo_file_id` dan `photo_updated_at`, serta folder Drive private berasingan.
-- **Operasi:** thumbnail kompak dengan placeholder pada kad Warden/HEP dan Guard; Tetapan Pelajar Admin menyokong thumbnail dan confirmed removal ber-audit.
-- **Privasi:** foto dihantar melalui POST batch berautentikasi tanpa Drive ID/URL pada response awam; Public Monitoring kekal tanpa foto dan workflow selfie/Telegram tidak berubah.
-- **Preview:** thumbnail sebenar Pelajar, Warden/HEP, Guard dan Admin membuka modal portrait besar; initials kekal inert, dan close button/backdrop/Escape/scroll lock/focus return disokong.
-- **Performance:** preview menggunakan data URI stored-compressed kira-kira 600×800 daripada cache batch authenticated yang sama tanpa request tambahan atau N+1.
-- **Documentation:** current-state docs diselaraskan kepada aplikasi v2.1.0, production GAS Version 31, landing 2×2, Public Monitoring inline, Statistik Admin inline, enam modul Admin serta foto profil/selfie yang berasingan.
-- **Production:** ciri foto profil telah operational pada GAS Version 31. Preview semasa tidak mengubah GAS, schema atau service worker dan tidak memerlukan deployment backend baharu.
+Tiada perubahan belum direlease pada masa close-out v2.2.0.
+
+## v2.2.0 — 2026-08-09
+
+- **Admin operations:** menyatukan Pemantauan operasi, Statistik selamat, Rekod Master, pengurusan Warden/HEP/Guard, Tetapan Pelajar dan Tetapan Outing sebagai enam panel inline dalam shell Admin authenticated.
+- **Statistik:** mengekalkan aggregate KPI, filter bulan/tahun/kelas, statistik individu Admin, ringkasan kelas/status dan jumlah outing tahunan Pelajar yang self-only; Public Statistik UI dan statistik individu awam kekal tiada.
+- **Master dan pengurusan:** menambah carian/filter/pagination Rekod Master serta create/edit/aktif/nyahaktif untuk staff dan pelajar tanpa mendedahkan PIN atau mengubah schema role sedia ada.
+- **Landing dan monitoring:** menggunakan grid empat kad kompak 2×2, akses Admin berasingan dan Public Pemantauan inline yang kekal photo-free.
+- **Foto profil:** menambah upload/ganti sendiri, crop pusat 3:4, compression maksimum kira-kira 600×800, metadata private STUDENTS, Admin removal dan initials fallback.
+- **Private photo delivery:** menggunakan `photo_variant = "thumbnail"` untuk batch list dan `photo_variant = "full"` untuk satu pelajar apabila preview dibuka. Drive `thumbnailLink`, file ID, URL dan OAuth token kekal server-side/private.
+- **Operational identification:** thumbnail authenticated tersedia pada Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; preview penuh dicache sepanjang sesi dan mempunyai loading/error/retry selamat.
+- **Selfie separation:** bukti selfie pulang kekal pada folder, schema, submission dan Telegram `sendPhoto` yang berasingan; foto profil tidak dihantar ke Telegram.
+- **UX:** membezakan butang Guard keluar berwarna oren dan masuk berwarna hijau, menambah Enter submit yang scoped/selamat serta animasi KPI kira-kira 450 ms dengan reduced-motion.
+- **PWA:** membersihkan revision preview dan menyelaraskan `APP_VERSION`, footer, `version.json`, asset query serta cache service worker kepada `2.2.0`.
+- **Documentation:** menyatukan current production architecture, deployment runbook, security boundary, project status dan TODO tanpa menulis semula sejarah release lama.
+- **Production:** GAS Version 32 dideploy dan disahkan pada 9 Ogos 2026 menggunakan Spreadsheet dan endpoint production sedia ada.
 
 ## v2.1.0 — 2026-08-09
 

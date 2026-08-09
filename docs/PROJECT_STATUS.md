@@ -1,16 +1,16 @@
 # Project Status eOuting ITU
 
-Status repo semasa: **v2.1.0 — production frontend release**.
+Status repo semasa: **v2.2.0 — production verified**.
 
-## eOuting v2.1 Production
+## eOuting v2.2 Production
 
-Frontend v2.1.0 diterbitkan melalui commit `chore: bump eOuting version to 2.1.0` (commit release ini). URL production ialah `https://itumelaka.github.io/eouting/`.
+Frontend v2.2.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa ialah **release production v2.1.0** dengan GAS Version 31 yang telah live. Footer dan cache repo kekal pada `v2.1.0`; ciri preview foto profil semasa tidak menaikkan versi aplikasi.
+Verdict semasa ialah **release production v2.2.0** dengan GAS Version 32 yang telah live dan disahkan pada 9 Ogos 2026. Footer, asset query, `version.json` dan cache repo berada pada `v2.2.0`.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.1.0` dan backend production ialah GAS **Version 31**;
+- frontend release ialah `v2.2.0` dan backend production ialah GAS **Version 32**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=false`, maka validation submission legacy masih aktif;
@@ -21,9 +21,8 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata frontend, footer dan cache repo berada pada `v2.1.0`.
-- Release v2.1.0 dikenal pasti melalui commit `chore: bump eOuting version to 2.1.0`.
-- Backend GAS production ialah **Version 31** dan source kanonik ialah `gas/Code.gs`.
+- Metadata frontend, footer, asset query dan cache repo berada pada `v2.2.0`.
+- Backend GAS production ialah **Version 32** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -45,18 +44,19 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Statistik hanya boleh dicapai sebagai modul inline Admin berautentikasi; filter bulan/tahun/kelas, KPI, ringkasan kelas/status dan statistik individu kekal tersedia.
 - Enam modul Admin inline ialah `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`.
 - Rekod Master menyokong carian, filter dan pagination; Pemantauan Admin memaparkan operasi semasa secara baca sahaja; Pelajar melihat jumlah outing tahunan.
-- Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated membekalkan thumbnail dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
-- Foto sebenar boleh dibuka dalam modal besar daripada cache authenticated tanpa request tambahan; placeholder dan Public Monitoring tidak mempunyai preview.
+- Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
+- Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Version, footer, asset query strings dan cache konsisten pada v2.1.0.
+- Version, footer, asset query strings dan cache konsisten pada v2.2.0 tanpa revision preview aktif.
 - Bukti selfie wajib untuk semua lima jenis permohonan selepas `confirmIn`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR` / `SUDAH_HANTAR` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
 - Backend mengesahkan pemilikan, status/masa masuk, MIME/base64/saiz dan duplicate submission dengan `LockService`.
 - Cleanup transaksi separa serta audit failure non-fatal selepas submission lengkap telah disahkan.
 - Public Monitoring dan service worker mengekalkan boundary privasi metadata selfie.
-- Admin production login serta flow Pelajar, Warden dan Guard kekal berfungsi pada v2.1.0.
+- Admin production login serta flow Pelajar, Warden/HEP dan Guard disahkan pada v2.2.0/GAS Version 32.
 - Public Monitoring berfungsi pada klik pertama dan Statistik Admin inline berjaya dimuatkan tanpa meninggalkan sesi Admin.
+- Production smoke test mengesahkan upload Pelajar, thumbnail Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar, secure full preview, Public Pemantauan photo-free, keyboard Enter, rolling KPI serta two-tier performance optimisation.
 
 ## Privacy Boundary
 
@@ -98,6 +98,7 @@ Nilai backend `KELUAR` tidak berubah.
 - **v1.7.1:** menambah Outing Sabtu / Ahad; Pull Request #2 digabungkan melalui `fa7227e` daripada `1e6303c`.
 - **v2.0.0:** production frontend rollout pada 4 Ogos 2026 melalui `4eedcbe`; backend kekal GAS Version 24 dengan feature flag config-driven submission masih `false`.
 - **v2.1.0:** Guard UI diperkemas, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh outing sebenar, hygiene clasp dan pembaikan rendering Statistik Admin. Production kini menggunakan GAS Version 31 dengan foto profil operational; preview besar semasa ialah perubahan frontend-only.
+- **v2.2.0:** enam modul Admin inline, pengurusan operasi/master data, foto profil private dengan thumbnail batch/full on-demand, identifikasi Warden/Guard/Admin, rolling KPI, Enter UX dan cache delivery. GAS Version 32 serta semua smoke test semasa disahkan live pada 9 Ogos 2026.
 
 ## Production Validation v1.7.0
 
@@ -121,6 +122,5 @@ Ujian production berjaya menggunakan request `OUT-20260726-121316-1479`:
 - Telegram retry queue.
 - Consent/privacy notice refinement.
 - QR code.
-- Admin master-data page.
 - Late-return escalation.
 - Automated reports dan version injection.

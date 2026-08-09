@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.1.0**.
+Versi repo semasa: **v2.2.0**. Production menggunakan GAS Version 32, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
 
 ## Komponen
 
@@ -119,14 +119,18 @@ Warden login -> POST getTodayRecords -> approve/reject
 Guard login -> POST getTodayRecords -> confirmOut/confirmIn
   -> Telegram pergerakan
 Pelajar login -> compress 3:4 -> submitStudentProfilePhoto -> STUDENTS metadata
-Student/Warden/Guard/Admin -> POST getStudentProfilePhotos (batch authenticated) -> stored compressed data URI
-Authorised thumbnail click -> cached data URI -> accessible large modal (no extra request)
+Student/Warden/Guard/Admin -> POST getStudentProfilePhotos photo_variant=thumbnail (batch authenticated)
+  -> Drive API v3 thumbnailLink server-side -> OAuth fetch -> safe thumbnail data URI
+Authorised thumbnail click -> POST getStudentProfilePhotos photo_variant=full (one student)
+  -> thumbnail/loading modal -> full stored image -> authenticated session cache
 Pelajar selepas confirmIn -> kamera/preview/compress -> submitReturnSelfie
   -> LockService -> Drive private -> Telegram sendPhoto -> metadata Sheet
 Public Monitoring -> GET getTodayRecords -> mapPublicMonitoringRecord
 ```
 
-`getOperationalTodayRecords` menambah hanya `has_profile_photo` dan masa kemas kini. Selepas kad operasi dirender dengan placeholder, frontend membuat satu batch request bagi semua ID yang diperlukan. Response mengandungi imej stored-compressed kira-kira 600×800 sebagai data URI; thumbnail kekal kecil, manakala preview besar menggunakan byte cache yang sama tanpa N+1 atau panggilan on-demand. Hanya thumbnail sebenar ialah button; initials kekal inert. Kegagalan batch tidak menghalang approve, reject, confirm out atau confirm in. `getTodayRecords` awam kekal pada projection enam medan tanpa metadata atau trigger foto.
+`getOperationalTodayRecords` menambah hanya `has_profile_photo` dan masa kemas kini. Selepas kad operasi dirender dengan placeholder, frontend membuat satu batch `thumbnail` bagi ID unik yang diperlukan. GAS mengesahkan viewer pada setiap request, menyelesaikan file private, mendapatkan `thumbnailLink` melalui Drive API v3 dan memuat turun thumbnail dengan OAuth server-side. Browser tidak menerima file ID, URL Drive, `thumbnailLink` atau token. Cache thumbnail/full, negative entry, single-flight dan version guard adalah berasingan. Kegagalan thumbnail mengekalkan initials tanpa fallback bulk kepada imej 600×800.
+
+Klik thumbnail membuat satu request `full` untuk pelajar itu sahaja jika full-image cache belum tersedia. Modal memaparkan thumbnail/loading dahulu, kemudian menggantikannya dengan imej stored-compressed; pembukaan kedua menggunakan cache sesi. Kegagalan full menunjukkan error/retry selamat. Student editor boleh menggunakan imej penuh sendiri. Hanya thumbnail sebenar ialah button; initials kekal inert. `getTodayRecords` awam kekal pada projection enam medan tanpa metadata atau trigger foto.
 
 ## Status Bukti Selfie
 
@@ -189,7 +193,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache semasa ialah `eouting-cache-v2.1.0`.
+Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache production semasa ialah `eouting-cache-v2.2.0`; tiada revision preview aktif.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
@@ -217,3 +221,9 @@ Shell Admin dan identiti sesi kekal visible apabila enam modul inline bertukar: 
 Pemantauan Admin menggunakan satu POST `getAdminMonitoring` untuk KPI dan rekod operasi aktif. Rekod Master menggunakan satu POST `searchAdminMasterRecords` dengan carian, filter dan pagination maksimum 50 rekod. Statistik individu menggunakan `getAdminIndividualStats` selepas credential Admin disahkan. Pengurusan staff menggunakan `getAdminStaff` serta write `createStaff`, `updateStaff` dan `toggleStaffStatus`; semua endpoint memanggil `validateAdminCredentials_()`.
 
 `WARDENS` dan `GUARDS` kekal source of truth serta login Warden/Guard sedia ada terus membaca PIN dari tab masing-masing. Write staff dilindungi `LockService`; tiada model authentication atau sheet baharu diperkenalkan.
+
+## UI Runtime Safeguards
+
+Login Pelajar, Warden/HEP, Guard dan Admin serta editor Admin yang selamat menggunakan submit form sedia ada apabila Enter ditekan pada input satu baris. Tiada handler Enter global; textarea kekal newline dan action operasi/destructive memerlukan button/confirmation explicit. Lock disabled/loading sedia ada mencegah duplicate submission.
+
+KPI yang sesuai menggunakan count-up kira-kira 450 ms daripada nilai lama kepada integer akhir tepat. Nilai tidak berubah tidak replay, `prefers-reduced-motion` memintas animasi, dan identifiers, tarikh, masa, telefon, pagination serta duration string tidak dianimasikan.

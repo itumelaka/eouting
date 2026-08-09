@@ -1,6 +1,6 @@
 # Struktur Database Google Sheets
 
-Google Sheets ialah database dan source of truth eOuting ITU v2.1.0. Frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
+Google Sheets ialah database dan source of truth eOuting ITU v2.2.0. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
 ## `STUDENTS`
 
@@ -15,8 +15,8 @@ student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | cata
 - `no_matrik` dan `no_tel` hendaklah berformat Plain text.
 - `photo_file_id` ialah ID fail private dalam folder foto profil yang dikonfigurasi; ia tidak dipulangkan oleh GET awam.
 - `photo_updated_at` ialah masa kemas kini berjaya dalam zon Asia/Kuala_Lumpur. Base64 tidak disimpan dalam Sheet.
-- Admin list menerima hanya `has_profile_photo` dan `photo_updated_at`; `photo_file_id` tidak dihantar. Byte imej dibaca daripada fail private hanya oleh POST batch authenticated dan dipetakan menggunakan `student_id` yang dinormalisasi.
-- Preview besar tidak menambah schema atau menyimpan data baharu. Ia menggunakan data URI compressed yang sudah berada dalam cache frontend selepas batch authorised.
+- Admin list menerima hanya `has_profile_photo` dan `photo_updated_at`; `photo_file_id` tidak dihantar. Thumbnail dibaca melalui POST batch authenticated `photo_variant = "thumbnail"` dan dipetakan menggunakan `student_id` yang dinormalisasi. Drive metadata/URL/token kekal server-side.
+- Preview besar tidak menambah schema atau menyimpan data baharu. POST authenticated `photo_variant = "full"` membaca satu imej stored-compressed untuk satu pelajar apabila diperlukan dan frontend mencachenya sepanjang sesi.
 
 Public `getStudents` hanya mengeluarkan:
 
@@ -81,6 +81,8 @@ Kolum bukti selfie v1.7.0:
 | `selfie_telegram_message_id` | ID mesej Telegram | Direkod selepas `sendPhoto` berjaya untuk kawalan dan cleanup transaksi. |
 
 `selfie_whatsapp` dikekalkan sebagai kolum legacy dan tidak dinamakan semula atau dibuang. Akses code menggunakan nama header, bukan kedudukan kolum. Oleh itu, lima kolum baharu mungkin muncul secara fizikal selepas kolum kosong/berformat yang tidak digunakan tanpa menjejaskan mapping, selagi nama header tepat.
+
+Field `selfie_*`, folder `SELFIE_FOLDER_ID`, submission `submitReturnSelfie` dan Telegram `sendPhoto` tidak digunakan oleh foto profil. Foto profil hanya menggunakan `STUDENTS.photo_file_id`, `photo_updated_at` dan `PROFILE_PHOTO_FOLDER_ID`; kedua-dua bukti kekal private dan berasingan.
 
 ## Public Monitoring Projection
 

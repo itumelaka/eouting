@@ -1,6 +1,14 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v2.1.0**. Backend production semasa ialah GAS **Version 31**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Preview foto profil semasa ialah frontend-only; tiada deployment GAS diperlukan untuk ciri itu.
+Versi repo semasa: **v2.2.0**. Backend production semasa ialah GAS **Version 32**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.production-v171.gs` ialah snapshot lama, bukan source kanonik, dan tidak boleh dideploy.
+
+## Release Production v2.2.0 — 9 Ogos 2026
+
+- GAS Version 32 dideploy pada Web App sedia ada dan URL/access settings dikekalkan.
+- Dua-tier delivery foto profil (`thumbnail` batch dan `full` on-demand) telah disahkan untuk Pelajar, Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar.
+- Public Pemantauan kekal photo-free; return selfie kekal pada folder/schema/Telegram workflow berasingan.
+- Enam modul Admin inline, Statistik selamat, Rekod Master, rolling KPI, Enter UX serta cache/service-worker delivery telah melalui smoke test production.
+- Frontend release metadata dan cache ditutup sebagai v2.2.0 hanya selepas backend Version 32 disahkan live.
 
 ## Release Production v2.1.0 — 9 Ogos 2026
 
@@ -32,7 +40,7 @@ Urutan activation masa hadapan ialah: backup Sheet, jalankan migration idempoten
 
 ## Release Beta v2.0
 
-Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.1.0`.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.2.0`.
 
 Beta pertama hendaklah menguji lima seed sahaja. Jenis custom, statistik dinamik, label Telegram dinamik dan penggunaan operasi `require_selfie` belum menjadi gate yang lengkap. `require_warden_approval=false` juga perlu dianggap high-impact kerana backend akan auto-approve sebagai `AUTO_CONFIG_V2`.
 
@@ -60,16 +68,19 @@ Gunakan flow ini apabila `gas/Code.gs` berubah:
 
 `gas/Code.gs` ialah satu-satunya source GAS executable kanonik. `.claspignore` mesti kekal sebagai whitelist untuk `Code.gs` dan `appsscript.json`; snapshot arkib tidak boleh berada dalam skop `rootDir` tanpa ignore yang eksplisit.
 
-1. semak Git diff dan syntax GAS secara local;
-2. jalankan focused/full tests serta `git diff --check`;
+1. jalankan focused/full tests dan syntax checks;
+2. jalankan `git diff --check` serta semak `git status --short`;
 3. semak whitelist dengan `clasp show-file-status`;
-4. commit dan push Git source yang telah disahkan;
-5. jalankan `clasp push` secara manual;
-6. jalankan setup helper hanya jika schema atau Script Property memerlukannya;
+4. pastikan hanya `gas/appsscript.json` dan `gas/Code.gs` berada dalam skop clasp;
+5. commit dan push Git source yang telah disahkan;
+6. jalankan `clasp push` hanya apabila GAS berubah;
 7. buka Apps Script: `Deploy -> Manage deployments -> Edit`;
-8. pilih `New version`, kekalkan deployment URL sedia ada, kemudian `Deploy`;
-9. smoke-test endpoint public dan POST authenticated yang terlibat;
-10. rekod Git SHA, Apps Script version, deployment ID/URL, Spreadsheet ID, description dan tarikh release.
+8. pilih `New version`;
+9. kekalkan deployment URL dan access settings sedia ada, kemudian `Deploy`;
+10. authorize jika Google meminta scope semasa;
+11. smoke-test endpoint public, POST authenticated dan flow yang terlibat;
+12. sahkan GitHub Pages, footer, asset query dan cache delivery;
+13. bump/tutup release frontend selepas backend production disahkan, kemudian rekod Git SHA, GAS version, URL, Spreadsheet ID dan tarikh.
 
 `clasp push` sahaja tidak menjamin deployment `/exec` menggunakan code baharu. Deployment version baharu tetap diperlukan.
 
@@ -125,7 +136,7 @@ Rollout v1.7.0 melalui urutan ini menggunakan GAS Version 21. Pull Request #1 te
 
 ## Rekod Deployment Foto Profil Pelajar
 
-Foto profil telah beroperasi pada production GAS Version 31. Urutan Version 30 di bawah ialah rekod rollout asal dan tidak perlu diulang untuk preview frontend semasa:
+Foto profil dan two-tier thumbnail/full delivery telah beroperasi pada production GAS Version 32. Urutan Version 30 di bawah ialah rekod rollout asal dan tidak perlu diulang:
 
 1. Jalankan semula semua ujian pada commit release.
 2. Jalankan `clasp push` secara manual daripada source kanonik `gas/Code.gs`.
@@ -136,7 +147,7 @@ Foto profil telah beroperasi pada production GAS Version 31. Urutan Version 30 d
 7. Smoke-test upload/ganti Pelajar, kad Warden/HEP, ketiga-tiga kad Guard, thumbnail/removal Admin dan audit log.
 8. Sahkan GET Public Monitoring tidak mengandungi sebarang field atau byte foto profil.
 
-Deployment Version 30/31 dan setup schema telah selesai. Jangan jalankan semula helper kecuali header/property benar-benar perlu dibaiki dan perubahan itu diluluskan.
+Deployment Version 30/31, optimisasi Version 32 dan setup schema telah selesai. Jangan jalankan semula helper kecuali header/property benar-benar perlu dibaiki dan perubahan itu diluluskan.
 
 ## Semakan Release
 
