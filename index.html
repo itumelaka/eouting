@@ -81,11 +81,11 @@
         </form>
 
         <form class="access-panel" id="wardenLoginPanel">
-          <h3>Masuk sebagai Warden</h3>
-          <label for="wardenSelect">Nama Warden</label>
+          <h3>Masuk sebagai Warden atau HEP</h3>
+          <label for="wardenSelect">Nama Warden / HEP</label>
           <select id="wardenSelect" required></select>
 
-          <button class="primary-action" type="submit">Masuk sebagai Warden</button>
+          <button class="primary-action" type="submit">Masuk sebagai Warden atau HEP</button>
         </form>
 
         <form class="access-panel" id="guardLoginPanel">
@@ -300,7 +300,7 @@
             <button class="admin-subtab active" id="adminMonitoringTab" type="button" role="tab" aria-selected="true" aria-controls="adminMonitoringPanel" data-admin-section="monitoring">Pemantauan</button>
             <button class="admin-subtab" id="adminStatisticsButton" type="button" role="tab" aria-selected="false" aria-controls="adminStatisticsPanel" data-admin-section="statistics">Statistik</button>
             <button class="admin-subtab" id="adminMasterTab" type="button" role="tab" aria-selected="false" aria-controls="adminMasterPanel" data-admin-section="master">Rekod Master</button>
-            <button class="admin-subtab" id="adminStaffTab" type="button" role="tab" aria-selected="false" aria-controls="adminStaffPanel" data-admin-section="staff">Warden &amp; Guard</button>
+            <button class="admin-subtab" id="adminStaffTab" type="button" role="tab" aria-selected="false" aria-controls="adminStaffPanel" data-admin-section="staff">Warden, HEP &amp; Guard</button>
             <button class="admin-subtab" id="adminStudentsTab" type="button" role="tab" aria-selected="false" aria-controls="adminStudentManagementPanel" data-admin-section="students">Tetapan Pelajar</button>
             <button class="admin-subtab" id="adminOutingTab" type="button" role="tab"
               aria-selected="false" aria-controls="adminOutingSettingsPanel" data-admin-section="outing">
@@ -567,7 +567,7 @@
           </section>
 
           <section class="admin-subpanel" id="adminStaffPanel" role="tabpanel" aria-labelledby="adminStaffTab" hidden>
-            <div class="admin-section-toolbar"><div><h3>Pengurusan Warden &amp; Guard</h3><p>PIN sedia ada tidak pernah dipaparkan.</p></div><div class="admin-heading-actions"><button class="secondary-action" id="adminStaffRefreshButton" type="button">Refresh</button><button class="primary-action" id="adminStaffAddButton" type="button">+ Tambah Staff</button></div></div>
+            <div class="admin-section-toolbar"><div><h3>Pengurusan Warden, HEP &amp; Guard</h3><p>PIN sedia ada tidak pernah dipaparkan.</p></div><div class="admin-heading-actions"><button class="secondary-action" id="adminStaffRefreshButton" type="button">Refresh</button><button class="primary-action" id="adminStaffAddButton" type="button">+ Tambah Staff</button></div></div>
             <label class="admin-staff-search">Carian<input id="adminStaffSearch" type="search" placeholder="Cari ID, nama atau role"></label>
             <p class="form-message" id="adminStaffMessage" aria-live="polite"></p>
             <div class="admin-staff-list" id="adminStaffList"></div>

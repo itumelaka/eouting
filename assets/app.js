@@ -1701,7 +1701,7 @@ function setupStaffPinFields() {
     els.wardenPinInput.type = "password";
     els.wardenPinInput.inputMode = "numeric";
     els.wardenPinInput.autocomplete = "current-password";
-    els.wardenPinInput.placeholder = "PIN Warden";
+    els.wardenPinInput.placeholder = "PIN Warden / HEP";
     const rememberLabel = document.createElement("label");
     rememberLabel.className = "remember-device";
     els.wardenRememberInput = document.createElement("input");
