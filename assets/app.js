@@ -584,6 +584,7 @@ function setupAccessEnhancements() {
   setupMonitoringPanel();
   setupStatisticsPanel();
   setupAdminDashboardV200();
+  setupScopedEnterSubmissionV211();
   setupStudentProfilePhotoControls();
   setupProfilePhotoPreview();
 }
@@ -729,6 +730,7 @@ function setupAdminDashboardV200() {
 
 async function handleAdminLoginV200(event) {
   event.preventDefault();
+  if (els.adminLoginButton.disabled) return;
   const identity = els.adminIdentityInput.value.trim();
   const pin = els.adminPinInput.value.trim();
   if (!identity || !pin) {
@@ -1025,6 +1027,7 @@ function closeAdminStaffEditorV210() { adminEditingStaffV210 = null; els.adminSt
 
 async function saveAdminStaffV210(event) {
   event.preventDefault();
+  if (els.adminStaffSaveButton.disabled) return;
   const staff = { staff_id: els.adminStaffId.value.trim(), role: els.adminStaffRole.value, nama: els.adminStaffName.value.trim(), email: els.adminStaffEmail.value.trim(), no_tel: els.adminStaffPhone.value.trim(), pin: els.adminStaffPin.value.trim(), status: els.adminStaffStatus.value, catatan: els.adminStaffNote.value.trim() };
   if (!window.confirm(`Sahkan simpan staff ${staff.nama}?`)) return;
   els.adminStaffSaveButton.disabled = true; els.adminStaffEditorMessage.textContent = "Menyimpan...";
@@ -1244,6 +1247,7 @@ function buildAdminStudentFormPayloadV200() {
 
 async function handleAdminStudentSubmitV200(event) {
   event.preventDefault();
+  if (els.adminSaveStudentButton.disabled) return;
   const student = buildAdminStudentFormPayloadV200();
   if (!student.student_id || !student.no_matrik || !student.nama) {
     setAdminStudentEditorMessageV200("ID pelajar, no. matrik dan nama diperlukan.", true);
@@ -1541,6 +1545,7 @@ function collectAdminOutingTypeConfigV200() {
 
 async function handleAdminTypeSubmitV200(event) {
   event.preventDefault();
+  if (els.adminSaveTypeButton.disabled) return;
   if (!els.adminOutingTypeForm.reportValidity()) {
     return;
   }
@@ -1911,8 +1916,78 @@ function setupStatisticsPanel() {
   setStatisticsYearOptions();
 }
 
-els.studentLoginPanel.addEventListener("submit", async (event) => {
+function setLoginFormSubmittingV211(form, isSubmitting, loadingText) {
+  if (!form) return false;
+  const button = form.querySelector('button[type="submit"]');
+  if (isSubmitting) {
+    if (form.dataset.submitting === "1" || !button || button.disabled) return false;
+    form.dataset.submitting = "1";
+    button.dataset.idleText = button.textContent;
+    button.disabled = true;
+    button.textContent = loadingText;
+    return true;
+  }
+  delete form.dataset.submitting;
+  if (button) {
+    button.disabled = false;
+    button.textContent = button.dataset.idleText || button.textContent;
+    delete button.dataset.idleText;
+  }
+  return true;
+}
+
+function isSafeEnterSubmitTargetV211(target) {
+  if (!target || target.isContentEditable) return false;
+  const tagName = String(target.tagName || "").toUpperCase();
+  if (tagName === "TEXTAREA" || tagName === "BUTTON") return false;
+  if (tagName === "SELECT") return true;
+  if (tagName !== "INPUT") return false;
+  return ["button", "checkbox", "color", "file", "radio", "range", "reset", "submit"].indexOf(String(target.type || "text").toLowerCase()) === -1;
+}
+
+function handleScopedFormEnterV211(event) {
+  if (event.key !== "Enter" || event.defaultPrevented || event.isComposing) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (!isSafeEnterSubmitTargetV211(event.target)) return;
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  if (!button || button.disabled || form.dataset.submitting === "1") {
+    event.preventDefault();
+    return;
+  }
+  if (form === els.adminStaffForm && adminEditingStaffV210 && els.adminStaffPin.value.trim()) {
+    event.preventDefault();
+    els.adminStaffEditorMessage.textContent = "Gunakan butang Simpan Staff untuk mengesahkan reset PIN.";
+    return;
+  }
   event.preventDefault();
+  if (typeof form.requestSubmit === "function") {
+    form.requestSubmit(button);
+  } else {
+    button.click();
+  }
+}
+
+function setupScopedEnterSubmissionV211() {
+  [
+    els.studentLoginPanel,
+    els.wardenLoginPanel,
+    els.guardLoginPanel,
+    els.adminLoginPanel,
+    els.adminStudentForm,
+    els.adminStaffForm,
+    els.adminOutingTypeForm
+  ].forEach((form) => {
+    if (!form || form.dataset.enterSubmitReady === "1") return;
+    form.dataset.enterSubmitReady = "1";
+    form.addEventListener("keydown", handleScopedFormEnterV211);
+  });
+}
+
+async function handleStudentLoginSubmitV211(event) {
+  event.preventDefault();
+  if (!setLoginFormSubmittingV211(els.studentLoginPanel, true, "Mengesahkan...")) return;
+  try {
   const selectedStudent = students.find((item) => item.id === els.studentLoginSelect.value);
   const enteredMatric = els.matricInput.value.trim().toUpperCase();
 
@@ -1941,10 +2016,17 @@ els.studentLoginPanel.addEventListener("submit", async (event) => {
 
   rememberSessionIfRequested("student", selectedStudent, els.studentRememberInput);
   startStudentSession(selectedStudent);
-});
+  } finally {
+    setLoginFormSubmittingV211(els.studentLoginPanel, false);
+  }
+}
 
-els.wardenLoginPanel.addEventListener("submit", async (event) => {
+els.studentLoginPanel.addEventListener("submit", handleStudentLoginSubmitV211);
+
+async function handleWardenLoginSubmitV211(event) {
   event.preventDefault();
+  if (!setLoginFormSubmittingV211(els.wardenLoginPanel, true, "Mengesahkan...")) return;
+  try {
   const name = els.wardenSelect.value;
   const pin = els.wardenPinInput ? els.wardenPinInput.value.trim() : "";
   if (els.wardenLoginMessage) els.wardenLoginMessage.textContent = "";
@@ -1979,10 +2061,17 @@ els.wardenLoginPanel.addEventListener("submit", async (event) => {
   clearStaffLoginSuccessFeedback();
   rememberSessionIfRequested("warden", mockWarden, els.wardenRememberInput);
   startSession("warden", mockWarden);
-});
+  } finally {
+    setLoginFormSubmittingV211(els.wardenLoginPanel, false);
+  }
+}
 
-els.guardLoginPanel.addEventListener("submit", async (event) => {
+els.wardenLoginPanel.addEventListener("submit", handleWardenLoginSubmitV211);
+
+async function handleGuardLoginSubmitV211(event) {
   event.preventDefault();
+  if (!setLoginFormSubmittingV211(els.guardLoginPanel, true, "Mengesahkan...")) return;
+  try {
   const name = els.guardSelect.value;
   const pin = els.guardPinInput ? els.guardPinInput.value.trim() : "";
   if (els.guardLoginMessage) els.guardLoginMessage.textContent = "";
@@ -2017,7 +2106,12 @@ els.guardLoginPanel.addEventListener("submit", async (event) => {
   clearStaffLoginSuccessFeedback();
   rememberSessionIfRequested("guard", mockGuard, els.guardRememberInput);
   startSession("guard", mockGuard);
-});
+  } finally {
+    setLoginFormSubmittingV211(els.guardLoginPanel, false);
+  }
+}
+
+els.guardLoginPanel.addEventListener("submit", handleGuardLoginSubmitV211);
 
 els.logoutButton.addEventListener("click", () => {
   closeProfilePhotoPreview();

@@ -89,9 +89,7 @@ test("frontend maps and filters a minimal public student directory", () => {
 });
 
 test("frontend login submits student_id and the entered matric number", () => {
-  const start = appSource.indexOf('els.studentLoginPanel.addEventListener("submit"');
-  const end = appSource.indexOf('els.wardenLoginPanel.addEventListener("submit"', start);
-  const loginHandler = appSource.slice(start, end);
+  const loginHandler = extractFunction(appSource, "handleStudentLoginSubmitV211", "handleWardenLoginSubmitV211");
 
   assert.match(loginHandler, /student_id:\s*selectedStudent \? selectedStudent\.id : ""/);
   assert.doesNotMatch(loginHandler, /nama:\s*selectedStudent/);
