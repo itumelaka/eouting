@@ -180,36 +180,58 @@ test("frontend exposes a compact self summary and Admin-only individual statisti
   assert.doesNotMatch(appSource, /function openStatisticsPage\(/);
 });
 
-test("Admin Statistics reactivates both the shared workspace and its inner stats panel", () => {
-  const activateSource = extractFunctionSource(
-    appSource,
-    "activateStatisticsWorkspaceV200",
-    "closeStatisticsPage"
-  );
-  const adminOpenSource = extractFunctionSource(appSource, "openAdminStatisticsPageV200", "activateStatisticsWorkspaceV200");
-  let workspaceActive = false;
-  let panelActive = false;
-  const context = vm.createContext({
-    els: {
-      statsWorkspace: {
-        classList: { add: (name) => { workspaceActive = name === "active"; } },
-        querySelector: (selector) => selector === "#stats"
-          ? { classList: { add: (name) => { panelActive = name === "active"; } } }
-          : null
-      }
-    },
-    setupStatisticsPanel: () => { throw new Error("existing shared workspace must be reused"); }
-  });
-  vm.runInContext(activateSource, context);
-  context.activateStatisticsWorkspaceV200();
-
-  assert.equal(workspaceActive, true);
-  assert.equal(panelActive, true);
-  assert.match(adminOpenSource, /activateStatisticsWorkspaceV200\(\)/);
+test("Admin Statistics is an authenticated inline Admin panel", () => {
+  const adminOpenSource = extractFunctionSource(appSource, "openAdminStatisticsPageV200", "setupStatsFilters");
+  const adminSectionSource = extractFunctionSource(appSource, "setAdminSectionV200", "loadAdminMonitoringV210");
+  assert.match(indexSource, /id="adminStatisticsButton"[^>]*aria-controls="adminStatisticsPanel"[^>]*data-admin-section="statistics"/);
+  assert.match(indexSource, /id="adminStatisticsPanel"[^>]*role="tabpanel"[^>]*aria-labelledby="adminStatisticsButton"[^>]*hidden/);
+  assert.match(indexSource, /id="admin"[\s\S]*id="adminStatisticsPanel"/);
+  assert.doesNotMatch(`${indexSource}\n${appSource}`, /statsWorkspace|statsBackButton|Kembali ke Admin|PAPARAN Statistik Outing/);
+  assert.match(adminSectionSource, /\["statistics", els\.adminStatisticsButton, els\.adminStatisticsPanel\]/);
+  assert.match(adminSectionSource, /tab\.classList\.toggle\("active", name === nextSection\)/);
+  assert.match(adminSectionSource, /panel\.hidden = name !== nextSection/);
+  assert.match(adminOpenSource, /setAdminSectionV200\("statistics"\)/);
+  assert.match(adminOpenSource, /els\.appWorkspace\.classList\.add\("active"\)/);
+  assert.match(adminOpenSource, /els\.adminDashboard\.classList\.add\("active"\)/);
   assert.match(adminOpenSource, /currentSession\.role !== "admin"/);
   assert.match(adminOpenSource, /adminRuntimeCredential/);
   assert.doesNotMatch(adminOpenSource, /currentSession\s*=\s*null|adminRuntimeCredential\s*=\s*null/);
-  assert.match(adminOpenSource, /Kembali ke Admin/);
+  assert.match(adminOpenSource, /setupStatsFilters\(\)/);
+  assert.match(adminOpenSource, /loadStatistics\(\)/);
+  for (const section of ["monitoring", "master", "students", "staff", "outing"]) {
+    assert.match(adminSectionSource, new RegExp(`\\["${section}",`));
+  }
+
+  const session = { role: "admin", user: { admin_id: "ADMIN1" } };
+  const credential = { admin_id: "ADMIN1", pin: "2468" };
+  const calls = [];
+  const classList = { add: (name) => calls.push(["class", name]), remove: () => {} };
+  const context = vm.createContext({
+    currentSession: session,
+    adminRuntimeCredential: credential,
+    els: {
+      accessScreen: { classList },
+      appWorkspace: { classList },
+      monitorWorkspace: { classList },
+      adminDashboard: { classList },
+      adminStatisticsPanel: { scrollIntoView: () => {} }
+    },
+    isIntentionalNavigationV200: () => true,
+    setAdminSectionV200: (section) => calls.push(["section", section]),
+    scheduleIntentionalScrollV200: () => calls.push(["scroll"]),
+    setupStatsFilters: () => calls.push(["filters"]),
+    loadStatistics: () => calls.push(["load"]),
+    showError: () => calls.push(["error"])
+  });
+  vm.runInContext(adminOpenSource, context);
+  context.openAdminStatisticsPageV200({ type: "click" });
+  assert.strictEqual(context.currentSession, session);
+  assert.strictEqual(context.adminRuntimeCredential, credential);
+  assert.deepEqual(calls.filter(([name]) => ["section", "filters", "load", "error"].includes(name)), [
+    ["section", "statistics"],
+    ["filters"],
+    ["load"]
+  ]);
 });
 
 test("clasp upload scope whitelists only the canonical source and manifest", () => {

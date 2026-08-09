@@ -343,6 +343,7 @@ const els = {
   countEmergency: document.querySelector("#countEmergency"),
   adminDashboard: document.querySelector("#admin"),
   adminStatisticsButton: document.querySelector("#adminStatisticsButton"),
+  adminStatisticsPanel: document.querySelector("#adminStatisticsPanel"),
   adminOutingTab: document.querySelector("#adminOutingTab"),
   adminStudentsTab: document.querySelector("#adminStudentsTab"),
   adminMonitoringTab: document.querySelector("#adminMonitoringTab"),
@@ -769,11 +770,12 @@ function buildAdminCredentialPayloadV200() {
 }
 
 function setAdminSectionV200(section) {
-  const allowed = ["monitoring", "master", "students", "staff", "outing"];
+  const allowed = ["monitoring", "statistics", "master", "students", "staff", "outing"];
   const nextSection = allowed.indexOf(section) === -1 ? "monitoring" : section;
   activeAdminSectionV200 = nextSection;
   const map = [
     ["monitoring", els.adminMonitoringTab, els.adminMonitoringPanel],
+    ["statistics", els.adminStatisticsButton, els.adminStatisticsPanel],
     ["master", els.adminMasterTab, els.adminMasterPanel],
     ["students", els.adminStudentsTab, els.adminStudentManagementPanel],
     ["staff", els.adminStaffTab, els.adminStaffPanel],
@@ -1793,72 +1795,11 @@ function setupMonitoringPanel() {
 }
 
 function setupStatisticsPanel() {
-  if (document.querySelector("#statsWorkspace")) {
+  const panel = els.adminStatisticsPanel;
+  if (!panel || panel.dataset.ready === "1") {
     return;
   }
-
-  // Future version can restrict Statistik to Warden/HEP only.
-  const panel = document.createElement("section");
-  panel.className = "app-workspace stats-workspace";
-  panel.id = "statsWorkspace";
-  panel.innerHTML = `
-    <div class="session-bar">
-      <div>
-        <span>Paparan</span>
-        <strong>Statistik Outing</strong>
-      </div>
-      <button class="secondary-action" id="statsBackButton" type="button">Tukar Peranan</button>
-    </div>
-    <section class="tab-panel active" id="stats">
-      <div class="section-heading">
-        <h2>Statistik Outing</h2>
-        <p>Ringkasan bulanan kekerapan outing pelajar</p>
-      </div>
-      <div class="stats-filter-card">
-        <div class="stats-filter-grid">
-          <div class="stats-filter-field">
-            <label for="statsMonthSelect">Bulan</label>
-            <select id="statsMonthSelect"></select>
-          </div>
-          <div class="stats-filter-field stats-filter-year">
-            <label for="statsYearSelect">Tahun</label>
-            <select id="statsYearSelect"></select>
-          </div>
-          <div class="stats-filter-field">
-            <label for="statsClassSelect">Kelas</label>
-            <select id="statsClassSelect"></select>
-          </div>
-        </div>
-        <div class="stats-filter-actions">
-          <button class="primary-action" id="statsGenerateButton" type="button">Jana Statistik</button>
-          <button class="secondary-action" id="statsRefreshButton" type="button">Refresh</button>
-        </div>
-      </div>
-      <div class="summary-grid stats-summary" id="statsSummary"></div>
-      <section class="stats-section">
-        <div class="student-record-heading">
-          <h3>Statistik Individu Pelajar</h3>
-          <p id="statsPrivacyMessage">Ringkasan agregat tersedia kepada umum; statistik individu terhad kepada Admin yang dibenarkan.</p>
-        </div>
-        <div class="stats-list" id="statsLeaderboard"></div>
-      </section>
-      <section class="stats-section">
-        <div class="student-record-heading">
-          <h3>Ringkasan Mengikut Kelas</h3>
-        </div>
-        <div class="stats-list" id="statsClassSummary"></div>
-      </section>
-      <section class="stats-section">
-        <div class="student-record-heading">
-          <h3>Pecahan Status</h3>
-        </div>
-        <div class="status-pill-grid" id="statsStatusSummary"></div>
-      </section>
-    </section>
-  `;
-  els.appShell.appendChild(panel);
-  els.statsWorkspace = panel;
-  els.statsBackButton = panel.querySelector("#statsBackButton");
+  panel.dataset.ready = "1";
   els.statsMonthSelect = panel.querySelector("#statsMonthSelect");
   els.statsYearSelect = panel.querySelector("#statsYearSelect");
   els.statsClassSelect = panel.querySelector("#statsClassSelect");
@@ -1869,7 +1810,6 @@ function setupStatisticsPanel() {
   els.statsLeaderboard = panel.querySelector("#statsLeaderboard");
   els.statsClassSummary = panel.querySelector("#statsClassSummary");
   els.statsStatusSummary = panel.querySelector("#statsStatusSummary");
-  els.statsBackButton.addEventListener("click", closeStatisticsPage);
   els.statsGenerateButton.addEventListener("click", loadStatistics);
   els.statsRefreshButton.addEventListener("click", loadStatistics);
   setStatisticsYearOptions();
@@ -4515,40 +4455,13 @@ function openAdminStatisticsPageV200(eventOrOptions) {
 
   const intentional = isIntentionalNavigationV200(eventOrOptions) || Boolean(eventOrOptions);
   els.accessScreen.classList.add("hidden");
-  els.appWorkspace.classList.remove("active");
+  els.appWorkspace.classList.add("active");
   if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
-  activateStatisticsWorkspaceV200();
-  if (els.statsBackButton) els.statsBackButton.textContent = "Kembali ke Admin";
-  if (intentional) scheduleIntentionalScrollV200(els.statsWorkspace);
+  els.adminDashboard.classList.add("active");
+  setAdminSectionV200("statistics");
+  if (intentional) scheduleIntentionalScrollV200(els.adminStatisticsPanel);
   setupStatsFilters();
   loadStatistics();
-}
-
-function activateStatisticsWorkspaceV200() {
-  if (!els.statsWorkspace) {
-    setupStatisticsPanel();
-  }
-  if (!els.statsWorkspace) {
-    return;
-  }
-
-  els.statsWorkspace.classList.add("active");
-  const statsPanel = els.statsWorkspace.querySelector("#stats");
-  if (statsPanel) {
-    statsPanel.classList.add("active");
-  }
-}
-
-function closeStatisticsPage() {
-  els.statsWorkspace.classList.remove("active");
-  if (currentSession && currentSession.role === "admin" && adminRuntimeCredential) {
-    els.appWorkspace.classList.add("active");
-    els.accessScreen.classList.add("hidden");
-    els.adminDashboard.classList.add("active");
-    return;
-  }
-  els.accessScreen.classList.remove("hidden");
-  hideLoginPanels();
 }
 
 function setupStatsFilters() {
@@ -6650,10 +6563,6 @@ function setupRefreshPageTrackingV152() {
   if (els.monitorBackButton) {
     els.monitorBackButton.addEventListener("click", () => setActiveRefreshPageV152("access"));
   }
-
-  if (els.statsBackButton) {
-    els.statsBackButton.addEventListener("click", () => setActiveRefreshPageV152("access"));
-  }
 }
 
 function setActiveRefreshPageV152(page) {
@@ -6672,7 +6581,7 @@ function getActiveRefreshPageV152() {
     return "monitoring";
   }
 
-  if (isWorkspaceActive(els.statsWorkspace)) {
+  if (currentSession && currentSession.role === "admin" && activeAdminSectionV200 === "statistics") {
     return "statistics";
   }
 
@@ -6713,31 +6622,6 @@ async function refreshActiveMonitoringPageV152() {
   showMonitoringPageV152();
 }
 
-async function refreshActiveStatisticsPageV152() {
-  setActiveRefreshPageV152("statistics");
-  showStatisticsPageV152();
-
-  try {
-    if (els.statsSummary) {
-      els.statsSummary.innerHTML = emptyState("Memuatkan statistik...");
-    }
-    if (els.statsLeaderboard) {
-      els.statsLeaderboard.innerHTML = emptyState("Memuatkan statistik...");
-    }
-    if (els.statsClassSummary) {
-      els.statsClassSummary.innerHTML = emptyState("Memuatkan ringkasan kelas...");
-    }
-    if (els.statsStatusSummary) {
-      els.statsStatusSummary.innerHTML = emptyState("Memuatkan pecahan status...");
-    }
-  } catch (error) {
-    console.warn("Paparan loading statistik gagal dikemas kini.", error);
-  }
-
-  await loadStatistics();
-  showStatisticsPageV152();
-}
-
 async function refreshStudentLoginStateV152() {
   setActiveRefreshPageV152("student");
   showStudentLoginPageV152();
@@ -6748,21 +6632,9 @@ function showMonitoringPageV152() {
   try {
     if (els.accessScreen) els.accessScreen.classList.add("hidden");
     if (els.appWorkspace) els.appWorkspace.classList.remove("active");
-    if (els.statsWorkspace) els.statsWorkspace.classList.remove("active");
     if (els.monitorWorkspace) els.monitorWorkspace.classList.add("active");
   } catch (error) {
     console.warn("Paparan Pemantauan Semasa tidak dapat dikekalkan.", error);
-  }
-}
-
-function showStatisticsPageV152() {
-  try {
-    if (els.accessScreen) els.accessScreen.classList.add("hidden");
-    if (els.appWorkspace) els.appWorkspace.classList.remove("active");
-    if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
-    activateStatisticsWorkspaceV200();
-  } catch (error) {
-    console.warn("Paparan Statistik tidak dapat dikekalkan.", error);
   }
 }
 
@@ -6770,7 +6642,6 @@ function showStudentLoginPageV152() {
   try {
     if (els.appWorkspace) els.appWorkspace.classList.remove("active");
     if (els.monitorWorkspace) els.monitorWorkspace.classList.remove("active");
-    if (els.statsWorkspace) els.statsWorkspace.classList.remove("active");
     if (els.accessScreen) els.accessScreen.classList.remove("hidden");
     hideLoginPanels();
     if (els.studentLoginPanel) els.studentLoginPanel.classList.add("active");
@@ -6862,10 +6733,6 @@ function showSignedInTab(tabName) {
 
     if (els.monitorWorkspace) {
       els.monitorWorkspace.classList.remove("active");
-    }
-
-    if (els.statsWorkspace) {
-      els.statsWorkspace.classList.remove("active");
     }
 
     document.querySelectorAll(".tab-button").forEach((button) => {
@@ -8183,9 +8050,6 @@ async function openMonitoringPage(eventOrOptions) {
   }
   if (els.appWorkspace) {
     els.appWorkspace.classList.remove("active");
-  }
-  if (els.statsWorkspace) {
-    els.statsWorkspace.classList.remove("active");
   }
   if (els.monitorWorkspace) {
     els.monitorWorkspace.classList.add("active");

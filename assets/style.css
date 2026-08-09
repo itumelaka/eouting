@@ -1814,10 +1814,6 @@ textarea {
   }
 }
 
-.stats-workspace.active {
-  display: block;
-}
-
 .stats-filter-card {
   background: linear-gradient(145deg, #ffffff, #edf3fb);
   border: 1px solid rgba(8, 36, 92, 0.12);
@@ -3457,7 +3453,7 @@ button:disabled,
 /* Intentional navigation targets account for the sticky mobile header. */
 .access-panel,
 .monitor-workspace,
-.stats-workspace {
+#adminStatisticsPanel {
   scroll-margin-top: 96px;
 }
 
@@ -3499,7 +3495,7 @@ button:disabled,
 
   .access-panel,
   .monitor-workspace,
-  .stats-workspace {
+  #adminStatisticsPanel {
     scroll-margin-top: 76px;
   }
 }

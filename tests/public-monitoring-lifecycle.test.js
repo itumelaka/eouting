@@ -69,7 +69,6 @@ function createLifecycleContext(options = {}) {
   const els = {
     accessScreen: { classList: fakeClassList() },
     appWorkspace: { classList: fakeClassList(["active"]) },
-    statsWorkspace: { classList: fakeClassList(["active"]) },
     monitorWorkspace: {
       classList: fakeClassList(),
       scrollIntoView: (settings) => calls.scroll.push(settings)
@@ -149,7 +148,6 @@ test("first monitoring click activates before scrolling and performs one public 
   assert.equal(els.monitorWorkspace.classList.contains("active"), true);
   assert.equal(els.accessScreen.classList.contains("hidden"), true);
   assert.equal(els.appWorkspace.classList.contains("active"), false);
-  assert.equal(els.statsWorkspace.classList.contains("active"), false);
   assert.equal(calls.scrollAfterActivation, true);
   assert.deepEqual(JSON.parse(JSON.stringify(calls.scroll)), [{ behavior: "smooth", block: "start" }]);
   assert.deepEqual(calls.apiGet, ["getTodayRecords"]);
