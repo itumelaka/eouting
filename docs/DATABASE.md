@@ -103,22 +103,24 @@ Operational POST `getTodayRecords` kekal berasingan. Selepas credential disahkan
 ## `OUTING_TYPES` — staging v2.0
 
 ```text
-type_code | display_name | description | active | sort_order | allowed_days | application_open_time | application_close_time | fixed_return_time | same_day_only | require_leave_date | require_return_date | require_return_time | require_guardian_phone | require_guardian_relation | require_emergency_reason | require_purpose | require_location | require_vehicle | require_warden_approval | require_selfie | config_version | created_at | created_by | updated_at | updated_by
+type_code | display_name | description | active | sort_order | allowed_days | application_open_time | application_close_time | fixed_return_time | same_day_only | require_leave_date | require_return_date | require_return_time | require_guardian_phone | require_guardian_relation | require_emergency_reason | require_purpose | require_location | require_vehicle | require_warden_approval | require_selfie | config_version | created_at | created_by | updated_at | updated_by | departure_allowed_days | earliest_departure_time
 ```
 
-`setupAdminOutingConfigV200()` mencipta tab ini secara idempotent dan seed lima jenis sedia ada. `type_code` ialah identifier immutable: migration tidak menamakan semula atau menimpa row yang sudah wujud. `allowed_days` menggunakan nama hari BM uppercase dipisahkan koma. Nilai boolean disimpan sebagai boolean Sheet.
+`setupAdminOutingConfigV200()` mencipta tab ini secara idempotent dan seed lima jenis sedia ada. `type_code` ialah identifier immutable: migration tidak menamakan semula atau menimpa row yang sudah wujud. `allowed_days` menentukan hari permohonan boleh dihantar, manakala `departure_allowed_days` menentukan hari pelajar dibenarkan keluar. Kedua-duanya menggunakan nama hari BM uppercase dipisahkan koma. `earliest_departure_time` ialah masa keluar paling awal dalam format `HH:mm`; nilai kosong bermaksud tiada masa minimum dikonfigurasi. Nilai boolean disimpan sebagai boolean Sheet.
 
 Fasa 3 menyediakan public safe read serta authenticated Admin read/create/update/toggle. Fasa 5A menggunakan safe projection untuk borang Pelajar dan Fasa 5B membolehkan `submitRequest` membaca tab ini hanya apabila `OUTING_CONFIG_V2_ENABLED = "true"`. Statistik dan pemformatan Telegram masih belum dinamik. Apabila flag `false`, `submitRequest` tidak memerlukan tab ini dan validator legacy v1.7.1 kekal berfungsi.
 
 Andaian seed konservatif:
 
-| Jenis | Hari | Buka | Pulang tetap | Hari sama | Tarikh keluar | Tarikh balik/masa | Waris | Sebab kecemasan |
-|---|---|---|---|---:|---:|---:|---:|---:|
-| `OUTING_BIASA` | Selasa, Rabu | 17:00 | 22:00 | Ya | Tidak | Tidak | Tidak | Tidak |
-| `OUTING_HUJUNG_MINGGU` | Sabtu, Ahad | Tiada had dipetakan | 22:00 | Ya | Ya | Ya | Tidak | Tidak |
-| `KECEMASAN` | Semua hari | Tiada had dipetakan | 22:00 | Ya | Tidak | Tidak | Tidak | Ya |
-| `PULANG_BERMALAM` | Semua hari | Peraturan Jumaat khas kekal dalam code | Ikut permohonan | Tidak | Tidak | Ya | Ya | Tidak |
-| `CUTI_SEMESTER` | Semua hari | Tiada had dipetakan | Ikut permohonan | Tidak | Tidak | Ya | Ya | Tidak |
+| Jenis | Hari permohonan | Buka permohonan | Hari keluar | Keluar paling awal | Pulang tetap | Hari sama | Tarikh balik/masa | Waris |
+|---|---|---|---|---|---|---:|---:|---:|
+| `OUTING_BIASA` | Selasa, Rabu | 17:00 | Tiada had tambahan | Tiada | 22:00 | Ya | Tidak | Tidak |
+| `OUTING_HUJUNG_MINGGU` | Sabtu, Ahad | Tiada had dipetakan | Tiada had tambahan | Tiada | 22:00 | Ya | Ya | Tidak |
+| `KECEMASAN` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | 22:00 | Ya | Tidak | Tidak |
+| `PULANG_BERMALAM` | Semua hari | Tiada had dipetakan | Jumaat | Belum ditetapkan; perlu pengesahan Admin/HEP | Ikut permohonan | Tidak | Ya | Ya |
+| `CUTI_SEMESTER` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | Ikut permohonan | Tidak | Ya | Ya |
+
+Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Tarikh keluar yang diminta mesti hari Jumaat apabila config-driven submission diaktifkan. Guard hanya boleh mengesahkan keluar pada hari yang dibenarkan dan pada/selepas `earliest_departure_time` jika masa itu telah ditetapkan. Migration menetapkan `departure_allowed_days = JUMAAT` tetapi membiarkan `earliest_departure_time` kosong supaya tidak mencipta polisi 14:00 atau 17:00 tanpa pengesahan operasi.
 
 Semua seed bermula `active = true`, `require_purpose = true`, `require_location = true`, `require_vehicle = true`, `require_warden_approval = true`, `require_selfie = true` dan `config_version = 1`. `require_leave_date` untuk Cuti Semester kekal `false` kerana backend semasa menerima tarikh kosong dan menggunakan tarikh semasa; ini tidak mengubah paparan frontend sedia ada.
 

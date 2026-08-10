@@ -57,6 +57,8 @@ Fasa 4.6 menetapkan satu sahaja canonical `apiPost` frontend. Router ini meminta
 
 Fasa 5A memuatkan public `GET getOutingTypes` hanya selepas sesi Pelajar dibuka. Dropdown, visibility, required/disabled state, `same_day_only` dan `fixed_return_time` dirender daripada safe config. Kegagalan atau response kosong menggunakan lima legacy config dalam memory; `submitRequest` GAS dan feature flag default tidak berubah.
 
+Foundation departure-rule menambah `departure_allowed_days` dan `earliest_departure_time` pada `OUTING_TYPES` sedia ada. Ia tidak mencipta modul polisi kedua. `allowed_days` kekal peraturan hari permohonan, manakala medan departure mengawal tarikh keluar yang diminta dan masa paling awal Guard boleh mengesahkan keluar. Enforcement kekal di belakang `OUTING_CONFIG_V2_ENABLED`; legacy production tidak berubah semasa flag `false`.
+
 ```text
 Production v1.7.1: config-driven rendering + hard-coded submitRequest
 Staging v2.0:      OUTING_TYPES + ADMIN_USERS (inactive)

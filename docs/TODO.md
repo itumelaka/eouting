@@ -128,6 +128,9 @@ Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 32** pada
 
 ## Near TODO
 
+- [x] Tambah foundation peraturan keluar pada `OUTING_TYPES`: hari keluar dan masa keluar paling awal, tanpa mengaktifkan config-driven production.
+- [ ] Admin/HEP sahkan nilai operasi awal `earliest_departure_time` untuk `PULANG_BERMALAM` sebelum feature flag diaktifkan.
+
 - [x] Fasa 6: audit beta readiness, metadata, migration/security boundaries serta sediakan rollout dan rollback checklist.
 - [x] Fasa 4.5: Local/Mock QA Admin dengan lima seed, credential development terasing, error/retry dan optimistic conflict.
 - [x] Fasa 4.6: buang duplicate `apiPost` dan kekalkan satu canonical POST router dengan regression coverage.

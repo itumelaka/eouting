@@ -135,7 +135,8 @@ test("all config-driven fields are mapped to visibility and required state", () 
     "require_location",
     "require_vehicle",
     "same_day_only",
-    "fixed_return_time"
+    "fixed_return_time",
+    "departure_allowed_days"
   ]) {
     assert.match(source, new RegExp(field));
   }
@@ -153,6 +154,13 @@ test("fixed return time fills and locks the active return-time input", () => {
   assert.match(source, /fixedReturnTime/);
   assert.match(source, /readOnly: Boolean\(fixedReturnTime\)/);
   assert.match(source, /value: fixedReturnTime/);
+});
+
+test("configured departure days expose and require a requested leave date", () => {
+  const source = extractFunction("applyStudentOutingTypeConfigV200");
+  assert.match(source, /hasDepartureDayRule/);
+  assert.match(source, /leaveDateRequired/);
+  assert.match(source, /require_leave_date === true \|\| hasDepartureDayRule/);
 });
 
 test("type changes clear values that are no longer relevant", () => {

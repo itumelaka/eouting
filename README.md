@@ -57,6 +57,8 @@ Pelajar hantar permohonan
   -> Pelajar ambil dan hantar bukti selfie pulang
 ```
 
+Konfigurasi staging kini membezakan waktu **permohonan** daripada waktu **keluar**. Untuk `PULANG_BERMALAM`, permohonan boleh dihantar pada mana-mana hari tetapi tarikh keluar yang diminta ialah Jumaat. Masa keluar Jumaat paling awal boleh ditetapkan melalui Tetapan Outing selepas polisi Admin/HEP disahkan; tiada nilai 14:00 atau 17:00 diandaikan secara kekal. Production masih menggunakan `OUTING_CONFIG_V2_ENABLED=false`.
+
 ## Bukti Pulang Asrama v1.7.0
 
 Bukti selfie pulang diwajibkan selepas Guard mengesahkan masuk untuk semua jenis permohonan:

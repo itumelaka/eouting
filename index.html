@@ -445,19 +445,11 @@
                     <option value="false">Tidak Aktif</option>
                   </select>
                 </label>
-                <label>Masa Permohonan Dibuka
-                  <input id="adminOpenTimeInput" type="time">
-                </label>
-                <label>Masa Permohonan Ditutup
-                  <input id="adminCloseTimeInput" type="time">
-                </label>
-                <label>Masa Pulang Tetap
-                  <input id="adminFixedReturnTimeInput" type="time">
-                </label>
               </div>
 
               <fieldset class="admin-config-fieldset">
-                <legend>Hari Dibenarkan</legend>
+                <legend>Peraturan Permohonan</legend>
+                <p>“Permohonan” menentukan bila pelajar boleh menghantar borang, bukan bila pelajar dibenarkan keluar.</p>
                 <div class="admin-checkbox-grid" id="adminAllowedDays">
                   <label><input type="checkbox" value="AHAD"> Ahad</label>
                   <label><input type="checkbox" value="ISNIN"> Isnin</label>
@@ -467,10 +459,42 @@
                   <label><input type="checkbox" value="JUMAAT"> Jumaat</label>
                   <label><input type="checkbox" value="SABTU"> Sabtu</label>
                 </div>
+                <div class="admin-form-grid">
+                  <label>Masa Permohonan Dibuka
+                    <input id="adminOpenTimeInput" type="time">
+                  </label>
+                  <label>Masa Permohonan Ditutup
+                    <input id="adminCloseTimeInput" type="time">
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset class="admin-config-fieldset">
+                <legend>Peraturan Keluar</legend>
+                <p>“Keluar” menentukan hari dan masa paling awal pelajar yang telah diluluskan boleh meninggalkan pos Guard.</p>
+                <div class="admin-checkbox-grid" id="adminDepartureAllowedDays">
+                  <label><input type="checkbox" value="AHAD"> Ahad</label>
+                  <label><input type="checkbox" value="ISNIN"> Isnin</label>
+                  <label><input type="checkbox" value="SELASA"> Selasa</label>
+                  <label><input type="checkbox" value="RABU"> Rabu</label>
+                  <label><input type="checkbox" value="KHAMIS"> Khamis</label>
+                  <label><input type="checkbox" value="JUMAAT"> Jumaat</label>
+                  <label><input type="checkbox" value="SABTU"> Sabtu</label>
+                </div>
+                <div class="admin-form-grid">
+                  <label>Masa Keluar Paling Awal
+                    <input id="adminEarliestDepartureTimeInput" type="time">
+                  </label>
+                </div>
               </fieldset>
 
               <fieldset class="admin-config-fieldset">
                 <legend>Peraturan dan Medan Wajib</legend>
+                <div class="admin-form-grid">
+                  <label>Masa Pulang Tetap
+                    <input id="adminFixedReturnTimeInput" type="time">
+                  </label>
+                </div>
                 <div class="admin-checkbox-grid admin-rule-grid">
                   <label><input id="adminSameDayInput" type="checkbox"> Pulang hari sama</label>
                   <label><input id="adminRequireLeaveDateInput" type="checkbox"> Tarikh keluar</label>

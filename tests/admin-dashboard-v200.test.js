@@ -128,6 +128,15 @@ test("create, edit and toggle actions call the controlled POST APIs", () => {
   assert.match(adminBlock, /await loadAdminOutingTypesV200\(\)/);
 });
 
+test("Tetapan Outing separates application and departure rules", () => {
+  assert.match(indexSource, /<legend>Peraturan Permohonan<\/legend>/);
+  assert.match(indexSource, /<legend>Peraturan Keluar<\/legend>/);
+  assert.match(indexSource, /id="adminDepartureAllowedDays"/);
+  assert.match(indexSource, /id="adminEarliestDepartureTimeInput"[^>]*type="time"/);
+  assert.match(adminBlock, /departure_allowed_days/);
+  assert.match(adminBlock, /earliest_departure_time/);
+});
+
 test("type_code is read-only during edit and active is excluded from update", () => {
   const editSource = extractFunction("openAdminEditEditorV200", "closeAdminEditorV200");
   const submitSource = extractFunction("handleAdminTypeSubmitV200", "handleAdminToggleV200");

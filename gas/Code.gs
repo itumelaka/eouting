@@ -81,7 +81,9 @@ const HEADERS = {
     "created_at",
     "created_by",
     "updated_at",
-    "updated_by"
+    "updated_by",
+    "departure_allowed_days",
+    "earliest_departure_time"
   ],
   ADMIN_USERS: [
     "admin_id",
@@ -129,6 +131,7 @@ const OUTING_TYPE_BOOLEAN_FIELDS = [
 const OUTING_TYPE_TIME_FIELDS = [
   "application_open_time",
   "application_close_time",
+  "earliest_departure_time",
   "fixed_return_time"
 ];
 
@@ -140,6 +143,8 @@ const PUBLIC_OUTING_TYPE_FIELDS = [
   "allowed_days",
   "application_open_time",
   "application_close_time",
+  "departure_allowed_days",
+  "earliest_departure_time",
   "fixed_return_time",
   "same_day_only",
   "require_leave_date",
@@ -245,6 +250,7 @@ function setupAdminOutingConfigV200() {
   const adminUsersSheet = getSheet_(SHEETS.adminUsers);
   const auditSheet = getSheet_(SHEETS.audit);
 
+  const shouldBackfillDepartureDays = !sheetHasHeader_(outingTypesSheet, "departure_allowed_days");
   ensureHeaders_(outingTypesSheet, HEADERS.OUTING_TYPES);
   ensureHeaders_(adminUsersSheet, HEADERS.ADMIN_USERS);
   ensureHeaders_(auditSheet, HEADERS.AUDIT_LOG);
@@ -286,6 +292,10 @@ function setupAdminOutingConfigV200() {
     createdTypeCodes.push(seed.type_code);
   });
 
+  if (shouldBackfillDepartureDays) {
+    backfillOutingDepartureDefaultsV220_(outingTypesSheet);
+  }
+
   return {
     ok: true,
     sheets: [SHEETS.outingTypes, SHEETS.adminUsers, SHEETS.audit],
@@ -300,6 +310,8 @@ function getDefaultOutingTypeSeedsV200_(timestamp, createdBy) {
   const common = {
     active: true,
     application_close_time: "",
+    departure_allowed_days: "",
+    earliest_departure_time: "",
     require_purpose: true,
     require_location: true,
     require_vehicle: true,
@@ -372,6 +384,7 @@ function getDefaultOutingTypeSeedsV200_(timestamp, createdBy) {
       sort_order: 4,
       allowed_days: allDays,
       application_open_time: "",
+      departure_allowed_days: "JUMAAT",
       fixed_return_time: "",
       same_day_only: false,
       require_leave_date: false,
@@ -401,6 +414,34 @@ function getDefaultOutingTypeSeedsV200_(timestamp, createdBy) {
   ];
 }
 
+function sheetHasHeader_(sheet, headerName) {
+  if (!sheet || sheet.getLastRow() === 0) return false;
+  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map((header) => String(header).trim());
+  return headers.indexOf(headerName) !== -1;
+}
+
+function backfillOutingDepartureDefaultsV220_(sheet) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return 0;
+  const headers = values[0].map((header) => String(header).trim());
+  const typeCodeIndex = headers.indexOf("type_code");
+  const departureDaysIndex = headers.indexOf("departure_allowed_days");
+  if (typeCodeIndex === -1 || departureDaysIndex === -1) return 0;
+
+  let updated = 0;
+  for (let index = 1; index < values.length; index += 1) {
+    const typeCode = String(values[index][typeCodeIndex] || "").trim().toUpperCase();
+    const currentDays = String(values[index][departureDaysIndex] || "").trim();
+    if (typeCode === REQUEST_TYPE.overnight && !currentDays) {
+      sheet.getRange(index + 1, departureDaysIndex + 1, 1, 1).setValues([["JUMAAT"]]);
+      updated += 1;
+    }
+  }
+  return updated;
+}
+
 function isOutingConfigV2Enabled_() {
   const value = PropertiesService.getScriptProperties().getProperty(OUTING_CONFIG_V2_PROPERTY);
   return normalizeText_(value) === "true";
@@ -425,6 +466,8 @@ function getEditableOutingTypeFields_() {
     "allowed_days",
     "application_open_time",
     "application_close_time",
+    "departure_allowed_days",
+    "earliest_departure_time",
     "fixed_return_time",
     "same_day_only",
     "require_leave_date",
@@ -471,7 +514,8 @@ function validateOutingTypeConfig_(input, options) {
     display_name: displayName,
     description: description,
     sort_order: sortOrder,
-    allowed_days: normalizeAllowedDays_(data.allowed_days)
+    allowed_days: normalizeAllowedDays_(data.allowed_days),
+    departure_allowed_days: normalizeOptionalAllowedDays_(data.departure_allowed_days)
   };
 
   OUTING_TYPE_TIME_FIELDS.forEach((field) => {
@@ -522,6 +566,12 @@ function normalizeAllowedDays_(value) {
     throw new Error("allowed_days mesti mengandungi sekurang-kurangnya satu hari.");
   }
   return days.join(",");
+}
+
+function normalizeOptionalAllowedDays_(value) {
+  const rawDays = Array.isArray(value) ? value : String(value || "").split(",");
+  const hasConfiguredDay = rawDays.some((day) => String(day || "").trim() !== "");
+  return hasConfiguredDay ? normalizeAllowedDays_(rawDays) : "";
 }
 
 function normalizeOptionalTime_(value, fieldName) {
@@ -604,6 +654,7 @@ function normalizeOutingTypeRecord_(row) {
   result.description = String(result.description || "").trim();
   result.sort_order = Number(result.sort_order) || 0;
   result.allowed_days = String(result.allowed_days || "").trim().toUpperCase();
+  result.departure_allowed_days = String(result.departure_allowed_days || "").trim().toUpperCase();
   OUTING_TYPE_TIME_FIELDS.forEach((field) => {
     result[field] = normalizeStoredTimeOnly_(result[field]);
   });
@@ -883,6 +934,10 @@ function getOutingTypes() {
 
 function getLegacyPublicOutingTypes_() {
   return sortOutingTypes_(getDefaultOutingTypeSeedsV200_("", "")
+    .map((row) => Object.assign({}, row, {
+      departure_allowed_days: "",
+      earliest_departure_time: ""
+    }))
     .map(normalizeOutingTypeRecord_)
     .filter((row) => row.active))
     .map(toPublicOutingType_);
@@ -1641,10 +1696,12 @@ function validateConfigDrivenSubmissionV200_(payload, config, now) {
   }
 
   const allowedDays = String(config.allowed_days || "").split(",");
-  const leaveDay = getDayNameFromDateKey_(effectiveLeaveDateKey).toUpperCase();
-  if (allowedDays.indexOf(leaveDay) === -1) {
-    throw new Error("Jenis outing ini tidak dibenarkan pada hari yang dipilih.");
+  const applicationDay = getDayNameFromDateKey_(formatDate_(now)).toUpperCase();
+  if (allowedDays.indexOf(applicationDay) === -1) {
+    throw new Error("Permohonan jenis outing ini tidak dibenarkan pada hari ini.");
   }
+
+  validateRequestedDepartureV220_(leaveDateKey, config);
 
   const currentTime = Utilities.formatDate(now, "Asia/Kuala_Lumpur", "HH:mm");
   if (!isSubmissionTimeWithinWindowV200_(
@@ -1676,6 +1733,61 @@ function validateConfigDrivenSubmissionV200_(payload, config, now) {
   if (returnDateKey) submission.tarikh_balik = returnDateKey;
   submission.jenis_permohonan = config.type_code;
   return submission;
+}
+
+function getConfiguredDepartureDaysV220_(config) {
+  return String(config && config.departure_allowed_days || "")
+    .split(",")
+    .map((day) => String(day || "").trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function validateRequestedDepartureV220_(leaveDateKey, config) {
+  const departureDays = getConfiguredDepartureDaysV220_(config);
+  if (!departureDays.length) return true;
+  if (!leaveDateKey) {
+    throw new Error("Tarikh keluar diperlukan untuk peraturan keluar jenis outing ini.");
+  }
+  const departureDay = getDayNameFromDateKey_(leaveDateKey).toUpperCase();
+  if (departureDays.indexOf(departureDay) === -1) {
+    throw new Error("Tarikh keluar tidak dibenarkan untuk jenis outing ini.");
+  }
+  return true;
+}
+
+function formatOperationalTimeMalayV220_(timeValue) {
+  const time = normalizeOptionalTime_(timeValue, "earliest_departure_time");
+  if (!time) return "";
+  const parts = time.split(":");
+  const hour = Number(parts[0]);
+  const minute = parts[1];
+  const displayHour = hour % 12 || 12;
+  let period = "pagi";
+  if (hour === 0) period = "tengah malam";
+  else if (hour === 12) period = "tengah hari";
+  else if (hour >= 13 && hour < 19) period = "petang";
+  else if (hour >= 19) period = "malam";
+  return displayHour + ":" + minute + " " + period;
+}
+
+function validateGuardDepartureV220_(record, config, now) {
+  const departureDays = getConfiguredDepartureDaysV220_(config);
+  if (departureDays.length) {
+    const actualDay = getDayNameFromDateKey_(formatDate_(now)).toUpperCase();
+    if (departureDays.indexOf(actualDay) === -1) {
+      throw new Error("Pelajar tidak dibenarkan keluar pada hari ini.");
+    }
+  }
+
+  const earliestTime = String(config && config.earliest_departure_time || "").trim();
+  if (!earliestTime) return true;
+  const currentTime = Utilities.formatDate(now, "Asia/Kuala_Lumpur", "HH:mm");
+  if (currentTime < earliestTime) {
+    throw new Error(
+      "Pelajar hanya dibenarkan keluar mulai " + formatOperationalTimeMalayV220_(earliestTime) + "."
+    );
+  }
+  return true;
 }
 
 function submitRequest(payload) {
@@ -1920,6 +2032,7 @@ function confirmOut(payload) {
   const requestId = String(payload.request_id || "").trim();
   const guardName = String(payload.guard_name || payload.nama_guard || payload.user_name || "").trim();
   const pin = String(payload.pin === undefined || payload.pin === null ? "" : payload.pin).trim();
+  const now = new Date();
 
   if (!requestId || !guardName || !pin) {
     throw new Error("request_id, nama guard dan PIN diperlukan.");
@@ -1944,6 +2057,11 @@ function confirmOut(payload) {
 
   if (found.record.status !== STATUS.approved) {
     throw new Error("Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan.");
+  }
+
+  const departureConfig = resolveSubmissionOutingTypeConfigV200_(found.record.jenis_permohonan);
+  if (departureConfig) {
+    validateGuardDepartureV220_(found.record, departureConfig, now);
   }
 
   updateRowByHeaders_(found.sheet, found.rowNumber, {

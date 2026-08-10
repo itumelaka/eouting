@@ -31,7 +31,8 @@ submitRequest
   -> flag false: jalankan whitelist dan validator legacy tanpa OUTING_TYPES
   -> flag true: resolve row OUTING_TYPES daripada type_code
        -> type mesti active dan schema lengkap/sah
-       -> allowed_days + application window
+       -> allowed_days + application window berdasarkan masa permohonan
+       -> departure_allowed_days berdasarkan tarikh keluar yang diminta
        -> tarikh/masa server-side + fixed_return_time + same_day_only
        -> required fields menurut config
   -> semak pelajar aktif
@@ -40,6 +41,8 @@ submitRequest
 ```
 
 `fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN` dengan identiti sistem `AUTO_CONFIG_V2`. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
+
+Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Bagi `PULANG_BERMALAM`, permohonan Isnin hingga Khamis tetap sah jika tarikh keluar yang diminta ialah Jumaat. Default masa keluar paling awal dibiarkan kosong sehingga Admin/HEP mengesahkan polisi operasi.
 
 ## Student Form Config Rendering — Fasa 5A
 

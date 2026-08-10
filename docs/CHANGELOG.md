@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-Tiada perubahan belum direlease pada masa close-out v2.2.0.
+- **Departure configuration foundation:** meluaskan `OUTING_TYPES` dengan `departure_allowed_days` dan `earliest_departure_time`, memisahkan peraturan permohonan daripada peraturan keluar dalam Tetapan Outing.
+- **Pulang Bermalam:** menyediakan hari keluar Jumaat sambil membenarkan permohonan pada mana-mana hari; masa keluar paling awal kekal kosong sehingga disahkan Admin/HEP.
+- **Safety:** `OUTING_CONFIG_V2_ENABLED` kekal `false`; legacy production tidak berubah dan tiada deployment GAS dibuat oleh perubahan source ini.
 
 ## v2.2.0 — 2026-08-09
 

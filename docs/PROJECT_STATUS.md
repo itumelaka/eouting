@@ -18,6 +18,8 @@ Production boundary semasa:
 - pengaktifan config-driven submission memerlukan keputusan dan verifikasi berasingan;
 - `require_selfie` belum mengawal lifecycle;
 - statistik dan label Telegram belum dinamik sepenuhnya untuk jenis custom.
+- schema `OUTING_TYPES` telah membezakan hari/waktu permohonan daripada hari/waktu keluar melalui `departure_allowed_days` dan `earliest_departure_time`; enforcement kekal tidak aktif selagi feature flag `false`;
+- `PULANG_BERMALAM` disediakan dengan hari keluar Jumaat, tetapi masa keluar paling awal masih memerlukan pengesahan Admin/HEP dan tidak diandaikan sebagai 14:00 atau 17:00.
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 

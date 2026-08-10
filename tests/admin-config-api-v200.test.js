@@ -15,11 +15,11 @@ const OUTING_HEADERS = [
   "require_leave_date", "require_return_date", "require_return_time", "require_guardian_phone",
   "require_guardian_relation", "require_emergency_reason", "require_purpose", "require_location",
   "require_vehicle", "require_warden_approval", "require_selfie", "config_version", "created_at",
-  "created_by", "updated_at", "updated_by"
+  "created_by", "updated_at", "updated_by", "departure_allowed_days", "earliest_departure_time"
 ];
 const PUBLIC_FIELDS = [
   "type_code", "display_name", "description", "sort_order", "allowed_days",
-  "application_open_time", "application_close_time", "fixed_return_time", "same_day_only",
+  "application_open_time", "application_close_time", "departure_allowed_days", "earliest_departure_time", "fixed_return_time", "same_day_only",
   "require_leave_date", "require_return_date", "require_return_time", "require_guardian_phone",
   "require_guardian_relation", "require_emergency_reason", "require_purpose", "require_location",
   "require_vehicle", "require_warden_approval", "require_selfie"
@@ -122,6 +122,8 @@ function completeConfig(typeCode = "LAWATAN_KELUARGA") {
     allowed_days: "SABTU,AHAD",
     application_open_time: "08:00",
     application_close_time: "18:00",
+    departure_allowed_days: "JUMAAT",
+    earliest_departure_time: "14:00",
     fixed_return_time: "22:00",
     same_day_only: true,
     require_leave_date: true,
@@ -219,6 +221,14 @@ test("create validates fields, prevents duplicates and uses a script lock", () =
     /allowed_days/i
   );
   assert.throws(
+    () => runtime.context.createOutingType(adminPayload({ outing_type: { ...completeConfig("JENIS_BARU"), departure_allowed_days: "FRIDAY" } })),
+    /allowed_days/i
+  );
+  assert.throws(
+    () => runtime.context.createOutingType(adminPayload({ outing_type: { ...completeConfig("JENIS_BARU"), earliest_departure_time: "25:00" } })),
+    /earliest_departure_time/i
+  );
+  assert.throws(
     () => runtime.context.createOutingType(adminPayload({ outing_type: { ...completeConfig("JENIS_BARU"), require_selfie: "true" } })),
     /boolean/i
   );
@@ -246,7 +256,11 @@ test("update increments version, preserves creation metadata and audits safe cha
   const updated = context.updateOutingType(adminPayload({
     type_code: before.type_code,
     expected_config_version: before.config_version,
-    outing_type: { display_name: "Outing Harian" }
+    outing_type: {
+      display_name: "Outing Harian",
+      departure_allowed_days: "JUMAAT",
+      earliest_departure_time: "17:00"
+    }
   }));
   assert.equal(updated.config_version, 2);
   assert.equal(updated.created_at, before.created_at);
@@ -256,6 +270,8 @@ test("update increments version, preserves creation metadata and audits safe cha
   assert.equal(audit.entity_type, "OUTING_TYPE");
   assert.equal(audit.entity_id, before.type_code);
   assert.equal(audit.user_name, "ADM-001");
+  assert.match(String(audit.details), /departure_allowed_days/);
+  assert.match(String(audit.details), /earliest_departure_time/);
   assert.doesNotMatch(String(audit.details), /2468/);
 });
 

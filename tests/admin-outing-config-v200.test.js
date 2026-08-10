@@ -33,7 +33,9 @@ const OUTING_TYPE_HEADERS = [
   "created_at",
   "created_by",
   "updated_at",
-  "updated_by"
+  "updated_by",
+  "departure_allowed_days",
+  "earliest_departure_time"
 ];
 
 const ADMIN_USER_HEADERS = [
@@ -235,6 +237,58 @@ test("rerunning migration preserves existing type rows and immutable type_code",
   assert.equal(sheet.rows[1][0], "OUTING_BIASA");
   assert.equal(sheet.rows[1][displayNameIndex], "Nama Sedia Ada");
   assert.equal(sheet.rows.length, 6);
+});
+
+test("migration backfills Friday departure once without changing versions or later Admin edits", () => {
+  const legacyHeaders = OUTING_TYPE_HEADERS.filter((header) => (
+    header !== "departure_allowed_days" && header !== "earliest_departure_time"
+  ));
+  const legacyRow = legacyHeaders.map((header) => ({
+    type_code: "PULANG_BERMALAM",
+    display_name: "Pulang Bermalam",
+    description: "Sedia ada",
+    active: true,
+    sort_order: 4,
+    allowed_days: "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU",
+    application_open_time: "",
+    application_close_time: "",
+    fixed_return_time: "",
+    same_day_only: false,
+    require_leave_date: false,
+    require_return_date: true,
+    require_return_time: true,
+    require_guardian_phone: true,
+    require_guardian_relation: true,
+    require_emergency_reason: false,
+    require_purpose: true,
+    require_location: true,
+    require_vehicle: true,
+    require_warden_approval: true,
+    require_selfie: true,
+    config_version: 7,
+    created_at: "lama",
+    created_by: "ADM",
+    updated_at: "lama",
+    updated_by: "ADM"
+  }[header] ?? ""));
+  const sheet = new FakeSheet("OUTING_TYPES", [legacyHeaders, legacyRow]);
+  const { context } = createMigrationContext({ sheets: { OUTING_TYPES: sheet } });
+
+  context.setupAdminOutingConfigV200();
+  let rows = rowsAsObjects(sheet);
+  let overnight = rows.find((row) => row.type_code === "PULANG_BERMALAM");
+  assert.equal(overnight.departure_allowed_days, "JUMAAT");
+  assert.equal(overnight.earliest_departure_time || "", "");
+  assert.equal(overnight.config_version, 7);
+
+  const departureIndex = sheet.rows[0].indexOf("departure_allowed_days");
+  const overnightRowIndex = sheet.rows.findIndex((row, index) => index > 0 && row[0] === "PULANG_BERMALAM");
+  sheet.rows[overnightRowIndex][departureIndex] = "SABTU";
+  context.setupAdminOutingConfigV200();
+  rows = rowsAsObjects(sheet);
+  overnight = rows.find((row) => row.type_code === "PULANG_BERMALAM");
+  assert.equal(overnight.departure_allowed_days, "SABTU");
+  assert.equal(overnight.config_version, 7);
 });
 
 test("submitRequest keeps all legacy validators behind the v2 feature-gated resolver", () => {
