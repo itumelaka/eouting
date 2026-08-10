@@ -2,7 +2,20 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (9 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan GAS Version 32, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy. Lihat `docs/DEPLOYMENT.md` untuk urutan release semasa dan hygiene `clasp show-file-status`/`.claspignore`.
+> Catatan semasa (10 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r1`, GAS Version 36, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+
+## Close-out Config-driven Production — 10 Ogos 2026
+
+- [x] `OUTING_CONFIG_V2_ENABLED=true` diaktifkan secara terkawal selepas Admin readiness hijau.
+- [x] `OUTING_TYPES` menjadi source authoritative dan Tetapan Outing menjadi interface konfigurasi operasi.
+- [x] Status Admin dipadatkan kepada `Config Active`, `Legacy` atau `Config Issue` dengan reason access yang accessible.
+- [x] `PULANG_BERMALAM` menerima permohonan pada mana-mana hari, tetapi departure production semasa ialah Jumaat mulai `17:00`; masa boleh diubah Admin mengikut arahan HEP.
+- [x] Submission, Warden approval dan early Guard rejection lulus smoke test production.
+- [x] Bug payload tarikh overnight yang ditemui semasa activation test telah dibaiki dan diuji semula.
+- [x] Guard menerima mesej polisi tarikh/hari/masa yang selamat; error lain kekal generik.
+- [x] GAS Version 36 dideploy tanpa menukar URL production.
+
+Rollback config-driven tidak memerlukan redeployment: tetapkan `OUTING_CONFIG_V2_ENABLED=false` untuk kembali kepada submission/config legacy. Reactivation menggunakan `true` hanya selepas Tetapan Outing menunjukkan readiness hijau.
 
 ## Close-out Production v2.2.0 — 9 Ogos 2026
 
@@ -17,7 +30,7 @@ Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan 
 
 Urutan release seterusnya kekal: jalankan tests dan diff/status checks; semak `clasp show-file-status`; jalankan `clasp push` hanya jika GAS berubah; edit deployment Web App sedia ada kepada `New version`; kekalkan URL/access; authorize jika diminta; smoke-test production dan GitHub Pages/cache; kemudian tutup metadata frontend selepas backend production disahkan.
 
-## Keputusan Semasa
+## Keputusan v2.0 — Rekod Sejarah
 
 - Status code: rollout production selesai dan disahkan pada 4 Ogos 2026.
 - Status production frontend v2.0: berjaya.
@@ -42,7 +55,7 @@ Urutan release seterusnya kekal: jalankan tests dan diff/status checks; semak `c
 - [x] Suite automatik penuh lulus **177/177** sebelum deployment.
 - [x] Merge commit production ialah `4eedcbe` (`release: deploy eOuting v2.0.0`).
 
-## Had Beta yang Diketahui
+## Had Beta yang Diketahui — Rekod Sejarah
 
 - Gunakan lima jenis seed dahulu. Jenis custom belum dijamin mempunyai label mesra pengguna dalam semua mesej Telegram.
 - Statistik masih mengira kategori legacy dan belum dinamik sepenuhnya untuk jenis custom.

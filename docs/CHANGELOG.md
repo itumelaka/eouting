@@ -1,10 +1,17 @@
 # Changelog
 
-## Unreleased
+## 2026-08-10 — Config-driven production activation (v2.2.0)
 
-- **Departure configuration foundation:** meluaskan `OUTING_TYPES` dengan `departure_allowed_days` dan `earliest_departure_time`, memisahkan peraturan permohonan daripada peraturan keluar dalam Tetapan Outing.
-- **Pulang Bermalam:** menyediakan hari keluar Jumaat sambil membenarkan permohonan pada mana-mana hari; masa keluar paling awal kekal kosong sehingga disahkan Admin/HEP.
-- **Safety:** `OUTING_CONFIG_V2_ENABLED` kekal `false`; legacy production tidak berubah dan tiada deployment GAS dibuat oleh perubahan source ini.
+- **Departure configuration:** mengaktifkan `departure_allowed_days` dan `earliest_departure_time` sambil memisahkan application rules daripada physical departure rules.
+- **Pulang Bermalam:** membenarkan permohonan pada mana-mana hari; tarikh departure production semasa mesti Jumaat dan masa paling awal ialah `17:00`, boleh diubah Admin mengikut arahan HEP.
+- **Readiness:** mengukuhkan validation schema/config aktif, kod pendua, version, boolean, hari, masa dan consistency consumer sebelum activation.
+- **Config semantics:** menjadikan `require_selfie` authoritative (`TIDAK_DIPERLUKAN` apabila false) dan `require_warden_approval=false` sebagai auto-approval `AUTO_CONFIG_V2` dengan audit eksplisit.
+- **Dynamic consumers:** mengalirkan label/jenis config kepada Student, Telegram, Statistik, filter Admin, Warden checklist/filter, label kontekstual dan return-selfie eligibility.
+- **Controlled activation:** mengaktifkan `OUTING_CONFIG_V2_ENABLED=true` selepas readiness hijau dan smoke test submission/Warden/Guard; rollback flag-false kekal tanpa redeployment.
+- **Overnight payload fix:** membaiki tarikh keluar `PULANG_BERMALAM` yang kelihatan pada UI tetapi tidak sampai sebagai `payload.tarikh` semasa activation test pertama.
+- **Guard feedback:** menambah rejection tarikh/hari/masa yang jelas dan selamat; request 14 Ogos 2026 ditolak apabila `confirmOut` dicuba pada 10 Ogos 2026.
+- **Admin UX:** mengganti panel readiness besar dengan chip accessible `Config Active`, `Legacy` atau `Config Issue`.
+- **Production:** GAS Version 36 live pada endpoint sedia ada; frontend kekal v2.2.0 dengan cache/asset revision `2.2.0-r1`.
 
 ## v2.2.0 — 2026-08-09
 

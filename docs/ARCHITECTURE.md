@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.0**. Production menggunakan GAS Version 33, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
+Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r1`. Production menggunakan GAS Version 36, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
 
 ## Komponen
 
@@ -40,8 +40,8 @@ Google Sheets ialah database dan source of truth. Tab utama:
 - `GUARDS`
 - `OUTING_REQUESTS`
 - `AUDIT_LOG`
-- `OUTING_TYPES` — schema konfigurasi staging v2.0
-- `ADMIN_USERS` — schema identiti Admin staging v2.0
+- `OUTING_TYPES` — source authoritative konfigurasi outing production
+- `ADMIN_USERS` — identiti Admin private
 
 v1.7.0 menambah lima header selfie secara idempotent melalui `setupSelfieProofV170()` dan mengekalkan `selfie_whatsapp` sebagai kolum legacy.
 
@@ -57,14 +57,14 @@ Fasa 4.6 menetapkan satu sahaja canonical `apiPost` frontend. Router ini meminta
 
 Fasa 5A memuatkan public `GET getOutingTypes` hanya selepas sesi Pelajar dibuka. Dropdown, visibility, required/disabled state, `same_day_only` dan `fixed_return_time` dirender daripada safe config. Kegagalan atau response kosong menggunakan lima legacy config dalam memory; `submitRequest` GAS dan feature flag default tidak berubah.
 
-Foundation departure-rule menambah `departure_allowed_days` dan `earliest_departure_time` pada `OUTING_TYPES` sedia ada. Ia tidak mencipta modul polisi kedua. `allowed_days` kekal peraturan hari permohonan, manakala medan departure mengawal tarikh keluar yang diminta dan masa paling awal Guard boleh mengesahkan keluar. Enforcement kekal di belakang `OUTING_CONFIG_V2_ENABLED`; legacy production tidak berubah semasa flag `false`.
+Foundation departure-rule menambah `departure_allowed_days` dan `earliest_departure_time` pada `OUTING_TYPES` sedia ada. Ia tidak mencipta modul polisi kedua. `allowed_days` serta application window mengawal masa permohonan; medan departure mengawal tarikh keluar yang diminta dan masa paling awal Guard boleh mengesahkan keluar. Enforcement production kini membaca row aktif kerana `OUTING_CONFIG_V2_ENABLED=true`.
 
-Readiness hardening menambah POST Admin-only `getOutingConfigReadiness`. Ia membaca `OUTING_TYPES` tanpa mencipta atau mengubah sheet dan tidak mendedahkan property atau credential. Tetapan Outing memaparkan mode semasa berasingan daripada verdict readiness; tiada control activation. Label custom digunakan oleh Telegram, statistik, Rekod Master dan Checklist Warden. `require_warden_approval=false` menghasilkan state `DILULUSKAN_WARDEN`, approver `AUTO_CONFIG_V2`, masa approval dan audit `AUTO_APPROVE_REQUEST` yang eksplisit.
+Readiness hardening menambah POST Admin-only `getOutingConfigReadiness`. Ia membaca `OUTING_TYPES` tanpa mencipta atau mengubah sheet dan tidak mendedahkan property atau credential. Tetapan Outing memaparkan chip `Config Active`, `Legacy` atau `Config Issue` dengan sebab not-ready yang accessible; tiada control activation. Label config digunakan oleh Student, Telegram, statistik, Rekod Master, filter Admin, Checklist/filter Warden, label kontekstual dan return-selfie eligibility. `require_warden_approval=false` menghasilkan state `DILULUSKAN_WARDEN`, approver `AUTO_CONFIG_V2`, masa approval dan audit `AUTO_APPROVE_REQUEST` yang eksplisit.
 
 ```text
-Production v1.7.1: config-driven rendering + hard-coded submitRequest
-Staging v2.0:      OUTING_TYPES + ADMIN_USERS (inactive)
-Feature flag:      OUTING_CONFIG_V2_ENABLED=false
+Production v2.2.0: config-driven rendering + validation + dynamic consumers
+Configuration:     OUTING_TYPES authoritative; Admin Tetapan Outing
+Feature flag:      OUTING_CONFIG_V2_ENABLED=true; readiness Ready
 ```
 
 ## Boundary API
@@ -197,7 +197,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Versi perlu konsisten pada `APP_VERSION`, footer, query string asset, `CACHE_NAME`, app-shell URLs dan `version.json`. Cache production semasa ialah `eouting-cache-v2.2.0`; tiada revision preview aktif.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset production semasa ialah `eouting-cache-v2.2.0-r1` dan query `2.2.0-r1`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
@@ -216,7 +216,9 @@ OUTING_CONFIG_V2_ENABLED === "true"
   -> duplicate check dan append/audit/Telegram sedia ada
 ```
 
-Frontend tidak menentukan authorization atau validation akhir. Config yang dihantar client tidak dipercayai; resolver sentiasa membaca `OUTING_TYPES`. Sheet hilang, jenis hilang/inactive atau config malformed gagal tertutup. Feature flag kekal `false`, maka flow production semasa masih melalui validator legacy.
+Frontend tidak menentukan authorization atau validation akhir. Config yang dihantar client tidak dipercayai; resolver sentiasa membaca `OUTING_TYPES`. Sheet hilang, jenis hilang/inactive atau config malformed gagal tertutup. Feature flag production ialah `true`; rollback kepada validator legacy dilakukan dengan menetapkannya kepada `false` tanpa redeployment.
+
+`confirmOut` turut menyemak tarikh keluar yang diluluskan, configured departure day dan earliest departure time. Policy error yang sepadan dipaparkan kepada Guard dalam wording Melayu yang diallowlist; network/internal error kekal generik dan stack detail tidak didedahkan.
 
 ## Operasi Admin
 

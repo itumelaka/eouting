@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan production **v2.2.0 / GAS Version 32**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan production **v2.2.0 / GAS Version 36**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -63,7 +63,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache semasa ialah `eouting-cache-v2.2.0`; revision preview tidak aktif.
+- Cache semasa ialah `eouting-cache-v2.2.0-r1`; displayed app version kekal v2.2.0.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -110,9 +110,9 @@ Authorization tetap dijalankan pada setiap thumbnail/full request; cache tidak m
 
 Frontend role hiding, button visibility, PWA install dan local state bukan security enforcement.
 
-## Backend Admin Config v2.0
+## Backend Admin Config
 
-- `OUTING_TYPES` dan `ADMIN_USERS` diwujudkan sebagai schema staging sahaja.
+- `OUTING_TYPES` kini authoritative bagi config-driven production; `ADMIN_USERS` kekal private.
 - `ADMIN_USERS` tidak diseed dengan akaun atau PIN contoh.
 - Fasa 3 menambah `loginAdmin`, public safe config GET dan Admin read/create/update/toggle melalui POST.
 - Tiada Dashboard Admin, butang login Admin atau session token frontend dalam Fasa 3.
@@ -175,7 +175,13 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 - `fixed_return_time` dikuatkuasakan oleh backend; nilai client tidak boleh mengatasinya.
 - `require_warden_approval = false` menggunakan auto-approval backend beridentiti `AUTO_CONFIG_V2`; client tidak boleh memilih status awal sendiri.
 - Audit hanya menyimpan type code dan config version tambahan, bukan config penuh atau credential.
-- Feature flag kekal `false`; tiada migration atau activation live dilakukan dalam fasa ini.
+- Feature flag production ialah `true` sejak controlled activation 10 Ogos 2026. Rollback kepada `false` mengembalikan validator legacy tanpa redeployment; reactivation hanya apabila readiness hijau.
+
+### Guard Policy Error Boundary
+
+- `confirmOut` menolak future approved departure date, disallowed configured day dan waktu sebelum `earliest_departure_time`.
+- Hanya bentuk mesej polisi tarikh/hari/masa Melayu yang diallowlist dipaparkan kepada Guard.
+- Network, unrelated dan internal failures menggunakan mesej retry generic; stack, line number dan internal exception tidak didedahkan.
 
 ## Telegram dan Deployment Secrets
 

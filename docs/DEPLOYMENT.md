@@ -1,14 +1,29 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v2.2.0**. Backend production semasa ialah GAS **Version 33**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.production-v171.gs` ialah snapshot lama, bukan source kanonik, dan tidak boleh dideploy.
+Versi aplikasi semasa: **v2.2.0**, cache/asset revision `2.2.0-r1`. Backend production ialah GAS **Version 36**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production aktif dan ready sejak 10 Ogos 2026.
 
-## Release Production v2.2.0 — 9 Ogos 2026
+## Config-driven Production Activation — 10 Ogos 2026
+
+- `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi.
+- Admin menunjukkan chip `Config Active`; readiness ialah `Ready`.
+- Smoke test production lulus untuk non-Friday rejection, Friday submission, Warden approval dan rejection awal Guard dengan mesej tarikh yang jelas.
+- GAS Version 36 membawa enforcement/feedback akhir tanpa menukar deployment URL atau Spreadsheet.
+
+Emergency rollback:
+
+```text
+OUTING_CONFIG_V2_ENABLED=false
+```
+
+Kesan: production kembali kepada submission/config legacy tanpa code push, `clasp push` atau deployment GAS. Data `OUTING_TYPES` dan audit tidak dipadam. Untuk reactivation, tetapkan semula `true` hanya selepas Admin menunjukkan readiness hijau dan konfigurasi production telah disemak.
+
+## Release Production v2.2.0 — 9 Ogos 2026 (sejarah sebelum activation)
 
 - GAS Version 33 ialah baseline pada Web App sedia ada dan URL/access settings dikekalkan.
 - Dua-tier delivery foto profil (`thumbnail` batch dan `full` on-demand) telah disahkan untuk Pelajar, Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar.
 - Public Pemantauan kekal photo-free; return selfie kekal pada folder/schema/Telegram workflow berasingan.
 - Enam modul Admin inline, Statistik selamat, Rekod Master, rolling KPI, Enter UX serta cache/service-worker delivery telah melalui smoke test production.
-- Frontend release metadata dan cache kekal v2.2.0; readiness hardening source belum dideploy.
+- Pada close-out 9 Ogos, frontend release metadata/cache ialah v2.2.0 dan readiness hardening belum dideploy; keadaan ini digantikan oleh activation Version 36 pada 10 Ogos.
 
 ## Release Production v2.1.0 — 9 Ogos 2026
 
@@ -32,11 +47,9 @@ Versi repo semasa: **v2.2.0**. Backend production semasa ialah GAS **Version 33*
 
 Rollout ini tidak mengaktifkan config-driven submission dan tidak menukar endpoint production.
 
-## Fasa 5B Belum Diaktifkan
+## Fasa 5B — Rekod Activation Selesai
 
-Kod backend config-driven submission sudah tersedia di branch v2.0 tetapi `OUTING_CONFIG_V2_ENABLED` mesti kekal `false` sehingga migration live, semakan lima seed, backup dan QA rollback diluluskan. Jangan mengaktifkan flag sebelum versi GAS yang mengandungi resolver Fasa 5B dideploy dan `OUTING_TYPES` disahkan lengkap.
-
-Urutan activation masa hadapan ialah: backup Sheet, jalankan migration idempotent, deploy hardening GAS tanpa menukar flag, uji legacy dengan flag `false`, buka Tetapan Outing dan pastikan `Config-driven Ready` tanpa sebab gagal, kemudian aktifkan flag hanya dalam tetingkap terkawal dan uji submit/duplicate/Warden/Guard/selfie/Telegram/statistik/custom type. Rollback segera ialah kembalikan flag kepada `false` dan, jika perlu, pilih deployment GAS stabil terdahulu; jangan padam tab, kolum atau rekod lama. Tiada langkah activation/deployment dilakukan oleh perubahan source ini.
+Urutan backup, migration idempotent, legacy check, readiness hijau dan controlled activation telah selesai. Production kini menggunakan config-driven submission. Lima flow seed dan consumer dinamik mesti terus diuji apabila konfigurasi operational berubah; active custom config tidak dikecualikan daripada readiness dan regression QA.
 
 ## Release Beta v2.0
 

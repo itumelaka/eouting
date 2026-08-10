@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.0** dengan GAS Version 33.
+Dokumen ini menerangkan flow production semasa **v2.2.0** dengan GAS Version 36 dan `OUTING_CONFIG_V2_ENABLED=true`.
 
 ## Backend Config API v2.0
 
@@ -22,7 +22,7 @@ Admin POST create/update/toggle
   -> AUDIT_LOG entity OUTING_TYPE
 ```
 
-Tiada delete flow. `type_code` immutable. Fasa 5A menggunakan public projection untuk rendering borang Pelajar. Fasa 5B menambah validation config-driven pada `submitRequest`, tetapi laluan itu hanya boleh dicapai apabila `OUTING_CONFIG_V2_ENABLED` tepat `"true"`; default dan production semasa kekal pada validator legacy.
+Tiada delete flow. `type_code` immutable. Production kini menggunakan public projection untuk rendering borang Pelajar dan validation config-driven pada `submitRequest`; resolver membaca `OUTING_TYPES` authoritative apabila property tepat `"true"`.
 
 ## Backend Submission Config — Fasa 5B
 
@@ -42,7 +42,7 @@ submitRequest
 
 `fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN`, mengisi masa approval dan identiti sistem `AUTO_CONFIG_V2`, serta menulis audit `AUTO_APPROVE_REQUEST`. Guard hanya menerima state approved yang sah. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
 
-Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` semasa menetapkan Jumaat dan `17:00`; peraturan ini belum aktif pada production kerana feature flag kekal `false`.
+Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` production membenarkan permohonan pada mana-mana hari, departure Jumaat dan masa paling awal semasa `17:00`; Admin boleh mengubah masa itu mengikut arahan HEP.
 
 ## Student Form Config Rendering — Fasa 5A
 
@@ -181,6 +181,10 @@ Quick filter Guard:
 Filter digunakan pada kedua-dua seksyen. Empty-state berubah mengikut filter dan seksyen. `Kecemasan` tidak dianggap Outing Harian.
 
 `confirmIn` kekal tanggungjawab Guard dan masih menerima catatan masuk optional. Guard tidak mengambil atau upload selfie; bukti dihantar oleh Pelajar selepas status menjadi `SELESAI`.
+
+Sebelum `confirmOut`, backend menyemak tarikh keluar approved/requested, configured departure day dan earliest departure time. Tarikh masa hadapan, hari tidak dibenarkan dan masa terlalu awal ditolak. Policy failure dipaparkan dalam Malay operational wording yang selamat, manakala unrelated/network/internal failure kekal generic tanpa stack detail. Contoh production: request 14 Ogos 2026 tidak boleh disahkan keluar pada 10 Ogos 2026.
+
+Tetapan Outing memaparkan readiness sebagai chip compact `Config Active`, `Legacy` atau `Config Issue`; reason not-ready boleh dibuka secara accessible dan tiada feature-flag toggle.
 
 ## Flow Bukti Selfie dan Retry
 

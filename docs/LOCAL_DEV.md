@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.2.0** dan production GAS Version 32.
+Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r1` dan production GAS Version 36.
 
 ## Keperluan
 
@@ -83,7 +83,7 @@ Ujian Admin beta:
 
 Backend semasa belum mengeluarkan session token Admin. PIN yang ditaip disimpan hanya dalam memory runtime tab untuk menghantar authenticated Admin POST berikutnya; ia tidak disimpan dalam `localStorage`, `sessionStorage`, URL atau log. Logout membersihkan credential runtime tersebut.
 
-Dengan `OUTING_CONFIG_V2_ENABLED=false`, jangkaan yang betul ialah:
+Untuk QA rollback/beta dengan `OUTING_CONFIG_V2_ENABLED=false` (bukan state production semasa), jangkaan yang betul ialah:
 
 - authentication Admin serta Admin read/create/update/toggle masih boleh berfungsi untuk menyediakan konfigurasi beta;
 - public `getOutingTypes` memulangkan fallback lima jenis legacy;
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline release v2.2.0 ialah **246/246 lulus** semasa close-out 9 Ogos 2026.
+Baseline selepas close-out config-driven 10 Ogos 2026 ialah **275/275 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -178,6 +178,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 4. Pastikan Outing Harian tidak menangkap Kecemasan.
 5. Uji confirm keluar/masuk dan Telegram.
 6. Klik foto sebenar pada setiap jenis kad Guard dan sahkan satu batch thumbnail digunakan, full preview dimuat on-demand/cached dan tidak mengganggu `Sahkan Keluar`/`Sahkan Masuk`; initials kekal inert.
+7. Untuk `PULANG_BERMALAM`, uji future approved date, disallowed departure day dan sebelum `earliest_departure_time`; policy error mesti jelas dan error network/internal mesti kekal generic.
 
 ## Smoke Test Public Monitoring
 
@@ -201,7 +202,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 ## PWA dan Cache
 
 - Semak footer v2.2.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.2.0` tanpa revision preview aktif.
+- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r1`; displayed app version kekal v2.2.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

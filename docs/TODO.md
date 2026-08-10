@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 33**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 36** pada 10 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
@@ -12,7 +12,9 @@ Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 33**. Rek
 - [x] Two-tier photo delivery: unique-ID thumbnail batch, server-side Drive thumbnail, one-student full preview, cache sesi, duplicate suppression dan safe failure.
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
-- [x] GAS Version 33 ialah baseline production semasa; feature flag kekal `false`.
+- [x] GAS Version 36 ialah baseline production semasa; config-driven active dan readiness hijau.
+- [x] Cache/asset revision `2.2.0-r1` dengan displayed app version kekal v2.2.0.
+- [x] Controlled activation: submission, Warden approval, early Guard rejection dan safe policy feedback disahkan.
 
 ### eOuting v2.0 — Fasa 2 Schema dan Migration
 
@@ -129,7 +131,7 @@ Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 33**. Rek
 ## Near TODO
 
 - [x] Tambah foundation peraturan keluar pada `OUTING_TYPES`: hari keluar dan masa keluar paling awal, tanpa mengaktifkan config-driven production.
-- [ ] Admin/HEP sahkan nilai operasi awal `earliest_departure_time` untuk `PULANG_BERMALAM` sebelum feature flag diaktifkan.
+- [x] Admin/HEP menetapkan `earliest_departure_time=17:00` untuk `PULANG_BERMALAM`; nilai ini boleh diubah mengikut arahan operasi semasa.
 
 - [x] Fasa 6: audit beta readiness, metadata, migration/security boundaries serta sediakan rollout dan rollback checklist.
 - [x] Fasa 4.5: Local/Mock QA Admin dengan lima seed, credential development terasing, error/retry dan optimistic conflict.
@@ -138,12 +140,12 @@ Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 33**. Rek
 - [x] Fasa 5B: selaraskan submission/validation config-driven di belakang feature flag dengan fail-closed config resolution dan legacy fallback.
 - [x] Bina `getOutingTypes` dengan kontrak public projection selamat.
 - [x] Bina CRUD backend dan Dashboard Admin pada fasa berasingan.
-- [ ] Aktifkan config-driven submission hanya selepas live migration, feature flag dan rollback diuji/diluluskan.
+- [x] Aktifkan config-driven submission selepas live migration, readiness, feature flag dan rollback diuji/diluluskan.
 - [ ] Sediakan persekitaran beta berasingan atau kelulusan khusus jika menggunakan data production.
 - [x] Sambungkan `require_selfie` kepada lifecycle config-driven dengan state `TIDAK_DIPERLUKAN` tanpa mengubah legacy.
 - [x] Jadikan statistik, label Telegram, Rekod Master dan Checklist Warden config-aware untuk jenis custom.
 - [x] Tambah readiness read-only Admin untuk schema, config aktif, pendua, versi, hari/masa dan konsistensi consumer.
-- [ ] Deploy hardening ke GAS dan jalankan readiness terhadap Sheet production dalam perubahan berasingan; jangan aktifkan flag serentak.
+- [x] Deploy hardening, sahkan readiness production, lakukan controlled activation dan deploy Guard feedback sebagai GAS Version 36.
 - [ ] Telegram inline button/link to open Warden/Guard/Pemantauan page.
 - [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Aplikasi`, if still required.
 - [ ] Optional `request_id` deep link/highlight later.

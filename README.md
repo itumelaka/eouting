@@ -14,7 +14,7 @@ Versi repo semasa: **v2.2.0 — Operasi Bersepadu dan Foto Profil Private Dua Pe
 
 Frontend production v2.2.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Backend production semasa menggunakan GAS **Version 33**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
+Backend production semasa menggunakan GAS **Version 36**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
 Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
@@ -58,11 +58,16 @@ Pelajar hantar permohonan
   -> Pelajar hantar bukti selfie jika diwajibkan
 ```
 
-Konfigurasi staging kini membezakan waktu **permohonan** daripada waktu **keluar**. Row `PULANG_BERMALAM` semasa menetapkan hari keluar Jumaat dan masa paling awal `17:00`; production masih menggunakan `OUTING_CONFIG_V2_ENABLED=false`, maka peraturan itu belum mengubah flow legacy.
+Konfigurasi production membezakan dua konsep:
+
+- **Peraturan permohonan:** `allowed_days`, `application_open_time` dan `application_close_time` menentukan bila pelajar boleh menghantar permohonan.
+- **Peraturan keluar:** `departure_allowed_days` dan `earliest_departure_time` menentukan hari serta masa paling awal pelajar yang diluluskan boleh keluar secara fizikal.
+
+Untuk `PULANG_BERMALAM`, pelajar boleh memohon pada mana-mana hari, tetapi tarikh keluar yang diminta kini mesti hari Jumaat dan masa keluar paling awal pada row production ialah `17:00`. Nilai masa ini ialah konfigurasi operasi yang boleh diubah oleh Admin melalui Tetapan Outing mengikut arahan semasa HEP; ia bukan polisi kekal yang hard-coded.
 
 ## Bukti Pulang Asrama v1.7.0
 
-Bukti selfie pulang diwajibkan selepas Guard mengesahkan masuk untuk semua jenis legacy semasa production menggunakan flag `false`. Dalam config-driven mode, `require_selfie` disnapshot pada rekod semasa submission: `false` menggunakan `TIDAK_DIPERLUKAN`, manakala `true` menjadi `BELUM_HANTAR` selepas `confirmIn`.
+Dalam production config-driven, `require_selfie` ialah authoritative dan disnapshot pada rekod semasa submission: `false` menggunakan `TIDAK_DIPERLUKAN`, manakala `true` menjadi `BELUM_HANTAR` selepas `confirmIn`.
 
 - `OUTING_BIASA`
 - `OUTING_HUJUNG_MINGGU`
@@ -74,7 +79,11 @@ Selepas `confirmIn`, status utama rekod kekal `SELESAI` dan `selfie_status` menj
 
 Backend menyemak pemilikan melalui `student_id` + `no_matrik`, status `SELESAI`, kewujudan `masa_masuk`, MIME/base64 dan duplicate submission. Gambar disimpan secara private dalam folder Drive `eOuting - Bukti Selfie Pulang` dan dihantar sebagai imej sebenar ke Telegram melalui `sendPhoto`. Public Monitoring tidak menerima URL, file ID, nombor matrik atau metadata selfie.
 
-Tetapan Outing kini turut memaparkan pemeriksaan read-only `Config Mode` dan `Config-driven Ready/Not Ready`. Semakan Admin-authenticated ini mengesahkan schema/config aktif, kod pendua, versi, boolean, hari, masa dan konsistensi departure tanpa menyediakan toggle untuk mengaktifkan feature flag.
+Tetapan Outing ialah interface operasi bagi `OUTING_TYPES`. Status readiness dipaparkan sebagai chip kompak dan accessible: `Config Active`, `Legacy` atau `Config Issue`; sebab kegagalan kekal boleh dibuka apabila tidak ready. Production semasa ialah **Config Active · Ready**. Tiada toggle feature flag pada UI.
+
+Jenis aktif dan label config-driven digunakan secara dinamik oleh borang/label Pelajar, Telegram, grouping/filter Statistik, filter Admin, filter/Checklist Warden, label outing kontekstual dan eligibility return-selfie. Konfigurasi aktif tetap mesti lulus readiness validation; jenis custom tidak dianggap selamat tanpa ujian.
+
+Semasa `confirmOut`, GAS menyemak tarikh keluar yang diluluskan, hari keluar yang dibenarkan dan `earliest_departure_time`. Kegagalan polisi dipaparkan kepada Guard dalam wording Melayu yang selamat; error network/internal kekal generik tanpa stack detail. Smoke test 10 Ogos 2026 mengesahkan permohonan untuk 14 Ogos 2026 tidak boleh disahkan keluar pada 10 Ogos 2026 dan Guard menerima maklum balas tarikh yang jelas.
 
 ## Foto Profil Pelajar
 
@@ -193,6 +202,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 33**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 36**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan cache frontend `2.2.0-r1`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

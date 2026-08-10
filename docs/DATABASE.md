@@ -100,7 +100,7 @@ Operational POST `getTodayRecords` kekal berasingan. Selepas credential disahkan
 
 `getOutingStats` mengira aggregated counts daripada `OUTING_REQUESTS` dan boleh kekal sebagai endpoint compatibility tanpa row mentah, nama pelajar atau nombor matrik. UI awam tidak menyediakan navigasi Statistik. Modul Statistik inline Admin menggunakan laluan authenticated berasingan untuk statistik individu.
 
-## `OUTING_TYPES` — staging v2.0
+## `OUTING_TYPES` — authoritative production configuration
 
 ```text
 type_code | display_name | description | active | sort_order | allowed_days | application_open_time | application_close_time | fixed_return_time | same_day_only | require_leave_date | require_return_date | require_return_time | require_guardian_phone | require_guardian_relation | require_emergency_reason | require_purpose | require_location | require_vehicle | require_warden_approval | require_selfie | config_version | created_at | created_by | updated_at | updated_by | departure_allowed_days | earliest_departure_time
@@ -108,7 +108,7 @@ type_code | display_name | description | active | sort_order | allowed_days | ap
 
 `setupAdminOutingConfigV200()` mencipta tab ini secara idempotent dan seed lima jenis sedia ada. `type_code` ialah identifier immutable: migration tidak menamakan semula atau menimpa row yang sudah wujud. `allowed_days` menentukan hari permohonan boleh dihantar, manakala `departure_allowed_days` menentukan hari pelajar dibenarkan keluar. Kedua-duanya menggunakan nama hari BM uppercase dipisahkan koma. `earliest_departure_time` ialah masa keluar paling awal dalam format `HH:mm`; nilai kosong bermaksud tiada masa minimum dikonfigurasi. Nilai boolean disimpan sebagai boolean Sheet.
 
-Fasa 3 menyediakan public safe read serta authenticated Admin read/create/update/toggle. Fasa 5A menggunakan safe projection untuk borang Pelajar dan Fasa 5B membolehkan `submitRequest` membaca tab ini hanya apabila `OUTING_CONFIG_V2_ENABLED = "true"`. Statistik, Telegram dan filter operasi kini menggunakan label config bagi jenis custom. Apabila flag `false`, `submitRequest` tidak memerlukan tab ini dan validator legacy v1.7.1 kekal berfungsi.
+Production menggunakan `OUTING_CONFIG_V2_ENABLED=true`, maka `submitRequest` membaca row aktif daripada tab ini. Tetapan Outing ialah interface operasi Admin bagi read/create/update/toggle. Jenis dan label config mengalir kepada Student labels/forms, Telegram, Statistik grouping/filtering, Admin filters, Warden filters/checklists, contextual outing labels dan return-selfie eligibility. Setiap konfigurasi aktif mesti lulus readiness validation; jenis custom masih memerlukan ujian.
 
 Andaian seed konservatif:
 
@@ -120,11 +120,11 @@ Andaian seed konservatif:
 | `PULANG_BERMALAM` | Semua hari | Tiada had dipetakan | Jumaat | 17:00 pada row semasa | Ikut permohonan | Tidak | Ya | Ya |
 | `CUTI_SEMESTER` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | Ikut permohonan | Tidak | Ya | Ya |
 
-Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Tarikh keluar yang diminta mesti hari Jumaat apabila config-driven submission diaktifkan. Guard hanya boleh mengesahkan keluar pada hari yang dibenarkan dan pada/selepas `earliest_departure_time`. Migration asal membiarkan masa kosong; row Sheet semasa telah ditetapkan Admin/HEP kepada `17:00`. Flag production kekal `false`.
+Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Tarikh keluar yang diminta mesti hari Jumaat. Guard hanya boleh mengesahkan keluar pada tarikh yang diluluskan, hari yang dibenarkan dan pada/selepas `earliest_departure_time`. Row production semasa ialah `17:00`, tetapi Admin boleh mengubahnya mengikut arahan HEP; nilai itu ialah konfigurasi operasi, bukan rule hard-coded kekal.
 
-Semua seed bermula `active = true`, `require_purpose = true`, `require_location = true`, `require_vehicle = true`, `require_warden_approval = true`, `require_selfie = true` dan `config_version = 1`. `require_leave_date` untuk Cuti Semester kekal `false` kerana backend semasa menerima tarikh kosong dan menggunakan tarikh semasa; ini tidak mengubah paparan frontend sedia ada.
+Semua seed bermula `active = true`, `require_purpose = true`, `require_location = true`, `require_vehicle = true`, `require_warden_approval = true`, `require_selfie = true` dan `config_version = 1`. Dalam config-driven mode, `require_selfie` ialah authoritative: false menghasilkan `selfie_status=TIDAK_DIPERLUKAN`. `require_warden_approval=false` menghasilkan approval `AUTO_CONFIG_V2` dan audit `AUTO_APPROVE_REQUEST`. `created_at`, `created_by`, `updated_at` dan `updated_by` ialah metadata audit config; `config_version` menyokong optimistic concurrency.
 
-## `ADMIN_USERS` — staging v2.0
+## `ADMIN_USERS`
 
 ```text
 admin_id | nama_admin | pin | status | catatan | created_at | updated_at
