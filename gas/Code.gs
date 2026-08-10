@@ -1875,9 +1875,31 @@ function validateRequestedDepartureV220_(leaveDateKey, config) {
   }
   const departureDay = getDayNameFromDateKey_(leaveDateKey).toUpperCase();
   if (departureDays.indexOf(departureDay) === -1) {
-    throw new Error("Tarikh keluar tidak dibenarkan untuk jenis outing ini.");
+    const outingLabel = String(config && config.display_name || "Jenis outing ini").trim();
+    throw new Error(
+      outingLabel + " hanya dibenarkan keluar pada hari " +
+      formatOperationalDaysMalayV220_(departureDays) + "."
+    );
   }
   return true;
+}
+
+function formatOperationalDaysMalayV220_(days) {
+  const labels = {
+    AHAD: "Ahad",
+    ISNIN: "Isnin",
+    SELASA: "Selasa",
+    RABU: "Rabu",
+    KHAMIS: "Khamis",
+    JUMAAT: "Jumaat",
+    SABTU: "Sabtu"
+  };
+  const values = Array.from(new Set((days || [])
+    .map((day) => labels[String(day || "").trim().toUpperCase()] || "")
+    .filter(Boolean)));
+  if (values.length <= 1) return values[0] || "yang dikonfigurasi";
+  if (values.length === 2) return values[0] + " atau " + values[1];
+  return values.slice(0, -1).join(", ") + " atau " + values[values.length - 1];
 }
 
 function formatOperationalTimeMalayV220_(timeValue) {

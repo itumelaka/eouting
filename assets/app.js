@@ -6913,10 +6913,8 @@ apiPost = async function apiPostWithPulangBermalamFields(action, payload) {
 
     payload = {
       ...payload,
-      tarikh: requestType === REQUEST_TYPE.weekend
-        ? leaveDate
-        : payload.tarikh || "",
-      hari: requestType === REQUEST_TYPE.weekend
+      tarikh: leaveDate || payload.tarikh || "",
+      hari: leaveDate
         ? getDayNameFromDateInput(leaveDate)
         : payload.hari || "",
       tarikh_balik: returnDate,

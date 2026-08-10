@@ -104,10 +104,93 @@ test("configured Friday departure rejects another requested day and accepts Frid
   const monday = dateInContext(context, "2026-08-03T02:00:00Z");
   assert.throws(
     () => context.validateConfigDrivenSubmissionV200_({ tarikh: "2026-08-08" }, config, monday),
-    /Tarikh keluar tidak dibenarkan/
+    /Pulang Bermalam hanya dibenarkan keluar pada hari Jumaat\./
   );
   assert.doesNotThrow(
     () => context.validateConfigDrivenSubmissionV200_({ tarikh: "2026-08-07" }, config, monday)
+  );
+});
+
+test("real activation payload accepts Monday application for Friday leave with return and guardian fields", () => {
+  const { context } = createContext();
+  const config = departureConfig(context, {
+    earliest_departure_time: "17:00",
+    require_leave_date: true,
+    require_return_date: true,
+    require_return_time: true,
+    require_guardian_phone: true,
+    require_guardian_relation: true
+  });
+  const monday = dateInContext(context, "2026-08-10T02:00:00Z");
+  const payload = {
+    tarikh: "2026-08-14",
+    tarikh_balik: "2026-08-16",
+    masa_balik_dijangka: "20:30",
+    telefon_waris: "0123456789",
+    hubungan_waris: "Ibu"
+  };
+  const result = context.validateConfigDrivenSubmissionV200_(payload, config, monday);
+  assert.equal(result.tarikh, "2026-08-14");
+  assert.equal(result.tarikh_balik, "2026-08-16");
+  assert.equal(result.masa_balik_dijangka, "20:30");
+});
+
+test("populated non-Friday leave date gets the dynamic day error, never a false required error", () => {
+  const { context } = createContext();
+  const config = departureConfig(context, { require_leave_date: true });
+  const monday = dateInContext(context, "2026-08-10T02:00:00Z");
+  assert.throws(
+    () => context.validateConfigDrivenSubmissionV200_({ tarikh: "2026-08-15" }, config, monday),
+    (error) => {
+      assert.match(error.message, /Pulang Bermalam hanya dibenarkan keluar pada hari Jumaat\./);
+      assert.doesNotMatch(error.message, /Tarikh keluar diperlukan/);
+      return true;
+    }
+  );
+});
+
+test("multiple configured departure days are formatted safely", () => {
+  const { context } = createContext();
+  const config = departureConfig(context, { departure_allowed_days: "JUMAAT,SABTU" });
+  const monday = dateInContext(context, "2026-08-10T02:00:00Z");
+  assert.throws(
+    () => context.validateConfigDrivenSubmissionV200_({ tarikh: "2026-08-16" }, config, monday),
+    /Pulang Bermalam hanya dibenarkan keluar pada hari Jumaat atau Sabtu\./
+  );
+});
+
+test("missing leave date, invalid return ordering and guardian requirements remain explicit", () => {
+  const { context } = createContext();
+  const config = departureConfig(context, {
+    require_leave_date: true,
+    require_return_date: true,
+    require_return_time: true,
+    require_guardian_phone: true,
+    require_guardian_relation: true
+  });
+  const monday = dateInContext(context, "2026-08-10T02:00:00Z");
+  assert.throws(
+    () => context.validateConfigDrivenSubmissionV200_({}, config, monday),
+    /Tarikh keluar diperlukan/
+  );
+  assert.throws(
+    () => context.validateConfigDrivenSubmissionV200_({
+      tarikh: "2026-08-14",
+      tarikh_balik: "2026-08-13",
+      masa_balik_dijangka: "20:30",
+      telefon_waris: "0123456789",
+      hubungan_waris: "Ibu"
+    }, config, monday),
+    /Tarikh pulang ke asrama tidak boleh lebih awal/
+  );
+  assert.throws(
+    () => context.validateConfigDrivenSubmissionV200_({
+      tarikh: "2026-08-14",
+      tarikh_balik: "2026-08-16",
+      masa_balik_dijangka: "20:30",
+      hubungan_waris: "Ibu"
+    }, config, monday),
+    /Telefon waris diperlukan/
   );
 });
 
