@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 32** pada 9 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 33**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
@@ -12,7 +12,7 @@ Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 32** pada
 - [x] Two-tier photo delivery: unique-ID thumbnail batch, server-side Drive thumbnail, one-student full preview, cache sesi, duplicate suppression dan safe failure.
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
-- [x] GAS Version 32, endpoint lama, GitHub Pages/cache delivery dan smoke test production disahkan.
+- [x] GAS Version 33 ialah baseline production semasa; feature flag kekal `false`.
 
 ### eOuting v2.0 — Fasa 2 Schema dan Migration
 
@@ -140,8 +140,10 @@ Senarai kerja semasa selepas release production **v2.2.0 / GAS Version 32** pada
 - [x] Bina CRUD backend dan Dashboard Admin pada fasa berasingan.
 - [ ] Aktifkan config-driven submission hanya selepas live migration, feature flag dan rollback diuji/diluluskan.
 - [ ] Sediakan persekitaran beta berasingan atau kelulusan khusus jika menggunakan data production.
-- [ ] Sambungkan `require_selfie` kepada lifecycle sebelum membenarkannya sebagai tetapan operasi.
-- [ ] Jadikan statistik dan label Telegram config-aware sebelum jenis custom dibuka secara umum.
+- [x] Sambungkan `require_selfie` kepada lifecycle config-driven dengan state `TIDAK_DIPERLUKAN` tanpa mengubah legacy.
+- [x] Jadikan statistik, label Telegram, Rekod Master dan Checklist Warden config-aware untuk jenis custom.
+- [x] Tambah readiness read-only Admin untuk schema, config aktif, pendua, versi, hari/masa dan konsistensi consumer.
+- [ ] Deploy hardening ke GAS dan jalankan readiness terhadap Sheet production dalam perubahan berasingan; jangan aktifkan flag serentak.
 - [ ] Telegram inline button/link to open Warden/Guard/Pemantauan page.
 - [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Aplikasi`, if still required.
 - [ ] Optional `request_id` deep link/highlight later.

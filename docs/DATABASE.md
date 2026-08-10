@@ -74,7 +74,7 @@ Kolum bukti selfie v1.7.0:
 
 | Kolum | Nilai / format | Tujuan dan masa kemas kini |
 |---|---|---|
-| `selfie_status` | `BELUM_HANTAR` atau `SUDAH_HANTAR` | Dimulakan sebagai `BELUM_HANTAR` semasa `confirmIn`; menjadi `SUDAH_HANTAR` hanya selepas transaksi bukti berjaya. |
+| `selfie_status` | kosong, `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` | Legacy submission kekal kosong sehingga `confirmIn`, kemudian `BELUM_HANTAR`. Config-driven `require_selfie=false` disnapshot sebagai `TIDAK_DIPERLUKAN`; `true` menjadi `BELUM_HANTAR` semasa `confirmIn`. Hanya transaksi bukti berjaya menetapkan `SUDAH_HANTAR`. |
 | `selfie_file_id` | ID fail Drive | Diisi selepas imej berjaya disimpan dan transaksi lengkap. |
 | `selfie_url` | URL rujukan Drive | Diisi bersama file ID untuk rujukan staf yang dibenarkan; tidak dipaparkan secara awam. |
 | `masa_selfie` | Tarikh/masa Asia/Kuala_Lumpur | Masa submission bukti yang berjaya. |
@@ -108,7 +108,7 @@ type_code | display_name | description | active | sort_order | allowed_days | ap
 
 `setupAdminOutingConfigV200()` mencipta tab ini secara idempotent dan seed lima jenis sedia ada. `type_code` ialah identifier immutable: migration tidak menamakan semula atau menimpa row yang sudah wujud. `allowed_days` menentukan hari permohonan boleh dihantar, manakala `departure_allowed_days` menentukan hari pelajar dibenarkan keluar. Kedua-duanya menggunakan nama hari BM uppercase dipisahkan koma. `earliest_departure_time` ialah masa keluar paling awal dalam format `HH:mm`; nilai kosong bermaksud tiada masa minimum dikonfigurasi. Nilai boolean disimpan sebagai boolean Sheet.
 
-Fasa 3 menyediakan public safe read serta authenticated Admin read/create/update/toggle. Fasa 5A menggunakan safe projection untuk borang Pelajar dan Fasa 5B membolehkan `submitRequest` membaca tab ini hanya apabila `OUTING_CONFIG_V2_ENABLED = "true"`. Statistik dan pemformatan Telegram masih belum dinamik. Apabila flag `false`, `submitRequest` tidak memerlukan tab ini dan validator legacy v1.7.1 kekal berfungsi.
+Fasa 3 menyediakan public safe read serta authenticated Admin read/create/update/toggle. Fasa 5A menggunakan safe projection untuk borang Pelajar dan Fasa 5B membolehkan `submitRequest` membaca tab ini hanya apabila `OUTING_CONFIG_V2_ENABLED = "true"`. Statistik, Telegram dan filter operasi kini menggunakan label config bagi jenis custom. Apabila flag `false`, `submitRequest` tidak memerlukan tab ini dan validator legacy v1.7.1 kekal berfungsi.
 
 Andaian seed konservatif:
 
@@ -117,10 +117,10 @@ Andaian seed konservatif:
 | `OUTING_BIASA` | Selasa, Rabu | 17:00 | Tiada had tambahan | Tiada | 22:00 | Ya | Tidak | Tidak |
 | `OUTING_HUJUNG_MINGGU` | Sabtu, Ahad | Tiada had dipetakan | Tiada had tambahan | Tiada | 22:00 | Ya | Ya | Tidak |
 | `KECEMASAN` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | 22:00 | Ya | Tidak | Tidak |
-| `PULANG_BERMALAM` | Semua hari | Tiada had dipetakan | Jumaat | Belum ditetapkan; perlu pengesahan Admin/HEP | Ikut permohonan | Tidak | Ya | Ya |
+| `PULANG_BERMALAM` | Semua hari | Tiada had dipetakan | Jumaat | 17:00 pada row semasa | Ikut permohonan | Tidak | Ya | Ya |
 | `CUTI_SEMESTER` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | Ikut permohonan | Tidak | Ya | Ya |
 
-Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Tarikh keluar yang diminta mesti hari Jumaat apabila config-driven submission diaktifkan. Guard hanya boleh mengesahkan keluar pada hari yang dibenarkan dan pada/selepas `earliest_departure_time` jika masa itu telah ditetapkan. Migration menetapkan `departure_allowed_days = JUMAAT` tetapi membiarkan `earliest_departure_time` kosong supaya tidak mencipta polisi 14:00 atau 17:00 tanpa pengesahan operasi.
+Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Tarikh keluar yang diminta mesti hari Jumaat apabila config-driven submission diaktifkan. Guard hanya boleh mengesahkan keluar pada hari yang dibenarkan dan pada/selepas `earliest_departure_time`. Migration asal membiarkan masa kosong; row Sheet semasa telah ditetapkan Admin/HEP kepada `17:00`. Flag production kekal `false`.
 
 Semua seed bermula `active = true`, `require_purpose = true`, `require_location = true`, `require_vehicle = true`, `require_warden_approval = true`, `require_selfie = true` dan `config_version = 1`. `require_leave_date` untuk Cuti Semester kekal `false` kerana backend semasa menerima tarikh kosong dan menggunakan tarikh semasa; ini tidak mengubah paparan frontend sedia ada.
 

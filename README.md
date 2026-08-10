@@ -14,7 +14,7 @@ Versi repo semasa: **v2.2.0 — Operasi Bersepadu dan Foto Profil Private Dua Pe
 
 Frontend production v2.2.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Backend production semasa menggunakan GAS **Version 32**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
+Backend production semasa menggunakan GAS **Version 33**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
 Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
@@ -50,18 +50,19 @@ Semua jenis menggunakan aliran utama yang sama:
 
 ```text
 Pelajar hantar permohonan
-  -> Warden luluskan atau tolak
+  -> Warden luluskan atau tolak (legacy dan config require_warden_approval=true)
+     ATAU auto-approve beridentiti AUTO_CONFIG_V2 (config require_warden_approval=false)
   -> Guard sahkan keluar
   -> Guard sahkan masuk
   -> status utama kekal SELESAI
-  -> Pelajar ambil dan hantar bukti selfie pulang
+  -> Pelajar hantar bukti selfie jika diwajibkan
 ```
 
-Konfigurasi staging kini membezakan waktu **permohonan** daripada waktu **keluar**. Untuk `PULANG_BERMALAM`, permohonan boleh dihantar pada mana-mana hari tetapi tarikh keluar yang diminta ialah Jumaat. Masa keluar Jumaat paling awal boleh ditetapkan melalui Tetapan Outing selepas polisi Admin/HEP disahkan; tiada nilai 14:00 atau 17:00 diandaikan secara kekal. Production masih menggunakan `OUTING_CONFIG_V2_ENABLED=false`.
+Konfigurasi staging kini membezakan waktu **permohonan** daripada waktu **keluar**. Row `PULANG_BERMALAM` semasa menetapkan hari keluar Jumaat dan masa paling awal `17:00`; production masih menggunakan `OUTING_CONFIG_V2_ENABLED=false`, maka peraturan itu belum mengubah flow legacy.
 
 ## Bukti Pulang Asrama v1.7.0
 
-Bukti selfie pulang diwajibkan selepas Guard mengesahkan masuk untuk semua jenis permohonan:
+Bukti selfie pulang diwajibkan selepas Guard mengesahkan masuk untuk semua jenis legacy semasa production menggunakan flag `false`. Dalam config-driven mode, `require_selfie` disnapshot pada rekod semasa submission: `false` menggunakan `TIDAK_DIPERLUKAN`, manakala `true` menjadi `BELUM_HANTAR` selepas `confirmIn`.
 
 - `OUTING_BIASA`
 - `OUTING_HUJUNG_MINGGU`
@@ -72,6 +73,8 @@ Bukti selfie pulang diwajibkan selepas Guard mengesahkan masuk untuk semua jenis
 Selepas `confirmIn`, status utama rekod kekal `SELESAI` dan `selfie_status` menjadi state bukti yang berasingan. Pelajar melihat `Ambil Selfie & Lapor Pulang`, menggunakan kamera depan jika disokong, menyemak preview, mengambil semula jika perlu dan menghantar gambar. Frontend mengecilkan sisi terpanjang kepada kira-kira 1280px dan memampatkan kepada JPEG sebelum memanggil `submitReturnSelfie`.
 
 Backend menyemak pemilikan melalui `student_id` + `no_matrik`, status `SELESAI`, kewujudan `masa_masuk`, MIME/base64 dan duplicate submission. Gambar disimpan secara private dalam folder Drive `eOuting - Bukti Selfie Pulang` dan dihantar sebagai imej sebenar ke Telegram melalui `sendPhoto`. Public Monitoring tidak menerima URL, file ID, nombor matrik atau metadata selfie.
+
+Tetapan Outing kini turut memaparkan pemeriksaan read-only `Config Mode` dan `Config-driven Ready/Not Ready`. Semakan Admin-authenticated ini mengesahkan schema/config aktif, kod pendua, versi, boolean, hari, masa dan konsistensi departure tanpa menyediakan toggle untuk mengaktifkan feature flag.
 
 ## Foto Profil Pelajar
 
@@ -190,6 +193,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 32** dan telah disahkan pada 9 Ogos 2026; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 33**; `OUTING_CONFIG_V2_ENABLED` kekal `false` sehingga pengaktifan berasingan diluluskan.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

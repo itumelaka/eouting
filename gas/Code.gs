@@ -205,6 +205,7 @@ function doPost(e) {
     if (action === "updateStaff") return jsonResponse(updateStaff(payload));
     if (action === "toggleStaffStatus") return jsonResponse(toggleStaffStatus(payload));
     if (action === "getAdminOutingTypes") return jsonResponse(getAdminOutingTypes(payload));
+    if (action === "getOutingConfigReadiness") return jsonResponse(getOutingConfigReadiness(payload));
     if (action === "createOutingType") return jsonResponse(createOutingType(payload));
     if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
     if (action === "toggleOutingType") return jsonResponse(toggleOutingType(payload));
@@ -603,6 +604,20 @@ function normalizeStoredBoolean_(value) {
   return false;
 }
 
+function normalizeStoredBooleanStrictV220_(value, fieldName) {
+  if (value === true || value === false) {
+    return value;
+  }
+  const normalized = normalizeText_(value);
+  if (normalized === "true" || normalized === "ya" || normalized === "1") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "tidak" || normalized === "0") {
+    return false;
+  }
+  throw new Error((fieldName || "boolean") + " mesti boolean true atau false.");
+}
+
 function getOutingTypeTimeZone_() {
   let timeZone = "";
 
@@ -948,6 +963,121 @@ function getAdminOutingTypes(payload) {
   return sortOutingTypes_(getRowsAsObjects_(getSheet_(SHEETS.outingTypes))
     .map(normalizeOutingTypeRecord_))
     .map(toAdminOutingType_);
+}
+
+function getOutingConfigReadiness(payload) {
+  validateAdminCredentials_(payload);
+  const configModeEnabled = isOutingConfigV2Enabled_();
+  const assessment = assessOutingConfigReadinessV220_();
+  return {
+    config_mode: configModeEnabled ? "CONFIG_DRIVEN" : "LEGACY",
+    config_mode_label: configModeEnabled ? "Config-driven (Active)" : "Legacy (Production)",
+    ready: assessment.reasons.length === 0,
+    readiness_label: assessment.reasons.length === 0 ? "Ready" : "Not Ready",
+    active_type_count: assessment.active_type_count,
+    reasons: assessment.reasons,
+    checked_at: now_()
+  };
+}
+
+function assessOutingConfigReadinessV220_() {
+  const reasons = [];
+  let activeTypeCount = 0;
+  let spreadsheet;
+  let sheet;
+
+  try {
+    spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    sheet = spreadsheet.getSheetByName(SHEETS.outingTypes);
+  } catch (error) {
+    reasons.push("OUTING_TYPES tidak dapat dibaca.");
+    return { active_type_count: 0, reasons: reasons };
+  }
+  if (!sheet) {
+    reasons.push("Sheet OUTING_TYPES belum wujud.");
+    return { active_type_count: 0, reasons: reasons };
+  }
+
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) {
+    reasons.push("OUTING_TYPES tidak mempunyai header.");
+    return { active_type_count: 0, reasons: reasons };
+  }
+  const headers = values[0].map((header) => String(header || "").trim());
+  const missingHeaders = HEADERS.OUTING_TYPES.filter((header) => headers.indexOf(header) === -1);
+  if (missingHeaders.length) {
+    reasons.push("Header OUTING_TYPES tidak lengkap: " + missingHeaders.join(", ") + ".");
+    return { active_type_count: 0, reasons: reasons };
+  }
+
+  const seenTypeCodes = {};
+  values.slice(1).forEach((cells, rowIndex) => {
+    const row = {};
+    headers.forEach((header, columnIndex) => {
+      row[header] = cells[columnIndex];
+    });
+    if (!headers.some((header) => hasCellValue_(row[header]))) {
+      return;
+    }
+
+    const sheetRow = rowIndex + 2;
+    const rawTypeCode = String(row.type_code || "").trim().toUpperCase();
+    const typeLabel = rawTypeCode || "baris " + sheetRow;
+    if (rawTypeCode) {
+      if (seenTypeCodes[rawTypeCode]) {
+        reasons.push("Kod jenis pendua: " + rawTypeCode + ".");
+      } else {
+        seenTypeCodes[rawTypeCode] = true;
+      }
+    }
+
+    let active;
+    try {
+      active = normalizeStoredBooleanStrictV220_(row.active, "active");
+    } catch (error) {
+      reasons.push(typeLabel + ": " + error.message);
+      return;
+    }
+    if (!active) {
+      return;
+    }
+    activeTypeCount += 1;
+
+    try {
+      const stored = Object.assign({}, row);
+      OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
+        stored[field] = normalizeStoredBooleanStrictV220_(stored[field], field);
+      });
+      OUTING_TYPE_TIME_FIELDS.forEach((field) => {
+        const normalizedTime = normalizeStoredTimeOnly_(stored[field]);
+        if (hasCellValue_(stored[field]) && !normalizedTime) {
+          throw new Error(field + " mesti menggunakan format HH:mm.");
+        }
+        stored[field] = normalizedTime;
+      });
+      const configVersion = Number(stored.config_version);
+      if (!Number.isInteger(configVersion) || configVersion < 1) {
+        throw new Error("config_version mesti nombor bulat positif.");
+      }
+      const validated = validateOutingTypeConfig_(stored, {
+        requireTypeCode: true,
+        typeCode: stored.type_code
+      });
+      if (validated.departure_allowed_days && !validated.require_leave_date) {
+        throw new Error("departure_allowed_days memerlukan require_leave_date=true.");
+      }
+    } catch (error) {
+      reasons.push(typeLabel + ": " + (error.message || "konfigurasi tidak sah."));
+    }
+  });
+
+  if (activeTypeCount === 0) {
+    reasons.push("Sekurang-kurangnya satu jenis outing aktif diperlukan.");
+  }
+  return {
+    active_type_count: activeTypeCount,
+    reasons: Array.from(new Set(reasons))
+  };
 }
 
 function getStudentInput_(payload) {
@@ -1574,19 +1704,14 @@ function resolveSubmissionOutingTypeConfigV200_(requestType) {
 
     const stored = Object.assign({}, found.record);
     OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
-      if (stored[field] === true || stored[field] === false) {
-        return;
+      stored[field] = normalizeStoredBooleanStrictV220_(stored[field], field);
+    });
+    OUTING_TYPE_TIME_FIELDS.forEach((field) => {
+      const normalizedTime = normalizeStoredTimeOnly_(stored[field]);
+      if (hasCellValue_(stored[field]) && !normalizedTime) {
+        throw new Error("INVALID_TIME_CONFIG");
       }
-      const value = normalizeText_(stored[field]);
-      if (value === "true" || value === "ya" || value === "1") {
-        stored[field] = true;
-        return;
-      }
-      if (value === "false" || value === "tidak" || value === "0") {
-        stored[field] = false;
-        return;
-      }
-      throw new Error("INVALID_BOOLEAN_CONFIG");
+      stored[field] = normalizedTime;
     });
     const validated = validateOutingTypeConfig_(stored, {
       requireTypeCode: true,
@@ -1917,7 +2042,7 @@ const record = withScriptLock_(function () {
     guard_masuk_by: "",
     lewat: "",
     selfie_whatsapp: "",
-    selfie_status: "",
+    selfie_status: submissionConfig && !submissionConfig.require_selfie ? "TIDAK_DIPERLUKAN" : "",
     selfie_file_id: "",
     selfie_url: "",
     masa_selfie: "",
@@ -1941,8 +2066,18 @@ const record = withScriptLock_(function () {
   if (submissionConfig) {
     auditDetails.config_version = submissionConfig.config_version;
     auditDetails.require_warden_approval = submissionConfig.require_warden_approval;
+    auditDetails.require_selfie = submissionConfig.require_selfie;
   }
   appendAuditLog("SUBMIT_REQUEST", requestId, "Student", student.nama, JSON.stringify(auditDetails));
+  if (submissionConfig && !requiresWardenApproval) {
+    appendAuditLog("AUTO_APPROVE_REQUEST", requestId, "System", "AUTO_CONFIG_V2", JSON.stringify({
+      student_name: student.nama || "",
+      no_matrik: String(student.no_matrik || ""),
+      jenis_permohonan: requestType,
+      config_version: submissionConfig.config_version,
+      reason: "require_warden_approval=false"
+    }));
+  }
   sendTelegramMessage_(buildTelegramSubmitMessage_(record));
 
   return record;
@@ -2115,13 +2250,14 @@ function confirmIn(payload) {
     ? (isHostelReturnLate_(now, found.record) ? "Ya" : "Tidak")
     : (isLate_(now) ? "Ya" : "Tidak");
   const guardReturnNote = String(payload.catatan || payload.catatan_masuk || "").trim();
+  const requiresReturnSelfie = normalizeText_(found.record.selfie_status) !== "tidak_diperlukan";
 
   updateRowByHeaders_(found.sheet, found.rowNumber, {
     status: STATUS.done,
     masa_masuk: now_(),
     guard_masuk_by: guard.nama_guard,
     lewat: late,
-    selfie_status: "BELUM_HANTAR",
+    selfie_status: requiresReturnSelfie ? "BELUM_HANTAR" : "TIDAK_DIPERLUKAN",
     catatan: guardReturnNote || found.record.catatan || ""
   });
 
@@ -2197,6 +2333,9 @@ function submitReturnSelfie(payload) {
     }
     if (record.status !== STATUS.done || !hasCellValue_(record.masa_masuk)) {
       throw new Error("Bukti selfie hanya boleh dihantar selepas Guard mengesahkan masuk.");
+    }
+    if (!isReturnSelfieRequiredForRecordV220_(record)) {
+      throw new Error("Bukti selfie tidak diperlukan untuk jenis outing ini.");
     }
     if (normalizeText_(record.selfie_status) === "sudah_hantar" ||
         hasCellValue_(record.selfie_file_id) ||
@@ -2286,6 +2425,14 @@ function submitReturnSelfie(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function isReturnSelfieRequiredForRecordV220_(record) {
+  const selfieStatus = normalizeText_(record && record.selfie_status);
+  if (selfieStatus === "tidak_diperlukan") {
+    return false;
+  }
+  return true;
 }
 
 function setupSelfieProofV170() {
@@ -2901,6 +3048,7 @@ function getOutingStats(payload) {
   const studentsMap = {};
   const classMap = {};
   const statusMap = {};
+  const typeMap = {};
 
   rows.forEach((row) => {
     const status = String(row.status || "");
@@ -2922,6 +3070,14 @@ function getOutingStats(payload) {
     if (late) totals.total_late += 1;
 
     statusMap[status] = (statusMap[status] || 0) + 1;
+    if (!typeMap[requestType]) {
+      typeMap[requestType] = {
+        type_code: requestType,
+        display_name: requestTypeLabel_(requestType),
+        count: 0
+      };
+    }
+    typeMap[requestType].count += 1;
 
     studentsMap[studentKey] = true;
 
@@ -2962,6 +3118,7 @@ function getOutingStats(payload) {
     generated_at: now_(),
     totals: totals,
     class_summary: classSummary,
+    type_summary: Object.keys(typeMap).sort().map((typeCode) => typeMap[typeCode]),
     status_summary: Object.keys(statusMap).sort().map((status) => ({
       status: status,
       count: statusMap[status]
@@ -3439,12 +3596,29 @@ function buildTelegramStatusMessage_(title, record) {
 }
 
 function requestTypeLabel_(requestType) {
+  const configuredLabel = typeof getConfigDrivenRequestTypeLabelV220_ === "function"
+    ? getConfigDrivenRequestTypeLabelV220_(requestType)
+    : "";
+  if (configuredLabel) return configuredLabel;
   if (requestType === REQUEST_TYPE.normal) return "Outing Biasa";
   if (requestType === REQUEST_TYPE.weekend) return "Outing Sabtu / Ahad";
   if (requestType === REQUEST_TYPE.emergency) return "Kecemasan";
   if (requestType === REQUEST_TYPE.overnight) return "Pulang Bermalam";
   if (requestType === REQUEST_TYPE.semester) return "CUTI SEMESTER";
   return requestType || "-";
+}
+
+function getConfigDrivenRequestTypeLabelV220_(requestType) {
+  if (typeof PropertiesService === "undefined" || !isOutingConfigV2Enabled_()) return "";
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(SHEETS.outingTypes);
+    if (!sheet) return "";
+    const found = findOutingTypeRowByCode_(sheet, requestType);
+    return found ? String(found.record.display_name || "").trim() : "";
+  } catch (error) {
+    return "";
+  }
 }
 
 function testTelegramNotification() {

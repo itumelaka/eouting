@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.0** dengan GAS Version 32.
+Dokumen ini menerangkan flow production semasa **v2.2.0** dengan GAS Version 33.
 
 ## Backend Config API v2.0
 
@@ -40,9 +40,9 @@ submitRequest
   -> simpan OUTING_REQUESTS + audit minimum + Telegram
 ```
 
-`fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN` dengan identiti sistem `AUTO_CONFIG_V2`. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
+`fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN`, mengisi masa approval dan identiti sistem `AUTO_CONFIG_V2`, serta menulis audit `AUTO_APPROVE_REQUEST`. Guard hanya menerima state approved yang sah. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
 
-Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Bagi `PULANG_BERMALAM`, permohonan Isnin hingga Khamis tetap sah jika tarikh keluar yang diminta ialah Jumaat. Default masa keluar paling awal dibiarkan kosong sehingga Admin/HEP mengesahkan polisi operasi.
+Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` semasa menetapkan Jumaat dan `17:00`; peraturan ini belum aktif pada production kerana feature flag kekal `false`.
 
 ## Student Form Config Rendering — Fasa 5A
 
@@ -120,7 +120,9 @@ Warden login nama + PIN
 Guard login nama + PIN
   -> POST getTodayRecords authenticated
   -> confirm keluar / masuk + Telegram
-  -> confirmIn menetapkan status SELESAI dan selfie_status BELUM_HANTAR
+  -> confirmIn menetapkan status SELESAI
+     -> BELUM_HANTAR jika bukti diwajibkan
+     -> TIDAK_DIPERLUKAN jika config-driven require_selfie=false
 Pelajar refresh rekod sendiri
   -> lihat “Ambil Selfie & Lapor Pulang”
   -> kamera depan / pilih gambar -> preview -> ambil semula atau hantar
@@ -139,7 +141,7 @@ Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords
 
 Pelajar boleh upload/ganti foto profil sendiri. Identity/editor memuatkan thumbnail melalui batch authenticated dan editor sendiri boleh menggunakan imej penuh. Klik thumbnail membuka modal; jika full cache belum tersedia, satu request authenticated `photo_variant = "full"` dibuat untuk pelajar itu sahaja. Initials tidak mempunyai tindakan klik.
 
-Selepas Guard mengesahkan masuk, bukti selfie pulang diwajibkan untuk kelima-lima jenis permohonan. Sebelum submission, dashboard menunjukkan `Bukti Selfie Belum Dihantar`. Selepas berjaya, action upload hilang dan dashboard menunjukkan `Bukti Selfie Dihantar` bersama `Masa Bukti`.
+Semasa flag `false`, semua jenis legacy kekal memerlukan bukti selepas Guard mengesahkan masuk. Dalam config-driven mode, `require_selfie` disnapshot pada submission; `false` memaparkan `Bukti Selfie Tidak Diperlukan`, manakala `true` memaparkan action `Bukti Selfie Belum Dihantar`. Selepas berjaya, action upload hilang dan dashboard menunjukkan `Bukti Selfie Dihantar` bersama `Masa Bukti`.
 
 ## Warden / HEP
 
@@ -187,6 +189,7 @@ Syarat backend untuk `submitReturnSelfie`:
 - `request_id`, `student_id` dan `no_matrik` diperlukan;
 - rekod mesti dimiliki oleh identiti Pelajar tersebut;
 - status mesti `SELESAI` dan `masa_masuk` mesti wujud;
+- `selfie_status` tidak boleh `TIDAK_DIPERLUKAN`;
 - MIME hanya JPEG, PNG atau WebP, dengan base64 sah dan dalam had saiz;
 - bukti terdahulu tidak boleh dihantar semula.
 

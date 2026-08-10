@@ -1,14 +1,14 @@
 # Deployment eOuting ITU
 
-Versi repo semasa: **v2.2.0**. Backend production semasa ialah GAS **Version 32**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.production-v171.gs` ialah snapshot lama, bukan source kanonik, dan tidak boleh dideploy.
+Versi repo semasa: **v2.2.0**. Backend production semasa ialah GAS **Version 33**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `gas/Code.production-v171.gs` ialah snapshot lama, bukan source kanonik, dan tidak boleh dideploy.
 
 ## Release Production v2.2.0 — 9 Ogos 2026
 
-- GAS Version 32 dideploy pada Web App sedia ada dan URL/access settings dikekalkan.
+- GAS Version 33 ialah baseline pada Web App sedia ada dan URL/access settings dikekalkan.
 - Dua-tier delivery foto profil (`thumbnail` batch dan `full` on-demand) telah disahkan untuk Pelajar, Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar.
 - Public Pemantauan kekal photo-free; return selfie kekal pada folder/schema/Telegram workflow berasingan.
 - Enam modul Admin inline, Statistik selamat, Rekod Master, rolling KPI, Enter UX serta cache/service-worker delivery telah melalui smoke test production.
-- Frontend release metadata dan cache ditutup sebagai v2.2.0 hanya selepas backend Version 32 disahkan live.
+- Frontend release metadata dan cache kekal v2.2.0; readiness hardening source belum dideploy.
 
 ## Release Production v2.1.0 — 9 Ogos 2026
 
@@ -36,13 +36,13 @@ Rollout ini tidak mengaktifkan config-driven submission dan tidak menukar endpoi
 
 Kod backend config-driven submission sudah tersedia di branch v2.0 tetapi `OUTING_CONFIG_V2_ENABLED` mesti kekal `false` sehingga migration live, semakan lima seed, backup dan QA rollback diluluskan. Jangan mengaktifkan flag sebelum versi GAS yang mengandungi resolver Fasa 5B dideploy dan `OUTING_TYPES` disahkan lengkap.
 
-Urutan activation masa hadapan ialah: backup Sheet, jalankan migration idempotent, semak config active/schema, deploy GAS, uji legacy dengan flag `false`, aktifkan flag dalam tetingkap terkawal, kemudian uji submit/duplicate/Warden/Guard. Rollback segera hanya memerlukan flag dikembalikan kepada `false`; jangan padam tab atau rekod lama. Tiada langkah ini dilakukan dalam Fasa 5B semasa.
+Urutan activation masa hadapan ialah: backup Sheet, jalankan migration idempotent, deploy hardening GAS tanpa menukar flag, uji legacy dengan flag `false`, buka Tetapan Outing dan pastikan `Config-driven Ready` tanpa sebab gagal, kemudian aktifkan flag hanya dalam tetingkap terkawal dan uji submit/duplicate/Warden/Guard/selfie/Telegram/statistik/custom type. Rollback segera ialah kembalikan flag kepada `false` dan, jika perlu, pilih deployment GAS stabil terdahulu; jangan padam tab, kolum atau rekod lama. Tiada langkah activation/deployment dilakukan oleh perubahan source ini.
 
 ## Release Beta v2.0
 
 Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.2.0`.
 
-Beta pertama hendaklah menguji lima seed sahaja. Jenis custom, statistik dinamik, label Telegram dinamik dan penggunaan operasi `require_selfie` belum menjadi gate yang lengkap. `require_warden_approval=false` juga perlu dianggap high-impact kerana backend akan auto-approve sebagai `AUTO_CONFIG_V2`.
+Beta pertama hendaklah menguji lima seed dan sekurang-kurangnya satu jenis custom. Gate mesti meliputi `require_selfie=true/false`, `require_warden_approval=true/false`, audit `AUTO_APPROVE_REQUEST`, Guard transition, Telegram, statistik dan filter. `require_warden_approval=false` kekal high-impact walaupun auto-approval kini eksplisit dan diaudit.
 
 Keutamaan persekitaran ialah salinan Spreadsheet dan deployment GAS beta berasingan. Jika beta perlu menggunakan data production, backup, tetingkap perubahan, pemilik rollback dan kill switch flag mesti disahkan sebelum migration.
 
@@ -108,7 +108,7 @@ Jangan isi akaun Admin, mengaktifkan feature flag atau menganggap schema staging
 - Uji login berjaya, PIN salah, Admin tidak aktif, optimistic conflict dan audit tanpa PIN.
 - Sahkan create/update/toggle hanya melalui POST; jangan buka write action melalui GET.
 - Sahkan tiada route delete dan `submitRequest` masih tidak membaca `OUTING_TYPES`.
-- Jangan aktifkan flag sehingga Admin UI, config-driven form dan rollback production diluluskan pada fasa lain.
+- Jangan aktifkan flag sehingga Admin UI menunjukkan `Config-driven Ready`, semua sebab readiness kosong, config production disemak oleh Admin/HEP dan rollback production diluluskan.
 
 ### Pemeriksaan Fasa 4 sebelum deployment masa hadapan
 

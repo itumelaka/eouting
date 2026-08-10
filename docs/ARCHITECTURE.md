@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.0**. Production menggunakan GAS Version 32, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
+Versi repo semasa: **v2.2.0**. Production menggunakan GAS Version 33, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
 
 ## Komponen
 
@@ -58,6 +58,8 @@ Fasa 4.6 menetapkan satu sahaja canonical `apiPost` frontend. Router ini meminta
 Fasa 5A memuatkan public `GET getOutingTypes` hanya selepas sesi Pelajar dibuka. Dropdown, visibility, required/disabled state, `same_day_only` dan `fixed_return_time` dirender daripada safe config. Kegagalan atau response kosong menggunakan lima legacy config dalam memory; `submitRequest` GAS dan feature flag default tidak berubah.
 
 Foundation departure-rule menambah `departure_allowed_days` dan `earliest_departure_time` pada `OUTING_TYPES` sedia ada. Ia tidak mencipta modul polisi kedua. `allowed_days` kekal peraturan hari permohonan, manakala medan departure mengawal tarikh keluar yang diminta dan masa paling awal Guard boleh mengesahkan keluar. Enforcement kekal di belakang `OUTING_CONFIG_V2_ENABLED`; legacy production tidak berubah semasa flag `false`.
+
+Readiness hardening menambah POST Admin-only `getOutingConfigReadiness`. Ia membaca `OUTING_TYPES` tanpa mencipta atau mengubah sheet dan tidak mendedahkan property atau credential. Tetapan Outing memaparkan mode semasa berasingan daripada verdict readiness; tiada control activation. Label custom digunakan oleh Telegram, statistik, Rekod Master dan Checklist Warden. `require_warden_approval=false` menghasilkan state `DILULUSKAN_WARDEN`, approver `AUTO_CONFIG_V2`, masa approval dan audit `AUTO_APPROVE_REQUEST` yang eksplisit.
 
 ```text
 Production v1.7.1: config-driven rendering + hard-coded submitRequest
@@ -146,8 +148,8 @@ State bukti disimpan secara berasingan:
 
 ```text
 selfie_status = BELUM_HANTAR
-  -> submitReturnSelfie berjaya
-selfie_status = SUDAH_HANTAR
+  -> submitReturnSelfie berjaya -> SUDAH_HANTAR
+ATAU selfie_status = TIDAK_DIPERLUKAN
 ```
 
 Rekod lama tanpa `selfie_status` kekal boleh dibaca. Rekod `SELESAI` yang mempunyai `masa_masuk` tetapi tiada metadata selfie dianggap belum menghantar bukti. `LockService` meliputi semakan duplicate, simpanan Drive, penghantaran Telegram dan kemas kini Sheet. Jika transaksi separa gagal, fail Drive dan/atau mesej Telegram dibersihkan; selepas Sheet berjaya ditanda lengkap, kegagalan `AUDIT_LOG` tidak mengubah hasil.

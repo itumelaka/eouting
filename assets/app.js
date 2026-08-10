@@ -114,6 +114,7 @@ const MOCK_ADMIN_QA = ALLOW_MOCK_MODE
 const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "loginAdmin",
   "getAdminOutingTypes",
+  "getOutingConfigReadiness",
   "createOutingType",
   "updateOutingType",
   "toggleOutingType",
@@ -221,6 +222,7 @@ let wardenChecklistTypeFilter = "all";
 let wardenChecklistRecords = [];
 let adminRuntimeCredential = null;
 let adminOutingTypes = [];
+let operationalOutingTypesV220 = buildLegacyStudentOutingTypesV200();
 let adminEditingTypeCode = "";
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
@@ -269,9 +271,9 @@ const wardenActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 const RETURN_SELFIE_STATUS = {
   pending: "BELUM_HANTAR",
-  submitted: "SUDAH_HANTAR"
+  submitted: "SUDAH_HANTAR",
+  notRequired: "TIDAK_DIPERLUKAN"
 };
-const RETURN_SELFIE_TYPES = new Set(Object.values(REQUEST_TYPE));
 const returnSelfieDrafts = new Map();
 
 const els = {
@@ -460,6 +462,9 @@ const els = {
   adminMasterPrev: document.querySelector("#adminMasterPrev"),
   adminMasterNext: document.querySelector("#adminMasterNext"),
   adminMasterPage: document.querySelector("#adminMasterPage"),
+  adminConfigMode: document.querySelector("#adminConfigMode"),
+  adminConfigReadinessStatus: document.querySelector("#adminConfigReadinessStatus"),
+  adminConfigReadinessReasons: document.querySelector("#adminConfigReadinessReasons"),
   adminStaffRefreshButton: document.querySelector("#adminStaffRefreshButton"),
   adminStaffAddButton: document.querySelector("#adminStaffAddButton"),
   adminStaffSearch: document.querySelector("#adminStaffSearch"),
@@ -958,7 +963,7 @@ function renderAdminMonitoringV210(options) {
         <div class="admin-ops-identity-copy">
           <h4>${escapeHtml(row.nama || "-")}</h4>
           <div class="admin-ops-summary">
-            <span>${escapeHtml(row.kelas || "-")} · ${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</span>
+            <span>${escapeHtml(row.kelas || "-")} · ${escapeHtml(typeof requestTypeLabel === "function" ? requestTypeLabel(row.jenis_permohonan) : (REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan))}</span>
             <span class="status-badge admin-ops-status ${isOut ? "is-out" : ""}">${escapeHtml(adminMonitoringStatusLabelV210(row.status))}</span>
           </div>
         </div>
@@ -997,7 +1002,10 @@ function renderAdminMasterV210() {
   const rows = adminMasterV210.records || [];
   els.adminMasterBody.innerHTML = rows.length ? rows.map((row) => {
     const id = String(row.request_id || "").replace(/[^a-zA-Z0-9_-]/g, "_");
-    return `<tr><td><strong>${escapeHtml(row.nama)}</strong><small>${escapeHtml(row.no_matrik || row.student_id || "")}</small></td><td>${escapeHtml(row.kelas)}</td><td>${escapeHtml(REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan)}</td><td>${escapeHtml(formatDisplayDate(row.tarikh || row.masa_mohon))}</td><td>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</td><td>${escapeHtml(row.masa_masuk ? formatDisplayDateTime(row.masa_masuk) : "-")}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.duration || "-")}</td><td><button class="secondary-action compact-action" type="button" data-master-details="${id}">Lihat Butiran</button></td></tr><tr class="admin-master-details" id="admin-master-details-${id}" hidden><td colspan="9"><strong>${escapeHtml(row.request_id)}</strong> · Tujuan: ${escapeHtml(row.tujuan || "-")} · Lokasi: ${escapeHtml(row.lokasi || "-")} · Kenderaan: ${escapeHtml([row.jenis_kenderaan, row.butiran_kenderaan].filter(Boolean).join(" / ") || "-")} · Warden: ${escapeHtml(row.warden_approve_by || "-")} · Keluar oleh: ${escapeHtml(row.guard_keluar_by || "-")} · Masuk oleh: ${escapeHtml(row.guard_masuk_by || "-")}</td></tr>`;
+    const typeLabel = typeof requestTypeLabel === "function"
+      ? requestTypeLabel(row.jenis_permohonan)
+      : (REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan);
+    return `<tr><td><strong>${escapeHtml(row.nama)}</strong><small>${escapeHtml(row.no_matrik || row.student_id || "")}</small></td><td>${escapeHtml(row.kelas)}</td><td>${escapeHtml(typeLabel)}</td><td>${escapeHtml(formatDisplayDate(row.tarikh || row.masa_mohon))}</td><td>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</td><td>${escapeHtml(row.masa_masuk ? formatDisplayDateTime(row.masa_masuk) : "-")}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.duration || "-")}</td><td><button class="secondary-action compact-action" type="button" data-master-details="${id}">Lihat Butiran</button></td></tr><tr class="admin-master-details" id="admin-master-details-${id}" hidden><td colspan="9"><strong>${escapeHtml(row.request_id)}</strong> · Tujuan: ${escapeHtml(row.tujuan || "-")} · Lokasi: ${escapeHtml(row.lokasi || "-")} · Kenderaan: ${escapeHtml([row.jenis_kenderaan, row.butiran_kenderaan].filter(Boolean).join(" / ") || "-")} · Warden: ${escapeHtml(row.warden_approve_by || "-")} · Keluar oleh: ${escapeHtml(row.guard_keluar_by || "-")} · Masuk oleh: ${escapeHtml(row.guard_masuk_by || "-")}</td></tr>`;
   }).join("") : '<tr><td colspan="9">Tiada rekod sepadan.</td></tr>';
   els.adminMasterPage.textContent = `Halaman ${adminMasterV210.page || 1} daripada ${adminMasterV210.total_pages || 1}`;
   els.adminMasterPrev.disabled = (adminMasterV210.page || 1) <= 1;
@@ -1346,7 +1354,10 @@ async function loadAdminOutingTypesV200() {
   try {
     const rows = await apiPost("getAdminOutingTypes", buildAdminCredentialPayloadV200());
     adminOutingTypes = Array.isArray(rows) ? rows.slice().sort(adminOutingTypeSortV200) : [];
+    setOperationalOutingTypesV220(adminOutingTypes);
+    renderAdminMasterTypeOptionsV220();
     renderAdminOutingTypesV200();
+    loadAdminOutingConfigReadinessV220();
     setAdminDashboardMessageV200("");
   } catch (error) {
     adminOutingTypes = [];
@@ -1532,6 +1543,60 @@ function getAdminRuleInputMapV200() {
 
 function setAdminAllowedDaysV200(allowedDays) {
   setAdminDaySelectionV220(els.adminAllowedDays, allowedDays);
+}
+
+async function loadAdminOutingConfigReadinessV220() {
+  if (!currentSession || currentSession.role !== "admin") return;
+  if (els.adminConfigMode) els.adminConfigMode.textContent = "Memuatkan...";
+  if (els.adminConfigReadinessStatus) els.adminConfigReadinessStatus.textContent = "Memuatkan...";
+  if (els.adminConfigReadinessReasons) els.adminConfigReadinessReasons.innerHTML = "";
+  try {
+    const result = await apiPost("getOutingConfigReadiness", buildAdminCredentialPayloadV200());
+    renderAdminOutingConfigReadinessV220(result);
+  } catch (error) {
+    renderAdminOutingConfigReadinessV220({
+      config_mode_label: "Tidak dapat disahkan",
+      ready: false,
+      readiness_label: "Not Ready",
+      reasons: ["Semakan readiness gagal dimuatkan."]
+    });
+  }
+}
+
+function renderAdminOutingConfigReadinessV220(result) {
+  const readiness = result || {};
+  const ready = readiness.ready === true;
+  if (els.adminConfigMode) {
+    els.adminConfigMode.textContent = readiness.config_mode_label || "Tidak diketahui";
+  }
+  if (els.adminConfigReadinessStatus) {
+    els.adminConfigReadinessStatus.textContent = `Config-driven ${ready ? "Ready" : "Not Ready"}`;
+    els.adminConfigReadinessStatus.classList.toggle("is-ready", ready);
+    els.adminConfigReadinessStatus.classList.toggle("is-not-ready", !ready);
+  }
+  if (els.adminConfigReadinessReasons) {
+    const reasons = Array.isArray(readiness.reasons) ? readiness.reasons : [];
+    els.adminConfigReadinessReasons.innerHTML = reasons
+      .map((reason) => `<li>${escapeHtml(reason)}</li>`)
+      .join("");
+    els.adminConfigReadinessReasons.hidden = reasons.length === 0;
+  }
+}
+
+function setOperationalOutingTypesV220(rows) {
+  const normalized = normalizeStudentOutingTypesV200(rows);
+  if (normalized.length) operationalOutingTypesV220 = normalized;
+}
+
+function renderAdminMasterTypeOptionsV220() {
+  if (!els.adminMasterType) return;
+  const selected = els.adminMasterType.value;
+  const rows = normalizeStudentOutingTypesV200(adminOutingTypes);
+  els.adminMasterType.innerHTML = [
+    '<option value="">Semua</option>',
+    ...rows.map((type) => `<option value="${escapeHtml(type.type_code)}">${escapeHtml(type.display_name)}</option>`)
+  ].join("");
+  if (rows.some((type) => type.type_code === selected)) els.adminMasterType.value = selected;
 }
 
 function setAdminDepartureAllowedDaysV220(allowedDays) {
@@ -1945,6 +2010,7 @@ function setupStatisticsPanel() {
   els.statsPrivacyMessage = panel.querySelector("#statsPrivacyMessage");
   els.statsLeaderboard = panel.querySelector("#statsLeaderboard");
   els.statsClassSummary = panel.querySelector("#statsClassSummary");
+  els.statsTypeSummary = panel.querySelector("#statsTypeSummary");
   els.statsStatusSummary = panel.querySelector("#statsStatusSummary");
   els.statsGenerateButton.addEventListener("click", loadStatistics);
   els.statsRefreshButton.addEventListener("click", loadStatistics);
@@ -2368,6 +2434,17 @@ async function mockAdminApiPostV200(action, payload) {
   }
   if (action === "getAdminIndividualStats") {
     return buildMockAdminIndividualStatsV200(request);
+  }
+  if (action === "getOutingConfigReadiness") {
+    return {
+      config_mode: "LEGACY",
+      config_mode_label: "Legacy (Production)",
+      ready: true,
+      readiness_label: "Ready",
+      active_type_count: mockAdminOutingTypesV200.filter((type) => type.active === true).length,
+      reasons: [],
+      checked_at: new Date().toISOString()
+    };
   }
   if (action === "getAdminMonitoring") {
     return { generated_at: new Date().toISOString(), kpis: { pending: 0, approved: 0, out: 0, not_returned: 0, late: 0, emergency: 0 }, records: [] };
@@ -3179,6 +3256,7 @@ async function loadStudentOutingTypesV200() {
       useLegacyStudentOutingTypesV200("Tiada konfigurasi aktif. Lima jenis legacy digunakan.", false);
     } else {
       studentOutingTypesV200 = activeRows;
+      setOperationalOutingTypesV220(activeRows);
       studentOutingTypesUsingFallbackV200 = false;
       renderStudentOutingTypesV200();
       setStudentOutingTypesStateV200("", false, false);
@@ -3217,6 +3295,7 @@ function normalizeStudentOutingTypesV200(rows) {
 
 function useLegacyStudentOutingTypesV200(message, showRetry) {
   studentOutingTypesV200 = buildLegacyStudentOutingTypesV200();
+  operationalOutingTypesV220 = buildLegacyStudentOutingTypesV200();
   studentOutingTypesUsingFallbackV200 = true;
   renderStudentOutingTypesV200();
   setStudentOutingTypesStateV200(message, true, showRetry);
@@ -4451,6 +4530,23 @@ function startSession(role, user) {
     refreshGuardRecords("login");
     startGuardAutoRefresh();
   }
+  if ((role === "warden" || role === "guard") && typeof loadOperationalOutingTypesV220 === "function") {
+    loadOperationalOutingTypesV220();
+  }
+}
+
+async function loadOperationalOutingTypesV220() {
+  try {
+    const rows = await apiGet("getOutingTypes");
+    setOperationalOutingTypesV220(rows);
+    if (currentSession && currentSession.role === "warden") {
+      renderWardenSemesterChecklist(outingRecords);
+    }
+  } catch (error) {
+    if (typeof buildLegacyStudentOutingTypesV200 === "function") {
+      operationalOutingTypesV220 = buildLegacyStudentOutingTypesV200();
+    }
+  }
 }
 
 function applyRoleView() {
@@ -5206,6 +5302,7 @@ function computeStatsFromRecords(records, month, year) {
   const studentMap = {};
   const classMap = {};
   const statusMap = {};
+  const typeMap = {};
 
   records.forEach((record) => {
     const status = record.rawStatus || reverseDisplayStatus(record.status);
@@ -5224,6 +5321,7 @@ function computeStatsFromRecords(records, month, year) {
     if (requestType === REQUEST_TYPE.normal) totals.total_normal += 1;
     if (late) totals.total_late += 1;
     statusMap[status] = (statusMap[status] || 0) + 1;
+    typeMap[requestType] = (typeMap[requestType] || 0) + 1;
 
     studentMap[studentKey] = true;
 
@@ -5252,6 +5350,11 @@ function computeStatsFromRecords(records, month, year) {
       late: item.late,
       total_students: Object.keys(item.studentKeys).length
     })),
+    type_summary: Object.keys(typeMap).sort().map((typeCode) => ({
+      type_code: typeCode,
+      display_name: requestTypeLabel(typeCode),
+      count: typeMap[typeCode]
+    })),
     status_summary: Object.keys(statusMap).sort().map((status) => ({ status, count: statusMap[status] }))
   };
 }
@@ -5274,6 +5377,7 @@ function emptyStats(params) {
       total_students: 0
     },
     class_summary: [],
+    type_summary: [],
     status_summary: []
   };
 }
@@ -5298,6 +5402,15 @@ function renderStatistics(stats) {
     ? stats.class_summary.map(classSummaryCard).join("")
     : emptyState("Belum ada ringkasan kelas untuk bulan ini.");
   animateRollingNumbers(els.statsClassSummary, "admin-statistics-class");
+
+  if (els.statsTypeSummary) {
+    els.statsTypeSummary.innerHTML = stats.type_summary && stats.type_summary.length
+      ? stats.type_summary.map((item) => `
+        <span class="status-pill">${escapeHtml(item.display_name || requestTypeLabel(item.type_code))} <strong data-rolling-number="${Number(item.count || 0)}" data-rolling-key="type-${escapeHtml(item.type_code)}">${Number(item.count || 0)}</strong></span>
+      `).join("")
+      : emptyState("Belum ada ringkasan jenis outing untuk bulan ini.");
+    animateRollingNumbers(els.statsTypeSummary, "admin-statistics-type");
+  }
 
   const statusOrder = ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "DITOLAK_WARDEN", "KELUAR", "SELESAI"];
   const statusMap = {};
@@ -5442,6 +5555,10 @@ function isReturnSelfieSubmitted(record) {
     Boolean(record && (record.selfie_file_id || record.masa_selfie));
 }
 
+function isReturnSelfieNotRequired(record) {
+  return String(record && record.selfie_status || "").trim().toUpperCase() === RETURN_SELFIE_STATUS.notRequired;
+}
+
 function isReturnSelfieEligible(record) {
   const rawStatus = record && (record.rawStatus || reverseDisplayStatus(record.status));
   return Boolean(
@@ -5451,7 +5568,7 @@ function isReturnSelfieEligible(record) {
     isRecordForCurrentStudent(record) &&
     rawStatus === "SELESAI" &&
     (record.masa_masuk || record.returnedAt) &&
-    RETURN_SELFIE_TYPES.has(record.jenis_permohonan) &&
+    !isReturnSelfieNotRequired(record) &&
     !isReturnSelfieSubmitted(record)
   );
 }
@@ -5469,6 +5586,14 @@ function returnSelfieProofHtml(record) {
         <span class="badge badge-selfie-submitted">Bukti Selfie Dihantar</span>
         ${submittedTime}
         <strong>Bukti selfie telah dihantar</strong>
+      </section>
+    `;
+  }
+  if (isReturnSelfieNotRequired(record)) {
+    return `
+      <section class="return-selfie-proof return-selfie-proof-complete" aria-label="Status bukti selfie">
+        <span class="badge badge-selfie-submitted">Bukti Selfie Tidak Diperlukan</span>
+        <strong>Jenis outing ini tidak memerlukan bukti selfie pulang.</strong>
       </section>
     `;
   }
@@ -6449,6 +6574,11 @@ function formatExpectedReturnTime(value) {
 }
 
 function requestTypeLabel(requestType) {
+  const rows = typeof operationalOutingTypesV220 !== "undefined" && Array.isArray(operationalOutingTypesV220)
+    ? operationalOutingTypesV220
+    : [];
+  const configured = rows.find((type) => type.type_code === requestType);
+  if (configured && configured.display_name) return configured.display_name;
   return REQUEST_TYPE_LABEL[requestType] || requestType;
 }
 
@@ -9116,10 +9246,6 @@ function ensureWardenSemesterChecklist() {
     <div class="checklist-copy-controls">
       <div class="checklist-filter-pills" id="wardenChecklistFilterButtons" aria-label="Filter jenis permohonan">
         <button class="checklist-filter-pill active" type="button" data-checklist-type="all">Semua</button>
-        <button class="checklist-filter-pill" type="button" data-checklist-type="OUTING_BIASA">Outing</button>
-        <button class="checklist-filter-pill" type="button" data-checklist-type="PULANG_BERMALAM">Bermalam</button>
-        <button class="checklist-filter-pill" type="button" data-checklist-type="CUTI_SEMESTER">Cuti Semester</button>
-        <button class="checklist-filter-pill" type="button" data-checklist-type="KECEMASAN">Kecemasan</button>
       </div>
       <button class="secondary-action checklist-copy-button" id="wardenCopyNamesButton" type="button">Copy Senarai Nama</button>
     </div>
@@ -9142,7 +9268,8 @@ function renderWardenSemesterChecklist(records) {
     return;
   }
 
-  wardenChecklistRecords = records.filter((record) => Object.values(REQUEST_TYPE).includes(record.jenis_permohonan));
+  wardenChecklistRecords = records.filter((record) => Boolean(record && record.jenis_permohonan));
+  renderWardenChecklistTypeFiltersV220();
   const semesterRecords = filterWardenChecklistRecords(wardenChecklistRecords);
   if (els.wardenSemesterCount) {
     els.wardenSemesterCount.textContent = `Checklist Permohonan: ${semesterRecords.length} rekod`;
@@ -9173,12 +9300,12 @@ function renderWardenSemesterChecklist(records) {
 function setupWardenChecklistCopyControls() {
   if (els.wardenChecklistFilterButtons && els.wardenChecklistFilterButtons.dataset.ready !== "1") {
     els.wardenChecklistFilterButtons.dataset.ready = "1";
-    els.wardenChecklistFilterButtons.querySelectorAll("[data-checklist-type]").forEach((button) => {
-      button.addEventListener("click", () => {
-        wardenChecklistTypeFilter = button.dataset.checklistType || "all";
-        updateWardenChecklistFilterButtons();
-        renderWardenSemesterChecklist(wardenChecklistRecords);
-      });
+    els.wardenChecklistFilterButtons.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-checklist-type]");
+      if (!button) return;
+      wardenChecklistTypeFilter = button.dataset.checklistType || "all";
+      updateWardenChecklistFilterButtons();
+      renderWardenSemesterChecklist(wardenChecklistRecords);
     });
   }
 
@@ -9187,6 +9314,25 @@ function setupWardenChecklistCopyControls() {
     els.wardenCopyNamesButton.addEventListener("click", copyWardenChecklistNames);
   }
 
+  updateWardenChecklistFilterButtons();
+}
+
+function renderWardenChecklistTypeFiltersV220() {
+  if (!els.wardenChecklistFilterButtons) return;
+  const typeCodes = new Set();
+  operationalOutingTypesV220.forEach((type) => typeCodes.add(type.type_code));
+  wardenChecklistRecords.forEach((record) => typeCodes.add(record.jenis_permohonan));
+  const types = Array.from(typeCodes)
+    .filter(Boolean)
+    .map((typeCode) => ({ type_code: typeCode, display_name: requestTypeLabel(typeCode) }))
+    .sort((left, right) => left.display_name.localeCompare(right.display_name));
+  if (wardenChecklistTypeFilter !== "all" && !typeCodes.has(wardenChecklistTypeFilter)) {
+    wardenChecklistTypeFilter = "all";
+  }
+  els.wardenChecklistFilterButtons.innerHTML = [
+    '<button class="checklist-filter-pill" type="button" data-checklist-type="all">Semua</button>',
+    ...types.map((type) => `<button class="checklist-filter-pill" type="button" data-checklist-type="${escapeHtml(type.type_code)}">${escapeHtml(type.display_name)}</button>`)
+  ].join("");
   updateWardenChecklistFilterButtons();
 }
 
@@ -9295,14 +9441,8 @@ function getWardenChecklistCopyStatusIcon(record) {
 }
 
 function getWardenChecklistCopyHeader() {
-  const headers = {
-    all: "SENARAI NAMA PERMOHONAN eOUTING",
-    OUTING_BIASA: "SENARAI NAMA PERMOHONAN OUTING BIASA",
-    PULANG_BERMALAM: "SENARAI NAMA PERMOHONAN PULANG BERMALAM",
-    CUTI_SEMESTER: "SENARAI NAMA PERMOHONAN CUTI SEMESTER",
-    KECEMASAN: "SENARAI NAMA PERMOHONAN KECEMASAN"
-  };
-  return headers[wardenChecklistTypeFilter] || headers.all;
+  if (wardenChecklistTypeFilter === "all") return "SENARAI NAMA PERMOHONAN eOUTING";
+  return "SENARAI NAMA PERMOHONAN " + requestTypeLabel(wardenChecklistTypeFilter).toUpperCase();
 }
 
 async function copyTextToClipboard(text) {
@@ -9352,7 +9492,8 @@ function semesterChecklistItem(record) {
 
 function requestChecklistDateTime(record) {
   const requestType = record.jenis_permohonan;
-  if (requestType === REQUEST_TYPE.overnight || requestType === REQUEST_TYPE.semester) {
+  if (record.tarikh_balik || record.returnDate || record.masa_balik_dijangka || record.expectedReturnTime ||
+      requestType === REQUEST_TYPE.overnight || requestType === REQUEST_TYPE.semester) {
     return formatExpectedReturnV160(record);
   }
 
@@ -9363,7 +9504,7 @@ function requestChecklistDateTime(record) {
 
 function requestChecklistTypeLabel(record) {
   const type = record && record.jenis_permohonan;
-  return REQUEST_TYPE_LABEL[type] || type || "-";
+  return requestTypeLabel(type) || "-";
 }
 
 function requestChecklistTypeSummary(records) {
@@ -9377,12 +9518,10 @@ function requestChecklistTypeSummary(records) {
     return acc;
   }, {});
 
-  return [
-    `Outing: ${counts[REQUEST_TYPE.normal] || 0}`,
-    `Bermalam: ${counts[REQUEST_TYPE.overnight] || 0}`,
-    `Cuti Semester: ${counts[REQUEST_TYPE.semester] || 0}`,
-    `Kecemasan: ${counts[REQUEST_TYPE.emergency] || 0}`
-  ].join(" · ");
+  return Object.keys(counts)
+    .sort((left, right) => requestTypeLabel(left).localeCompare(requestTypeLabel(right)))
+    .map((type) => `${requestTypeLabel(type)}: ${counts[type]}`)
+    .join(" · ");
 }
 
 function semesterChecklistSummary(records) {

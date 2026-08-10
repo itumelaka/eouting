@@ -261,7 +261,7 @@ test("existing confirmIn status transition and Guard note remain intact", () => 
   assert.match(confirmInSource, /status:\s*STATUS\.done/);
   assert.match(confirmInSource, /masa_masuk:\s*now_\(\)/);
   assert.match(confirmInSource, /guard_masuk_by:\s*guard\.nama_guard/);
-  assert.match(confirmInSource, /selfie_status:\s*"BELUM_HANTAR"/);
+  assert.match(confirmInSource, /selfie_status:\s*requiresReturnSelfie\s*\?\s*"BELUM_HANTAR"\s*:\s*"TIDAK_DIPERLUKAN"/);
   assert.match(confirmInSource, /catatan:\s*guardReturnNote/);
 });
 

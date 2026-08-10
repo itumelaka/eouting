@@ -393,6 +393,12 @@
             </section>
             <section class="stats-section">
               <div class="student-record-heading">
+                <h3>Ringkasan Mengikut Jenis Outing</h3>
+              </div>
+              <div class="status-pill-grid" id="statsTypeSummary"></div>
+            </section>
+            <section class="stats-section">
+              <div class="student-record-heading">
                 <h3>Pecahan Status</h3>
               </div>
               <div class="status-pill-grid" id="statsStatusSummary"></div>
@@ -410,6 +416,18 @@
                 <button class="primary-action" id="adminAddTypeButton" type="button">+ Tambah Jenis</button>
               </div>
             </div>
+
+            <section class="admin-config-readiness" id="adminConfigReadiness" aria-live="polite">
+              <div>
+                <span>Config Mode</span>
+                <strong id="adminConfigMode">Memuatkan...</strong>
+              </div>
+              <div>
+                <span>Config-driven</span>
+                <strong id="adminConfigReadinessStatus">Memuatkan...</strong>
+              </div>
+              <ul id="adminConfigReadinessReasons"></ul>
+            </section>
 
             <p class="form-message admin-dashboard-message" id="adminDashboardMessage" aria-live="polite"></p>
             <div class="admin-type-list" id="adminTypeList" aria-live="polite"></div>
@@ -616,7 +634,7 @@
               <label>Bulan<select id="adminMasterMonth"><option value="">Semua</option><option value="1">Januari</option><option value="2">Februari</option><option value="3">Mac</option><option value="4">April</option><option value="5">Mei</option><option value="6">Jun</option><option value="7">Julai</option><option value="8">Ogos</option><option value="9">September</option><option value="10">Oktober</option><option value="11">November</option><option value="12">Disember</option></select></label>
               <label>Tahun<input id="adminMasterYear" type="number" min="2000" max="2200" placeholder="Semua"></label>
               <label>Kelas<select id="adminMasterClass"><option value="">Semua</option><option>A2</option><option>A3</option><option>LI</option></select></label>
-              <label>Jenis<select id="adminMasterType"><option value="">Semua</option><option value="OUTING_BIASA">Outing Biasa</option><option value="OUTING_HUJUNG_MINGGU">Hujung Minggu</option><option value="KECEMASAN">Kecemasan</option><option value="PULANG_BERMALAM">Pulang Bermalam</option><option value="CUTI_SEMESTER">Cuti Semester</option></select></label>
+              <label>Jenis<select id="adminMasterType"><option value="">Semua</option></select></label>
               <label>Status<select id="adminMasterStatus"><option value="">Semua</option><option value="MENUNGGU_KELULUSAN">Menunggu</option><option value="DILULUSKAN_WARDEN">Diluluskan</option><option value="DITOLAK_WARDEN">Ditolak</option><option value="KELUAR">Keluar</option><option value="SELESAI">Selesai</option></select></label>
             </div>
             <p class="form-message" id="adminMasterMessage" aria-live="polite"></p>

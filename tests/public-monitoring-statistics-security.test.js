@@ -394,6 +394,7 @@ test("getOutingStats returns aggregate structures only", () => {
     "month",
     "status_summary",
     "totals",
+    "type_summary",
     "year"
   ]);
   const serialized = JSON.stringify(stats);
