@@ -1917,12 +1917,36 @@ function formatOperationalTimeMalayV220_(timeValue) {
   return displayHour + ":" + minute + " " + period;
 }
 
+function formatOperationalDateMalayV220_(dateKey) {
+  const normalizedDateKey = normalizeDateKey_(dateKey);
+  if (!normalizedDateKey) return "";
+  const parts = normalizedDateKey.split("-");
+  const months = [
+    "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+    "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+  ];
+  return Number(parts[2]) + " " + months[Number(parts[1]) - 1] + " " + parts[0];
+}
+
 function validateGuardDepartureV220_(record, config, now) {
+  const approvedDateKey = normalizeDateKey_(record && record.tarikh);
+  const todayKey = formatDate_(now);
+  if (approvedDateKey && todayKey < approvedDateKey) {
+    throw new Error(
+      "Tarikh keluar yang diluluskan ialah " + formatOperationalDateMalayV220_(approvedDateKey) +
+      ". Sahkan Keluar hanya boleh dibuat pada tarikh tersebut."
+    );
+  }
+
   const departureDays = getConfiguredDepartureDaysV220_(config);
   if (departureDays.length) {
-    const actualDay = getDayNameFromDateKey_(formatDate_(now)).toUpperCase();
+    const actualDay = getDayNameFromDateKey_(todayKey).toUpperCase();
     if (departureDays.indexOf(actualDay) === -1) {
-      throw new Error("Pelajar tidak dibenarkan keluar pada hari ini.");
+      const outingLabel = String(config && config.display_name || "Jenis outing ini").trim();
+      throw new Error(
+        outingLabel + " hanya dibenarkan keluar pada hari " +
+        formatOperationalDaysMalayV220_(departureDays) + "."
+      );
     }
   }
 

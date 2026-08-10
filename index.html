@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.2.0">
+    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r1">
   </head>
   <body>
     <header class="app-header">
@@ -412,22 +412,20 @@
                 <p>Urus konfigurasi jenis outing tanpa mengubah kod permohonan production.</p>
               </div>
               <div class="admin-heading-actions">
+                <details class="admin-config-status" id="adminConfigStatus" data-state="loading">
+                  <summary id="adminConfigStatusSummary" title="Status konfigurasi sedang dimuatkan">
+                    <span class="admin-config-status-dot" aria-hidden="true"></span>
+                    <span id="adminConfigStatusLabel">Semakan Config...</span>
+                  </summary>
+                  <div class="admin-config-status-popover">
+                    <p id="adminConfigStatusDetails">Status konfigurasi sedang dimuatkan.</p>
+                    <ul id="adminConfigReadinessReasons"></ul>
+                  </div>
+                </details>
                 <button class="secondary-action" id="adminRefreshButton" type="button">Refresh</button>
                 <button class="primary-action" id="adminAddTypeButton" type="button">+ Tambah Jenis</button>
               </div>
             </div>
-
-            <section class="admin-config-readiness" id="adminConfigReadiness" aria-live="polite">
-              <div>
-                <span>Config Mode</span>
-                <strong id="adminConfigMode">Memuatkan...</strong>
-              </div>
-              <div>
-                <span>Config-driven</span>
-                <strong id="adminConfigReadinessStatus">Memuatkan...</strong>
-              </div>
-              <ul id="adminConfigReadinessReasons"></ul>
-            </section>
 
             <p class="form-message admin-dashboard-message" id="adminDashboardMessage" aria-live="polite"></p>
             <div class="admin-type-list" id="adminTypeList" aria-live="polite"></div>
@@ -502,6 +500,7 @@
                 <div class="admin-form-grid">
                   <label>Masa Keluar Paling Awal
                     <input id="adminEarliestDepartureTimeInput" type="time">
+                    <small class="admin-field-helper">Masa ini boleh diubah oleh Admin mengikut arahan semasa HEP.</small>
                   </label>
                 </div>
               </fieldset>
@@ -680,6 +679,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.2.0"></script>
+    <script src="assets/app.js?v=2.2.0-r1"></script>
   </body>
 </html>

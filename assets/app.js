@@ -462,8 +462,10 @@ const els = {
   adminMasterPrev: document.querySelector("#adminMasterPrev"),
   adminMasterNext: document.querySelector("#adminMasterNext"),
   adminMasterPage: document.querySelector("#adminMasterPage"),
-  adminConfigMode: document.querySelector("#adminConfigMode"),
-  adminConfigReadinessStatus: document.querySelector("#adminConfigReadinessStatus"),
+  adminConfigStatus: document.querySelector("#adminConfigStatus"),
+  adminConfigStatusSummary: document.querySelector("#adminConfigStatusSummary"),
+  adminConfigStatusLabel: document.querySelector("#adminConfigStatusLabel"),
+  adminConfigStatusDetails: document.querySelector("#adminConfigStatusDetails"),
   adminConfigReadinessReasons: document.querySelector("#adminConfigReadinessReasons"),
   adminStaffRefreshButton: document.querySelector("#adminStaffRefreshButton"),
   adminStaffAddButton: document.querySelector("#adminStaffAddButton"),
@@ -1547,8 +1549,8 @@ function setAdminAllowedDaysV200(allowedDays) {
 
 async function loadAdminOutingConfigReadinessV220() {
   if (!currentSession || currentSession.role !== "admin") return;
-  if (els.adminConfigMode) els.adminConfigMode.textContent = "Memuatkan...";
-  if (els.adminConfigReadinessStatus) els.adminConfigReadinessStatus.textContent = "Memuatkan...";
+  if (els.adminConfigStatusLabel) els.adminConfigStatusLabel.textContent = "Semakan Config...";
+  if (els.adminConfigStatusDetails) els.adminConfigStatusDetails.textContent = "Status konfigurasi sedang dimuatkan.";
   if (els.adminConfigReadinessReasons) els.adminConfigReadinessReasons.innerHTML = "";
   try {
     const result = await apiPost("getOutingConfigReadiness", buildAdminCredentialPayloadV200());
@@ -1566,14 +1568,23 @@ async function loadAdminOutingConfigReadinessV220() {
 function renderAdminOutingConfigReadinessV220(result) {
   const readiness = result || {};
   const ready = readiness.ready === true;
-  if (els.adminConfigMode) {
-    els.adminConfigMode.textContent = readiness.config_mode_label || "Tidak diketahui";
+  const configActive = readiness.config_mode === "CONFIG_DRIVEN";
+  const state = !ready ? "issue" : (configActive ? "active" : "legacy");
+  const label = state === "active" ? "Config Active" : (state === "legacy" ? "Legacy" : "Config Issue");
+  const modeLabel = readiness.config_mode_label || (configActive ? "Config-driven (Active)" : "Legacy (Production)");
+  const detailsText = configActive
+    ? `Config-driven${ready ? " (Active) · Ready" : " Active · Not Ready"}`
+    : `${modeLabel} · Config-driven ${ready ? "Ready" : "Not Ready"}`;
+  if (els.adminConfigStatus) {
+    els.adminConfigStatus.dataset.state = state;
+    els.adminConfigStatus.open = false;
   }
-  if (els.adminConfigReadinessStatus) {
-    els.adminConfigReadinessStatus.textContent = `Config-driven ${ready ? "Ready" : "Not Ready"}`;
-    els.adminConfigReadinessStatus.classList.toggle("is-ready", ready);
-    els.adminConfigReadinessStatus.classList.toggle("is-not-ready", !ready);
+  if (els.adminConfigStatusLabel) els.adminConfigStatusLabel.textContent = label;
+  if (els.adminConfigStatusSummary) {
+    els.adminConfigStatusSummary.title = detailsText;
+    els.adminConfigStatusSummary.setAttribute("aria-label", `${label}. ${detailsText}`);
   }
+  if (els.adminConfigStatusDetails) els.adminConfigStatusDetails.textContent = detailsText;
   if (els.adminConfigReadinessReasons) {
     const reasons = Array.isArray(readiness.reasons) ? readiness.reasons : [];
     els.adminConfigReadinessReasons.innerHTML = reasons
@@ -1581,6 +1592,14 @@ function renderAdminOutingConfigReadinessV220(result) {
       .join("");
     els.adminConfigReadinessReasons.hidden = reasons.length === 0;
   }
+}
+
+function getSafeGuardPolicyMessageV220(error) {
+  const message = String(error && error.message || "").trim();
+  const dateRule = /^Tarikh keluar yang diluluskan ialah \d{1,2} (?:Januari|Februari|Mac|April|Mei|Jun|Julai|Ogos|September|Oktober|November|Disember) \d{4}\. Sahkan Keluar hanya boleh dibuat pada tarikh tersebut\.$/;
+  const timeRule = /^Pelajar hanya dibenarkan keluar mulai \d{1,2}:\d{2} (?:pagi|petang|malam|tengah hari|tengah malam)\.$/;
+  const dayRule = /^[A-Za-z0-9À-ÿ ()\/'_-]{1,100} hanya dibenarkan keluar pada hari (?:Ahad|Isnin|Selasa|Rabu|Khamis|Jumaat|Sabtu)(?:(?:, | atau )(?:Ahad|Isnin|Selasa|Rabu|Khamis|Jumaat|Sabtu))*\.$/;
+  return dateRule.test(message) || timeRule.test(message) || dayRule.test(message) ? message : "";
 }
 
 function setOperationalOutingTypesV220(rows) {
@@ -6151,7 +6170,7 @@ async function confirmOut(id, button) {
     showSuccess("Pelajar telah disahkan keluar.", "Sahkan Keluar");
   } catch (error) {
     showModeNotice(`Live API error: ${error.message}`);
-    showError("Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
+    showError(getSafeGuardPolicyMessageV220(error) || "Gagal disimpan. Sila tekan Cuba Lagi.", "Tindakan Gagal");
   } finally {
     clearOperationalActionLoading(loadingState);
     clearGuardActionPending(id);

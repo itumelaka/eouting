@@ -232,13 +232,23 @@ test("Guard departure enforcement uses the configured Friday time dynamically", 
   assert.doesNotThrow(() => context.validateGuardDepartureV220_({}, fivePm, friday1700));
 });
 
+test("Guard rejects confirmation before the approved departure date with a Malaysia-friendly date", () => {
+  const { context } = createContext();
+  const config = departureConfig(context, { earliest_departure_time: "17:00" });
+  const monday = dateInContext(context, "2026-08-10T02:00:00Z");
+  assert.throws(
+    () => context.validateGuardDepartureV220_({ tarikh: "2026-08-14" }, config, monday),
+    /Tarikh keluar yang diluluskan ialah 14 Ogos 2026\. Sahkan Keluar hanya boleh dibuat pada tarikh tersebut\./
+  );
+});
+
 test("Guard cannot confirm an actual departure on a non-configured day", () => {
   const { context } = createContext();
   const config = departureConfig(context);
   const thursday = dateInContext(context, "2026-08-06T09:00:00Z");
   assert.throws(
     () => context.validateGuardDepartureV220_({}, config, thursday),
-    /tidak dibenarkan keluar pada hari ini/
+    /Pulang Bermalam hanya dibenarkan keluar pada hari Jumaat\./
   );
 });
 

@@ -10,7 +10,7 @@ const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
 const EXPECTED_VERSION = "2.2.0";
-const EXPECTED_ASSET_REVISION = "2.2.0";
+const EXPECTED_ASSET_REVISION = "2.2.0-r1";
 const EXPECTED_RELEASE_DATE = "2026-08-09";
 const EXPECTED_RELEASE_NOTE = "eOuting v2.2.0 menyatukan operasi Admin, foto profil private dua peringkat, pemantauan berfoto untuk pengguna sah, animasi KPI dan penghantaran borang melalui papan kekunci.";
 

@@ -8,6 +8,7 @@ const root = path.join(__dirname, "..");
 const gasSource = fs.readFileSync(path.join(root, "gas", "Code.gs"), "utf8");
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
+const styleSource = fs.readFileSync(path.join(root, "assets", "style.css"), "utf8");
 
 const outingHeaders = [
   "type_code", "display_name", "description", "active", "sort_order", "allowed_days",
@@ -209,11 +210,70 @@ test("custom type flows through Telegram labels, statistics grouping and dynamic
   assert.match(indexSource, /id="adminMasterType"><option value="">Semua<\/option><\/select>/);
 });
 
-test("readiness UI is read-only and source never enables the production flag", () => {
-  assert.match(indexSource, /id="adminConfigMode"/);
-  assert.match(indexSource, /id="adminConfigReadinessStatus"/);
+test("readiness UI is compact, accessible, read-only and never enables the production flag", () => {
+  assert.match(indexSource, /<details class="admin-config-status" id="adminConfigStatus"/);
+  assert.match(indexSource, /id="adminConfigStatusSummary"/);
+  assert.match(indexSource, /id="adminConfigStatusLabel"/);
   assert.match(indexSource, /id="adminConfigReadinessReasons"/);
+  assert.doesNotMatch(indexSource, /class="admin-config-readiness"/);
+  assert.match(styleSource, /\.admin-config-status\[data-state="active"\].*#0a8a69/);
+  assert.match(styleSource, /\.admin-config-status\[data-state="legacy"\].*#d88a08/);
+  assert.match(styleSource, /\.admin-config-status\[data-state="issue"\].*#c43d2b/);
+  assert.match(styleSource, /@media \(max-width: 520px\)[\s\S]*\.admin-heading-actions \.admin-config-status/);
   assert.doesNotMatch(indexSource, /OUTING_CONFIG_V2_ENABLED/);
   assert.doesNotMatch(gasSource, /setProperty\(OUTING_CONFIG_V2_PROPERTY,\s*"true"\)/);
   assert.match(gasSource, /setProperty\(OUTING_CONFIG_V2_PROPERTY,\s*"false"\)/);
+});
+
+function renderReadinessState(result) {
+  const elements = {
+    adminConfigStatus: { dataset: {}, open: true },
+    adminConfigStatusSummary: {
+      title: "",
+      attributes: {},
+      setAttribute(name, value) { this.attributes[name] = value; }
+    },
+    adminConfigStatusLabel: { textContent: "" },
+    adminConfigStatusDetails: { textContent: "" },
+    adminConfigReadinessReasons: { innerHTML: "", hidden: false }
+  };
+  const context = vm.createContext({
+    els: elements,
+    escapeHtml: (value) => String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+  });
+  const start = appSource.indexOf("function renderAdminOutingConfigReadinessV220");
+  const end = appSource.indexOf("function getSafeGuardPolicyMessageV220", start);
+  vm.runInContext(appSource.slice(start, end), context);
+  context.renderAdminOutingConfigReadinessV220(result);
+  return elements;
+}
+
+test("compact readiness indicator renders active, legacy and issue states accessibly", () => {
+  const active = renderReadinessState({
+    config_mode: "CONFIG_DRIVEN", config_mode_label: "Config-driven (Active)", ready: true, reasons: []
+  });
+  assert.equal(active.adminConfigStatus.dataset.state, "active");
+  assert.equal(active.adminConfigStatusLabel.textContent, "Config Active");
+  assert.equal(active.adminConfigStatusSummary.title, "Config-driven (Active) · Ready");
+
+  const legacy = renderReadinessState({
+    config_mode: "LEGACY", config_mode_label: "Legacy (Production)", ready: true, reasons: []
+  });
+  assert.equal(legacy.adminConfigStatus.dataset.state, "legacy");
+  assert.equal(legacy.adminConfigStatusLabel.textContent, "Legacy");
+  assert.equal(legacy.adminConfigStatusSummary.title, "Legacy (Production) · Config-driven Ready");
+
+  const issue = renderReadinessState({
+    config_mode: "CONFIG_DRIVEN", config_mode_label: "Config-driven (Active)", ready: false,
+    reasons: ["OUTING_TYPES tidak lengkap."]
+  });
+  assert.equal(issue.adminConfigStatus.dataset.state, "issue");
+  assert.equal(issue.adminConfigStatusLabel.textContent, "Config Issue");
+  assert.equal(issue.adminConfigStatusSummary.title, "Config-driven Active · Not Ready");
+  assert.match(issue.adminConfigStatusSummary.attributes["aria-label"], /Config Issue/);
+  assert.match(issue.adminConfigReadinessReasons.innerHTML, /OUTING_TYPES tidak lengkap/);
+  assert.equal(issue.adminConfigReadinessReasons.hidden, false);
 });
