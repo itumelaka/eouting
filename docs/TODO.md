@@ -6,18 +6,20 @@ Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 37**. 
 
 ### eOuting v2.2.0 Production Close-out
 
-- [x] Enam modul Admin inline: Pemantauan, Statistik, Rekod Master, Warden/HEP/Guard, Tetapan Pelajar dan Tetapan Outing.
+- [x] Tujuh modul Admin inline: Pemantauan, Statistik, Rekod Master, Warden/HEP/Guard, Tetapan Pelajar, Tetapan Outing dan Notis Banner.
 - [x] Pengurusan staff, pelajar dan outing type serta Rekod Master search/filter/pagination.
 - [x] Foto profil private: self-upload, crop/compression, metadata STUDENTS, Admin removal dan initials fallback.
 - [x] Two-tier photo delivery: unique-ID thumbnail batch, server-side Drive thumbnail, one-student full preview, cache sesi, duplicate suppression dan safe failure.
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
 - [x] GAS Version 37 ialah baseline production semasa; config-driven active, readiness hijau dan Notis Banner V1 live.
-- [x] Cache/asset source revision `2.2.0-r3` dengan displayed app version kekal v2.2.0.
-- [x] Setiap banner aktif menggunakan ticker kiri berterusan; hover/focus pause dan reduced-motion kekal statik.
+- [x] Cache/asset source revision `2.2.0-r4` dengan displayed app version kekal v2.2.0.
+- [x] Setiap banner aktif menggunakan ticker kiri berterusan; hover/focus/touch pause dan reduced-motion kekal statik.
 - [x] Controlled activation: submission, Warden approval, early Guard rejection dan safe policy feedback disahkan.
-- [x] Source Notis Banner V1: satu notis Script Properties, Admin edit/aktif/penting, viewer authenticated, safe text, audit dan reduced-motion.
-- [ ] Deploy source Notis Banner ke GAS version baharu dan jalankan smoke test controlled; jangan ubah config outing atau feature flag.
+- [x] Notis Banner V1 live: satu notis Script Properties, Admin edit/aktif/penting, viewer authenticated, safe text, audit dan reduced-motion.
+- [x] Deploy Notis Banner sebagai GAS Version 37 dan sahkan Admin UI/save, Normal banner, authenticated display, timestamp serta public privacy.
+- [x] Focused banner tests **12/12** dan full Node suite **287/287**.
+- [x] Buang ayat panduan outing pendua di bawah “Permohonan Pelajar”; kekalkan Announcement Banner, `ruleNotice` dan borang.
 
 ### eOuting v2.0 — Fasa 2 Schema dan Migration
 

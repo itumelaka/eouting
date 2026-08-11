@@ -63,7 +63,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.2.0-r3`; displayed app version kekal v2.2.0.
+- Cache source semasa ialah `eouting-cache-v2.2.0-r4`; displayed app version kekal v2.2.0.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -115,11 +115,12 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 ### Notis Banner Authenticated
 
 - Read Admin dan mutation banner ialah POST-only serta memerlukan credential Admin aktif.
-- Viewer endpoint mengesahkan Student, Warden, Guard atau Admin dan hanya memulangkan `active`, `important`, `text` serta `updated_at` apabila aktif.
+- Viewer endpoint mengesahkan Student, Warden/HEP, Guard atau Admin dan hanya memulangkan `active`, `important`, `text` serta `updated_at` apabila aktif; `updated_by` hanya tersedia kepada Admin dan tidak didedahkan kepada ordinary viewer.
 - Landing, Public Pemantauan dan semua GET awam tidak menerima banner atau nama Script Property.
 - Teks di-trim, dihadkan kepada 500 aksara dan dirender frontend menggunakan `textContent`; input HTML/script kekal teks biasa.
-- Audit menyimpan status, flag penting dan ringkasan teks maksimum 120 aksara tanpa PIN atau secret.
-- Banner tidak digunakan sebagai input kepada mana-mana peraturan outing.
+- Property yang hilang bermaksud banner tidak aktif. Simpanan Admin pertama mengisi Script Properties secara automatik; tiada sheet `ANNOUNCEMENTS` atau setup property manual.
+- Audit `UPDATE_ANNOUNCEMENT_BANNER` menyimpan status, flag penting dan ringkasan teks maksimum 120 aksara tanpa PIN, secret atau nilai property.
+- Banner tidak digunakan sebagai input kepada mana-mana peraturan outing. Free text tidak boleh mengubah `OUTING_TYPES` atau `earliest_departure_time`; perubahan enforcement masih memerlukan mutation berasingan melalui Tetapan Outing.
 
 - `OUTING_TYPES` kini authoritative bagi config-driven production; `ADMIN_USERS` kekal private.
 - `ADMIN_USERS` tidak diseed dengan akaun atau PIN contoh.

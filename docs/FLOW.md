@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.0** dengan GAS Version 36 dan `OUTING_CONFIG_V2_ENABLED=true`.
+Dokumen ini menerangkan flow production semasa **v2.2.0**, cache revision `2.2.0-r4`, GAS Version 37 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
 
 ## Backend Config API v2.0
 
@@ -39,7 +39,13 @@ Authenticated POST getAnnouncementBanner
   -> active=true: safe projection text, important, updated_at
 ```
 
-Landing dan Public Pemantauan tidak memanggil endpoint ini. Banner dimuat selepas sesi authenticated bermula dan dibersihkan ketika logout. Kandungannya tidak pernah masuk ke `submitRequest`, `approveRequest`, `confirmOut`, `confirmIn` atau resolver `OUTING_TYPES`; perubahan operasi sebenar masih dibuat melalui Tetapan Outing.
+Property yang belum wujud menghasilkan `active=false`; simpanan Admin pertama mengisi storage secara automatik. Tiada sheet `ANNOUNCEMENTS` atau setup property manual. Admin UI menyediakan teks, `Penting`, `Aktif`, simpan, current state, timestamp dan identiti pengemas kini.
+
+Landing dan Public Pemantauan tidak memanggil endpoint ini. Banner dimuat selepas sesi authenticated Student, Warden/HEP, Guard atau Admin bermula dan dibersihkan ketika logout. Viewer biasa tidak menerima `updated_by`, nama property atau secret. Teks bounded dirender sebagai plain text, jadi HTML/script tidak dilaksanakan.
+
+Normal dipaparkan sebagai `MAKLUMAN` dan Important sebagai `PENTING`. Kedua-duanya menggunakan ticker mendatar berterusan yang perlahan, dengan hover/fokus/sentuhan untuk pause dan paparan statik bagi `prefers-reduced-motion`; tiada `<marquee>`.
+
+Kandungannya tidak pernah masuk ke `submitRequest`, `approveRequest`, `confirmOut`, `confirmIn` atau resolver `OUTING_TYPES`. Contohnya, banner “Pulang Bermalam dibenarkan keluar mulai jam 2.00 petang.” tidak mengubah `earliest_departure_time`; Admin mesti mengemas kini `Tetapan Outing > Pulang Bermalam > Masa Keluar Paling Awal` secara berasingan.
 
 ## Backend Submission Config — Fasa 5B
 
@@ -155,6 +161,8 @@ Pelajar, Warden dan Guard refresh melalui laluan authenticated masing-masing
 Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown menggunakan `student_id` sebagai value dalaman dan memaparkan nama. Nombor matrik ditaip berasingan dan backend memadankan kedua-dua credential dengan row Google Sheets.
 
 Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords`. Active request menghalang permohonan baharu sehingga selesai atau ditolak.
+
+Hierarki workspace Pelajar ialah Announcement Banner, navigasi/workspace, `ruleNotice` kuning, tajuk “Permohonan Pelajar” dan borang outing. Banner ialah notis operasi semasa; `ruleNotice` kekal authoritative untuk panduan peraturan kontekstual. Ayat panduan outing pendua di bawah tajuk telah dibuang tanpa mengubah borang.
 
 Pelajar boleh upload/ganti foto profil sendiri. Identity/editor memuatkan thumbnail melalui batch authenticated dan editor sendiri boleh menggunakan imej penuh. Klik thumbnail membuka modal; jika full cache belum tersedia, satu request authenticated `photo_variant = "full"` dibuat untuk pelajar itu sahaja. Initials tidak mempunyai tindakan klik.
 
@@ -281,7 +289,7 @@ Tanpa `mock=1`, cabang mock tidak boleh dicapai dan `apiPost` meneruskan request
 
 ## Admin Inline
 
-Selepas login, identiti sesi, tajuk `Admin eOuting` dan navigasi kekal visible. Enam panel inline ialah `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`.
+Selepas login, identiti sesi, tajuk `Admin eOuting` dan navigasi kekal visible. Tujuh panel inline ialah `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar`, `Tetapan Outing` dan `Notis Banner`.
 
 `Admin login -> Tetapan Pelajar -> getAdminStudents/createStudent/updateStudent/toggleStudentStatus` menggunakan POST dan credential Admin runtime sedia ada. Status `TIDAK AKTIF` menyebabkan rekod tidak lagi dipulangkan oleh public `getStudents`, tanpa mengubah `OUTING_REQUESTS` atau sejarah outing. LI ialah nilai `kelas` dalam STUDENTS, bukan role login baharu. Thumbnail sebenar Admin boleh dipreview daripada batch authenticated yang sama; removal kekal tindakan berasingan dan ber-audit.
 

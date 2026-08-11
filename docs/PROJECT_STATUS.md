@@ -6,13 +6,15 @@ Status repo semasa: **v2.2.0 — production verified**.
 
 Frontend v2.2.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa ialah **config-driven production ACTIVE dan Ready** pada release v2.2.0 dengan GAS Version 37. Displayed version kekal v2.2.0 dan cache/asset source revision ialah `2.2.0-r3`.
+Verdict semasa ialah **config-driven production ACTIVE dan Ready** pada release v2.2.0 dengan GAS Version 37. Displayed version kekal v2.2.0 dan cache/asset source revision ialah `2.2.0-r4`. Production stabil.
 
-`Notis Banner` V1 kini live pada GAS Version 37. Patch frontend r3 menjadikan setiap banner aktif ticker berterusan tanpa mengubah backend, config outing atau feature flag.
+`Notis Banner` V1 kini live dan verified pada GAS Version 37. Admin mengurus satu banner global melalui Script Properties; Normal/Important, save, authenticated display, timestamp, continuous ticker, pause hover/focus/touch, reduced-motion dan public privacy telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**.
+
+Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.2.0` dan backend production ialah GAS **Version 36**;
+- frontend release ialah `v2.2.0` dan backend production ialah GAS **Version 37**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
@@ -24,8 +26,8 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.2.0`; asset/cache source revision ialah `2.2.0-r3`.
-- Backend GAS production ialah **Version 36** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
+- Metadata displayed frontend/footer/version berada pada `v2.2.0`; asset/cache source revision ialah `2.2.0-r4`.
+- Backend GAS production ialah **Version 37** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -50,7 +52,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer kekal v2.2.0; asset query dan cache source konsisten pada `2.2.0-r3`.
+- Displayed version/footer kekal v2.2.0; asset query dan cache source konsisten pada `2.2.0-r4`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -102,8 +104,9 @@ Nilai backend `KELUAR` tidak berubah.
 - **v1.7.1:** menambah Outing Sabtu / Ahad; Pull Request #2 digabungkan melalui `fa7227e` daripada `1e6303c`.
 - **v2.0.0:** production frontend rollout pada 4 Ogos 2026 melalui `4eedcbe`; backend kekal GAS Version 24 dengan feature flag config-driven submission masih `false`.
 - **v2.1.0:** Guard UI diperkemas, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh outing sebenar, hygiene clasp dan pembaikan rendering Statistik Admin. Production kini menggunakan GAS Version 31 dengan foto profil operational; preview besar semasa ialah perubahan frontend-only.
-- **v2.2.0:** enam modul Admin inline, pengurusan operasi/master data, foto profil private dengan thumbnail batch/full on-demand, identifikasi Warden/Guard/Admin, rolling KPI, Enter UX dan cache delivery. GAS Version 32 serta semua smoke test semasa disahkan live pada 9 Ogos 2026.
+- **v2.2.0:** tujuh modul Admin inline, pengurusan operasi/master data, foto profil private dengan thumbnail batch/full on-demand, identifikasi Warden/Guard/Admin, rolling KPI, Enter UX dan cache delivery. GAS Version 32 serta semua smoke test ketika rollout awal disahkan live pada 9 Ogos 2026.
 - **10 Ogos 2026:** config-driven production diaktifkan dan disahkan pada GAS Version 36; cache revision `2.2.0-r1`, readiness hijau dan rollback flag-false kekal tersedia tanpa redeployment.
+- **11 Ogos 2026:** Announcement Banner V1 dideploy dan disahkan pada GAS Version 37; ticker serta cleanup panduan Pelajar ditutup pada cache `2.2.0-r4`, dengan config-driven kekal Active + Ready.
 
 ## Production Validation v1.7.0
 

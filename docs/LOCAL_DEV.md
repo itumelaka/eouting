@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r3` dan production GAS Version 37.
+Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r4` dan production GAS Version 37.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline selepas close-out config-driven 10 Ogos 2026 ialah **275/275 lulus**.
+Baseline production selepas close-out Announcement Banner pada 11 Ogos 2026 ialah **287/287 lulus**. Focused banner regression ialah **12/12 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -119,6 +119,7 @@ Ujian manual Admin Dashboard:
 
 Suite utama:
 
+- `tests/announcement-banner-v1.test.js`: Admin UI/save, authenticated projection, ticker sentiasa aktif, hover/fokus pause, reduced-motion, public privacy dan cleanup panduan Pelajar.
 - `tests/student-directory-security.test.js`: projection direktori Pelajar dan login backend.
 - `tests/student-login-dropdown-privacy.test.js`: dropdown nama tanpa nombor matrik.
 - `tests/public-monitoring-statistics-security.test.js`: privacy public response, operational POST, credential runtime, statistik agregat dan status kontekstual.
@@ -149,6 +150,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## Smoke Test Pelajar
 
+0. Selepas login, sahkan hierarki Announcement Banner → workspace → `ruleNotice` kuning → “Permohonan Pelajar” → borang; ayat panduan pendua tidak wujud.
 1. Pastikan dropdown memaparkan nama dan filter A2/A3 berfungsi.
 2. Pilih pelajar; `student_id` kekal value dalaman.
 3. Masukkan nombor matrik betul dan sahkan login berjaya.
@@ -191,6 +193,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 7. Klik refresh berulang semasa request aktif dan pastikan tiada overlap.
 8. Simulasi refresh gagal dan pastikan data/timestamp lama kekal.
 9. Pastikan tiada thumbnail, preview trigger, data URI atau metadata foto profil muncul.
+10. Pastikan Public Pemantauan dan landing tidak memaparkan atau meminta Announcement Banner.
 
 ## Smoke Test Admin
 
@@ -198,11 +201,12 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 2. Pastikan `Statistik` aktif inline dan filter/KPI/statistik individu dimuat tanpa butang `Kembali ke Admin`.
 3. Dalam `Tetapan Pelajar`, sahkan list menggunakan thumbnail cache, klik foto dan pastikan satu full image dimuat on-demand lalu dicache; `Buang Foto` kekal tindakan berasingan dengan confirmation serta invalidasi kedua-dua cache.
 4. Semak Rekod Master search/filter/pagination, Pemantauan dan pengurusan Warden/HEP/Guard masih boleh ditukar tanpa login semula.
+5. Dalam `Notis Banner`, uji teks, `Penting`, `Aktif`, simpan, current state, timestamp dan updater; sahkan Normal/Penting bergerak sama dan viewer authenticated menerima projection selamat.
 
 ## PWA dan Cache
 
 - Semak footer v2.2.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r3`; displayed app version kekal v2.2.0.
+- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r4`; displayed app version kekal v2.2.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

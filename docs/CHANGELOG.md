@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-11 — Announcement Banner V1 production close-out (v2.2.0)
+
+- Mengesahkan `Notis Banner` Admin dan tiga POST action authenticated live pada GAS Version 37.
+- Menyimpan satu banner global dalam Script Properties tanpa sheet `ANNOUNCEMENTS` atau setup property manual; simpanan Admin pertama mengisi storage.
+- Menyokong Normal `MAKLUMAN` dan Important `PENTING`, current state, timestamp serta identiti updater pada projection Admin.
+- Mengehadkan viewer kepada Student, Warden/HEP, Guard dan Admin authenticated; landing dan Public Pemantauan kekal tanpa banner.
+- Menutup ticker sebagai gerakan mendatar berterusan yang perlahan, pause hover/focus/touch, static reduced-motion dan tanpa `<marquee>`.
+- Mengekalkan teks sebagai plain text bounded serta makluman sahaja; business rules kekal di `Admin > Tetapan Outing`.
+- Membuang ayat panduan pendua di bawah “Permohonan Pelajar” sambil mengekalkan Announcement Banner, `ruleNotice` kuning dan borang outing.
+- Mengesahkan focused tests **12/12** dan full Node suite **287/287**; displayed version kekal v2.2.0 dan cache revision ialah `2.2.0-r4`.
+
 ## 2026-08-11 — Continuous announcement ticker patch (v2.2.0)
 
 - Menjadikan setiap banner aktif bergerak ke kiri secara berterusan walaupun teks muat dalam ruang tersedia.
@@ -7,7 +18,7 @@
 - Mengekalkan pause hover/focus, paparan statik reduced-motion, label/timestamp, privacy awam dan data model backend.
 - Menaikkan cache/asset frontend kepada `2.2.0-r3`; GAS Version 37 tidak berubah dan tiada deployment GAS diperlukan.
 
-## 2026-08-11 — Admin-managed announcement banner (v2.2.0)
+## 2026-08-11 — Admin-managed announcement banner (v2.2.0; implementation history before production close-out)
 
 - Menambah satu `Notis Banner` yang boleh diedit, diaktif/nyahaktif dan ditanda `PENTING` oleh Admin.
 - Menyimpan konfigurasi dalam Script Properties tanpa sheet/migration atau setup property manual.
@@ -15,7 +26,7 @@
 - Mengehadkan paparan kepada Student, Warden/HEP, Guard dan Admin yang telah log masuk; landing dan Public Pemantauan kekal tanpa banner.
 - Merender teks sebagai plain text, menganimasi hanya overflow, pause pada hover/focus dan mematikan animasi untuk reduced motion.
 - Mengekalkan banner sebagai makluman sahaja; `OUTING_CONFIG_V2_ENABLED`, `OUTING_TYPES` dan semua flow outing tidak berubah.
-- Displayed version kekal v2.2.0; cache/asset source meningkat kepada `2.2.0-r2`. Backend memerlukan deployment GAS baharu sebelum ciri boleh digunakan secara live.
+- Displayed version kekal v2.2.0; cache/asset source meningkat kepada `2.2.0-r2`. Pada tahap implementation ini backend masih memerlukan deployment GAS baharu; deployment tersebut kemudiannya selesai sebagai Version 37 seperti direkod dalam close-out di atas.
 
 ## 2026-08-10 — Config-driven production activation (v2.2.0)
 

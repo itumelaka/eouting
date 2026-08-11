@@ -1,10 +1,12 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r3`. Backend production ialah GAS **Version 37**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production aktif dan ready sejak 10 Ogos 2026.
+Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r4`. Backend production ialah GAS **Version 37**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026.
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan tiga POST action banner dan frontend `Notis Banner` telah live. Patch ticker `2.2.0-r3` ialah frontend-only: tiada Script Property, setup function, sheet migration, backend deployment atau perubahan `OUTING_CONFIG_V2_ENABLED` diperlukan. Selepas GitHub Pages dikemas kini, sahkan ticker kedua-dua mod, pause hover/focus, reduced-motion dan privacy Public Pemantauan.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Cache close-out `2.2.0-r4` mengekalkan displayed v2.2.0.
+
+Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
 ## Config-driven Production Activation — 10 Ogos 2026
 

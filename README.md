@@ -14,13 +14,19 @@ Versi repo semasa: **v2.2.0 — Operasi Bersepadu dan Foto Profil Private Dua Pe
 
 Frontend production v2.2.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Backend production semasa menggunakan GAS **Version 36**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
+Backend production semasa menggunakan GAS **Version 37**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
 Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
-Admin turut mempunyai `Notis Banner` untuk satu makluman operasi. Konfigurasi disimpan dalam Script Properties dan hanya projection selamat dihantar melalui POST selepas Pelajar, Warden/HEP, Guard atau Admin disahkan. Banner tidak muncul pada landing atau Public Pemantauan. Mod `MAKLUMAN` dan `PENTING` menggunakan ticker kiri berterusan yang tenang, berhenti semasa hover/focus dan kekal statik untuk `prefers-reduced-motion`.
+Admin turut mempunyai `Notis Banner` untuk satu makluman operasi global pada satu masa. Admin boleh menetapkan teks, `Penting`, `Aktif`, menyimpan perubahan dan melihat keadaan semasa, timestamp serta identiti pengemas kini. Konfigurasi disimpan dalam Script Properties; property yang belum wujud bermaksud banner tidak aktif dan simpanan Admin pertama mengisinya secara automatik. Tiada sheet `ANNOUNCEMENTS` atau setup Script Property manual diperlukan.
 
-Banner ialah makluman sahaja. Kandungannya tidak mengubah `OUTING_TYPES`, masa keluar atau validation. Sebarang perubahan polisi masih perlu dibuat secara berasingan melalui `Admin > Tetapan Outing`.
+Pelajar, Warden/HEP, Guard dan Admin yang telah disahkan menerima projection selamat melalui POST `getAnnouncementBanner`; Admin menggunakan `getAnnouncementBannerAdmin` dan `updateAnnouncementBanner`. Mutation memerlukan authentication Admin dan direkod sebagai `UPDATE_ANNOUNCEMENT_BANNER`. Public landing serta Public Pemantauan tidak memanggil atau menerima banner. Nama property/secret dan `updated_by` tidak didedahkan kepada viewer biasa. Teks mempunyai had panjang, dirender sebagai plain text dan HTML/script tidak dilaksanakan.
+
+Mod Normal berlabel `MAKLUMAN`, manakala mod Important berlabel `PENTING`. Kedua-duanya menggunakan ticker kiri berterusan yang perlahan dan mudah dibaca, dengan ruang sebelum ulangan serta tanpa `<marquee>`. Hover, fokus papan kekunci dan interaksi sentuh boleh menjeda gerakan; `prefers-reduced-motion` memaparkan teks statik. Susun atur stabil dan kekal mudah dibaca pada mobile.
+
+Banner ialah komunikasi sahaja. Contohnya, teks “Pulang Bermalam dibenarkan keluar mulai jam 2.00 petang.” tidak mengubah `earliest_departure_time`. Admin mesti mengemas kini `Admin > Tetapan Outing > Pulang Bermalam > Masa Keluar Paling Awal` secara berasingan jika enforcement sebenar hendak berubah.
+
+Dalam workspace Pelajar, Announcement Banner menyampaikan notis operasi semasa, manakala `ruleNotice` kuning kekal authoritative untuk panduan peraturan kontekstual. Ayat panduan pendua di bawah “Permohonan Pelajar” telah dibuang; banner, `ruleNotice` dan borang outing kekal.
 
 ## Architecture Ringkas
 
@@ -169,7 +175,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline release v2.0.0 ialah **177/177 lulus**. Syntax checks:
+Baseline production semasa ialah **287/287 lulus**; focused Announcement Banner regression ialah **12/12 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -206,6 +212,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 37**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r3`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 37**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r4`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

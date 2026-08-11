@@ -2,7 +2,18 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (10 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r1`, GAS Version 36, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (11 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r4`, GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+
+## Close-out Announcement Banner V1 — 11 Ogos 2026
+
+- [x] `Notis Banner` Admin dan tiga action POST authenticated live pada GAS Version 37.
+- [x] Satu banner global disimpan dalam Script Properties tanpa sheet atau setup property manual.
+- [x] Normal `MAKLUMAN`, Important `PENTING`, timestamp dan current state disahkan.
+- [x] Ticker berterusan, hover/focus/touch pause dan paparan reduced-motion statik disahkan.
+- [x] Pelajar, Warden/HEP, Guard dan Admin authenticated boleh melihat banner; landing dan Public Pemantauan kekal tanpa banner.
+- [x] Ayat panduan Pelajar pendua dibuang; `ruleNotice`, Announcement Banner dan borang outing kekal.
+- [x] Focused tests lulus **12/12** dan full Node suite lulus **287/287**.
+- [x] Displayed version kekal v2.2.0 dan cache revision ditutup pada `2.2.0-r4`.
 
 ## Close-out Config-driven Production — 10 Ogos 2026
 

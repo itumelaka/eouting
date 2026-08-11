@@ -144,6 +144,14 @@ timestamp | action | request_id | user_role | user_name | details | entity_type 
 
 Untuk submission config-driven, audit `SUBMIT_REQUEST` hanya menambah `config_version` yang digunakan bersama `jenis_permohonan`; keseluruhan row config tidak disalin ke audit. Schema `OUTING_REQUESTS` dan rekod lama tidak diubah oleh Fasa 5B.
 
+Kemas kini Announcement Banner direkod sebagai `UPDATE_ANNOUNCEMENT_BANNER`. Audit menyimpan identiti Admin dan ringkasan tindakan yang diperlukan, bukan secret atau nama/nilai Script Property.
+
+## Announcement Banner V1 — Script Properties
+
+V1 menyokong satu banner global, maka ia menggunakan Script Properties dan bukannya Google Sheet. Tiada sheet `ANNOUNCEMENTS`, migration sheet atau setup property manual. Jika property banner belum wujud, backend menganggap banner tidak aktif; simpanan pertama melalui `Admin > Notis Banner` mencipta atau mengemas kini teks, status aktif/penting, masa dan identiti pengemas kini.
+
+Nama property dan nilai dalaman tidak menjadi sebahagian daripada projection viewer. Konfigurasi banner ialah data komunikasi sahaja dan tidak dirujuk oleh `OUTING_TYPES`, submission validation atau enforcement Guard.
+
 ## Kawalan Akses
 
 - Spreadsheet mesti private dan hanya dikongsi kepada akaun yang perlu.
