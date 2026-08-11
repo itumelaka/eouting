@@ -24,6 +24,23 @@ Admin POST create/update/toggle
 
 Tiada delete flow. `type_code` immutable. Production kini menggunakan public projection untuk rendering borang Pelajar dan validation config-driven pada `submitRequest`; resolver membaca `OUTING_TYPES` authoritative apabila property tepat `"true"`.
 
+## Notis Banner V1
+
+```text
+Admin POST getAnnouncementBannerAdmin / updateAnnouncementBanner
+  -> validate Admin aktif + PIN
+  -> trim / had 500 aksara / boolean ketat
+  -> Script Properties + LockService
+  -> AUDIT_LOG UPDATE_ANNOUNCEMENT_BANNER
+
+Authenticated POST getAnnouncementBanner
+  -> validate Student / Warden / Guard / Admin
+  -> active=false: { active: false }
+  -> active=true: safe projection text, important, updated_at
+```
+
+Landing dan Public Pemantauan tidak memanggil endpoint ini. Banner dimuat selepas sesi authenticated bermula dan dibersihkan ketika logout. Kandungannya tidak pernah masuk ke `submitRequest`, `approveRequest`, `confirmOut`, `confirmIn` atau resolver `OUTING_TYPES`; perubahan operasi sebenar masih dibuat melalui Tetapan Outing.
+
 ## Backend Submission Config — Fasa 5B
 
 ```text

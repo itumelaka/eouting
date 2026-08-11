@@ -1,6 +1,10 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.2.0**, cache/asset revision `2.2.0-r1`. Backend production ialah GAS **Version 36**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production aktif dan ready sejak 10 Ogos 2026.
+Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r2`. Backend production ialah GAS **Version 36**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production aktif dan ready sejak 10 Ogos 2026.
+
+## Notis Banner V1 — Pending GAS Deployment
+
+Source mengandungi tiga POST action banner dan frontend `Notis Banner`. Production GAS Version 36 tidak menyediakan action tersebut sehingga deployment GAS baharu dibuat. Tiada Script Property manual, setup function, sheet migration atau perubahan `OUTING_CONFIG_V2_ENABLED` diperlukan; property banner diwujudkan semasa simpanan Admin pertama. Selepas deployment, uji Admin save normal/penting/aktif/tidak aktif dan pastikan hanya workspace authenticated memaparkannya. Semak `AUDIT_LOG` untuk `UPDATE_ANNOUNCEMENT_BANNER` dan pastikan Tetapan Outing kekal tidak berubah.
 
 ## Config-driven Production Activation — 10 Ogos 2026
 

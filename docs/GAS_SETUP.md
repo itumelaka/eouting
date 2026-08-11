@@ -11,6 +11,7 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - menyediakan projection public minimum dan rekod operasi authenticated;
 - mengira statistik agregat;
 - menulis `AUDIT_LOG`;
+- menyimpan dan menyediakan satu Notis Banner authenticated melalui Script Properties;
 - menghantar notifikasi Telegram;
 - mengesahkan, menyimpan dan menghantar bukti selfie pulang.
 - mengesahkan upload/removal foto profil serta penghantaran thumbnail batch/full on-demand private kepada viewer yang dibenarkan.
@@ -92,6 +93,8 @@ OUTING_CONFIG_V2_ENABLED=true
 ```
 
 Emergency rollback ialah menukarnya kepada `false`; ini mengaktifkan semula laluan legacy tanpa push atau deployment. Reactivation kepada `true` hanya dibuat apabila chip Admin menunjukkan readiness hijau.
+
+Script Properties Notis Banner dicipta secara automatik apabila Admin menyimpan buat kali pertama: teks, status aktif/penting, masa dan identiti pengemas kini. Tiada setup property manual atau sheet baharu diperlukan. Jika semua property belum wujud, backend menganggap banner tidak aktif. Nilai ini hanya untuk paparan dan tidak menggantikan konfigurasi `OUTING_TYPES`.
 
 Jangan dokumentasi atau commit nilai sebenar token, chat ID atau folder ID. Notifikasi Telegram lifecycle biasa kekal non-blocking. Untuk `submitReturnSelfie`, `sendPhoto` ialah langkah transaksi yang diperlukan dan kegagalan dikendalikan dengan cleanup.
 

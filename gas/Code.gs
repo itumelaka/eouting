@@ -12,6 +12,15 @@ const SHEETS = {
 
 const OUTING_CONFIG_V2_PROPERTY = "OUTING_CONFIG_V2_ENABLED";
 
+const ANNOUNCEMENT_BANNER_PROPERTIES = {
+  text: "ANNOUNCEMENT_BANNER_TEXT",
+  active: "ANNOUNCEMENT_BANNER_ACTIVE",
+  important: "ANNOUNCEMENT_BANNER_IMPORTANT",
+  updatedAt: "ANNOUNCEMENT_BANNER_UPDATED_AT",
+  updatedBy: "ANNOUNCEMENT_BANNER_UPDATED_BY"
+};
+const ANNOUNCEMENT_BANNER_MAX_LENGTH = 500;
+
 const HEADERS = {
   STUDENTS: ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan", "photo_file_id", "photo_updated_at"],
   WARDENS: ["warden_id", "nama_warden", "email", "no_tel", "pin", "status", "catatan"],
@@ -205,6 +214,9 @@ function doPost(e) {
     if (action === "updateStaff") return jsonResponse(updateStaff(payload));
     if (action === "toggleStaffStatus") return jsonResponse(toggleStaffStatus(payload));
     if (action === "getAdminOutingTypes") return jsonResponse(getAdminOutingTypes(payload));
+    if (action === "getAnnouncementBannerAdmin") return jsonResponse(getAnnouncementBannerAdmin(payload));
+    if (action === "updateAnnouncementBanner") return jsonResponse(updateAnnouncementBanner(payload));
+    if (action === "getAnnouncementBanner") return jsonResponse(getAnnouncementBanner(payload));
     if (action === "getOutingConfigReadiness") return jsonResponse(getOutingConfigReadiness(payload));
     if (action === "createOutingType") return jsonResponse(createOutingType(payload));
     if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
@@ -2863,6 +2875,84 @@ function getTodayRecords() {
     lewat: String(row.lewat || ""),
     belum_masuk: String(row.status || "") === STATUS.out && !hasCellValue_(row.masa_masuk)
   }));
+}
+
+function getAnnouncementBannerAdmin(payload) {
+  validateAdminCredentials_(payload);
+  return readAnnouncementBannerConfig_();
+}
+
+function updateAnnouncementBanner(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const data = payload || {};
+  const text = String(data.text === undefined || data.text === null ? "" : data.text).trim();
+  const active = requireBoolean_(data.active, "active");
+  const important = requireBoolean_(data.important, "important");
+
+  if (active && !text) {
+    throw new Error("Teks pengumuman diperlukan apabila banner aktif.");
+  }
+  if (text.length > ANNOUNCEMENT_BANNER_MAX_LENGTH) {
+    throw new Error("Teks pengumuman tidak boleh melebihi " + ANNOUNCEMENT_BANNER_MAX_LENGTH + " aksara.");
+  }
+
+  return withScriptLock_(function () {
+    const updatedAt = now_();
+    const updatedBy = getSafeAdminIdentity_(admin);
+    const properties = PropertiesService.getScriptProperties();
+    properties.setProperties({
+      ANNOUNCEMENT_BANNER_TEXT: text,
+      ANNOUNCEMENT_BANNER_ACTIVE: String(active),
+      ANNOUNCEMENT_BANNER_IMPORTANT: String(important),
+      ANNOUNCEMENT_BANNER_UPDATED_AT: updatedAt,
+      ANNOUNCEMENT_BANNER_UPDATED_BY: updatedBy
+    }, false);
+
+    appendAuditLog(
+      "UPDATE_ANNOUNCEMENT_BANNER", "", "Admin", updatedBy,
+      JSON.stringify({ active: active, important: important, text_summary: text.slice(0, 120) }),
+      "SYSTEM_CONFIG", "ANNOUNCEMENT_BANNER"
+    );
+    return readAnnouncementBannerConfig_();
+  }, "Notis banner sedang dikemas kini. Sila cuba sebentar lagi.");
+}
+
+function getAnnouncementBanner(payload) {
+  validateAnnouncementBannerViewer_(payload);
+  const config = readAnnouncementBannerConfig_();
+  if (!config.active || !config.text) {
+    return { active: false };
+  }
+  return {
+    active: true,
+    important: config.important,
+    text: config.text,
+    updated_at: config.updated_at
+  };
+}
+
+function readAnnouncementBannerConfig_() {
+  const properties = PropertiesService.getScriptProperties();
+  return {
+    text: String(properties.getProperty(ANNOUNCEMENT_BANNER_PROPERTIES.text) || "").trim(),
+    active: normalizeStoredBoolean_(properties.getProperty(ANNOUNCEMENT_BANNER_PROPERTIES.active)),
+    important: normalizeStoredBoolean_(properties.getProperty(ANNOUNCEMENT_BANNER_PROPERTIES.important)),
+    updated_at: String(properties.getProperty(ANNOUNCEMENT_BANNER_PROPERTIES.updatedAt) || "").trim(),
+    updated_by: String(properties.getProperty(ANNOUNCEMENT_BANNER_PROPERTIES.updatedBy) || "").trim()
+  };
+}
+
+function validateAnnouncementBannerViewer_(payload) {
+  const data = payload || {};
+  const role = normalizeText_(data.role);
+  if (role === "student" && findActiveStudent_(data.student_id || data.id, data.no_matrik || data.matric)) return true;
+  if (role === "warden" && findActiveWarden_(data.nama_warden || data.warden_name || data.name, data.pin)) return true;
+  if (role === "guard" && findActiveGuard_(data.nama_guard || data.guard_name || data.name, data.pin)) return true;
+  if (role === "admin") {
+    validateAdminCredentials_(data);
+    return true;
+  }
+  throw new Error("Akses sesi diperlukan.");
 }
 
 function getOperationalTodayRecords(payload) {

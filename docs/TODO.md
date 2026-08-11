@@ -13,8 +13,10 @@ Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 36** p
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
 - [x] GAS Version 36 ialah baseline production semasa; config-driven active dan readiness hijau.
-- [x] Cache/asset revision `2.2.0-r1` dengan displayed app version kekal v2.2.0.
+- [x] Cache/asset source revision `2.2.0-r2` dengan displayed app version kekal v2.2.0.
 - [x] Controlled activation: submission, Warden approval, early Guard rejection dan safe policy feedback disahkan.
+- [x] Source Notis Banner V1: satu notis Script Properties, Admin edit/aktif/penting, viewer authenticated, safe text, audit dan reduced-motion.
+- [ ] Deploy source Notis Banner ke GAS version baharu dan jalankan smoke test controlled; jangan ubah config outing atau feature flag.
 
 ### eOuting v2.0 — Fasa 2 Schema dan Migration
 

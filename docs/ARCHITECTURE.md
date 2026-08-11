@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r1`. Production menggunakan GAS Version 36, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
+Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r2`. Production menggunakan GAS Version 36, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
 
 ## Komponen
 
@@ -23,7 +23,7 @@ Fail utama:
 - `service-worker.js`
 - `version.json`
 
-Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP dan Guard, Public Monitoring read-only yang dibuka inline, enam modul Admin inline, update PWA serta input kamera/file untuk foto profil dan bukti pulang. Statistik tidak mempunyai laluan awam dan kekal di dalam shell Admin. Foto profil dipotong 3:4 dan dikecilkan kepada maksimum kira-kira 600×800; selfie kekal pada resize sisi terpanjang kira-kira 1280px. Frontend role hiding bukan boundary keselamatan.
+Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP dan Guard, Public Monitoring read-only yang dibuka inline, tujuh modul Admin inline termasuk `Notis Banner`, update PWA serta input kamera/file untuk foto profil dan bukti pulang. Statistik tidak mempunyai laluan awam dan kekal di dalam shell Admin. Foto profil dipotong 3:4 dan dikecilkan kepada maksimum kira-kira 600×800; selfie kekal pada resize sisi terpanjang kira-kira 1280px. Frontend role hiding bukan boundary keselamatan.
 
 ### GAS Router
 
@@ -42,6 +42,12 @@ Google Sheets ialah database dan source of truth. Tab utama:
 - `AUDIT_LOG`
 - `OUTING_TYPES` — source authoritative konfigurasi outing production
 - `ADMIN_USERS` — identiti Admin private
+
+### Notis Banner
+
+Notis tunggal disimpan dalam Script Properties sebagai teks, status aktif, status penting, masa kemas kini dan identiti Admin. `getAnnouncementBannerAdmin` serta `updateAnnouncementBanner` memerlukan credential Admin; `getAnnouncementBanner` mengesahkan sesi Student, Warden, Guard atau Admin dan hanya memulangkan projection aktif yang selamat. Tiada action banner pada router GET awam dan tiada sheet baharu.
+
+Frontend meletakkan banner di dalam `appWorkspace`, bukan pada landing/Public Pemantauan. Teks dirender dengan `textContent`. Animasi CSS hanya digunakan apabila teks overflow, pause pada hover/focus dan dimatikan untuk reduced motion. Konfigurasi ini tidak dibaca oleh resolver outing dan tidak boleh mengubah business rule.
 
 v1.7.0 menambah lima header selfie secara idempotent melalui `setupSelfieProofV170()` dan mengekalkan `selfie_whatsapp` sebagai kolum legacy.
 
@@ -197,7 +203,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset production semasa ialah `eouting-cache-v2.2.0-r1` dan query `2.2.0-r1`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.0-r2` dan query `2.2.0-r2`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
@@ -222,7 +228,7 @@ Frontend tidak menentukan authorization atau validation akhir. Config yang dihan
 
 ## Operasi Admin
 
-Shell Admin dan identiti sesi kekal visible apabila enam modul inline bertukar: `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar` dan `Tetapan Outing`. Statistik menggunakan active-tab yang sama seperti modul lain dan tidak lagi mempunyai workspace atau butang kembali berasingan.
+Shell Admin dan identiti sesi kekal visible apabila tujuh modul inline bertukar: `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar`, `Tetapan Outing` dan `Notis Banner`. Statistik menggunakan active-tab yang sama seperti modul lain dan tidak lagi mempunyai workspace atau butang kembali berasingan.
 
 Pemantauan Admin menggunakan satu POST `getAdminMonitoring` untuk KPI dan rekod operasi aktif. Rekod Master menggunakan satu POST `searchAdminMasterRecords` dengan carian, filter dan pagination maksimum 50 rekod. Statistik individu menggunakan `getAdminIndividualStats` selepas credential Admin disahkan. Pengurusan staff menggunakan `getAdminStaff` serta write `createStaff`, `updateStaff` dan `toggleStaffStatus`; semua endpoint memanggil `validateAdminCredentials_()`.
 

@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r1` dan production GAS Version 36.
+Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r2` dan production GAS Version 36.
 
 ## Keperluan
 
@@ -32,7 +32,7 @@ Buka `http://localhost:8080/?mock=1`, pilih `Admin` dan gunakan credential local
 
 Credential ini hanya dibina apabila query tepat `mock=1` hadir. Tanpa query tersebut, semua action Admin menggunakan GAS live dan credential mock tidak diterima. Mock login response tidak mengandungi PIN; PIN hanya berada dalam runtime tab semasa dan dibersihkan semasa logout.
 
-Lima jenis outing disediakan dalam memory, termasuk `CUTI_SEMESTER` yang tidak aktif untuk QA toggle. Create, edit dan toggle hanya mengubah array memory dan tidak memanggil GAS atau Google Sheets. Refresh page mengembalikan seed asal.
+Lima jenis outing dan satu Notis Banner contoh disediakan dalam memory, termasuk `CUTI_SEMESTER` yang tidak aktif untuk QA toggle. Create, edit dan toggle hanya mengubah data memory dan tidak memanggil GAS atau Google Sheets. Refresh page mengembalikan seed asal.
 
 URL senario tambahan:
 
@@ -194,7 +194,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## Smoke Test Admin
 
-1. Login Admin dan pastikan identiti, tajuk serta enam tab inline kekal visible ketika bertukar panel.
+1. Login Admin dan pastikan identiti, tajuk serta tujuh tab inline kekal visible ketika bertukar panel.
 2. Pastikan `Statistik` aktif inline dan filter/KPI/statistik individu dimuat tanpa butang `Kembali ke Admin`.
 3. Dalam `Tetapan Pelajar`, sahkan list menggunakan thumbnail cache, klik foto dan pastikan satu full image dimuat on-demand lalu dicache; `Buang Foto` kekal tindakan berasingan dengan confirmation serta invalidasi kedua-dua cache.
 4. Semak Rekod Master search/filter/pagination, Pemantauan dan pengurusan Warden/HEP/Guard masih boleh ditukar tanpa login semula.
@@ -202,7 +202,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 ## PWA dan Cache
 
 - Semak footer v2.2.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r1`; displayed app version kekal v2.2.0.
+- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r2`; displayed app version kekal v2.2.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-11 — Admin-managed announcement banner (v2.2.0)
+
+- Menambah satu `Notis Banner` yang boleh diedit, diaktif/nyahaktif dan ditanda `PENTING` oleh Admin.
+- Menyimpan konfigurasi dalam Script Properties tanpa sheet/migration atau setup property manual.
+- Menambah POST authenticated `getAnnouncementBanner`, `getAnnouncementBannerAdmin` dan `updateAnnouncementBanner`, dengan audit `UPDATE_ANNOUNCEMENT_BANNER`.
+- Mengehadkan paparan kepada Student, Warden/HEP, Guard dan Admin yang telah log masuk; landing dan Public Pemantauan kekal tanpa banner.
+- Merender teks sebagai plain text, menganimasi hanya overflow, pause pada hover/focus dan mematikan animasi untuk reduced motion.
+- Mengekalkan banner sebagai makluman sahaja; `OUTING_CONFIG_V2_ENABLED`, `OUTING_TYPES` dan semua flow outing tidak berubah.
+- Displayed version kekal v2.2.0; cache/asset source meningkat kepada `2.2.0-r2`. Backend memerlukan deployment GAS baharu sebelum ciri boleh digunakan secara live.
+
 ## 2026-08-10 — Config-driven production activation (v2.2.0)
 
 - **Departure configuration:** mengaktifkan `departure_allowed_days` dan `earliest_departure_time` sambil memisahkan application rules daripada physical departure rules.

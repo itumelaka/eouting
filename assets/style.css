@@ -3352,6 +3352,31 @@ button:disabled,
   .action-button:hover {
     transform: none;
   }
+
+  .announcement-banner-viewport {
+    overflow: visible !important;
+  }
+
+  .announcement-banner-track {
+    animation: none !important;
+    transform: none !important;
+    white-space: normal !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .announcement-banner-main {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+
+  .announcement-banner-viewport {
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    touch-action: pan-x;
+  }
 }
 
 /* Landing role correction: five operational roles plus compact Admin management entry */
@@ -3447,6 +3472,83 @@ button:disabled,
   display: flex;
   gap: 12px;
   min-width: 0;
+}
+
+.announcement-banner {
+  background: linear-gradient(145deg, #eef8ff, #dceefb);
+  border: 1px solid rgba(22, 90, 159, 0.24);
+  border-left: 7px solid var(--info);
+  border-radius: 16px;
+  box-shadow: var(--clay-shadow-soft, 0 8px 20px rgba(3, 18, 47, 0.08));
+  color: #123f6c;
+  display: grid;
+  gap: 5px;
+  margin: 0 0 14px;
+  min-height: 72px;
+  padding: 12px 14px;
+}
+
+.announcement-banner[hidden] {
+  display: none;
+}
+
+.announcement-banner.is-important {
+  background: linear-gradient(145deg, #fff7d6, #ffe7aa);
+  border-color: rgba(176, 91, 0, 0.34);
+  border-left-color: #b14a18;
+  color: #69330d;
+}
+
+.announcement-banner-main {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.announcement-banner-label {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.announcement-banner-viewport {
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.announcement-banner-track {
+  display: inline-block;
+  max-width: none;
+  white-space: nowrap;
+}
+
+.announcement-banner-viewport.is-overflowing .announcement-banner-track {
+  animation: announcementBannerScroll var(--announcement-scroll-duration, 18s) linear infinite alternate;
+}
+
+.announcement-banner:hover .announcement-banner-track,
+.announcement-banner:focus .announcement-banner-track,
+.announcement-banner:focus-within .announcement-banner-track {
+  animation-play-state: paused;
+}
+
+.announcement-banner:focus-visible {
+  outline: 3px solid rgba(22, 90, 159, 0.38);
+  outline-offset: 2px;
+}
+
+.announcement-banner-updated {
+  color: currentColor;
+  font-size: 0.72rem;
+  opacity: 0.72;
+}
+
+@keyframes announcementBannerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-1 * var(--announcement-scroll-distance, 0px))); }
 }
 
 .rolling-number {
@@ -3899,6 +4001,60 @@ button.profile-photo-frame {
 .admin-section-toolbar p,
 .admin-student-editor-heading p {
   color: var(--muted-text);
+  margin: 0;
+}
+
+.admin-announcement-form {
+  background: linear-gradient(145deg, #ffffff, #eaf6f2);
+  border: 1px solid rgba(23, 134, 109, 0.2);
+  border-radius: 20px;
+  box-shadow: var(--clay-shadow-soft);
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  padding: clamp(16px, 3vw, 24px);
+}
+
+.admin-announcement-form textarea {
+  resize: vertical;
+}
+
+.admin-announcement-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-announcement-options label {
+  align-items: center;
+  background: linear-gradient(145deg, #ffffff, #e1efea);
+  border: 1px solid rgba(23, 134, 109, 0.18);
+  border-radius: 13px;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+}
+
+.admin-announcement-options input {
+  accent-color: var(--clay-green, #17866d);
+  height: 20px;
+  min-height: 20px;
+  width: 20px;
+}
+
+.admin-announcement-boundary {
+  background: #fff7d6;
+  border-left: 4px solid #d88a08;
+  border-radius: 10px;
+  color: #614b00;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.admin-announcement-state {
+  color: var(--muted-text, var(--muted));
+  font-size: 0.86rem;
   margin: 0;
 }
 

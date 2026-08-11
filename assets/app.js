@@ -130,7 +130,10 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "updateStudent",
   "toggleStudentStatus",
   "getStudentProfilePhotos",
-  "removeStudentProfilePhoto"
+  "removeStudentProfilePhoto",
+  "getAnnouncementBannerAdmin",
+  "updateAnnouncementBanner",
+  "getAnnouncementBanner"
 ]);
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
 
@@ -266,6 +269,13 @@ let mockAdminConflictPendingV200 = ALLOW_MOCK_MODE
   && new URLSearchParams(window.location.search).get("mockAdminConflict") === "1";
 let mockPublicOutingTypesErrorPendingV200 = ALLOW_MOCK_MODE
   && new URLSearchParams(window.location.search).get("mockOutingTypes") === "error-once";
+let mockAnnouncementBannerV1 = {
+  text: "Makluman contoh untuk pengguna yang telah log masuk.",
+  active: true,
+  important: false,
+  updated_at: new Date().toISOString(),
+  updated_by: "ADMIN-MOCK"
+};
 const guardActionLocks = {};
 const wardenActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
@@ -309,6 +319,11 @@ const els = {
   sessionRole: document.querySelector("#sessionRole"),
   sessionName: document.querySelector("#sessionName"),
   ruleNotice: document.querySelector("#ruleNotice"),
+  announcementBanner: document.querySelector("#announcementBanner"),
+  announcementBannerLabel: document.querySelector("#announcementBannerLabel"),
+  announcementBannerViewport: document.querySelector("#announcementBannerViewport"),
+  announcementBannerText: document.querySelector("#announcementBannerText"),
+  announcementBannerUpdated: document.querySelector("#announcementBannerUpdated"),
   loggedStudentName: document.querySelector("#loggedStudentName"),
   loggedStudentMeta: document.querySelector("#loggedStudentMeta"),
   studentIdentityProfilePhoto: document.querySelector("#studentIdentityProfilePhoto"),
@@ -383,11 +398,13 @@ const els = {
   adminMonitoringTab: document.querySelector("#adminMonitoringTab"),
   adminMasterTab: document.querySelector("#adminMasterTab"),
   adminStaffTab: document.querySelector("#adminStaffTab"),
+  adminAnnouncementTab: document.querySelector("#adminAnnouncementTab"),
   adminOutingSettingsPanel: document.querySelector("#adminOutingSettingsPanel"),
   adminStudentManagementPanel: document.querySelector("#adminStudentManagementPanel"),
   adminMonitoringPanel: document.querySelector("#adminMonitoringPanel"),
   adminMasterPanel: document.querySelector("#adminMasterPanel"),
   adminStaffPanel: document.querySelector("#adminStaffPanel"),
+  adminAnnouncementPanel: document.querySelector("#adminAnnouncementPanel"),
   adminDashboardMessage: document.querySelector("#adminDashboardMessage"),
   adminTypeList: document.querySelector("#adminTypeList"),
   adminRefreshButton: document.querySelector("#adminRefreshButton"),
@@ -445,6 +462,13 @@ const els = {
   adminStudentNoteInput: document.querySelector("#adminStudentNoteInput"),
   adminStudentEditorMessage: document.querySelector("#adminStudentEditorMessage"),
   adminSaveStudentButton: document.querySelector("#adminSaveStudentButton"),
+  adminAnnouncementForm: document.querySelector("#adminAnnouncementForm"),
+  adminAnnouncementText: document.querySelector("#adminAnnouncementText"),
+  adminAnnouncementImportant: document.querySelector("#adminAnnouncementImportant"),
+  adminAnnouncementActive: document.querySelector("#adminAnnouncementActive"),
+  adminAnnouncementState: document.querySelector("#adminAnnouncementState"),
+  adminAnnouncementMessage: document.querySelector("#adminAnnouncementMessage"),
+  adminAnnouncementSaveButton: document.querySelector("#adminAnnouncementSaveButton"),
   adminMonitoringRefreshButton: document.querySelector("#adminMonitoringRefreshButton"),
   adminMonitoringMessage: document.querySelector("#adminMonitoringMessage"),
   adminMonitoringUpdated: document.querySelector("#adminMonitoringUpdated"),
@@ -686,6 +710,8 @@ function setupAdminDashboardV200() {
   if (els.adminMonitoringTab) els.adminMonitoringTab.addEventListener("click", () => setAdminSectionV200("monitoring"));
   if (els.adminMasterTab) els.adminMasterTab.addEventListener("click", () => setAdminSectionV200("master"));
   if (els.adminStaffTab) els.adminStaffTab.addEventListener("click", () => setAdminSectionV200("staff"));
+  if (els.adminAnnouncementTab) els.adminAnnouncementTab.addEventListener("click", () => setAdminSectionV200("announcement"));
+  if (els.adminAnnouncementForm) els.adminAnnouncementForm.addEventListener("submit", saveAdminAnnouncementV1);
   if (els.adminMonitoringRefreshButton) els.adminMonitoringRefreshButton.addEventListener("click", loadAdminMonitoringV210);
   if (els.adminMonitoringKpis) els.adminMonitoringKpis.addEventListener("click", (event) => {
     const button = event.target.closest("[data-monitor-filter]");
@@ -813,6 +839,7 @@ function startAdminSessionV200(admin) {
   closeAdminStudentEditorV200();
   setAdminSectionV200("monitoring");
   loadAdminOutingTypesV200();
+  loadAnnouncementBannerV1();
 }
 
 function clearAdminRuntimeCredentialV200() {
@@ -826,6 +853,7 @@ function clearAdminRuntimeCredentialV200() {
   adminMasterV210 = { page: 1, total_pages: 1, total: 0, records: [] };
   adminStaffV210 = [];
   adminEditingStaffV210 = null;
+  clearAnnouncementBannerV1();
   clearProfilePhotoSessionCaches();
   if (els.adminPinInput) els.adminPinInput.value = "";
   if (els.adminIdentityInput) els.adminIdentityInput.value = "";
@@ -867,8 +895,138 @@ function buildAdminCredentialPayloadV200() {
   };
 }
 
+function buildAnnouncementViewerPayloadV1() {
+  if (!currentSession) throw new Error("Akses sesi diperlukan.");
+  if (currentSession.role === "admin") {
+    return Object.assign({ role: "admin" }, buildAdminCredentialPayloadV200());
+  }
+  return buildTodayRecordsAccessPayload();
+}
+
+async function loadAnnouncementBannerV1() {
+  if (!currentSession) {
+    clearAnnouncementBannerV1();
+    return;
+  }
+  const sessionAtRequest = currentSession;
+  try {
+    const banner = await apiPost("getAnnouncementBanner", buildAnnouncementViewerPayloadV1());
+    if (currentSession !== sessionAtRequest) return;
+    renderAnnouncementBannerV1(banner);
+  } catch (error) {
+    if (currentSession === sessionAtRequest) clearAnnouncementBannerV1();
+  }
+}
+
+function renderAnnouncementBannerV1(banner) {
+  if (!els.announcementBanner) return;
+  const text = String(banner && banner.text || "").trim();
+  const active = Boolean(banner && banner.active && text);
+  if (!active) {
+    clearAnnouncementBannerV1();
+    return;
+  }
+  const important = banner.important === true;
+  els.announcementBanner.hidden = false;
+  els.announcementBanner.classList.toggle("is-important", important);
+  els.announcementBannerLabel.textContent = important ? "⚠️ PENTING" : "📢 MAKLUMAN";
+  els.announcementBannerText.textContent = text;
+  const displayTime = banner.updated_at ? formatDisplayTime(banner.updated_at) : "";
+  els.announcementBannerUpdated.textContent = displayTime && displayTime !== "-"
+    ? `Dikemaskini ${displayTime}`
+    : "";
+  updateAnnouncementOverflowV1();
+}
+
+function clearAnnouncementBannerV1() {
+  if (!els.announcementBanner) return;
+  els.announcementBanner.hidden = true;
+  els.announcementBanner.classList.remove("is-important");
+  if (els.announcementBannerViewport) els.announcementBannerViewport.classList.remove("is-overflowing");
+  if (els.announcementBannerText) {
+    els.announcementBannerText.textContent = "";
+    els.announcementBannerText.style.removeProperty("--announcement-scroll-distance");
+    els.announcementBannerText.style.removeProperty("--announcement-scroll-duration");
+  }
+  if (els.announcementBannerUpdated) els.announcementBannerUpdated.textContent = "";
+}
+
+function updateAnnouncementOverflowV1() {
+  if (!els.announcementBannerViewport || !els.announcementBannerText || els.announcementBanner.hidden) return;
+  const measure = () => {
+    const distance = Math.ceil(els.announcementBannerText.scrollWidth - els.announcementBannerViewport.clientWidth);
+    const shouldScroll = distance > 8 && !prefersReducedMotionV200();
+    els.announcementBannerViewport.classList.toggle("is-overflowing", shouldScroll);
+    if (shouldScroll) {
+      els.announcementBannerText.style.setProperty("--announcement-scroll-distance", `${distance}px`);
+      els.announcementBannerText.style.setProperty("--announcement-scroll-duration", `${Math.max(14, distance / 24)}s`);
+    }
+  };
+  if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(measure);
+  else measure();
+}
+
+async function loadAdminAnnouncementV1() {
+  if (!currentSession || currentSession.role !== "admin" || !els.adminAnnouncementForm) return;
+  els.adminAnnouncementMessage.textContent = "Memuatkan notis banner...";
+  els.adminAnnouncementMessage.classList.remove("error");
+  try {
+    const config = await apiPost("getAnnouncementBannerAdmin", buildAdminCredentialPayloadV200());
+    renderAdminAnnouncementV1(config);
+    els.adminAnnouncementMessage.textContent = "";
+  } catch (error) {
+    els.adminAnnouncementMessage.textContent = "Notis banner gagal dimuatkan. Sila cuba lagi.";
+    els.adminAnnouncementMessage.classList.add("error");
+  }
+}
+
+function renderAdminAnnouncementV1(config) {
+  if (!els.adminAnnouncementForm) return;
+  els.adminAnnouncementText.value = String(config && config.text || "");
+  els.adminAnnouncementActive.checked = Boolean(config && config.active);
+  els.adminAnnouncementImportant.checked = Boolean(config && config.important);
+  const status = config && config.active ? "Aktif" : "Tidak aktif";
+  const priority = config && config.important ? "Penting" : "Normal";
+  const updated = config && config.updated_at ? formatDisplayDateTime(config.updated_at) : "Belum pernah dikemas kini";
+  const updatedBy = config && config.updated_by ? ` oleh ${config.updated_by}` : "";
+  els.adminAnnouncementState.textContent = `${status} · ${priority} · ${updated}${updatedBy}`;
+}
+
+async function saveAdminAnnouncementV1(event) {
+  event.preventDefault();
+  if (!currentSession || currentSession.role !== "admin" || els.adminAnnouncementSaveButton.disabled) return;
+  const text = els.adminAnnouncementText.value.trim();
+  const active = els.adminAnnouncementActive.checked;
+  if (active && !text) {
+    els.adminAnnouncementMessage.textContent = "Teks pengumuman diperlukan apabila banner aktif.";
+    els.adminAnnouncementMessage.classList.add("error");
+    return;
+  }
+  els.adminAnnouncementSaveButton.disabled = true;
+  els.adminAnnouncementSaveButton.textContent = "Menyimpan...";
+  els.adminAnnouncementMessage.textContent = "";
+  els.adminAnnouncementMessage.classList.remove("error");
+  try {
+    const config = await apiPost("updateAnnouncementBanner", Object.assign(
+      buildAdminCredentialPayloadV200(),
+      { text, active, important: els.adminAnnouncementImportant.checked }
+    ));
+    renderAdminAnnouncementV1(config);
+    renderAnnouncementBannerV1(config);
+    els.adminAnnouncementMessage.textContent = "Notis banner berjaya disimpan.";
+  } catch (error) {
+    els.adminAnnouncementMessage.textContent = cleanApiError(error.message || "Notis banner gagal disimpan.");
+    els.adminAnnouncementMessage.classList.add("error");
+  } finally {
+    els.adminAnnouncementSaveButton.disabled = false;
+    els.adminAnnouncementSaveButton.textContent = "Simpan";
+  }
+}
+
+window.addEventListener("resize", updateAnnouncementOverflowV1);
+
 function setAdminSectionV200(section) {
-  const allowed = ["monitoring", "statistics", "master", "students", "staff", "outing"];
+  const allowed = ["monitoring", "statistics", "master", "students", "staff", "outing", "announcement"];
   const nextSection = allowed.indexOf(section) === -1 ? "monitoring" : section;
   activeAdminSectionV200 = nextSection;
   const map = [
@@ -877,7 +1035,8 @@ function setAdminSectionV200(section) {
     ["master", els.adminMasterTab, els.adminMasterPanel],
     ["students", els.adminStudentsTab, els.adminStudentManagementPanel],
     ["staff", els.adminStaffTab, els.adminStaffPanel],
-    ["outing", els.adminOutingTab, els.adminOutingSettingsPanel]
+    ["outing", els.adminOutingTab, els.adminOutingSettingsPanel],
+    ["announcement", els.adminAnnouncementTab, els.adminAnnouncementPanel]
   ];
   map.forEach(([name, tab, panel]) => {
     if (tab) { tab.classList.toggle("active", name === nextSection); tab.setAttribute("aria-selected", String(name === nextSection)); }
@@ -888,6 +1047,7 @@ function setAdminSectionV200(section) {
   if (nextSection === "students" && !adminStudentsV200.length) loadAdminStudentsV200();
   if (nextSection === "staff" && !adminStaffV210.length) loadAdminStaffV210();
   if (nextSection === "outing" && !adminOutingTypes.length) loadAdminOutingTypesV200();
+  if (nextSection === "announcement") loadAdminAnnouncementV1();
 }
 
 async function loadAdminMonitoringV210() {
@@ -2096,7 +2256,8 @@ function setupScopedEnterSubmissionV211() {
     els.adminLoginPanel,
     els.adminStudentForm,
     els.adminStaffForm,
-    els.adminOutingTypeForm
+    els.adminOutingTypeForm,
+    els.adminAnnouncementForm
   ].forEach((form) => {
     if (!form || form.dataset.enterSubmitReady === "1") return;
     form.dataset.enterSubmitReady = "1";
@@ -2241,6 +2402,7 @@ els.logoutButton.addEventListener("click", () => {
   stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
+  clearAnnouncementBannerV1();
   clearProfilePhotoSessionCaches();
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
@@ -2437,6 +2599,20 @@ async function mockAdminApiPostV200(action, payload) {
   }
   await delay(250);
   const request = payload || {};
+  if (action === "getAnnouncementBanner" && String(request.role || "").toLowerCase() !== "admin") {
+    const viewerRole = String(request.role || "").trim().toLowerCase();
+    if (["student", "warden", "guard"].indexOf(viewerRole) === -1) {
+      throw new Error("Akses sesi diperlukan.");
+    }
+    return mockAnnouncementBannerV1.active && mockAnnouncementBannerV1.text
+      ? cloneMockAdminValueV200({
+        active: true,
+        important: mockAnnouncementBannerV1.important,
+        text: mockAnnouncementBannerV1.text,
+        updated_at: mockAnnouncementBannerV1.updated_at
+      })
+      : { active: false };
+  }
   const identity = String(request.admin_id || request.nama_admin || "").trim().toUpperCase();
   const validIdentity = identity === MOCK_ADMIN_QA.admin_id
     || identity === MOCK_ADMIN_QA.nama_admin.toUpperCase();
@@ -2453,6 +2629,35 @@ async function mockAdminApiPostV200(action, payload) {
   }
   if (action === "getAdminIndividualStats") {
     return buildMockAdminIndividualStatsV200(request);
+  }
+  if (action === "getAnnouncementBanner") {
+    return mockAnnouncementBannerV1.active && mockAnnouncementBannerV1.text
+      ? cloneMockAdminValueV200({
+        active: true,
+        important: mockAnnouncementBannerV1.important,
+        text: mockAnnouncementBannerV1.text,
+        updated_at: mockAnnouncementBannerV1.updated_at
+      })
+      : { active: false };
+  }
+  if (action === "getAnnouncementBannerAdmin") {
+    return cloneMockAdminValueV200(mockAnnouncementBannerV1);
+  }
+  if (action === "updateAnnouncementBanner") {
+    const text = String(request.text || "").trim();
+    if (typeof request.active !== "boolean" || typeof request.important !== "boolean") {
+      throw new Error("Status banner tidak sah.");
+    }
+    if (request.active && !text) throw new Error("Teks pengumuman diperlukan apabila banner aktif.");
+    if (text.length > 500) throw new Error("Teks pengumuman tidak boleh melebihi 500 aksara.");
+    mockAnnouncementBannerV1 = {
+      text,
+      active: request.active,
+      important: request.important,
+      updated_at: new Date().toISOString(),
+      updated_by: MOCK_ADMIN_QA.admin_id
+    };
+    return cloneMockAdminValueV200(mockAnnouncementBannerV1);
   }
   if (action === "getOutingConfigReadiness") {
     return {
@@ -2948,6 +3153,7 @@ function setLiveUnavailableMode(message) {
   wardens = [];
   guards = [];
   outingRecords = [];
+  clearAnnouncementBannerV1();
   populateStudents();
   populateStaff();
   updateDataModeIndicator();
@@ -4540,6 +4746,7 @@ function startSession(role, user) {
   els.sessionName.textContent = user.name;
   applyRoleView();
   render();
+  if (typeof loadAnnouncementBannerV1 === "function") loadAnnouncementBannerV1();
   if (role === "student") {
     studentAnnualSummary = null;
     refreshStudentLiveRecords(true);

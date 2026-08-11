@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r1">
+    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r2">
   </head>
   <body>
     <header class="app-header">
@@ -134,6 +134,16 @@
           </div>
           <button class="secondary-action" id="logoutButton" type="button">Log Keluar</button>
         </div>
+
+        <section class="announcement-banner" id="announcementBanner" tabindex="0" aria-live="polite" hidden>
+          <div class="announcement-banner-main">
+            <strong class="announcement-banner-label" id="announcementBannerLabel">📢 MAKLUMAN</strong>
+            <div class="announcement-banner-viewport" id="announcementBannerViewport">
+              <span class="announcement-banner-track" id="announcementBannerText"></span>
+            </div>
+          </div>
+          <small class="announcement-banner-updated" id="announcementBannerUpdated"></small>
+        </section>
 
         <nav class="tabs" aria-label="Bahagian sistem">
         <button class="tab-button active" type="button" data-tab="pelajar">Pelajar</button>
@@ -339,6 +349,10 @@
             <button class="admin-subtab" id="adminOutingTab" type="button" role="tab"
               aria-selected="false" aria-controls="adminOutingSettingsPanel" data-admin-section="outing">
               Tetapan Outing
+            </button>
+            <button class="admin-subtab" id="adminAnnouncementTab" type="button" role="tab"
+              aria-selected="false" aria-controls="adminAnnouncementPanel" data-admin-section="announcement">
+              Notis Banner
             </button>
           </nav>
 
@@ -655,6 +669,30 @@
               </div><p class="form-message" id="adminStaffEditorMessage"></p><button class="primary-action" id="adminStaffSaveButton" type="submit">Simpan Staff</button></form>
             </section>
           </section>
+
+          <section class="admin-subpanel" id="adminAnnouncementPanel" role="tabpanel"
+            aria-labelledby="adminAnnouncementTab" hidden>
+            <div class="admin-section-toolbar">
+              <div>
+                <h3>Notis Banner</h3>
+                <p>Urus satu notis operasi untuk pengguna yang telah log masuk.</p>
+              </div>
+            </div>
+            <form class="admin-announcement-form" id="adminAnnouncementForm">
+              <label for="adminAnnouncementText">Teks Pengumuman</label>
+              <textarea id="adminAnnouncementText" rows="4" maxlength="500"
+                placeholder="Masukkan makluman ringkas untuk pengguna sistem"></textarea>
+              <small class="admin-field-helper">Notis ini dipaparkan kepada Pelajar, Warden/HEP, Guard dan Admin yang telah log masuk.</small>
+              <div class="admin-announcement-options">
+                <label><input id="adminAnnouncementImportant" type="checkbox"> Penting</label>
+                <label><input id="adminAnnouncementActive" type="checkbox"> Aktif</label>
+              </div>
+              <p class="admin-announcement-boundary">Banner ini hanya untuk makluman. Peraturan outing tetap dikawal melalui Tetapan Outing.</p>
+              <p class="admin-announcement-state" id="adminAnnouncementState">Belum dimuatkan.</p>
+              <p class="form-message" id="adminAnnouncementMessage" aria-live="polite"></p>
+              <button class="primary-action" id="adminAnnouncementSaveButton" type="submit">Simpan</button>
+            </form>
+          </section>
         </section>
       </section>
 
@@ -679,6 +717,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.2.0-r1"></script>
+    <script src="assets/app.js?v=2.2.0-r2"></script>
   </body>
 </html>
