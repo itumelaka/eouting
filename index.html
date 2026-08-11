@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r2">
+    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r3">
   </head>
   <body>
     <header class="app-header">
@@ -139,7 +139,10 @@
           <div class="announcement-banner-main">
             <strong class="announcement-banner-label" id="announcementBannerLabel">📢 MAKLUMAN</strong>
             <div class="announcement-banner-viewport" id="announcementBannerViewport">
-              <span class="announcement-banner-track" id="announcementBannerText"></span>
+              <div class="announcement-banner-track" id="announcementBannerTrack">
+                <span class="announcement-banner-copy" id="announcementBannerText"></span>
+                <span class="announcement-banner-copy announcement-banner-repeat" id="announcementBannerRepeat" aria-hidden="true"></span>
+              </div>
             </div>
           </div>
           <small class="announcement-banner-updated" id="announcementBannerUpdated"></small>
@@ -717,6 +720,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.2.0-r2"></script>
+    <script src="assets/app.js?v=2.2.0-r3"></script>
   </body>
 </html>

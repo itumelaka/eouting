@@ -3354,13 +3354,22 @@ button:disabled,
   }
 
   .announcement-banner-viewport {
-    overflow: visible !important;
+    overflow: hidden !important;
   }
 
   .announcement-banner-track {
     animation: none !important;
+    display: block !important;
     transform: none !important;
+    width: 100% !important;
+  }
+
+  .announcement-banner-copy {
     white-space: normal !important;
+  }
+
+  .announcement-banner-repeat {
+    display: none !important;
   }
 }
 
@@ -3372,10 +3381,8 @@ button:disabled,
   }
 
   .announcement-banner-viewport {
-    overflow-x: auto !important;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: thin;
-    touch-action: pan-x;
+    overflow: hidden !important;
+    touch-action: manipulation;
   }
 }
 
@@ -3520,18 +3527,28 @@ button:disabled,
 }
 
 .announcement-banner-track {
-  display: inline-block;
+  align-items: center;
+  display: flex;
+  gap: 3rem;
   max-width: none;
+  width: max-content;
+  will-change: transform;
+}
+
+.announcement-banner-copy {
+  display: block;
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 
-.announcement-banner-viewport.is-overflowing .announcement-banner-track {
-  animation: announcementBannerScroll var(--announcement-scroll-duration, 18s) linear infinite alternate;
+.announcement-banner-viewport.is-ticking .announcement-banner-track {
+  animation: announcementBannerScroll var(--announcement-scroll-duration, 20s) linear infinite;
 }
 
 .announcement-banner:hover .announcement-banner-track,
 .announcement-banner:focus .announcement-banner-track,
-.announcement-banner:focus-within .announcement-banner-track {
+.announcement-banner:focus-within .announcement-banner-track,
+.announcement-banner:active .announcement-banner-track {
   animation-play-state: paused;
 }
 
@@ -3548,7 +3565,7 @@ button:disabled,
 
 @keyframes announcementBannerScroll {
   from { transform: translateX(0); }
-  to { transform: translateX(calc(-1 * var(--announcement-scroll-distance, 0px))); }
+  to { transform: translateX(calc(-50% - 1.5rem)); }
 }
 
 .rolling-number {

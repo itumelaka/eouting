@@ -6,9 +6,9 @@ Status repo semasa: **v2.2.0 — production verified**.
 
 Frontend v2.2.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa ialah **config-driven production ACTIVE dan Ready** pada release v2.2.0 dengan GAS Version 36. Displayed version kekal v2.2.0 dan cache/asset source revision ialah `2.2.0-r2`.
+Verdict semasa ialah **config-driven production ACTIVE dan Ready** pada release v2.2.0 dengan GAS Version 37. Displayed version kekal v2.2.0 dan cache/asset source revision ialah `2.2.0-r3`.
 
-Repo kini turut mengandungi `Notis Banner` V1. Backend ciri ini belum live pada baseline GAS Version 36 dan memerlukan deployment GAS terkawal; ciri gagal secara tertutup (banner tersembunyi) sehingga action backend tersedia. Tiada config outing atau feature flag diubah.
+`Notis Banner` V1 kini live pada GAS Version 37. Patch frontend r3 menjadikan setiap banner aktif ticker berterusan tanpa mengubah backend, config outing atau feature flag.
 
 Production boundary semasa:
 
@@ -24,7 +24,7 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.2.0`; asset/cache source revision ialah `2.2.0-r2`.
+- Metadata displayed frontend/footer/version berada pada `v2.2.0`; asset/cache source revision ialah `2.2.0-r3`.
 - Backend GAS production ialah **Version 36** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
@@ -50,7 +50,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer kekal v2.2.0; asset query dan cache source konsisten pada `2.2.0-r2`.
+- Displayed version/footer kekal v2.2.0; asset query dan cache source konsisten pada `2.2.0-r3`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.

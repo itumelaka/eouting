@@ -175,54 +175,67 @@ test("Admin UI edits one banner and wires read/save through the authenticated se
 
 test("Admin-entered HTML renders as plain text with normal/important labels and updated time", () => {
   const classes = new Set();
+  let clearCount = 0;
   const els = {
     announcementBanner: { hidden: true, classList: { toggle: (name, on) => on ? classes.add(name) : classes.delete(name) } },
     announcementBannerLabel: { textContent: "" },
     announcementBannerText: { textContent: "" },
+    announcementBannerRepeat: { textContent: "" },
     announcementBannerUpdated: { textContent: "" }
   };
   const source = appSource.slice(appSource.indexOf("function renderAnnouncementBannerV1"), appSource.indexOf("function clearAnnouncementBannerV1"));
-  const context = vm.createContext({ els, Boolean, String, formatDisplayTime: () => "11:35", updateAnnouncementOverflowV1: () => {}, clearAnnouncementBannerV1: () => {} });
+  const context = vm.createContext({ els, Boolean, String, formatDisplayTime: () => "11:35", updateAnnouncementTickerV1: () => {}, clearAnnouncementBannerV1: () => { clearCount += 1; } });
   vm.runInContext(`${source}; this.renderAnnouncementBannerV1 = renderAnnouncementBannerV1;`, context);
 
   context.renderAnnouncementBannerV1({ active: true, important: false, text: '<script>alert("x")</script>', updated_at: "x" });
   assert.equal(els.announcementBannerLabel.textContent, "📢 MAKLUMAN");
   assert.equal(els.announcementBannerText.textContent, '<script>alert("x")</script>');
+  assert.equal(els.announcementBannerRepeat.textContent, '<script>alert("x")</script>');
   assert.equal(els.announcementBannerUpdated.textContent, "Dikemaskini 11:35");
   assert.equal(classes.has("is-important"), false);
 
   context.renderAnnouncementBannerV1({ active: true, important: true, text: "Penting", updated_at: "x" });
   assert.equal(els.announcementBannerLabel.textContent, "⚠️ PENTING");
   assert.equal(classes.has("is-important"), true);
+  context.renderAnnouncementBannerV1({ active: false, text: "" });
+  assert.equal(clearCount, 1);
   assert.doesNotMatch(source, /innerHTML/);
 });
 
-test("Overflow measurement applies animation only when needed and motion is allowed", () => {
+test("Every active banner gets the ticker class even when its text fits", () => {
   const classes = new Set();
   const variables = {};
   const els = {
     announcementBanner: { hidden: false },
-    announcementBannerViewport: { clientWidth: 200, classList: { toggle: (name, on) => on ? classes.add(name) : classes.delete(name) } },
-    announcementBannerText: { scrollWidth: 520, style: { setProperty: (key, value) => { variables[key] = value; } } }
+    announcementBannerViewport: { classList: { add: (name) => classes.add(name) } },
+    announcementBannerTrack: { style: { setProperty: (key, value) => { variables[key] = value; } } },
+    announcementBannerText: { scrollWidth: 40 }
   };
-  const source = appSource.slice(appSource.indexOf("function updateAnnouncementOverflowV1"), appSource.indexOf("async function loadAdminAnnouncementV1"));
-  const context = vm.createContext({ els, Math, prefersReducedMotionV200: () => false, window: { requestAnimationFrame: (callback) => callback() } });
-  vm.runInContext(`${source}; this.updateAnnouncementOverflowV1 = updateAnnouncementOverflowV1;`, context);
-  context.updateAnnouncementOverflowV1();
-  assert.equal(classes.has("is-overflowing"), true);
-  assert.equal(variables["--announcement-scroll-distance"], "320px");
+  const source = appSource.slice(appSource.indexOf("function updateAnnouncementTickerV1"), appSource.indexOf("async function loadAdminAnnouncementV1"));
+  const context = vm.createContext({ els, Math, window: { requestAnimationFrame: (callback) => callback() } });
+  vm.runInContext(`${source}; this.updateAnnouncementTickerV1 = updateAnnouncementTickerV1;`, context);
+  context.updateAnnouncementTickerV1();
+  assert.equal(classes.has("is-ticking"), true);
+  assert.equal(variables["--announcement-scroll-duration"], "20s");
 
-  els.announcementBannerText.scrollWidth = 205;
-  context.updateAnnouncementOverflowV1();
-  assert.equal(classes.has("is-overflowing"), false);
+  els.announcementBannerText.scrollWidth = 552;
+  context.updateAnnouncementTickerV1();
+  assert.equal(variables["--announcement-scroll-duration"], "25s");
+  assert.doesNotMatch(source, /clientWidth|is-overflowing|prefersReducedMotion/);
 });
 
-test("CSS pauses scrolling on hover/focus and reduced motion presents static text", () => {
+test("CSS provides a seamless ticker, hover/focus pause and static reduced motion", () => {
+  assert.match(htmlSource, /id="announcementBannerTrack"[\s\S]*id="announcementBannerRepeat"[^>]*aria-hidden="true"/);
+  assert.doesNotMatch(htmlSource, /<marquee/i);
   assert.match(cssSource, /@keyframes announcementBannerScroll/);
+  assert.match(cssSource, /\.announcement-banner-viewport\.is-ticking[\s\S]*linear infinite/);
+  assert.match(cssSource, /translateX\(calc\(-50% - 1\.5rem\)\)/);
+  assert.doesNotMatch(cssSource, /announcementBannerScroll[^;]*alternate/);
   assert.match(cssSource, /\.announcement-banner:hover[\s\S]*animation-play-state:\s*paused/);
   assert.match(cssSource, /\.announcement-banner:focus[\s\S]*animation-play-state:\s*paused/);
   assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.announcement-banner-track[\s\S]*animation:\s*none/);
-  assert.match(cssSource, /touch-action:\s*pan-x/);
+  assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.announcement-banner-repeat[\s\S]*display:\s*none/);
+  assert.match(cssSource, /touch-action:\s*manipulation/);
 });
 
 test("Banner code remains informational and does not alter outing business rules", () => {

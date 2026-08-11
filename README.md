@@ -18,7 +18,7 @@ Backend production semasa menggunakan GAS **Version 36**, Spreadsheet `1QQ0WKstU
 
 Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
-Admin turut mempunyai `Notis Banner` untuk satu makluman operasi. Konfigurasi disimpan dalam Script Properties dan hanya projection selamat dihantar melalui POST selepas Pelajar, Warden/HEP, Guard atau Admin disahkan. Banner tidak muncul pada landing atau Public Pemantauan. Mod `PENTING` mempunyai label dan ikon tersendiri; teks panjang bergerak hanya apabila overflow, berhenti semasa hover/focus dan kekal statik untuk `prefers-reduced-motion`.
+Admin turut mempunyai `Notis Banner` untuk satu makluman operasi. Konfigurasi disimpan dalam Script Properties dan hanya projection selamat dihantar melalui POST selepas Pelajar, Warden/HEP, Guard atau Admin disahkan. Banner tidak muncul pada landing atau Public Pemantauan. Mod `MAKLUMAN` dan `PENTING` menggunakan ticker kiri berterusan yang tenang, berhenti semasa hover/focus dan kekal statik untuk `prefers-reduced-motion`.
 
 Banner ialah makluman sahaja. Kandungannya tidak mengubah `OUTING_TYPES`, masa keluar atau validation. Sebarang perubahan polisi masih perlu dibuat secara berasingan melalui `Admin > Tetapan Outing`.
 
@@ -206,6 +206,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 36**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r2`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 37**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r3`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

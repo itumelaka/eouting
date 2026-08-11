@@ -322,7 +322,9 @@ const els = {
   announcementBanner: document.querySelector("#announcementBanner"),
   announcementBannerLabel: document.querySelector("#announcementBannerLabel"),
   announcementBannerViewport: document.querySelector("#announcementBannerViewport"),
+  announcementBannerTrack: document.querySelector("#announcementBannerTrack"),
   announcementBannerText: document.querySelector("#announcementBannerText"),
+  announcementBannerRepeat: document.querySelector("#announcementBannerRepeat"),
   announcementBannerUpdated: document.querySelector("#announcementBannerUpdated"),
   loggedStudentName: document.querySelector("#loggedStudentName"),
   loggedStudentMeta: document.querySelector("#loggedStudentMeta"),
@@ -931,36 +933,34 @@ function renderAnnouncementBannerV1(banner) {
   els.announcementBanner.classList.toggle("is-important", important);
   els.announcementBannerLabel.textContent = important ? "⚠️ PENTING" : "📢 MAKLUMAN";
   els.announcementBannerText.textContent = text;
+  els.announcementBannerRepeat.textContent = text;
   const displayTime = banner.updated_at ? formatDisplayTime(banner.updated_at) : "";
   els.announcementBannerUpdated.textContent = displayTime && displayTime !== "-"
     ? `Dikemaskini ${displayTime}`
     : "";
-  updateAnnouncementOverflowV1();
+  updateAnnouncementTickerV1();
 }
 
 function clearAnnouncementBannerV1() {
   if (!els.announcementBanner) return;
   els.announcementBanner.hidden = true;
   els.announcementBanner.classList.remove("is-important");
-  if (els.announcementBannerViewport) els.announcementBannerViewport.classList.remove("is-overflowing");
+  if (els.announcementBannerViewport) els.announcementBannerViewport.classList.remove("is-ticking");
   if (els.announcementBannerText) {
     els.announcementBannerText.textContent = "";
-    els.announcementBannerText.style.removeProperty("--announcement-scroll-distance");
-    els.announcementBannerText.style.removeProperty("--announcement-scroll-duration");
   }
+  if (els.announcementBannerRepeat) els.announcementBannerRepeat.textContent = "";
+  if (els.announcementBannerTrack) els.announcementBannerTrack.style.removeProperty("--announcement-scroll-duration");
   if (els.announcementBannerUpdated) els.announcementBannerUpdated.textContent = "";
 }
 
-function updateAnnouncementOverflowV1() {
-  if (!els.announcementBannerViewport || !els.announcementBannerText || els.announcementBanner.hidden) return;
+function updateAnnouncementTickerV1() {
+  if (!els.announcementBannerViewport || !els.announcementBannerTrack || !els.announcementBannerText || els.announcementBanner.hidden) return;
   const measure = () => {
-    const distance = Math.ceil(els.announcementBannerText.scrollWidth - els.announcementBannerViewport.clientWidth);
-    const shouldScroll = distance > 8 && !prefersReducedMotionV200();
-    els.announcementBannerViewport.classList.toggle("is-overflowing", shouldScroll);
-    if (shouldScroll) {
-      els.announcementBannerText.style.setProperty("--announcement-scroll-distance", `${distance}px`);
-      els.announcementBannerText.style.setProperty("--announcement-scroll-duration", `${Math.max(14, distance / 24)}s`);
-    }
+    const repeatGapPixels = 48;
+    const travelDistance = Math.max(1, Math.ceil(els.announcementBannerText.scrollWidth + repeatGapPixels));
+    els.announcementBannerTrack.style.setProperty("--announcement-scroll-duration", `${Math.max(20, travelDistance / 24)}s`);
+    els.announcementBannerViewport.classList.add("is-ticking");
   };
   if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(measure);
   else measure();
@@ -1023,7 +1023,7 @@ async function saveAdminAnnouncementV1(event) {
   }
 }
 
-window.addEventListener("resize", updateAnnouncementOverflowV1);
+window.addEventListener("resize", updateAnnouncementTickerV1);
 
 function setAdminSectionV200(section) {
   const allowed = ["monitoring", "statistics", "master", "students", "staff", "outing", "announcement"];

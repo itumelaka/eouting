@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-11 — Continuous announcement ticker patch (v2.2.0)
+
+- Menjadikan setiap banner aktif bergerak ke kiri secara berterusan walaupun teks muat dalam ruang tersedia.
+- Menggunakan dua salinan visual dengan jarak tetap untuk ulangan lancar tanpa `<marquee>` atau restart yang ketara.
+- Mengekalkan pause hover/focus, paparan statik reduced-motion, label/timestamp, privacy awam dan data model backend.
+- Menaikkan cache/asset frontend kepada `2.2.0-r3`; GAS Version 37 tidak berubah dan tiada deployment GAS diperlukan.
+
 ## 2026-08-11 — Admin-managed announcement banner (v2.2.0)
 
 - Menambah satu `Notis Banner` yang boleh diedit, diaktif/nyahaktif dan ditanda `PENTING` oleh Admin.

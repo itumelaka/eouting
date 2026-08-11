@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r2`. Production menggunakan GAS Version 36, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
+Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r3`. Production menggunakan GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
 
 ## Komponen
 
@@ -47,7 +47,7 @@ Google Sheets ialah database dan source of truth. Tab utama:
 
 Notis tunggal disimpan dalam Script Properties sebagai teks, status aktif, status penting, masa kemas kini dan identiti Admin. `getAnnouncementBannerAdmin` serta `updateAnnouncementBanner` memerlukan credential Admin; `getAnnouncementBanner` mengesahkan sesi Student, Warden, Guard atau Admin dan hanya memulangkan projection aktif yang selamat. Tiada action banner pada router GET awam dan tiada sheet baharu.
 
-Frontend meletakkan banner di dalam `appWorkspace`, bukan pada landing/Public Pemantauan. Teks dirender dengan `textContent`. Animasi CSS hanya digunakan apabila teks overflow, pause pada hover/focus dan dimatikan untuk reduced motion. Konfigurasi ini tidak dibaca oleh resolver outing dan tidak boleh mengubah business rule.
+Frontend meletakkan banner di dalam `appWorkspace`, bukan pada landing/Public Pemantauan. Teks dirender dengan `textContent`. Dua salinan visual menghasilkan ticker kiri berterusan bagi setiap banner aktif; salinan kedua `aria-hidden`, gerakan pause pada hover/focus dan dimatikan untuk reduced motion. Konfigurasi ini tidak dibaca oleh resolver outing dan tidak boleh mengubah business rule.
 
 v1.7.0 menambah lima header selfie secara idempotent melalui `setupSelfieProofV170()` dan mengekalkan `selfie_whatsapp` sebagai kolum legacy.
 
@@ -203,7 +203,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.0-r2` dan query `2.2.0-r2`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.0-r3` dan query `2.2.0-r3`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

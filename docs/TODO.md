@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 36** pada 10 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 37**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
@@ -12,8 +12,9 @@ Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 36** p
 - [x] Two-tier photo delivery: unique-ID thumbnail batch, server-side Drive thumbnail, one-student full preview, cache sesi, duplicate suppression dan safe failure.
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
-- [x] GAS Version 36 ialah baseline production semasa; config-driven active dan readiness hijau.
-- [x] Cache/asset source revision `2.2.0-r2` dengan displayed app version kekal v2.2.0.
+- [x] GAS Version 37 ialah baseline production semasa; config-driven active, readiness hijau dan Notis Banner V1 live.
+- [x] Cache/asset source revision `2.2.0-r3` dengan displayed app version kekal v2.2.0.
+- [x] Setiap banner aktif menggunakan ticker kiri berterusan; hover/focus pause dan reduced-motion kekal statik.
 - [x] Controlled activation: submission, Warden approval, early Guard rejection dan safe policy feedback disahkan.
 - [x] Source Notis Banner V1: satu notis Script Properties, Admin edit/aktif/penting, viewer authenticated, safe text, audit dan reduced-motion.
 - [ ] Deploy source Notis Banner ke GAS version baharu dan jalankan smoke test controlled; jangan ubah config outing atau feature flag.
