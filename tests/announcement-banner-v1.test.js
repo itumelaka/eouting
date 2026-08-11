@@ -161,6 +161,19 @@ test("Announcement actions are POST-only and public monitoring projection has no
   assert.doesNotMatch(publicMarkup, /announcementBanner|Notis Banner/);
 });
 
+test("Student hierarchy keeps the banner, rule notice and form without duplicate static guidance", () => {
+  const bannerIndex = htmlSource.indexOf('id="announcementBanner"');
+  const ruleNoticeIndex = htmlSource.indexOf('id="ruleNotice"');
+  const headingIndex = htmlSource.indexOf("<h2>Permohonan Pelajar</h2>");
+  const formIndex = htmlSource.indexOf('id="requestForm"');
+
+  assert.ok(bannerIndex >= 0);
+  assert.ok(ruleNoticeIndex > bannerIndex);
+  assert.ok(headingIndex > ruleNoticeIndex);
+  assert.ok(formIndex > headingIndex);
+  assert.doesNotMatch(htmlSource, /Permohonan outing hanya dibuka pada Selasa dan Rabu bermula 5:00 PM\./);
+});
+
 test("Admin UI edits one banner and wires read/save through the authenticated section", () => {
   assert.match(htmlSource, /id="adminAnnouncementTab"[^>]*data-admin-section="announcement"/);
   assert.match(htmlSource, /id="adminAnnouncementPanel"[^>]*hidden/);
