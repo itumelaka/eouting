@@ -1,10 +1,10 @@
-const CACHE_NAME = "eouting-cache-v2.2.0-r4";
+const CACHE_NAME = "eouting-cache-v2.2.0-r5";
 
 const APP_SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/style.css?v=2.2.0-r4",
-  "./assets/app.js?v=2.2.0-r4",
+  "./assets/style.css?v=2.2.0-r5",
+  "./assets/app.js?v=2.2.0-r5",
   "./assets/pwa-logo.png",
   "./assets/eouting-header-logo.png",
   "./assets/icons/icon-192.png",
