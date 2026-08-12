@@ -4554,6 +4554,71 @@ function stopGuardAutoRefresh() {
 
 els.requestTypeSelect.addEventListener("change", updateEmergencyFields);
 
+function normalizeStudentSubmissionDateV220(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    || text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return "";
+
+  const isDisplayDate = text.includes("/");
+  const year = Number(isDisplayDate ? match[3] : match[1]);
+  const month = Number(match[2]);
+  const day = Number(isDisplayDate ? match[1] : match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) {
+    return "";
+  }
+
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function buildStudentRequestPayloadV220(student, requestType) {
+  const leaveDate = normalizeStudentSubmissionDateV220(
+    els.leaveDateInput ? els.leaveDateInput.value : ""
+  );
+  const isWeekend = requestType === REQUEST_TYPE.weekend;
+  const isOvernight = requestType === REQUEST_TYPE.overnight;
+  const includeDepartureFields = isWeekend || isOvernight;
+  const returnDate = includeDepartureFields
+    ? normalizeStudentSubmissionDateV220(
+        isWeekend
+          ? leaveDate
+          : (els.returnDateInput ? els.returnDateInput.value : "")
+      )
+    : "";
+
+  return {
+    student_id: student.id,
+    no_matrik: student.no_matrik,
+    nama: student.name,
+    student_email: student.email || "",
+    email: student.email || "",
+    kelas: student.className,
+    jenis_permohonan: requestType,
+    tujuan: els.purposeInput.value.trim(),
+    lokasi: els.locationInput.value.trim(),
+    jenis_kenderaan: els.vehicleTypeSelect.value,
+    butiran_kenderaan: els.vehicleDetailInput.value.trim(),
+    sebab_kecemasan: els.emergencyReasonInput.value.trim(),
+    telefon_waris: els.guardianPhoneInput.value.trim(),
+    hubungan_waris: els.guardianRelationSelect.value,
+    catatan_kecemasan: els.emergencyNoteInput.value.trim(),
+    tarikh: includeDepartureFields ? leaveDate : "",
+    hari: includeDepartureFields ? getDayNameFromDateInput(leaveDate) : "",
+    tarikh_balik: returnDate,
+    hari_balik: getDayNameFromDateInput(returnDate),
+    masa_balik_dijangka: includeDepartureFields
+      ? (isWeekend ? "22:00" : els.expectedReturnTimeInput.value)
+      : ""
+  };
+}
+
 els.requestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -4625,23 +4690,7 @@ if (!student) {
 
   if (isLiveMode) {
     try {
-      const payload = {
-        student_id: student.id,
-        no_matrik: student.no_matrik,
-        nama: student.name,
-        student_email: student.email || "",
-        email: student.email || "",
-        kelas: student.className,
-        jenis_permohonan: requestType,
-        tujuan: els.purposeInput.value.trim(),
-        lokasi: els.locationInput.value.trim(),
-        jenis_kenderaan: els.vehicleTypeSelect.value,
-        butiran_kenderaan: els.vehicleDetailInput.value.trim(),
-        sebab_kecemasan: els.emergencyReasonInput.value.trim(),
-        telefon_waris: els.guardianPhoneInput.value.trim(),
-        hubungan_waris: els.guardianRelationSelect.value,
-        catatan_kecemasan: els.emergencyNoteInput.value.trim()
-      };
+      const payload = buildStudentRequestPayloadV220(student, requestType);
       const savedRecord = await apiPost("submitRequest", payload);
       els.requestForm.reset();
       updateEmergencyFields();
@@ -7112,51 +7161,6 @@ function syncMockPulangBermalamRecord() {
   target.masa_balik_dijangka = expectedReturnTime;
   render();
 }
-
-const apiPostWithoutPulangBermalamFields = apiPost;
-apiPost = async function apiPostWithPulangBermalamFields(action, payload) {
-  const requestType = payload ? payload.jenis_permohonan : "";
-
-  if (
-    action === "submitRequest" &&
-    payload &&
-    (
-      requestType === REQUEST_TYPE.overnight ||
-      requestType === REQUEST_TYPE.weekend
-    )
-  ) {
-    const leaveDate = els.leaveDateInput
-      ? els.leaveDateInput.value
-      : "";
-
-    const returnDate = requestType === REQUEST_TYPE.weekend
-      ? leaveDate
-      : (
-          els.returnDateInput
-            ? els.returnDateInput.value
-            : ""
-        );
-
-    payload = {
-      ...payload,
-      tarikh: leaveDate || payload.tarikh || "",
-      hari: leaveDate
-        ? getDayNameFromDateInput(leaveDate)
-        : payload.hari || "",
-      tarikh_balik: returnDate,
-      hari_balik: getDayNameFromDateInput(returnDate),
-      masa_balik_dijangka: requestType === REQUEST_TYPE.weekend
-        ? "22:00"
-        : (
-            els.expectedReturnTimeInput
-              ? els.expectedReturnTimeInput.value
-              : ""
-          )
-    };
-  }
-
-  return apiPostWithoutPulangBermalamFields(action, payload);
-};
 
 const mapLiveRecordWithoutPulangBermalamFields = mapLiveRecord;
 mapLiveRecord = function mapLiveRecordWithPulangBermalamFields(record) {
