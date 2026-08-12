@@ -2219,8 +2219,17 @@ function cancelStudentRequest(payload) {
     sebab_batal_pelajar: reason
   }));
 
-  if (transition.previousStatus === STATUS.approved) {
-    sendTelegramMessage_(buildTelegramStudentCancellationMessage_(transition.record));
+  try {
+    const telegramSent = sendTelegramMessage_(
+      buildTelegramStudentCancellationMessage_(transition.record, transition.previousStatus)
+    );
+    if (!telegramSent && typeof console !== "undefined" && console && typeof console.warn === "function") {
+      console.warn("CANCEL_STUDENT_REQUEST Telegram notification failed.");
+    }
+  } catch (telegramError) {
+    if (typeof console !== "undefined" && console && typeof console.warn === "function") {
+      console.warn("CANCEL_STUDENT_REQUEST Telegram notification failed.", telegramError);
+    }
   }
   return transition.record;
 }
@@ -3750,14 +3759,22 @@ function buildTelegramSubmitMessage_(record) {
   return buildTelegramStatusMessage_(title, record);
 }
 
-function buildTelegramStudentCancellationMessage_(record) {
+function studentCancellationPreviousStatusLabel_(status) {
+  if (status === STATUS.pending) return "Menunggu Kelulusan Warden";
+  if (status === STATUS.approved) return "Diluluskan Warden";
+  return "Status Tidak Diketahui";
+}
+
+function buildTelegramStudentCancellationMessage_(record, previousStatus) {
   return [
-    "🚫 Pelajar Membatalkan Permohonan Diluluskan",
+    "🚫 PERMOHONAN DIBATALKAN PELAJAR",
+    "",
     "Nama: " + (record.nama || "-"),
     "No. Matrik: " + (record.no_matrik || "-"),
     "Jenis: " + requestTypeLabel_(record.jenis_permohonan),
+    "Status sebelum batal: " + studentCancellationPreviousStatusLabel_(previousStatus),
     "Sebab: " + (record.sebab_batal_pelajar || "-"),
-    "Masa Batal: " + formatTelegramDateTime_(record.masa_batal_pelajar)
+    "Masa: " + formatTelegramDateTime_(record.masa_batal_pelajar)
   ].join("\n");
 }
 

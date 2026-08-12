@@ -17,10 +17,11 @@ function sourceBetween(source, start, end) {
   return source.slice(from, to);
 }
 
-function createBackend(status = "MENUNGGU_KELULUSAN", owner = true) {
+function createBackend(status = "MENUNGGU_KELULUSAN", owner = true, options = {}) {
   const updates = [];
   const audits = [];
   const telegram = [];
+  const warnings = [];
   let lockCalls = 0;
   const student = { student_id: "S1", no_matrik: "M1", nama: "Ali" };
   const row = {
@@ -44,12 +45,19 @@ function createBackend(status = "MENUNGGU_KELULUSAN", owner = true) {
     SpreadsheetApp: { flush() {} },
     withScriptLock_: (callback) => { lockCalls += 1; return callback(); },
     appendAuditLog: (...args) => audits.push(args),
-    sendTelegramMessage_: (message) => telegram.push(message),
-    buildTelegramStudentCancellationMessage_: () => "cancelled"
+    sendTelegramMessage_: (message) => {
+      telegram.push(message);
+      if (options.telegramThrows) throw new Error("Telegram unavailable");
+      return options.telegramFails ? false : true;
+    },
+    requestTypeLabel_: (type) => type === "CUSTOM_TYPE" ? "Lawatan Klinik" : type,
+    formatTelegramDateTime_: (value) => value,
+    console: { warn: (...args) => warnings.push(args) }
   };
   vm.createContext(context);
+  vm.runInContext(sourceBetween(gasSource, "function studentCancellationPreviousStatusLabel_", "function buildTelegramStatusMessage_"), context);
   vm.runInContext(sourceBetween(gasSource, "function validateStudentCancellationReason_", "function approveRequest"), context);
-  return { context, updates, audits, telegram, get lockCalls() { return lockCalls; } };
+  return { context, updates, audits, telegram, warnings, get lockCalls() { return lockCalls; } };
 }
 
 test("student cancellation UI is status-generic and shown only for pending or approved", () => {
@@ -93,23 +101,51 @@ test("backend trims valid reason and atomically stores cancellation metadata", (
   });
   assert.equal(result.status, "DIBATALKAN_PELAJAR");
   assert.equal(fixture.audits[0][0], "CANCEL_STUDENT_REQUEST");
-  assert.equal(fixture.telegram.length, 0);
+  assert.equal(fixture.telegram.length, 1);
+  assert.match(fixture.telegram[0], /Status sebelum batal: Menunggu Kelulusan Warden/);
 });
 
-test("backend permits approved cancellation and sends a non-blocking lifecycle notification", () => {
-  const fixture = createBackend("DILULUSKAN_WARDEN");
-  fixture.context.cancelStudentRequest({ request_id: "R1", student_id: "S1", no_matrik: "M1", reason: "Pelan keluarga berubah" });
-  assert.equal(fixture.updates[0].status, "DIBATALKAN_PELAJAR");
-  assert.deepEqual(fixture.telegram, ["cancelled"]);
+test("pending and approved cancellations each send exactly one complete human-readable Telegram notification", () => {
+  for (const [status, expectedLabel] of [
+    ["MENUNGGU_KELULUSAN", "Menunggu Kelulusan Warden"],
+    ["DILULUSKAN_WARDEN", "Diluluskan Warden"]
+  ]) {
+    const fixture = createBackend(status);
+    fixture.context.cancelStudentRequest({ request_id: "R1", student_id: "S1", no_matrik: "M1", reason: "Pelan keluarga berubah" });
+    assert.equal(fixture.updates[0].status, "DIBATALKAN_PELAJAR");
+    assert.equal(fixture.telegram.length, 1);
+    const message = fixture.telegram[0];
+    assert.match(message, /^🚫 PERMOHONAN DIBATALKAN PELAJAR/m);
+    assert.match(message, /Nama: Ali/);
+    assert.match(message, /No\. Matrik: M1/);
+    assert.match(message, /Jenis: Lawatan Klinik/);
+    assert.match(message, new RegExp(`Status sebelum batal: ${expectedLabel}`));
+    assert.doesNotMatch(message, /MENUNGGU_KELULUSAN|DILULUSKAN_WARDEN/);
+    assert.match(message, /Sebab: Pelan keluarga berubah/);
+    assert.match(message, /Masa: 2026-08-12 12:34:56/);
+  }
+});
+
+test("Telegram failure is reported without failing or duplicating a successful cancellation", () => {
+  for (const options of [{ telegramFails: true }, { telegramThrows: true }]) {
+    const fixture = createBackend("MENUNGGU_KELULUSAN", true, options);
+    const result = fixture.context.cancelStudentRequest({ request_id: "R1", student_id: "S1", no_matrik: "M1", reason: "Pelan keluarga berubah" });
+    assert.equal(result.status, "DIBATALKAN_PELAJAR");
+    assert.equal(fixture.telegram.length, 1);
+    assert.equal(fixture.warnings.length, 1);
+    assert.match(String(fixture.warnings[0][0]), /Telegram notification failed/);
+  }
 });
 
 test("backend rejects another student's request and every non-cancellable state", () => {
   const other = createBackend("MENUNGGU_KELULUSAN", false);
   assert.throws(() => other.context.cancelStudentRequest({ request_id: "R1", student_id: "S1", no_matrik: "M1", reason: "Sebab yang sah" }), /pelajar lain/);
+  assert.equal(other.telegram.length, 0);
   for (const status of ["KELUAR", "SELESAI", "DITOLAK_WARDEN", "DIBATALKAN_PELAJAR", "UNKNOWN_TERMINAL"]) {
     const fixture = createBackend(status);
     assert.throws(() => fixture.context.cancelStudentRequest({ request_id: "R1", student_id: "S1", no_matrik: "M1", reason: "Sebab yang sah" }), /statusnya telah berubah/);
     assert.equal(fixture.updates.length, 0);
+    assert.equal(fixture.telegram.length, 0);
   }
 });
 
