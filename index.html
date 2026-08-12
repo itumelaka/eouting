@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r5">
+    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r6">
   </head>
   <body>
     <header class="app-header">
@@ -665,7 +665,7 @@
               <label>Tahun<input id="adminMasterYear" type="number" min="2000" max="2200" placeholder="Semua"></label>
               <label>Kelas<select id="adminMasterClass"><option value="">Semua</option><option>A2</option><option>A3</option><option>LI</option></select></label>
               <label>Jenis<select id="adminMasterType"><option value="">Semua</option></select></label>
-              <label>Status<select id="adminMasterStatus"><option value="">Semua</option><option value="MENUNGGU_KELULUSAN">Menunggu</option><option value="DILULUSKAN_WARDEN">Diluluskan</option><option value="DITOLAK_WARDEN">Ditolak</option><option value="KELUAR">Keluar</option><option value="SELESAI">Selesai</option></select></label>
+              <label>Status<select id="adminMasterStatus"><option value="">Semua</option><option value="MENUNGGU_KELULUSAN">Menunggu</option><option value="DILULUSKAN_WARDEN">Diluluskan</option><option value="DITOLAK_WARDEN">Ditolak</option><option value="DIBATALKAN_PELAJAR">Dibatalkan oleh Pelajar</option><option value="KELUAR">Keluar</option><option value="SELESAI">Selesai</option></select></label>
             </div>
             <p class="form-message" id="adminMasterMessage" aria-live="polite"></p>
             <div class="admin-table-wrap"><table class="admin-master-table"><thead><tr><th>Pelajar</th><th>Kelas</th><th>Jenis</th><th>Tarikh</th><th>Keluar</th><th>Masuk</th><th>Status</th><th>Tempoh</th><th></th></tr></thead><tbody id="adminMasterBody"></tbody></table></div>
@@ -719,6 +719,23 @@
       </footer>
     </main>
 
+    <div class="student-cancel-modal" id="studentCancelModal" role="dialog" aria-modal="true"
+      aria-labelledby="studentCancelTitle" aria-describedby="studentCancelDescription" hidden>
+      <form class="student-cancel-sheet" id="studentCancelForm" novalidate>
+        <h2 id="studentCancelTitle">Batal Permohonan</h2>
+        <p id="studentCancelDescription">Anda pasti mahu membatalkan permohonan outing ini?</p>
+        <label for="studentCancelReason">Sebab Batal Permohonan</label>
+        <textarea id="studentCancelReason" name="sebab_batal_pelajar" rows="5" required minlength="5" maxlength="500"
+          aria-describedby="studentCancelHelper studentCancelError"></textarea>
+        <small id="studentCancelHelper">Sila nyatakan sebab pembatalan. Maksimum 500 aksara.</small>
+        <p class="student-cancel-error" id="studentCancelError" role="alert" hidden></p>
+        <div class="student-cancel-actions record-actions">
+          <button class="danger-action" id="studentCancelConfirm" type="submit" disabled>Sahkan Batal Permohonan</button>
+          <button class="secondary-action" id="studentCancelBack" type="button">Kembali</button>
+        </div>
+      </form>
+    </div>
+
     <div class="profile-photo-modal" id="profilePhotoModal" role="dialog" aria-modal="true"
       aria-labelledby="profilePhotoModalName" aria-describedby="profilePhotoModalMeta profilePhotoModalStatus" hidden>
       <div class="profile-photo-modal-dialog">
@@ -747,6 +764,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.2.0-r5"></script>
+    <script src="assets/app.js?v=2.2.0-r6"></script>
   </body>
 </html>

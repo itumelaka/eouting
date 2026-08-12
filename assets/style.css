@@ -3935,6 +3935,71 @@ button.profile-photo-frame {
   display: none;
 }
 
+.student-cancel-modal[hidden] {
+  display: none;
+}
+
+.student-cancel-modal {
+  align-items: center;
+  background: rgba(3, 14, 30, 0.76);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 16px;
+  position: fixed;
+  z-index: 10020;
+}
+
+.student-cancel-sheet {
+  background: linear-gradient(145deg, #ffffff, #edf3f8);
+  border: 1px solid rgba(5, 32, 65, 0.14);
+  border-radius: 22px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38), inset 2px 2px 5px rgba(255, 255, 255, 0.8);
+  display: grid;
+  gap: 12px;
+  max-height: calc(100vh - 32px);
+  max-width: 520px;
+  overflow-y: auto;
+  padding: clamp(20px, 5vw, 30px);
+  width: 100%;
+}
+
+.student-cancel-sheet h2,
+.student-cancel-sheet p {
+  margin: 0;
+}
+
+.student-cancel-sheet label {
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.student-cancel-sheet small {
+  color: var(--muted);
+}
+
+.student-cancel-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.student-cancel-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
+  margin-top: 4px;
+}
+
+.student-cancel-card-actions {
+  margin-top: 4px;
+}
+
+.badge-cancelled {
+  background: #f3e6e8;
+  color: #842b37;
+}
+
 .profile-photo-modal {
   align-items: center;
   background: rgba(3, 14, 30, 0.82);
@@ -4542,6 +4607,21 @@ button.profile-photo-frame {
 }
 
 @media (max-width: 520px) {
+  .student-cancel-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .student-cancel-sheet {
+    border-radius: 22px 22px 0 0;
+    max-height: 92vh;
+    max-width: none;
+  }
+
+  .student-cancel-actions {
+    grid-template-columns: 1fr;
+  }
+
   .admin-subnav,
   .admin-student-filters {
     grid-template-columns: 1fr;

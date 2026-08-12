@@ -159,7 +159,8 @@ const STATUS = {
   approved: "Diluluskan Warden",
   rejected: "Ditolak Warden",
   out: "Sedang Keluar",
-  returned: "Sudah Pulang"
+  returned: "Sudah Pulang",
+  studentCancelled: "Dibatalkan oleh Pelajar"
 };
 
 const REQUEST_TYPE = {
@@ -209,6 +210,9 @@ let isLiveMode = false;
 let dataModeMessage = "";
 let studentRefreshIntervalId = null;
 let studentLastUpdatedAt = null;
+let studentCancellationRequestId = "";
+let studentCancellationTrigger = null;
+let studentCancellationSubmitting = false;
 let wardenRefreshIntervalId = null;
 let wardenLastUpdatedAt = null;
 let isWardenLoading = false;
@@ -375,6 +379,12 @@ const els = {
   studentMessage: document.querySelector("#studentMessage"),
   studentAnnualSummary: document.querySelector("#studentAnnualSummary"),
   studentRecordsList: document.querySelector("#studentRecordsList"),
+  studentCancelModal: document.querySelector("#studentCancelModal"),
+  studentCancelForm: document.querySelector("#studentCancelForm"),
+  studentCancelReason: document.querySelector("#studentCancelReason"),
+  studentCancelError: document.querySelector("#studentCancelError"),
+  studentCancelConfirm: document.querySelector("#studentCancelConfirm"),
+  studentCancelBack: document.querySelector("#studentCancelBack"),
   studentRefreshButton: null,
   studentLastUpdated: null,
   wardenList: document.querySelector("#wardenList"),
@@ -1183,7 +1193,8 @@ function adminMonitoringStatusLabelV210(status) {
     DILULUSKAN_WARDEN: "Diluluskan",
     KELUAR: "Sedang Keluar",
     SELESAI: "Selesai",
-    DITOLAK_WARDEN: "Ditolak"
+    DITOLAK_WARDEN: "Ditolak",
+    DIBATALKAN_PELAJAR: "Dibatalkan oleh Pelajar"
   };
   return labels[String(status || "").trim().toUpperCase()] || String(status || "-");
 }
@@ -1274,7 +1285,7 @@ function renderAdminMasterV210() {
     const typeLabel = typeof requestTypeLabel === "function"
       ? requestTypeLabel(row.jenis_permohonan)
       : (REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan);
-    return `<tr><td><strong>${escapeHtml(row.nama)}</strong><small>${escapeHtml(row.no_matrik || row.student_id || "")}</small></td><td>${escapeHtml(row.kelas)}</td><td>${escapeHtml(typeLabel)}</td><td>${escapeHtml(formatDisplayDate(row.tarikh || row.masa_mohon))}</td><td>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</td><td>${escapeHtml(row.masa_masuk ? formatDisplayDateTime(row.masa_masuk) : "-")}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.duration || "-")}</td><td><button class="secondary-action compact-action" type="button" data-master-details="${id}">Lihat Butiran</button></td></tr><tr class="admin-master-details" id="admin-master-details-${id}" hidden><td colspan="9"><strong>${escapeHtml(row.request_id)}</strong> · Tujuan: ${escapeHtml(row.tujuan || "-")} · Lokasi: ${escapeHtml(row.lokasi || "-")} · Kenderaan: ${escapeHtml([row.jenis_kenderaan, row.butiran_kenderaan].filter(Boolean).join(" / ") || "-")} · Warden: ${escapeHtml(row.warden_approve_by || "-")} · Keluar oleh: ${escapeHtml(row.guard_keluar_by || "-")} · Masuk oleh: ${escapeHtml(row.guard_masuk_by || "-")}</td></tr>`;
+    return `<tr><td><strong>${escapeHtml(row.nama)}</strong><small>${escapeHtml(row.no_matrik || row.student_id || "")}</small></td><td>${escapeHtml(row.kelas)}</td><td>${escapeHtml(typeLabel)}</td><td>${escapeHtml(formatDisplayDate(row.tarikh || row.masa_mohon))}</td><td>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</td><td>${escapeHtml(row.masa_masuk ? formatDisplayDateTime(row.masa_masuk) : "-")}</td><td>${escapeHtml(adminMonitoringStatusLabelV210(row.status))}</td><td>${escapeHtml(row.duration || "-")}</td><td><button class="secondary-action compact-action" type="button" data-master-details="${id}">Lihat Butiran</button></td></tr><tr class="admin-master-details" id="admin-master-details-${id}" hidden><td colspan="9"><strong>${escapeHtml(row.request_id)}</strong> · Tujuan: ${escapeHtml(row.tujuan || "-")} · Lokasi: ${escapeHtml(row.lokasi || "-")} · Kenderaan: ${escapeHtml([row.jenis_kenderaan, row.butiran_kenderaan].filter(Boolean).join(" / ") || "-")} · Warden: ${escapeHtml(row.warden_approve_by || "-")} · Keluar oleh: ${escapeHtml(row.guard_keluar_by || "-")} · Masuk oleh: ${escapeHtml(row.guard_masuk_by || "-")}${row.sebab_batal_pelajar ? ` · Sebab: ${escapeHtml(row.sebab_batal_pelajar)}` : ""}</td></tr>`;
   }).join("") : '<tr><td colspan="9">Tiada rekod sepadan.</td></tr>';
   els.adminMasterPage.textContent = `Halaman ${adminMasterV210.page || 1} daripada ${adminMasterV210.total_pages || 1}`;
   els.adminMasterPrev.disabled = (adminMasterV210.page || 1) <= 1;
@@ -3254,6 +3265,9 @@ function mapLiveRecord(record) {
     guardInBy: record.guard_masuk_by || "",
     guard_masuk_by: record.guard_masuk_by || "",
     catatan: record.catatan || "",
+    sebab_batal_pelajar: record.sebab_batal_pelajar || "",
+    masa_batal_pelajar: record.masa_batal_pelajar || "",
+    dibatalkan_oleh: record.dibatalkan_oleh || "",
     selfie_status: record.selfie_status || "",
     selfie_file_id: record.selfie_file_id || "",
     selfie_url: record.selfie_url || "",
@@ -3282,6 +3296,7 @@ function mapLiveStatus(status) {
     MENUNGGU_KELULUSAN: STATUS.pending,
     DILULUSKAN_WARDEN: STATUS.approved,
     DITOLAK_WARDEN: STATUS.rejected,
+    DIBATALKAN_PELAJAR: STATUS.studentCancelled,
     KELUAR: STATUS.out,
     SELESAI: STATUS.returned
   };
@@ -5406,6 +5421,9 @@ function studentStatusCard(record) {
   const vehicleDetail = record.butiran_kenderaan
     ? `<br><strong>Butiran Kenderaan:</strong> ${escapeHtml(record.butiran_kenderaan)}`
     : "";
+  const cancelAction = canStudentCancelRequest(record)
+    ? `<div class="record-actions student-cancel-card-actions"><button class="danger-action" type="button" data-student-cancel="${escapeHtml(getRecordId(record))}">Batal Permohonan</button></div>`
+    : "";
 
   return `
     <article class="record-card">
@@ -5437,6 +5455,7 @@ function studentStatusCard(record) {
         <span>Mohon: ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}</span>
         <span>Status: ${escapeHtml(statusInfo.badge)}</span>
       </div>
+      ${cancelAction}
     </article>
   `;
 }
@@ -5485,6 +5504,14 @@ function studentStatusInfo(record) {
     };
   }
 
+  if (status === "DIBATALKAN_PELAJAR") {
+    return {
+      badge: "Dibatalkan oleh Pelajar",
+      badgeClass: "badge-cancelled",
+      message: "Permohonan ini telah dibatalkan oleh pelajar."
+    };
+  }
+
   return {
     badge: record.status || "Status Tidak Diketahui",
     badgeClass: badgeClass(record.status),
@@ -5498,7 +5525,13 @@ function reverseDisplayStatus(status) {
   if (status === STATUS.rejected) return "DITOLAK_WARDEN";
   if (status === STATUS.out) return "KELUAR";
   if (status === STATUS.returned) return "SELESAI";
+  if (status === STATUS.studentCancelled) return "DIBATALKAN_PELAJAR";
   return status || "";
+}
+
+function canStudentCancelRequest(record) {
+  const status = record && (record.rawStatus || reverseDisplayStatus(record.status));
+  return status === "MENUNGGU_KELULUSAN" || status === "DILULUSKAN_WARDEN";
 }
 
 function canSubmitNormalOuting(date = new Date()) {
@@ -5571,6 +5604,7 @@ function renderStudent() {
   const studentRecords = outingRecords.filter(isRecordForCurrentStudent);
   debugStudentRecords(studentRecords);
   els.studentRecordsList.innerHTML = renderStudentRecordSections(studentRecords);
+  bindStudentCancellationControls();
   bindStudentHistoryToggles();
   bindStudentReturnSelfieControls();
   updateStudentSubmitState();
@@ -5610,7 +5644,7 @@ function isActiveStudentRecord(record) {
 
 function isStudentHistoryRecord(record) {
   const status = record.rawStatus || reverseDisplayStatus(record.status);
-  return status === "SELESAI" || status === "DITOLAK_WARDEN";
+  return status === "SELESAI" || status === "DITOLAK_WARDEN" || status === "DIBATALKAN_PELAJAR";
 }
 
 function studentHistoryCard(record) {
@@ -5621,6 +5655,9 @@ function studentHistoryCard(record) {
     : "";
   const noteDetail = isRejected && record.catatan
     ? `<span>Catatan: ${escapeHtml(record.catatan)}</span>`
+    : "";
+  const cancellationReason = record.sebab_batal_pelajar
+    ? `<span>Sebab: ${escapeHtml(record.sebab_batal_pelajar)}</span>`
     : "";
   const detailsId = `history-${String(getRecordId(record) || "record").replace(/[^a-z0-9_-]/gi, "-")}`;
   const vehicleDetail = record.butiran_kenderaan
@@ -5644,6 +5681,7 @@ function studentHistoryCard(record) {
         <span>Mohon: ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}</span>
         ${inTime}
         ${noteDetail}
+        ${cancellationReason}
       </div>
       ${selfieProof}
       <button class="history-toggle" type="button" data-history-toggle="${detailsId}" aria-expanded="false">
@@ -5659,16 +5697,129 @@ function studentHistoryCard(record) {
           ${vehicleDetail}
           ${emergencyDetail}
           ${actorDetail}
+          ${record.sebab_batal_pelajar ? `<br><strong>Sebab Batal:</strong> ${escapeHtml(record.sebab_batal_pelajar)}` : ""}
         </div>
         <div class="record-times">
           <span>Mohon: ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}</span>
           <span>Lulus/Tolak: ${escapeHtml(formatDisplayDateTime(record.masa_approve || record.approvedAt || record.rejectedAt))}</span>
           <span>Keluar: ${escapeHtml(formatDisplayDateTime(record.masa_keluar || record.outAt))}</span>
           <span>Masuk: ${escapeHtml(formatDisplayDateTime(record.masa_masuk || record.returnedAt))}</span>
+          ${record.masa_batal_pelajar ? `<span>Batal: ${escapeHtml(formatDisplayDateTime(record.masa_batal_pelajar))}</span>` : ""}
         </div>
       </div>
     </article>
   `;
+}
+
+function validateStudentCancellationReason(reason) {
+  const trimmed = String(reason || "").trim();
+  if (trimmed.length < 5) return { valid: false, reason: trimmed, message: "Sebab pembatalan mesti sekurang-kurangnya 5 aksara." };
+  if (trimmed.length > 500) return { valid: false, reason: trimmed, message: "Sebab pembatalan tidak boleh melebihi 500 aksara." };
+  return { valid: true, reason: trimmed, message: "" };
+}
+
+function updateStudentCancellationValidation(showMessage) {
+  if (!els.studentCancelReason || !els.studentCancelConfirm || !els.studentCancelError) return false;
+  const result = validateStudentCancellationReason(els.studentCancelReason.value);
+  els.studentCancelConfirm.disabled = studentCancellationSubmitting || !result.valid;
+  els.studentCancelReason.setAttribute("aria-invalid", String(!result.valid && Boolean(showMessage)));
+  els.studentCancelError.textContent = showMessage && !result.valid ? result.message : "";
+  els.studentCancelError.hidden = !els.studentCancelError.textContent;
+  return result.valid;
+}
+
+function openStudentCancellationDialog(requestId, trigger) {
+  if (!els.studentCancelModal || !els.studentCancelReason) return;
+  const record = findRecordById(requestId);
+  if (!record || !canStudentCancelRequest(record) || !isRecordForCurrentStudent(record)) {
+    showWarning("Permohonan ini tidak lagi boleh dibatalkan.");
+    return;
+  }
+  studentCancellationRequestId = requestId;
+  studentCancellationTrigger = trigger || null;
+  studentCancellationSubmitting = false;
+  els.studentCancelReason.value = "";
+  els.studentCancelModal.hidden = false;
+  updateStudentCancellationValidation(false);
+  window.setTimeout(() => els.studentCancelReason.focus(), 0);
+}
+
+function closeStudentCancellationDialog(options) {
+  if (!els.studentCancelModal || studentCancellationSubmitting) return;
+  const restoreFocus = !options || options.restoreFocus !== false;
+  els.studentCancelModal.hidden = true;
+  studentCancellationRequestId = "";
+  if (restoreFocus && studentCancellationTrigger && document.contains(studentCancellationTrigger)) {
+    studentCancellationTrigger.focus();
+  }
+  studentCancellationTrigger = null;
+}
+
+async function submitStudentCancellation(event) {
+  event.preventDefault();
+  if (studentCancellationSubmitting || !studentCancellationRequestId) return;
+  const validation = validateStudentCancellationReason(els.studentCancelReason.value);
+  if (!validation.valid) {
+    updateStudentCancellationValidation(true);
+    els.studentCancelReason.focus();
+    return;
+  }
+
+  studentCancellationSubmitting = true;
+  const requestId = studentCancellationRequestId;
+  const loadingState = setOperationalActionLoading(els.studentCancelConfirm, "Membatalkan...");
+  updateStudentCancellationValidation(false);
+  try {
+    if (isLiveMode) {
+      const student = currentSession.user || {};
+      await apiPost("cancelStudentRequest", {
+        request_id: requestId,
+        student_id: student.student_id || student.studentId || student.id || "",
+        no_matrik: student.no_matrik || student.noMatrik || "",
+        sebab_batal_pelajar: validation.reason
+      });
+      await loadTodayRecords();
+    } else {
+      updateLocalRecord(requestId, (record) => ({
+        ...record,
+        rawStatus: "DIBATALKAN_PELAJAR",
+        status: STATUS.studentCancelled,
+        sebab_batal_pelajar: validation.reason,
+        masa_batal_pelajar: new Date(),
+        dibatalkan_oleh: "PELAJAR"
+      }));
+    }
+    studentCancellationSubmitting = false;
+    clearOperationalActionLoading(loadingState);
+    closeStudentCancellationDialog({ restoreFocus: false });
+    render();
+    showSuccess("Permohonan telah dibatalkan.", "Batal Permohonan");
+  } catch (error) {
+    studentCancellationSubmitting = false;
+    clearOperationalActionLoading(loadingState);
+    updateStudentCancellationValidation(false);
+    if (isLiveMode) await loadTodayRecords().catch(() => {});
+    showError(error.message || "Permohonan tidak dapat dibatalkan. Sila cuba lagi.", "Pembatalan Gagal");
+  }
+}
+
+function bindStudentCancellationControls() {
+  if (!els.studentRecordsList) return;
+  els.studentRecordsList.querySelectorAll("[data-student-cancel]").forEach((button) => {
+    button.addEventListener("click", () => openStudentCancellationDialog(button.dataset.studentCancel, button));
+  });
+  if (!els.studentCancelModal || els.studentCancelModal.dataset.bound === "1") return;
+  els.studentCancelModal.dataset.bound = "1";
+  els.studentCancelReason.addEventListener("input", () => updateStudentCancellationValidation(false));
+  els.studentCancelReason.addEventListener("blur", () => updateStudentCancellationValidation(true));
+  els.studentCancelForm.addEventListener("submit", submitStudentCancellation);
+  els.studentCancelBack.addEventListener("click", () => closeStudentCancellationDialog());
+  els.studentCancelModal.addEventListener("click", (event) => {
+    if (event.target === els.studentCancelModal) closeStudentCancellationDialog();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.studentCancelModal.hidden) closeStudentCancellationDialog();
+  });
 }
 
 function bindStudentHistoryToggles() {
@@ -5949,13 +6100,13 @@ function renderStatistics(stats) {
     animateRollingNumbers(els.statsTypeSummary, "admin-statistics-type");
   }
 
-  const statusOrder = ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "DITOLAK_WARDEN", "KELUAR", "SELESAI"];
+  const statusOrder = ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "DITOLAK_WARDEN", "DIBATALKAN_PELAJAR", "KELUAR", "SELESAI"];
   const statusMap = {};
   (stats.status_summary || []).forEach((item) => {
     statusMap[item.status] = item.count;
   });
   els.statsStatusSummary.innerHTML = statusOrder.map((status) => `
-    <span class="status-pill ${badgeClass(mapLiveStatus(status))}">${escapeHtml(status)} <strong data-rolling-number="${Number(statusMap[status] || 0)}" data-rolling-key="${escapeHtml(status)}">${Number(statusMap[status] || 0)}</strong></span>
+    <span class="status-pill ${badgeClass(mapLiveStatus(status))}">${escapeHtml(adminMonitoringStatusLabelV210(status))} <strong data-rolling-number="${Number(statusMap[status] || 0)}" data-rolling-key="${escapeHtml(status)}">${Number(statusMap[status] || 0)}</strong></span>
   `).join("");
   animateRollingNumbers(els.statsStatusSummary, "admin-statistics-status");
 }
@@ -7163,6 +7314,7 @@ function badgeClass(status) {
   if (status === STATUS.rejected) return "badge-rejected";
   if (status === STATUS.out) return "badge-out";
   if (status === STATUS.returned) return "badge-returned";
+  if (status === STATUS.studentCancelled) return "badge-cancelled";
   return "";
 }
 
@@ -9929,6 +10081,7 @@ function getContextualStatusDisplay(record) {
   if (item.status === STATUS.approved) return { key: "approved", icon: "🟢", label: "Diluluskan" };
   if (item.status === STATUS.returned) return { key: "returned", icon: "✅", label: "Sudah Pulang" };
   if (item.status === STATUS.rejected) return { key: "rejected", icon: "•", label: "Ditolak" };
+  if (item.status === STATUS.studentCancelled) return { key: "cancelled", icon: "•", label: "Dibatalkan oleh Pelajar" };
   return { key: "unknown", icon: "•", label: item.status || "-" };
 }
 

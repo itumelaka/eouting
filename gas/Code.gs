@@ -61,7 +61,10 @@ const HEADERS = {
     "selfie_file_id",
     "selfie_url",
     "masa_selfie",
-    "selfie_telegram_message_id"
+    "selfie_telegram_message_id",
+    "sebab_batal_pelajar",
+    "masa_batal_pelajar",
+    "dibatalkan_oleh"
   ],
   AUDIT_LOG: ["timestamp", "action", "request_id", "user_role", "user_name", "details", "entity_type", "entity_id"],
   OUTING_TYPES: [
@@ -110,7 +113,8 @@ const STATUS = {
   approved: "DILULUSKAN_WARDEN",
   rejected: "DITOLAK_WARDEN",
   out: "KELUAR",
-  done: "SELESAI"
+  done: "SELESAI",
+  studentCancelled: "DIBATALKAN_PELAJAR"
 };
 
 const REQUEST_TYPE = {
@@ -229,6 +233,7 @@ function doPost(e) {
     if (action === "updateStudent") return jsonResponse(updateStudent(payload));
     if (action === "toggleStudentStatus") return jsonResponse(toggleStudentStatus(payload));
     if (action === "submitRequest") return jsonResponse(submitRequest(payload));
+    if (action === "cancelStudentRequest") return jsonResponse(cancelStudentRequest(payload));
     if (action === "approveRequest") return jsonResponse(approveRequest(payload));
     if (action === "rejectRequest") return jsonResponse(rejectRequest(payload));
     if (action === "confirmOut") return jsonResponse(confirmOut(payload));
@@ -2141,6 +2146,85 @@ const record = withScriptLock_(function () {
   return record;
 }
 
+function validateStudentCancellationReason_(value) {
+  const reason = String(value === undefined || value === null ? "" : value).trim();
+  if (reason.length < 5) {
+    throw new Error("Sebab Batal Permohonan mesti sekurang-kurangnya 5 aksara.");
+  }
+  if (reason.length > 500) {
+    throw new Error("Sebab Batal Permohonan tidak boleh melebihi 500 aksara.");
+  }
+  return reason;
+}
+
+function cancelStudentRequest(payload) {
+  const data = payload || {};
+  const requestId = String(data.request_id || "").trim();
+  const studentId = String(data.student_id || data.id || "").trim();
+  const noMatrik = String(data.no_matrik || data.matric || "").trim();
+  const reason = validateStudentCancellationReason_(data.sebab_batal_pelajar || data.reason);
+
+  if (!requestId || !studentId || !noMatrik) {
+    throw new Error("request_id, student_id dan no_matrik diperlukan.");
+  }
+
+  const student = findActiveStudent_(studentId, noMatrik);
+  if (!student) {
+    throw new Error("Akses sesi pelajar tidak sah.");
+  }
+
+  const transition = withScriptLock_(function () {
+    const requestSheet = getSheet_(SHEETS.requests);
+    ensureHeaders_(requestSheet, HEADERS.OUTING_REQUESTS);
+    const found = findRowByRequestId_(requestId);
+    if (!found) {
+      throw new Error("Permohonan tidak dijumpai.");
+    }
+
+    const ownsRequest = normalizeText_(found.record.student_id) === normalizeText_(student.student_id) &&
+      normalizeText_(found.record.no_matrik) === normalizeText_(student.no_matrik);
+    if (!ownsRequest) {
+      throw new Error("Anda tidak dibenarkan membatalkan permohonan pelajar lain.");
+    }
+
+    const currentStatus = String(found.record.status || "").trim().toUpperCase();
+    if (currentStatus !== STATUS.pending && currentStatus !== STATUS.approved) {
+      throw new Error("Permohonan ini tidak lagi boleh dibatalkan kerana statusnya telah berubah.");
+    }
+
+    const cancelledAt = now_();
+    updateRowByHeaders_(found.sheet, found.rowNumber, {
+      status: STATUS.studentCancelled,
+      sebab_batal_pelajar: reason,
+      masa_batal_pelajar: cancelledAt,
+      dibatalkan_oleh: "PELAJAR"
+    });
+    SpreadsheetApp.flush();
+    return {
+      previousStatus: currentStatus,
+      record: Object.assign({}, found.record, {
+        status: STATUS.studentCancelled,
+        sebab_batal_pelajar: reason,
+        masa_batal_pelajar: cancelledAt,
+        dibatalkan_oleh: "PELAJAR"
+      })
+    };
+  }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
+
+  appendAuditLog("CANCEL_STUDENT_REQUEST", requestId, "Student", student.nama, JSON.stringify({
+    student_name: student.nama || "",
+    no_matrik: student.no_matrik || "",
+    jenis_permohonan: transition.record.jenis_permohonan || "",
+    status_sebelum: transition.previousStatus,
+    sebab_batal_pelajar: reason
+  }));
+
+  if (transition.previousStatus === STATUS.approved) {
+    sendTelegramMessage_(buildTelegramStudentCancellationMessage_(transition.record));
+  }
+  return transition.record;
+}
+
 function approveRequest(payload) {
   const requestId = String(payload.request_id || "").trim();
   const wardenName = String(payload.warden_name || payload.nama_warden || payload.user_name || "").trim();
@@ -2155,20 +2239,20 @@ function approveRequest(payload) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
 
-  const found = findRowByRequestId_(requestId);
-  if (!found) {
-    throw new Error("Permohonan tidak dijumpai.");
-  }
-
-  if (found.record.status !== STATUS.pending) {
-    throw new Error("Hanya permohonan MENUNGGU_KELULUSAN boleh diluluskan.");
-  }
-
-  updateRowByHeaders_(found.sheet, found.rowNumber, {
-    status: STATUS.approved,
-    warden_approve_by: warden.nama_warden,
-    masa_approve: now_()
-  });
+  const found = withScriptLock_(function () {
+    const authoritative = findRowByRequestId_(requestId);
+    if (!authoritative) throw new Error("Permohonan tidak dijumpai.");
+    if (authoritative.record.status !== STATUS.pending) {
+      throw new Error("Hanya permohonan MENUNGGU_KELULUSAN boleh diluluskan.");
+    }
+    updateRowByHeaders_(authoritative.sheet, authoritative.rowNumber, {
+      status: STATUS.approved,
+      warden_approve_by: warden.nama_warden,
+      masa_approve: now_()
+    });
+    SpreadsheetApp.flush();
+    return authoritative;
+  }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
 
   appendAuditLog("APPROVE_REQUEST", requestId, "Warden", warden.nama_warden, JSON.stringify({
     student_name: found.record.nama || "",
@@ -2194,21 +2278,21 @@ function rejectRequest(payload) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
 
-  const found = findRowByRequestId_(requestId);
-  if (!found) {
-    throw new Error("Permohonan tidak dijumpai.");
-  }
-
-  if (found.record.status !== STATUS.pending) {
-    throw new Error("Hanya permohonan MENUNGGU_KELULUSAN boleh ditolak.");
-  }
-
-  updateRowByHeaders_(found.sheet, found.rowNumber, {
-    status: STATUS.rejected,
-    warden_approve_by: warden.nama_warden,
-    masa_approve: now_(),
-    catatan: payload.catatan || found.record.catatan || ""
-  });
+  const found = withScriptLock_(function () {
+    const authoritative = findRowByRequestId_(requestId);
+    if (!authoritative) throw new Error("Permohonan tidak dijumpai.");
+    if (authoritative.record.status !== STATUS.pending) {
+      throw new Error("Hanya permohonan MENUNGGU_KELULUSAN boleh ditolak.");
+    }
+    updateRowByHeaders_(authoritative.sheet, authoritative.rowNumber, {
+      status: STATUS.rejected,
+      warden_approve_by: warden.nama_warden,
+      masa_approve: now_(),
+      catatan: payload.catatan || authoritative.record.catatan || ""
+    });
+    SpreadsheetApp.flush();
+    return authoritative;
+  }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
 
   appendAuditLog("REJECT_REQUEST", requestId, "Warden", warden.nama_warden, JSON.stringify({
     student_name: found.record.nama || "",
@@ -2236,32 +2320,29 @@ function confirmOut(payload) {
     throw new Error("Guard tidak dijumpai atau tidak aktif.");
   }
 
-  const found = findRowByRequestId_(requestId);
-  if (!found) {
-    throw new Error("Permohonan tidak dijumpai.");
+  const transition = withScriptLock_(function () {
+    const found = findRowByRequestId_(requestId);
+    if (!found) throw new Error("Permohonan tidak dijumpai.");
+    if (hasCellValue_(found.record.masa_keluar)) {
+      return { found: found, alreadyConfirmed: true };
+    }
+    if (found.record.status !== STATUS.approved) {
+      throw new Error("Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan.");
+    }
+    const departureConfig = resolveSubmissionOutingTypeConfigV200_(found.record.jenis_permohonan);
+    if (departureConfig) validateGuardDepartureV220_(found.record, departureConfig, now);
+    updateRowByHeaders_(found.sheet, found.rowNumber, {
+      status: STATUS.out,
+      masa_keluar: now_(),
+      guard_keluar_by: guard.nama_guard
+    });
+    SpreadsheetApp.flush();
+    return { found: found, alreadyConfirmed: false };
+  }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
+  const found = transition.found;
+  if (transition.alreadyConfirmed) {
+    return Object.assign({}, found.record, { message: "Rekod sudah disahkan keluar." });
   }
-
-  if (hasCellValue_(found.record.masa_keluar)) {
-    return {
-      ...found.record,
-      message: "Rekod sudah disahkan keluar."
-    };
-  }
-
-  if (found.record.status !== STATUS.approved) {
-    throw new Error("Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan.");
-  }
-
-  const departureConfig = resolveSubmissionOutingTypeConfigV200_(found.record.jenis_permohonan);
-  if (departureConfig) {
-    validateGuardDepartureV220_(found.record, departureConfig, now);
-  }
-
-  updateRowByHeaders_(found.sheet, found.rowNumber, {
-    status: STATUS.out,
-    masa_keluar: now_(),
-    guard_keluar_by: guard.nama_guard
-  });
 
   appendAuditLog("CONFIRM_OUT", requestId, "Guard", guard.nama_guard, JSON.stringify({
     student_name: found.record.nama || "",
@@ -3016,7 +3097,8 @@ function getTodayRecordRows_() {
         isDateValueToday_(row.masa_mohon, todayKey) ||
         isDateValueToday_(row.masa_approve, todayKey) ||
         isDateValueToday_(row.masa_keluar, todayKey) ||
-        isDateValueToday_(row.masa_masuk, todayKey);
+        isDateValueToday_(row.masa_masuk, todayKey) ||
+        isDateValueToday_(row.masa_batal_pelajar, todayKey);
       const activeRecord = isActiveRequestStatus_(row.status);
       // Active applications must stay visible even when tarikh is a future leave date.
       const hostelReturnOpen = isHostelReturnRequest_(row) && isOpenHostelReturnStatus_(row.status);
@@ -3052,7 +3134,7 @@ function hasActiveRequestForStudent_(student, requestRows) {
 
 function isOpenHostelReturnStatus_(status) {
   const text = String(status || "");
-  return text !== STATUS.done && text !== STATUS.rejected;
+  return text !== STATUS.done && text !== STATUS.rejected && text !== STATUS.studentCancelled;
 }
 
 function isDateValueToday_(value, todayKey) {
@@ -3096,6 +3178,9 @@ function toAdminOperationalRecord_(row, now) {
     masa_approve: row.masa_approve || "",
     guard_keluar_by: row.guard_keluar_by || "",
     guard_masuk_by: row.guard_masuk_by || "",
+    sebab_batal_pelajar: row.sebab_batal_pelajar || "",
+    masa_batal_pelajar: row.masa_batal_pelajar || "",
+    dibatalkan_oleh: row.dibatalkan_oleh || "",
     duration_minutes: calculateOutingDurationMinutes_(row),
     duration: calculateOutingDurationMinutes_(row) > 0 ? formatOutingDuration_(calculateOutingDurationMinutes_(row)) : ""
   };
@@ -3663,6 +3748,17 @@ function buildTelegramSubmitMessage_(record) {
   }
 
   return buildTelegramStatusMessage_(title, record);
+}
+
+function buildTelegramStudentCancellationMessage_(record) {
+  return [
+    "🚫 Pelajar Membatalkan Permohonan Diluluskan",
+    "Nama: " + (record.nama || "-"),
+    "No. Matrik: " + (record.no_matrik || "-"),
+    "Jenis: " + requestTypeLabel_(record.jenis_permohonan),
+    "Sebab: " + (record.sebab_batal_pelajar || "-"),
+    "Masa Batal: " + formatTelegramDateTime_(record.masa_batal_pelajar)
+  ].join("\n");
 }
 
 function buildTelegramStatusMessage_(title, record) {
