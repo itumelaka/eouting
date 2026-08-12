@@ -426,6 +426,7 @@ const els = {
   adminCloseTimeInput: document.querySelector("#adminCloseTimeInput"),
   adminDepartureAllowedDays: document.querySelector("#adminDepartureAllowedDays"),
   adminEarliestDepartureTimeInput: document.querySelector("#adminEarliestDepartureTimeInput"),
+  adminClearEarliestDepartureTimeButton: document.querySelector("#adminClearEarliestDepartureTimeButton"),
   adminFixedReturnTimeInput: document.querySelector("#adminFixedReturnTimeInput"),
   adminAllowedDays: document.querySelector("#adminAllowedDays"),
   adminSameDayInput: document.querySelector("#adminSameDayInput"),
@@ -702,6 +703,9 @@ function setupAdminDashboardV200() {
   els.adminAddTypeButton.addEventListener("click", openAdminCreateEditorV200);
   els.adminEditorCancelButton.addEventListener("click", closeAdminEditorV200);
   els.adminOutingTypeForm.addEventListener("submit", handleAdminTypeSubmitV200);
+  if (els.adminClearEarliestDepartureTimeButton) {
+    els.adminClearEarliestDepartureTimeButton.addEventListener("click", clearAdminEarliestDepartureTimeV220);
+  }
   els.adminTypeList.addEventListener("click", handleAdminTypeListActionV200);
   if (els.adminOutingTab) {
     els.adminOutingTab.addEventListener("click", () => setAdminSectionV200("outing"));
@@ -1707,6 +1711,13 @@ function setAdminAllowedDaysV200(allowedDays) {
   setAdminDaySelectionV220(els.adminAllowedDays, allowedDays);
 }
 
+function clearAdminEarliestDepartureTimeV220() {
+  if (!els.adminEarliestDepartureTimeInput) return;
+  els.adminEarliestDepartureTimeInput.value = "";
+  els.adminEarliestDepartureTimeInput.dispatchEvent(new Event("input", { bubbles: true }));
+  els.adminEarliestDepartureTimeInput.focus();
+}
+
 async function loadAdminOutingConfigReadinessV220() {
   if (!currentSession || currentSession.role !== "admin") return;
   if (els.adminConfigStatusLabel) els.adminConfigStatusLabel.textContent = "Semakan Config...";
@@ -1811,7 +1822,7 @@ function collectAdminOutingTypeConfigV200() {
     application_open_time: els.adminOpenTimeInput.value || "",
     application_close_time: els.adminCloseTimeInput.value || "",
     departure_allowed_days: departureAllowedDays.join(","),
-    earliest_departure_time: els.adminEarliestDepartureTimeInput.value || "",
+    earliest_departure_time: String(els.adminEarliestDepartureTimeInput.value || "").trim(),
     fixed_return_time: els.adminFixedReturnTimeInput.value || ""
   };
   getAdminRuleInputMapV200().forEach(([field, input]) => {
@@ -3574,6 +3585,17 @@ function applyStudentOutingTypeConfigV200(config) {
   const sameDayOnly = config.same_day_only === true;
   const fixedReturnTime = String(config.fixed_return_time || "").trim();
   const hasDepartureDayRule = String(config.departure_allowed_days || "").trim() !== "";
+  const standardTypeCodes = new Set(Object.values(REQUEST_TYPE));
+  const dynamicSectionTitle = els.overnightFields
+    ? els.overnightFields.querySelector("h3")
+    : null;
+  if (dynamicSectionTitle) {
+    if (config.type_code === REQUEST_TYPE.overnight) {
+      dynamicSectionTitle.textContent = "Maklumat Pulang Bermalam";
+    } else if (!standardTypeCodes.has(config.type_code)) {
+      dynamicSectionTitle.textContent = "Maklumat Tambahan";
+    }
+  }
   const leaveDateRequired = config.require_leave_date === true || hasDepartureDayRule;
   setConfigFieldStateV200(els.leaveDateInput, leaveDateRequired, leaveDateRequired, { reset: typeChanged, clearOnTypeChange: true });
   setConfigFieldStateV200(

@@ -514,10 +514,14 @@
                   <label><input type="checkbox" value="SABTU"> Sabtu</label>
                 </div>
                 <div class="admin-form-grid">
-                  <label>Masa Keluar Paling Awal
-                    <input id="adminEarliestDepartureTimeInput" type="time">
-                    <small class="admin-field-helper">Masa ini boleh diubah oleh Admin mengikut arahan semasa HEP.</small>
-                  </label>
+                  <div class="admin-field-group">
+                    <label for="adminEarliestDepartureTimeInput">Masa Keluar Paling Awal</label>
+                    <div class="admin-time-clear-control">
+                      <input id="adminEarliestDepartureTimeInput" type="time">
+                      <button class="secondary-action compact-action" id="adminClearEarliestDepartureTimeButton" type="button">Kosongkan</button>
+                    </div>
+                    <small class="admin-field-helper">Kosong bermaksud tiada sekatan masa keluar paling awal.</small>
+                  </div>
                 </div>
               </fieldset>
 

@@ -4142,6 +4142,19 @@ button.profile-photo-frame {
   line-height: 1.35;
 }
 
+.admin-field-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-time-clear-control {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .admin-student-filters {
   align-items: end;
   background: linear-gradient(145deg, #f4fbf8, #dcefe8);
