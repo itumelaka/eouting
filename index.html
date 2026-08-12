@@ -186,9 +186,11 @@
               <div class="student-profile-photo-copy">
                 <strong id="studentProfilePhotoTitle">Tiada Foto Profil</strong>
                 <small id="studentProfilePhotoUpdated"></small>
-                <label class="secondary-action student-profile-photo-picker" id="studentProfilePhotoPicker" for="studentProfilePhotoInput">Tambah Foto</label>
-                <input id="studentProfilePhotoInput" class="profile-photo-input" type="file"
-                  accept="image/jpeg,image/png,image/webp" aria-label="Pilih foto profil">
+                <button class="secondary-action student-profile-photo-picker" id="studentProfilePhotoPicker" type="button">Tambah Foto</button>
+                <input id="studentProfilePhotoCameraInput" class="profile-photo-input" type="file"
+                  accept="image/*" capture="user" aria-label="Ambil foto profil">
+                <input id="studentProfilePhotoGalleryInput" class="profile-photo-input" type="file"
+                  accept="image/*" aria-label="Pilih foto profil dari galeri">
                 <small class="profile-photo-guidance">Gunakan gambar muka yang jelas seperti gambar ukuran pasport.</small>
                 <p class="form-message student-profile-photo-message" id="studentProfilePhotoMessage" aria-live="polite"></p>
               </div>
@@ -729,6 +731,19 @@
         </div>
         <p class="profile-photo-modal-status" id="profilePhotoModalStatus" role="status" hidden></p>
         <button class="secondary-action compact-action" id="profilePhotoModalRetry" type="button" hidden>Cuba Lagi</button>
+      </div>
+    </div>
+
+    <div class="profile-photo-source-modal" id="profilePhotoSourceModal" role="dialog" aria-modal="true"
+      aria-labelledby="profilePhotoSourceTitle" hidden>
+      <div class="profile-photo-source-sheet">
+        <h2 id="profilePhotoSourceTitle">Pilih Sumber Foto</h2>
+        <p>Ambil foto baharu atau pilih gambar yang sedia ada.</p>
+        <div class="profile-photo-source-actions">
+          <button class="primary-action" id="profilePhotoCameraButton" type="button">Ambil Foto</button>
+          <button class="secondary-action" id="profilePhotoGalleryButton" type="button">Pilih dari Galeri</button>
+          <button class="secondary-action" id="profilePhotoSourceCancel" type="button">Batal</button>
+        </div>
       </div>
     </div>
 

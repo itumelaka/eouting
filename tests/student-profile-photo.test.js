@@ -200,7 +200,8 @@ test("batch failures stay non-blocking, rate-limited and free of sensitive diagn
 });
 
 test("Student UI compresses to a 3:4 JPEG and preserves the current photo on failure", () => {
-  assert.match(html, /id="studentProfilePhotoInput"[^>]*accept="image\/jpeg,image\/png,image\/webp"/s);
+  assert.match(html, /id="studentProfilePhotoCameraInput"[^>]*accept="image\/\*"[^>]*capture="user"/s);
+  assert.match(html, /id="studentProfilePhotoGalleryInput"[^>]*accept="image\/\*"/s);
   assert.match(html, /Gunakan gambar muka yang jelas seperti gambar ukuran pasport/);
   const compression = extractFunction(app, "compressStudentProfilePhoto", "startStudentSession");
   assert.match(compression, /targetRatio = 3 \/ 4/);

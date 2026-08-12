@@ -244,6 +244,7 @@ let profilePhotoBatchWarningAt = 0;
 let profilePhotoBatchWarningType = "";
 let profilePhotoPreviewTrigger = null;
 let profilePhotoPreviewBodyOverflow = "";
+let profilePhotoSourceTrigger = null;
 let activeAdminSectionV200 = "outing";
 let adminMonitoringV210 = null;
 let adminMonitoringFilterV210 = "all";
@@ -339,8 +340,13 @@ const els = {
   studentProfilePhotoTitle: document.querySelector("#studentProfilePhotoTitle"),
   studentProfilePhotoUpdated: document.querySelector("#studentProfilePhotoUpdated"),
   studentProfilePhotoPicker: document.querySelector("#studentProfilePhotoPicker"),
-  studentProfilePhotoInput: document.querySelector("#studentProfilePhotoInput"),
+  studentProfilePhotoCameraInput: document.querySelector("#studentProfilePhotoCameraInput"),
+  studentProfilePhotoGalleryInput: document.querySelector("#studentProfilePhotoGalleryInput"),
   studentProfilePhotoMessage: document.querySelector("#studentProfilePhotoMessage"),
+  profilePhotoSourceModal: document.querySelector("#profilePhotoSourceModal"),
+  profilePhotoCameraButton: document.querySelector("#profilePhotoCameraButton"),
+  profilePhotoGalleryButton: document.querySelector("#profilePhotoGalleryButton"),
+  profilePhotoSourceCancel: document.querySelector("#profilePhotoSourceCancel"),
   profilePhotoModal: document.querySelector("#profilePhotoModal"),
   profilePhotoModalClose: document.querySelector("#profilePhotoModalClose"),
   profilePhotoModalImage: document.querySelector("#profilePhotoModalImage"),
@@ -2528,6 +2534,7 @@ els.guardLoginPanel.addEventListener("submit", handleGuardLoginSubmitV211);
 
 els.logoutButton.addEventListener("click", () => {
   hideAuthLoadingV220();
+  closeProfilePhotoSourceChooser();
   closeProfilePhotoPreview();
   clearSavedSession();
   stopWardenAutoRefresh();
@@ -3757,9 +3764,68 @@ function syncStudentSameDayReturnV200() {
 }
 
 function setupStudentProfilePhotoControls() {
-  if (!els.studentProfilePhotoInput || els.studentProfilePhotoInput.dataset.ready === "1") return;
-  els.studentProfilePhotoInput.dataset.ready = "1";
-  els.studentProfilePhotoInput.addEventListener("change", handleStudentProfilePhotoSelection);
+  if (!els.studentProfilePhotoPicker || els.studentProfilePhotoPicker.dataset.ready === "1") return;
+  els.studentProfilePhotoPicker.dataset.ready = "1";
+  els.studentProfilePhotoPicker.addEventListener("click", openProfilePhotoSourceChooser);
+  [els.studentProfilePhotoCameraInput, els.studentProfilePhotoGalleryInput].forEach((input) => {
+    if (input) input.addEventListener("change", handleStudentProfilePhotoSelection);
+  });
+  if (els.profilePhotoCameraButton) {
+    els.profilePhotoCameraButton.addEventListener("click", () => chooseStudentProfilePhotoSource(els.studentProfilePhotoCameraInput));
+  }
+  if (els.profilePhotoGalleryButton) {
+    els.profilePhotoGalleryButton.addEventListener("click", () => chooseStudentProfilePhotoSource(els.studentProfilePhotoGalleryInput));
+  }
+  if (els.profilePhotoSourceCancel) els.profilePhotoSourceCancel.addEventListener("click", closeProfilePhotoSourceChooser);
+  if (els.profilePhotoSourceModal) {
+    els.profilePhotoSourceModal.addEventListener("click", (event) => {
+      if (event.target === els.profilePhotoSourceModal) closeProfilePhotoSourceChooser();
+    });
+    els.profilePhotoSourceModal.addEventListener("keydown", handleProfilePhotoSourceKeydown);
+  }
+}
+
+function openProfilePhotoSourceChooser() {
+  if (studentProfileUploadInFlight || !els.profilePhotoSourceModal) return;
+  profilePhotoSourceTrigger = document.activeElement;
+  els.profilePhotoSourceModal.hidden = false;
+  if (els.profilePhotoCameraButton) els.profilePhotoCameraButton.focus();
+}
+
+function closeProfilePhotoSourceChooser() {
+  if (!els.profilePhotoSourceModal || els.profilePhotoSourceModal.hidden) return;
+  els.profilePhotoSourceModal.hidden = true;
+  const trigger = profilePhotoSourceTrigger;
+  profilePhotoSourceTrigger = null;
+  if (trigger && typeof trigger.focus === "function") trigger.focus();
+}
+
+function chooseStudentProfilePhotoSource(input) {
+  if (!input || studentProfileUploadInFlight) return;
+  input.value = "";
+  closeProfilePhotoSourceChooser();
+  input.click();
+}
+
+function handleProfilePhotoSourceKeydown(event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeProfilePhotoSourceChooser();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const controls = [els.profilePhotoCameraButton, els.profilePhotoGalleryButton, els.profilePhotoSourceCancel]
+    .filter((button) => button && !button.disabled);
+  if (!controls.length) return;
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function profilePhotoCacheKey(studentId) {
@@ -4056,7 +4122,10 @@ function renderStudentProfilePhotoArea() {
   els.studentProfilePhotoUpdated.textContent = updatedAt ? `Dikemas kini: ${formatDisplayDateTime(updatedAt)}` : "";
   els.studentProfilePhotoPicker.textContent = hasPhoto ? "Kemaskini Foto" : "Tambah Foto";
   els.studentProfilePhotoPicker.classList.toggle("is-disabled", studentProfileUploadInFlight);
-  els.studentProfilePhotoInput.disabled = studentProfileUploadInFlight;
+  els.studentProfilePhotoPicker.disabled = studentProfileUploadInFlight;
+  [els.studentProfilePhotoCameraInput, els.studentProfilePhotoGalleryInput].forEach((input) => {
+    if (input) input.disabled = studentProfileUploadInFlight;
+  });
 }
 
 async function handleStudentProfilePhotoSelection(event) {
