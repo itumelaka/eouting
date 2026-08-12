@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r4` dan production GAS Version 37.
+Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r5` dan production GAS Version 37.
 
 ## Keperluan
 
@@ -30,7 +30,7 @@ Buka `http://localhost:8080/?mock=1`, pilih `Admin` dan gunakan credential local
 - nama alternatif: `Admin Mock QA`
 - PIN: `2468`
 
-Credential ini hanya dibina apabila query tepat `mock=1` hadir. Tanpa query tersebut, semua action Admin menggunakan GAS live dan credential mock tidak diterima. Mock login response tidak mengandungi PIN; PIN hanya berada dalam runtime tab semasa dan dibersihkan semasa logout.
+Credential ini hanya dibina apabila query tepat `mock=1` hadir. Tanpa query tersebut, semua action Admin menggunakan GAS live dan credential mock tidak diterima. Mock login response tidak mengandungi PIN; runtime dan dedicated Admin sessionStorage tab dibersihkan semasa logout.
 
 Lima jenis outing dan satu Notis Banner contoh disediakan dalam memory, termasuk `CUTI_SEMESTER` yang tidak aktif untuk QA toggle. Create, edit dan toggle hanya mengubah data memory dan tidak memanggil GAS atau Google Sheets. Refresh page mengembalikan seed asal.
 
@@ -81,7 +81,7 @@ Ujian Admin beta:
 7. semak lima seed, refresh, create/edit/toggle dan conflict handling pada beta sahaja;
 8. logout dan pastikan credential runtime serta senarai Admin dibersihkan.
 
-Backend semasa belum mengeluarkan session token Admin. PIN yang ditaip disimpan hanya dalam memory runtime tab untuk menghantar authenticated Admin POST berikutnya; ia tidak disimpan dalam `localStorage`, `sessionStorage`, URL atau log. Logout membersihkan credential runtime tersebut.
+Backend semasa belum mengeluarkan session token Admin. PIN berada dalam memory runtime untuk authenticated POST dan dedicated `sessionStorage` tab `eouting_admin_session_v1` untuk refresh restore; ia tidak disimpan dalam `localStorage`, URL atau log. Rekod menyimpan original normalized identity, PIN dan absolute `expiresAt` 12 jam. Restore mesti lulus `loginAdmin`, refresh tidak memanjangkan expiry, dan logout membersihkan saved/runtime state.
 
 Untuk QA rollback/beta dengan `OUTING_CONFIG_V2_ENABLED=false` (bukan state production semasa), jangkaan yang betul ialah:
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline production selepas close-out Announcement Banner pada 11 Ogos 2026 ialah **287/287 lulus**. Focused banner regression ialah **12/12 lulus**.
+Baseline yang disahkan pada 12 Ogos 2026 ialah **317/317 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -115,10 +115,14 @@ Ujian manual Admin Dashboard:
 5. edit row dan pastikan `type_code` read-only serta active tidak boleh diubah;
 6. uji conflict melalui `mockAdminConflict=1` dan pastikan data direfresh;
 7. toggle active/inactive dengan confirmation;
-8. logout dan pastikan refresh browser tidak memulihkan session Admin.
+8. refresh dan pastikan `loginAdmin` dipanggil semula, Admin dipulihkan, expiry asal kekal dan tab bukan default tidak dimuat eager;
+9. logout dan pastikan refresh browser tidak memulihkan session Admin.
 
 Suite utama:
 
+- `tests/admin-session-refresh-v220.test.js`: schema session Admin, payload login/restore sama, backend rejection, absolute expiry, logout dan lazy bootstrap.
+- `tests/auth-loading-v220.test.js`: loader shared semua role, cleanup success/failure/logout dan reduced-motion.
+- `tests/profile-photo-source-v220.test.js`: action sheet kamera/galeri, shared handler, cancellation/failure cleanup dan pengasingan return-selfie.
 - `tests/announcement-banner-v1.test.js`: Admin UI/save, authenticated projection, ticker sentiasa aktif, hover/fokus pause, reduced-motion, public privacy dan cleanup panduan Pelajar.
 - `tests/student-directory-security.test.js`: projection direktori Pelajar dan login backend.
 - `tests/student-login-dropdown-privacy.test.js`: dropdown nama tanpa nombor matrik.
@@ -160,7 +164,8 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 7. Selepas Guard confirm masuk, semak badge `Bukti Selfie Belum Dihantar`.
 8. Uji capture/pilih gambar, preview, ambil semula dan `Hantar Bukti`.
 9. Dalam mock mode, sahkan badge bertukar kepada `Bukti Selfie Dihantar` tanpa request Drive/Telegram.
-10. Jika foto profil sebenar tersedia, sahkan identity menggunakan thumbnail, klik foto dan pastikan modal menunjukkan thumbnail/loading sebelum full image jika cache kosong; pembukaan kedua menggunakan full-image cache. Escape/backdrop/close dan fokus kembali mesti berfungsi. Initials tidak boleh diklik.
+10. Tekan tindakan foto profil dan sahkan action sheet `Ambil Foto`, `Pilih dari Galeri`, `Batal`; kamera mengutamakan depan, galeri tidak memaksa kamera, cancel tidak meninggalkan loading, dan kedua-dua selection melalui validation/compression/upload yang sama.
+11. Jika foto profil sebenar tersedia, sahkan identity menggunakan thumbnail, klik foto dan pastikan modal menunjukkan thumbnail/loading sebelum full image jika cache kosong; pembukaan kedua menggunakan full-image cache. Escape/backdrop/close dan fokus kembali mesti berfungsi. Initials tidak boleh diklik.
 
 ## Smoke Test Warden
 
@@ -168,7 +173,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 2. Pastikan Dashboard dan Checklist memuatkan nama sebenar.
 3. Semak emoji/label kontekstual.
 4. Refresh Permohonan.
-5. Uji approve/reject dan Telegram.
+5. Uji approve/reject dan Telegram; klik berulang semasa loading mesti tidak menghantar action kedua.
 6. Pastikan credential hilang menghasilkan error, bukan data Public Monitoring.
 7. Klik foto sebenar pada kad Warden/HEP dan sahkan list menggunakan satu batch thumbnail, preview membuat hanya satu request full jika belum dicache, dan approve/reject tidak terganggu.
 
@@ -178,7 +183,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 2. Refresh dan semak `Sedia Untuk Keluar` serta `Sedang Keluar`.
 3. Uji filter Semua, Outing Harian, Pulang Bermalam, Cuti Semester, Kecemasan dan Lewat.
 4. Pastikan Outing Harian tidak menangkap Kecemasan.
-5. Uji confirm keluar/masuk dan Telegram.
+5. Uji confirm keluar/masuk dan Telegram; klik berulang semasa loading mesti tidak menghantar action kedua.
 6. Klik foto sebenar pada setiap jenis kad Guard dan sahkan satu batch thumbnail digunakan, full preview dimuat on-demand/cached dan tidak mengganggu `Sahkan Keluar`/`Sahkan Masuk`; initials kekal inert.
 7. Untuk `PULANG_BERMALAM`, uji future approved date, disallowed departure day dan sebelum `earliest_departure_time`; policy error mesti jelas dan error network/internal mesti kekal generic.
 
@@ -202,11 +207,12 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 3. Dalam `Tetapan Pelajar`, sahkan list menggunakan thumbnail cache, klik foto dan pastikan satu full image dimuat on-demand lalu dicache; `Buang Foto` kekal tindakan berasingan dengan confirmation serta invalidasi kedua-dua cache.
 4. Semak Rekod Master search/filter/pagination, Pemantauan dan pengurusan Warden/HEP/Guard masih boleh ditukar tanpa login semula.
 5. Dalam `Notis Banner`, uji teks, `Penting`, `Aktif`, simpan, current state, timestamp dan updater; sahkan Normal/Penting bergerak sama dan viewer authenticated menerima projection selamat.
+6. Refresh berulang selepas login dan sahkan restore loader, backend revalidation, shell selepas auth, default data dahulu serta lazy inactive sections.
 
 ## PWA dan Cache
 
 - Semak footer v2.2.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r4`; displayed app version kekal v2.2.0.
+- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r5` dan asset query `2.2.0-r5`; displayed app version kekal v2.2.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

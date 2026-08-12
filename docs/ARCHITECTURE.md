@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r4`. Production menggunakan GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
+Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r5`. Production menggunakan GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
 
 ## Komponen
 
@@ -23,7 +23,7 @@ Fail utama:
 - `service-worker.js`
 - `version.json`
 
-Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP dan Guard, Public Monitoring read-only yang dibuka inline, tujuh modul Admin inline termasuk `Notis Banner`, update PWA serta input kamera/file untuk foto profil dan bukti pulang. Statistik tidak mempunyai laluan awam dan kekal di dalam shell Admin. Foto profil dipotong 3:4 dan dikecilkan kepada maksimum kira-kira 600×800; selfie kekal pada resize sisi terpanjang kira-kira 1280px. Frontend role hiding bukan boundary keselamatan.
+Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP dan Guard, Public Monitoring read-only yang dibuka inline, tujuh modul Admin inline termasuk `Notis Banner`, update PWA serta input kamera/file untuk foto profil dan bukti pulang. Statistik tidak mempunyai laluan awam dan kekal di dalam shell Admin. Foto profil menawarkan input kamera `capture="user"` dan input galeri tanpa `capture`, kemudian kedua-duanya berkongsi crop 3:4 serta compression maksimum kira-kira 600×800; selfie kekal workflow berasingan pada resize sisi terpanjang kira-kira 1280px. Frontend role hiding bukan boundary keselamatan.
 
 ### GAS Router
 
@@ -63,7 +63,7 @@ Fasa 2 eOuting v2.0 menambah `setupAdminOutingConfigV200()` untuk mencipta dua t
 
 Fasa 3 menambah backend authentication dan API konfigurasi tanpa menambah UI Admin atau menukar `submitRequest`. Public config menggunakan GET read-only, manakala login, admin read dan semua write menggunakan POST dengan credential Admin pada setiap request.
 
-Fasa 4 menambah role dan Dashboard Admin pada frontend. Credential Admin disimpan dalam memory runtime sahaja; PIN tidak dimasukkan ke localStorage, log atau DOM selepas login. Dashboard membaca active/inactive config, menyediakan create/edit/toggle terkawal dan menghantar `expected_config_version` untuk update/toggle. Student form masih hard-coded.
+Rekod Fasa 4 asal menambah role dan Dashboard Admin pada frontend ketika credential masih memory-only dan Student form masih hard-coded. Keadaan itu ialah sejarah implementasi, bukan architecture production semasa; session restore dan rendering config-driven diterangkan di bawah.
 
 Fasa 4.6 menetapkan satu sahaja canonical `apiPost` frontend. Router ini memintas lima action Admin hanya dalam `?mock=1`; selain itu ia menghantar POST `no-store` ke GAS dan menyerahkan semua response kepada `parseApiResponse`. Duplicate dead declaration dibuang tanpa mengubah payload atau call site.
 
@@ -72,6 +72,20 @@ Fasa 5A memuatkan public `GET getOutingTypes` hanya selepas sesi Pelajar dibuka.
 Foundation departure-rule menambah `departure_allowed_days` dan `earliest_departure_time` pada `OUTING_TYPES` sedia ada. Ia tidak mencipta modul polisi kedua. `allowed_days` serta application window mengawal masa permohonan; medan departure mengawal tarikh keluar yang diminta dan masa paling awal Guard boleh mengesahkan keluar. Enforcement production kini membaca row aktif kerana `OUTING_CONFIG_V2_ENABLED=true`.
 
 Readiness hardening menambah POST Admin-only `getOutingConfigReadiness`. Ia membaca `OUTING_TYPES` tanpa mencipta atau mengubah sheet dan tidak mendedahkan property atau credential. Tetapan Outing memaparkan chip `Config Active`, `Legacy` atau `Config Issue` dengan sebab not-ready yang accessible; tiada control activation. Label config digunakan oleh Student, Telegram, statistik, Rekod Master, filter Admin, Checklist/filter Warden, label kontekstual dan return-selfie eligibility. `require_warden_approval=false` menghasilkan state `DILULUSKAN_WARDEN`, approver `AUTO_CONFIG_V2`, masa approval dan audit `AUTO_APPROVE_REQUEST` yang eksplisit.
+
+### Config-driven Outing dan Jenis Custom
+
+Konfigurasi jenis terpilih ialah source of truth frontend untuk visibility, required/disabled state dan payload `tarikh`, `tarikh_balik` serta `masa_balik_dijangka`. Tarikh paparan dinormalisasi kepada `YYYY-MM-DD`; `fixed_return_time` mengatasi input pengguna apabila ditetapkan. Jenis custom tidak memerlukan branch berdasarkan type code jika requirement boleh dinyatakan melalui `OUTING_TYPES`.
+
+Jenis production `KLINIK` (`Keluar ke Klinik`) ialah contoh: same-day, tiada input tarikh keluar/balik manual, tetapi masa balik dijangka, lokasi, kenderaan, kelulusan Warden dan selfie diperlukan. UI custom menggunakan `Maklumat Tambahan`; tajuk `Maklumat Pulang Bermalam` kekal khusus untuk `PULANG_BERMALAM`. `earliest_departure_time` kosong bermaksud tiada sekatan masa paling awal. Readiness menolak kombinasi bercanggah seperti `departure_allowed_days` berisi sedangkan `require_leave_date=false`.
+
+### Admin Session Restore
+
+Login Admin dan restore berkongsi pembina payload `{ admin_id: identity, nama_admin: identity, pin }`. Rekod tab minimum `{ identity, pin, expiresAt }` disimpan dalam `sessionStorage` melalui key `eouting_admin_session_v1`; expiry ialah 12 jam absolute dan tidak ditulis semula ketika refresh. PIN Admin tidak masuk `localStorage`, dan sessionStorage tidak dianggap bukti authentication tanpa POST `loginAdmin` ke backend.
+
+Bootstrap memeriksa saved Admin session, menunjukkan loader restore, menjalankan revalidation, membina semula `adminRuntimeCredential`, kemudian mengaktifkan shell. Ia tidak menunggu `getStudents`, `getWardens`, `getGuards` atau `getTodayRecords` terlebih dahulu. Default Admin section dimulakan selepas auth dan section lain dimuat secara lazy apabila dibuka; Tetapan Outing tidak lagi dimuat unconditional semasa restore.
+
+Loader authentication yang sama meliputi login/restore Pelajar, Warden, Guard dan Admin. Operation token menghalang kerja lama menyembunyikan loader operasi lebih baharu; success, failure dan logout membersihkannya. Animasi CSS Clay-style menghormati `prefers-reduced-motion`, dan Public Pemantauan tidak menggunakan loader authenticated ini.
 
 ```text
 Production v2.2.0: config-driven rendering + validation + dynamic consumers
@@ -209,7 +223,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.0-r4` dan query `2.2.0-r4`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.0-r5` dan query `2.2.0-r5`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
@@ -231,6 +245,8 @@ OUTING_CONFIG_V2_ENABLED === "true"
 Frontend tidak menentukan authorization atau validation akhir. Config yang dihantar client tidak dipercayai; resolver sentiasa membaca `OUTING_TYPES`. Sheet hilang, jenis hilang/inactive atau config malformed gagal tertutup. Feature flag production ialah `true`; rollback kepada validator legacy dilakukan dengan menetapkannya kepada `false` tanpa redeployment.
 
 `confirmOut` turut menyemak tarikh keluar yang diluluskan, configured departure day dan earliest departure time. Policy error yang sepadan dipaparkan kepada Guard dalam wording Melayu yang diallowlist; network/internal error kekal generik dan stack detail tidak didedahkan.
+
+Semakan active request serta append submission berada dalam satu `ScriptLock`. Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` menghalang duplicate; `SELESAI` serta `DITOLAK_WARDEN` tidak. Frontend juga menggunakan satu in-flight lock dan loading feedback. Action approve/reject Warden serta confirm-out/confirm-in Guard mempunyai lock UI masing-masing untuk menolak klik berganda tanpa mengubah boundary backend.
 
 ## Operasi Admin
 

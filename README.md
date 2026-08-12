@@ -14,6 +14,8 @@ Versi repo semasa: **v2.2.0 — Operasi Bersepadu dan Foto Profil Private Dua Pe
 
 Frontend production v2.2.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
+Revision aset frontend semasa ialah `2.2.0-r5` dan service worker menggunakan `eouting-cache-v2.2.0-r5`. Revision r5 memastikan mobile/PWA menerima pilihan kamera atau galeri bagi foto profil tanpa menaikkan displayed application version.
+
 Backend production semasa menggunakan GAS **Version 37**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
 Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
@@ -46,6 +48,7 @@ Frontend mengurus paparan, kamera dan pemampatan gambar. GAS menguatkuasakan log
 - **Pelajar:** pilih nama, masukkan nombor matrik, hantar permohonan dan lihat rekod sendiri.
 - **Warden/HEP:** berkongsi role backend `warden`, login nama + PIN, refresh rekod, approve/reject, guna Checklist Permohonan dan salin senarai nama.
 - **Guard:** login nama + PIN, lihat `Sedia Untuk Keluar` dan `Sedang Keluar`, kemudian sahkan keluar/masuk.
+- **Admin:** login ID/nama + PIN, urus modul operasi/config, dan memulihkan sesi tab secara selamat selepas refresh melalui revalidasi backend.
 - **Public Monitoring read-only:** lihat ringkasan dan `Senarai Status Semasa` tanpa tindakan operasi.
 
 ## Jenis Permohonan
@@ -67,6 +70,12 @@ Pelajar hantar permohonan
   -> status utama kekal SELESAI
   -> Pelajar hantar bukti selfie jika diwajibkan
 ```
+
+Frontend membina medan serta payload daripada konfigurasi jenis yang dipilih. `require_leave_date`, `require_return_date`, `require_return_time`, `fixed_return_time`, `same_day_only`, lokasi, kenderaan dan requirement lain menentukan nilai `tarikh`, `tarikh_balik` serta `masa_balik_dijangka`; tarikh dinormalisasi kepada `YYYY-MM-DD`. Jenis custom baharu tidak patut memerlukan branch frontend hard-coded.
+
+Jenis custom production `KLINIK` dipaparkan sebagai **Keluar ke Klinik**. Ia ialah outing hari sama tanpa input tarikh keluar/balik manual, memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden dan selfie pulang. Ruang dinamik menggunakan tajuk neutral `Maklumat Tambahan`; `PULANG_BERMALAM` mengekalkan `Maklumat Pulang Bermalam`. Nilai `earliest_departure_time` kosong bermaksud tiada had masa keluar paling awal dan boleh dikosongkan Admin melalui `Kosongkan`.
+
+Submission Pelajar mempunyai lock in-flight frontend dan loading feedback. Di backend, semakan active request serta append berlaku secara atomic di bawah `ScriptLock`; `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` menghalang duplicate, manakala `SELESAI` serta `DITOLAK_WARDEN` membenarkan permohonan baharu. Approve/reject Warden dan confirm-out/confirm-in Guard turut mempunyai perlindungan klik berganda semasa action berjalan.
 
 Konfigurasi production membezakan dua konsep:
 
@@ -98,6 +107,8 @@ Semasa `confirmOut`, GAS menyemak tarikh keluar yang diluluskan, hari keluar yan
 ## Foto Profil Pelajar
 
 Pelajar berautentikasi boleh menambah atau mengganti foto profil sendiri. Frontend menerima JPEG, PNG atau WebP sehingga 2 MB, memotong paparan tengah kepada nisbah 3:4 dan mengecilkan kepada maksimum kira-kira 600×800 sebelum menghantar JPEG termampat. Metadata private disimpan pada `STUDENTS.photo_file_id` dan `STUDENTS.photo_updated_at`; base64 tidak disimpan dalam Sheet.
+
+Tindakan foto profil membuka action sheet `Ambil Foto`, `Pilih dari Galeri` dan `Batal`. Kamera menggunakan `accept="image/*"` bersama `capture="user"` untuk mengutamakan kamera depan apabila disokong; galeri menggunakan input berasingan tanpa `capture`. Kedua-duanya masuk ke pipeline validation, crop, compression, upload dan cache yang sama. Return-selfie kekal workflow berasingan.
 
 Satu foto aktif dimaksudkan bagi setiap pelajar. Semasa replacement, fail baharu dicipta dan metadata Sheet di-commit/flush dahulu; hanya selepas itu fail lama yang disahkan berada dalam folder profil ditrash. Admin boleh membuang foto melalui tindakan confirmed berautentikasi.
 
@@ -175,7 +186,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline production semasa ialah **287/287 lulus**; focused Announcement Banner regression ialah **12/12 lulus**. Syntax checks:
+Baseline repo yang disahkan pada 12 Ogos 2026 ialah **317/317 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -184,6 +195,10 @@ Get-Content gas/Code.gs -Raw | node --check -
 ```
 
 ## Modul Operasi Admin v2.2.0
+
+Login Admin menyimpan credential minimum `{ identity, pin, expiresAt }` dalam `sessionStorage` tab di bawah key `eouting_admin_session_v1`, dengan absolute expiry 12 jam yang tidak dilanjutkan oleh refresh. PIN tidak ditulis ke `localStorage`. Refresh memanggil semula `loginAdmin` menggunakan semantic payload yang sama seperti login biasa sebelum shell privileged dipaparkan. Selepas sah, shell Admin muncul dahulu; default section dimuat dan tab lain lazy-load apabila dibuka.
+
+Satu loader authentication/restore Clay-style digunakan oleh Pelajar, Warden, Guard dan Admin untuk login serta restore sebenar. Ia dibuang terus pada success, failure atau logout, menggunakan operation token untuk mengelakkan race, dan menghormati `prefers-reduced-motion`. Public Pemantauan kekal berasingan.
 
 Dashboard Admin mengekalkan shell dan tujuh modul inline: `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar`, `Tetapan Outing` dan `Notis Banner`. Statistik tidak mempunyai workspace awam atau shell berasingan; agregat, filter bulan/tahun/kelas dan statistik individu hanya dimuat melalui sesi Admin. Rekod Master menyediakan carian/filter/pagination, Pemantauan ialah paparan operasi baca sahaja, dan jumlah outing tahunan turut dipaparkan kepada Pelajar. Endpoint Admin mengesahkan credential menggunakan `validateAdminCredentials_()` pada setiap permintaan.
 
@@ -212,6 +227,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 37**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r4`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 37**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r5`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

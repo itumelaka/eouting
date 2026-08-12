@@ -13,13 +13,21 @@ Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 37**. 
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
 - [x] GAS Version 37 ialah baseline production semasa; config-driven active, readiness hijau dan Notis Banner V1 live.
-- [x] Cache/asset source revision `2.2.0-r4` dengan displayed app version kekal v2.2.0.
+- [x] Cache/asset source revision `2.2.0-r5` dengan displayed app version kekal v2.2.0.
 - [x] Setiap banner aktif menggunakan ticker kiri berterusan; hover/focus/touch pause dan reduced-motion kekal statik.
 - [x] Controlled activation: submission, Warden approval, early Guard rejection dan safe policy feedback disahkan.
 - [x] Notis Banner V1 live: satu notis Script Properties, Admin edit/aktif/penting, viewer authenticated, safe text, audit dan reduced-motion.
 - [x] Deploy Notis Banner sebagai GAS Version 37 dan sahkan Admin UI/save, Normal banner, authenticated display, timestamp serta public privacy.
-- [x] Focused banner tests **12/12** dan full Node suite **287/287**.
+- [x] Full Node suite semasa **317/317** pada 12 Ogos 2026.
 - [x] Buang ayat panduan outing pendua di bawah “Permohonan Pelajar”; kekalkan Announcement Banner, `ruleNotice` dan borang.
+- [x] Atomic duplicate outing protection: frontend in-flight state serta backend `ScriptLock` untuk active-check + append.
+- [x] In-flight loading Warden approve/reject dan Guard confirm-out/confirm-in.
+- [x] Dynamic payload fields untuk semua jenis config/custom; KLINIK dan standard types regression-tested.
+- [x] Admin boleh `Kosongkan` earliest departure time; blank tidak berubah menjadi current time.
+- [x] Admin refresh persistence melalui `eouting_admin_session_v1`, 12-hour absolute expiry dan mandatory backend revalidation.
+- [x] Global auth/restore loader Pelajar, Warden, Guard dan Admin dengan operation token serta reduced-motion.
+- [x] Foto profil Pelajar menawarkan kamera depan atau galeri melalui satu shared processing pipeline; return-selfie kekal berasingan.
+- [x] Mobile/PWA production disahkan menggunakan cache r5.
 
 ### eOuting v2.0 — Fasa 2 Schema dan Migration
 

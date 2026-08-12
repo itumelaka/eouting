@@ -54,6 +54,8 @@ Backend memastikan:
 
 PIN yang ditaip digabungkan ke runtime session selepas fresh staff login supaya POST operasi boleh berjalan. Flow `Ingat peranti ini` sedia ada menggunakan localStorage dengan expiry; jangan gunakannya pada peranti public/shared tanpa kelulusan operasi. Shared Guard PC perlu log keluar selepas digunakan.
 
+Admin menggunakan mekanisme berasingan dan tidak masuk ke localStorage. Login berjaya menyimpan `{ identity, pin, expiresAt }` dalam tab-scoped `sessionStorage` menggunakan key `eouting_admin_session_v1`. Expiry absolute ialah 12 jam dan refresh tidak memanjangkannya. Restore mesti menghantar semula `{ admin_id: identity, nama_admin: identity, pin }` kepada `loginAdmin`; sessionStorage sahaja bukan bukti authentication. Credential malformed/expired/rejected dibersihkan bersama runtime/partial session, dan logout menghapuskan saved record serta `adminRuntimeCredential`.
+
 Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 
 ## Service Worker dan Cache
@@ -63,7 +65,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.2.0-r4`; displayed app version kekal v2.2.0.
+- Cache source semasa ialah `eouting-cache-v2.2.0-r5`; displayed app version kekal v2.2.0.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -105,6 +107,7 @@ Gambar disimpan dalam folder Google Drive private. `LockService` merangkumi sema
 - Semasa replacement, fail baharu dicipta dan metadata Sheet disimpan dahulu. Fail lama hanya ditrash selepas disahkan mempunyai parent folder profil yang dikonfigurasi. Kegagalan sebelum metadata baharu disimpan mengekalkan foto lama.
 - Admin removal memerlukan credential aktif, pengesahan UI, mengosongkan metadata, mengehadkan trash kepada folder profil dan menulis `REMOVE_STUDENT_PROFILE_PHOTO` tanpa byte imej.
 - Foto profil tidak dihantar ke Telegram dan tidak menggunakan mana-mana field `selfie_*`.
+- Action sheet foto profil menyediakan kamera `accept="image/*" capture="user"` dan galeri `accept="image/*"` tanpa capture. Kedua-duanya tetap melalui allowlist MIME JPEG/PNG/WebP serta pipeline validation/upload yang sama; atribut capture ialah hint peranti, bukan security boundary.
 
 Authorization tetap dijalankan pada setiap thumbnail/full request; cache tidak menyimpan keputusan authorization. Manifest tidak menambah explicit OAuth scope baharu kerana Drive dan external-request sudah digunakan oleh backend. `.claspignore` mesti mengehadkan deploy kepada `gas/appsscript.json` dan source kanonik `gas/Code.gs`; snapshot GAS lama tidak boleh berada dalam payload deploy.
 
@@ -127,7 +130,7 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 - Fasa 3 menambah `loginAdmin`, public safe config GET dan Admin read/create/update/toggle melalui POST.
 - Tiada Dashboard Admin, butang login Admin atau session token frontend dalam Fasa 3.
 - `OUTING_CONFIG_V2_ENABLED` default kepada string `false` dan migration tidak pernah menetapkannya kepada `true`.
-- `submitRequest` terus menggunakan whitelist dan validation hard-coded v1.7.1.
+- Dalam rekod Fasa 3 asal, `submitRequest` masih menggunakan whitelist dan validation hard-coded v1.7.1; production semasa menggunakan resolver config-driven apabila flag aktif.
 - `type_code` seed tidak ditukar atau ditimpa apabila migration dijalankan semula.
 - Tab `ADMIN_USERS`, khususnya kolum `pin`, mesti kekal private dan tidak boleh diterbitkan melalui GET awam pada fasa akan datang.
 - Login dan setiap Admin API mengesahkan `admin_id` atau `nama_admin`, PIN tepat dan status `AKTIF` terus terhadap Sheet.
@@ -136,17 +139,20 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 - Create/update/toggle menggunakan `LockService`; optimistic `expected_config_version` menghalang overwrite konfigurasi yang sudah berubah.
 - Semua boolean, masa, hari, `sort_order`, kod dan nama disahkan di GAS tanpa mempercayai frontend.
 
-### Frontend Admin Fasa 4
+### Frontend Admin — keadaan production semasa
 
-- PIN hanya berada dalam `adminRuntimeCredential` sepanjang session tab semasa.
+- PIN berada dalam `adminRuntimeCredential` semasa runtime dan dedicated `sessionStorage` tab untuk restore terkawal.
 - PIN input dikosongkan selepas login berjaya/gagal dan semasa logout.
-- Admin tidak menggunakan `rememberSessionIfRequested`, localStorage atau sessionStorage.
+- Admin tidak menggunakan `rememberSessionIfRequested` atau localStorage. Key `eouting_admin_session_v1` ialah satu-satunya persistence Admin yang diluluskan dalam architecture semasa.
+- Saved session menyimpan original normalized identity, PIN dan absolute `expiresAt`; refresh tidak mengubah expiry.
+- Restore sentiasa memerlukan revalidation `loginAdmin` sebelum UI privileged dipaparkan dan menggunakan semantic payload yang sama seperti login biasa.
 - Credential dan response Admin tidak dicetak melalui `console`.
 - Error login menggunakan mesej generik dan tidak memaparkan credential yang ditaip.
 - Dashboard tidak membaca atau memaparkan row `ADMIN_USERS`.
 - `type_code` read-only semasa edit; status active hanya melalui toggle dengan confirmation.
 - Frontend validation ialah bantuan UX sahaja; GAS kekal authorization dan validation boundary.
 - Logout membersihkan credential runtime, list config dan state editor Admin.
+- Restore failure membersihkan saved record, runtime credential serta partial `currentSession` dan tidak membuat retry loop.
 
 ### Pengasingan Mock Admin Fasa 4.5
 
@@ -155,7 +161,7 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 - Credential `ADMIN-MOCK` / PIN QA ialah data development sahaja, bukan akaun `ADMIN_USERS` dan tidak diseed ke Google Sheets.
 - Login response mock tidak memulangkan PIN dan router mock tidak log credential.
 - Create, update dan toggle mock hanya menulis array memory tab semasa; tiada `fetch`, GAS atau persistence browser.
-- PIN Admin mock/live tidak disimpan dalam localStorage atau sessionStorage dan dibersihkan semasa logout.
+- PIN Admin mock/live tidak disimpan dalam localStorage. Dedicated Admin sessionStorage menggunakan schema/expiry yang sama dan dibersihkan semasa logout.
 - Query `mockAdminError=1` dan `mockAdminConflict=1` hanya berfungsi bersama `mock=1`.
 
 ### Canonical POST Router Fasa 4.6

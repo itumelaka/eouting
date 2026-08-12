@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.0**, cache revision `2.2.0-r4`, GAS Version 37 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
+Dokumen ini menerangkan flow production semasa **v2.2.0**, cache revision `2.2.0-r5`, GAS Version 37 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
 
 ## Backend Config API v2.0
 
@@ -59,13 +59,15 @@ submitRequest
        -> tarikh/masa server-side + fixed_return_time + same_day_only
        -> required fields menurut config
   -> semak pelajar aktif
-  -> duplicate request protection sedia ada
+  -> dalam ScriptLock: semak duplicate active + append secara atomic
   -> simpan OUTING_REQUESTS + audit minimum + Telegram
 ```
 
 `fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN`, mengisi masa approval dan identiti sistem `AUTO_CONFIG_V2`, serta menulis audit `AUTO_APPROVE_REQUEST`. Guard hanya menerima state approved yang sah. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
 
 Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` production membenarkan permohonan pada mana-mana hari, departure Jumaat dan masa paling awal semasa `17:00`; Admin boleh mengubah masa itu mengikut arahan HEP.
+
+Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` dianggap active dan menghalang request baharu; `SELESAI` serta `DITOLAK_WARDEN` membenarkannya. Frontend mempunyai submission in-flight guard dan loading sendiri, tetapi atomic backend lock kekal protection authoritative.
 
 ## Student Form Config Rendering — Fasa 5A
 
@@ -77,6 +79,9 @@ Pelajar login / student form dibuka
   -> apply visibility, required dan disabled state
   -> same_day_only sync tarikh
   -> fixed_return_time isi dan lock masa
+  -> build payload daripada requirement config
+       -> tarikh / tarikh_balik / masa_balik_dijangka apabila diperlukan
+       -> normalize tarikh kepada YYYY-MM-DD
 
 GET gagal atau config kosong
   -> lima legacy config dalam memory
@@ -84,17 +89,26 @@ GET gagal atau config kosong
   -> retry tersedia untuk kegagalan request
 ```
 
-Hidden field dikosongkan apabila tidak lagi relevan dan sentiasa disabled. Rendering ini tidak menukar payload contract atau backend `submitRequest`.
+Hidden field dikosongkan apabila tidak lagi relevan dan sentiasa disabled. Payload builder menggunakan konfigurasi terpilih, bukan whitelist type code frontend. Jenis custom boleh menggunakan requirement sedia ada tanpa branch baharu.
 
-## Admin Dashboard v2.0 — Fasa 4
+`KLINIK` (`Keluar ke Klinik`) menggunakan same-day return, tidak memaparkan tarikh keluar/balik manual, dan memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden serta selfie. Custom section menggunakan `Maklumat Tambahan`; `PULANG_BERMALAM` sahaja mengekalkan `Maklumat Pulang Bermalam`. `earliest_departure_time` kosong bermaksud tiada had masa paling awal dan Admin boleh mengosongkannya melalui `Kosongkan`. Readiness memaparkan `Config Issue / Not Ready` bagi kombinasi tidak konsisten seperti departure days bersama `require_leave_date=false`.
+
+## Admin Dashboard dan Restore Production
 
 ```text
 Pilih Admin
   -> isi admin_id atau nama_admin + PIN
   -> POST loginAdmin
-  -> credential disimpan dalam memory runtime sahaja
+  -> runtime credential dibina
+  -> simpan { identity, pin, expiresAt } dalam sessionStorage tab
   -> buka Admin Dashboard
-  -> POST getAdminOutingTypes
+  -> load default Admin section; section lain lazy apabila dibuka
+
+Refresh dengan eouting_admin_session_v1
+  -> Memulihkan sesi Admin...
+  -> POST loginAdmin { admin_id: identity, nama_admin: identity, pin }
+  -> berjaya: bina runtime credential dan buka shell
+  -> gagal/expired/malformed: bersihkan saved/runtime/partial session dan papar login
 
 Tambah
   -> form semua medan config
@@ -114,7 +128,13 @@ Aktif/Nyahaktif
   -> refresh list
 ```
 
-Jika backend memulangkan `CONFIG_VERSION_CONFLICT`, editor ditutup, data terkini direfresh dan Admin diminta membuka Edit semula. Logout mengosongkan credential runtime dan PIN input. Tiada “ingat peranti” untuk Admin.
+Jika backend memulangkan `CONFIG_VERSION_CONFLICT`, editor ditutup, data terkini direfresh dan Admin diminta membuka Edit semula. Dedicated sessionStorage mempunyai absolute expiry 12 jam; refresh tidak memanjangkannya, PIN tidak masuk localStorage dan backend revalidation tidak boleh dipintas. Logout mengosongkan saved session, credential runtime dan PIN input.
+
+Restore Admin tidak lagi menunggu `getStudents`, `getWardens`, `getGuards` atau `getTodayRecords`, dan tidak memuat Tetapan Outing unconditional. Shell privileged hanya dipaparkan selepas `loginAdmin` berjaya.
+
+## Loader Authentication dan Restore
+
+Pelajar, Warden, Guard dan Admin berkongsi satu loader untuk fresh login serta saved-session restore. Teks restore adalah role-aware (`Memulihkan sesi Pelajar/Warden/Guard/Admin...`) dengan secondary text `Mengesahkan akses dan memuatkan paparan`. Operation token memastikan completion lama tidak menyembunyikan loader request yang lebih baharu. `finally`/logout membersihkan loader tanpa artificial delay dan `prefers-reduced-motion` mematikan animasi. Public Pemantauan menggunakan lifecycle loadingnya sendiri.
 
 ## Lifecycle Rekod
 
@@ -164,7 +184,9 @@ Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords
 
 Hierarki workspace Pelajar ialah Announcement Banner, navigasi/workspace, `ruleNotice` kuning, tajuk “Permohonan Pelajar” dan borang outing. Banner ialah notis operasi semasa; `ruleNotice` kekal authoritative untuk panduan peraturan kontekstual. Ayat panduan outing pendua di bawah tajuk telah dibuang tanpa mengubah borang.
 
-Pelajar boleh upload/ganti foto profil sendiri. Identity/editor memuatkan thumbnail melalui batch authenticated dan editor sendiri boleh menggunakan imej penuh. Klik thumbnail membuka modal; jika full cache belum tersedia, satu request authenticated `photo_variant = "full"` dibuat untuk pelajar itu sahaja. Initials tidak mempunyai tindakan klik.
+Pelajar boleh upload/ganti foto profil sendiri. Tindakan membuka action sheet `Ambil Foto`, `Pilih dari Galeri` dan `Batal`. Kamera menggunakan `capture="user"`; galeri tidak mempunyai capture. Kedua-duanya berkongsi handler validation, crop 3:4, compression, upload, preview dan cache yang sama. Escape/backdrop/Batal menutup chooser dan memulangkan fokus. Return-selfie tidak berkongsi input atau handler ini.
+
+Identity/editor memuatkan thumbnail melalui batch authenticated dan editor sendiri boleh menggunakan imej penuh. Klik thumbnail membuka modal; jika full cache belum tersedia, satu request authenticated `photo_variant = "full"` dibuat untuk pelajar itu sahaja. Initials tidak mempunyai tindakan klik.
 
 Semasa flag `false`, semua jenis legacy kekal memerlukan bukti selepas Guard mengesahkan masuk. Dalam config-driven mode, `require_selfie` disnapshot pada submission; `false` memaparkan `Bukti Selfie Tidak Diperlukan`, manakala `true` memaparkan action `Bukti Selfie Belum Dihantar`. Selepas berjaya, action upload hilang dan dashboard menunjukkan `Bukti Selfie Dihantar` bersama `Masa Bukti`.
 
@@ -176,7 +198,7 @@ Warden boleh:
 
 - refresh permohonan;
 - melihat Dashboard dan Checklist Permohonan;
-- approve/reject;
+- approve/reject dengan in-flight lock/loading yang menolak duplicate click;
 - salin senarai nama dengan emoji status.
 
 Checklist memaparkan semua jenis permohonan. Ikon dan label menggunakan status kontekstual pusat.
@@ -193,6 +215,8 @@ Seksyen utama:
 - `Sedang Keluar`.
 
 Tindakan `Sahkan Keluar` menggunakan penegasan oren dan `Sahkan Masuk` menggunakan penegasan hijau. Kedua-duanya kekal pada handler `confirmOut`/`confirmIn` sedia ada dan tidak dicetuskan oleh shortcut Enter generik.
+
+Kedua-dua tindakan menggunakan in-flight lock/loading tersendiri supaya klik berulang tidak menghasilkan request kedua; success/error dan backend validation kekal authoritative.
 
 Quick filter Guard:
 

@@ -2,7 +2,19 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (11 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r4`, GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (12 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r5`, GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+
+## Close-out Production — 12 Ogos 2026
+
+- [x] Duplicate submission Pelajar dilindungi oleh frontend in-flight state dan atomic backend `ScriptLock` bagi active status.
+- [x] Approve/reject Warden serta confirm-out/confirm-in Guard mempunyai loading/in-flight protection.
+- [x] Dynamic outing payload menggunakan requirement config; standard types dan custom `KLINIK` disahkan.
+- [x] `Masa Keluar Paling Awal` boleh dikosongkan tanpa current-time fallback; readiness mengesan kombinasi config bercanggah.
+- [x] Admin session refresh disahkan melalui sessionStorage tab + mandatory `loginAdmin` revalidation, absolute expiry 12 jam dan tiada PIN dalam localStorage.
+- [x] Global login/restore loader disahkan untuk Pelajar, Warden, Guard dan Admin; Public Pemantauan kekal berasingan.
+- [x] Student profile photo menawarkan `Ambil Foto`, `Pilih dari Galeri` dan `Batal`; kamera/galeri berkongsi pipeline dan return-selfie tidak berubah.
+- [x] Mobile/PWA disahkan pada revision `2.2.0-r5` dengan cache `eouting-cache-v2.2.0-r5`.
+- [x] Full Node suite semasa lulus **317/317**; syntax checks frontend/service worker lulus.
 
 ## Close-out Announcement Banner V1 — 11 Ogos 2026
 

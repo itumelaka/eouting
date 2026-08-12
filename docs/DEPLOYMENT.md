@@ -1,10 +1,19 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r4`. Backend production ialah GAS **Version 37**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026.
+Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r5` dan service-worker cache `eouting-cache-v2.2.0-r5`. Backend production ialah GAS **Version 37**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026.
+
+## Production verification — 12 Ogos 2026
+
+- Admin refresh restore melalui `eouting_admin_session_v1` dan backend `loginAdmin` revalidation disahkan pada refresh berulang.
+- Global login/restore loader disahkan untuk Pelajar, Warden, Guard dan Admin tanpa mendedahkan shell Admin sebelum authentication.
+- Dynamic payload/config fixes disahkan untuk standard types dan custom `KLINIK`; blank earliest-departure time bermaksud tiada sekatan.
+- Student profile-photo action sheet `Ambil Foto` / `Pilih dari Galeri` disahkan pada telefon; return-selfie kekal berasingan.
+- Revision r5 memaksa mobile/PWA mengambil CSS/JS terkini tanpa menukar displayed v2.2.0 atau GAS.
+- Suite semasa lulus **317/317** dan syntax checks `assets/app.js` serta `service-worker.js` lulus.
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Cache close-out `2.2.0-r4` mengekalkan displayed v2.2.0.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah r5.
 
 Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
@@ -79,6 +88,8 @@ Gunakan flow ini jika `gas/Code.gs` tidak berubah:
 8. push ke GitHub;
 9. tunggu GitHub Pages dan sahkan versi live/PWA update popup.
 
+Untuk perubahan cache-only, displayed `APP_VERSION`/`version.json` boleh kekal jika product version tidak berubah; bump namespace `CACHE_NAME`, query CSS/JS, app-shell URLs dan regression expectation secara konsisten seperti r4 → r5.
+
 v1.6.24 ialah frontend-only release untuk Guard quick filter dan contextual empty-state. v1.7.0 bukan frontend-only kerana melibatkan GAS, schema berasaskan header, Google Drive dan Telegram. v1.7.1 turut mengubah frontend dan GAS bagi `OUTING_HUJUNG_MINGGU`, maka ia bukan frontend-only.
 
 ## Backend GAS Release
@@ -129,11 +140,11 @@ Jangan isi akaun Admin, mengaktifkan feature flag atau menganggap schema staging
 - Sahkan tiada route delete dan `submitRequest` masih tidak membaca `OUTING_TYPES`.
 - Jangan aktifkan flag sehingga Admin UI menunjukkan `Config-driven Ready`, semua sebab readiness kosong, config production disemak oleh Admin/HEP dan rollback production diluluskan.
 
-### Pemeriksaan Fasa 4 sebelum deployment masa hadapan
+### Pemeriksaan Admin frontend semasa
 
 - Uji role dan panel login Admin pada desktop serta telefon.
-- Pastikan DevTools localStorage/sessionStorage tidak mengandungi Admin PIN atau session Admin.
-- Pastikan refresh browser selepas login memerlukan login Admin semula.
+- Pastikan localStorage tidak mengandungi Admin PIN. Dedicated sessionStorage hanya boleh menggunakan key `eouting_admin_session_v1` dengan `identity`, `pin` dan absolute `expiresAt`.
+- Pastikan refresh memanggil backend `loginAdmin`, memulihkan Admin apabila credential sah, tidak memanjangkan expiry dan membersihkan session apabila ditolak.
 - Uji loading, empty, error, retry, create, edit, toggle dan conflict state.
 - Pastikan tiada delete control dan tiada data `ADMIN_USERS` dipaparkan.
 - Feature flag mesti kekal `false`; Admin Dashboard boleh menyediakan config tanpa menukar student form production.
@@ -196,6 +207,9 @@ Frontend:
 
 - buka `https://itumelaka.github.io/eouting/`;
 - semak footer dan update popup;
+- semak asset query `2.2.0-r5` dan Cache Storage `eouting-cache-v2.2.0-r5`, khususnya selepas refresh/reopen PWA mobile;
+- login Admin, refresh berulang dan sahkan restore hanya selepas backend validation serta tab bukan default kekal lazy;
+- login Pelajar pada telefon, buka foto profil dan sahkan `Ambil Foto`, `Pilih dari Galeri` serta `Batal`; return-selfie mesti kekal sama;
 - buka Public Monitoring sekali dan pastikan loading, scroll, data serta timestamp betul;
 - semak Warden dan Guard masih menerima rekod operasi penuh.
 

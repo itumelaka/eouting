@@ -55,6 +55,7 @@ Jenis permohonan:
 - `KECEMASAN`
 - `PULANG_BERMALAM`
 - `CUTI_SEMESTER`
+- custom aktif seperti `KLINIK` apabila row `OUTING_TYPES` production dikonfigurasi dan ready
 
 Status lifecycle:
 
@@ -64,7 +65,7 @@ Status lifecycle:
 - `KELUAR`
 - `SELESAI`
 
-Status aktif yang menghalang duplicate request ialah `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR`. `SELESAI` dan `DITOLAK_WARDEN` tidak menghalang permohonan baharu.
+Status aktif yang menghalang duplicate request ialah `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR`. `SELESAI` dan `DITOLAK_WARDEN` tidak menghalang permohonan baharu. Backend menjalankan fresh active-check dan append dalam satu `ScriptLock`, jadi perlindungan tidak bergantung pada lock UI frontend sahaja.
 
 `lewat` ialah flag operasi dan tidak menggantikan status lifecycle. `tarikh_balik`, `hari_balik` dan `masa_balik_dijangka` digunakan oleh Pulang Bermalam/Cuti Semester.
 
@@ -108,7 +109,7 @@ type_code | display_name | description | active | sort_order | allowed_days | ap
 
 `setupAdminOutingConfigV200()` mencipta tab ini secara idempotent dan seed lima jenis sedia ada. `type_code` ialah identifier immutable: migration tidak menamakan semula atau menimpa row yang sudah wujud. `allowed_days` menentukan hari permohonan boleh dihantar, manakala `departure_allowed_days` menentukan hari pelajar dibenarkan keluar. Kedua-duanya menggunakan nama hari BM uppercase dipisahkan koma. `earliest_departure_time` ialah masa keluar paling awal dalam format `HH:mm`; nilai kosong bermaksud tiada masa minimum dikonfigurasi. Nilai boolean disimpan sebagai boolean Sheet.
 
-Production menggunakan `OUTING_CONFIG_V2_ENABLED=true`, maka `submitRequest` membaca row aktif daripada tab ini. Tetapan Outing ialah interface operasi Admin bagi read/create/update/toggle. Jenis dan label config mengalir kepada Student labels/forms, Telegram, Statistik grouping/filtering, Admin filters, Warden filters/checklists, contextual outing labels dan return-selfie eligibility. Setiap konfigurasi aktif mesti lulus readiness validation; jenis custom masih memerlukan ujian.
+Production menggunakan `OUTING_CONFIG_V2_ENABLED=true`, maka `submitRequest` membaca row aktif daripada tab ini. Tetapan Outing ialah interface operasi Admin bagi read/create/update/toggle. Jenis dan label config mengalir kepada Student labels/forms/payload, Telegram, Statistik grouping/filtering, Admin filters, Warden filters/checklists, contextual outing labels dan return-selfie eligibility. Requirement config menentukan `tarikh`, `tarikh_balik` dan `masa_balik_dijangka`; jenis custom tidak memerlukan branch frontend berdasarkan type code. Setiap konfigurasi aktif mesti lulus readiness validation dan regression QA.
 
 Andaian seed konservatif:
 
@@ -121,6 +122,8 @@ Andaian seed konservatif:
 | `CUTI_SEMESTER` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | Ikut permohonan | Tidak | Ya | Ya |
 
 Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Tarikh keluar yang diminta mesti hari Jumaat. Guard hanya boleh mengesahkan keluar pada tarikh yang diluluskan, hari yang dibenarkan dan pada/selepas `earliest_departure_time`. Row production semasa ialah `17:00`, tetapi Admin boleh mengubahnya mengikut arahan HEP; nilai itu ialah konfigurasi operasi, bukan rule hard-coded kekal.
+
+Custom production `KLINIK` mempunyai display name `Keluar ke Klinik`, `same_day_only=true`, tiada tarikh keluar/balik manual, serta memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden dan return selfie. `earliest_departure_time` dan `departure_allowed_days` boleh kosong apabila tiada restriction tarikh/hari keluar. Readiness menolak inconsistency seperti `departure_allowed_days` berisi ketika `require_leave_date=false`.
 
 Semua seed bermula `active = true`, `require_purpose = true`, `require_location = true`, `require_vehicle = true`, `require_warden_approval = true`, `require_selfie = true` dan `config_version = 1`. Dalam config-driven mode, `require_selfie` ialah authoritative: false menghasilkan `selfie_status=TIDAK_DIPERLUKAN`. `require_warden_approval=false` menghasilkan approval `AUTO_CONFIG_V2` dan audit `AUTO_APPROVE_REQUEST`. `created_at`, `created_by`, `updated_at` dan `updated_by` ialah metadata audit config; `config_version` menyokong optimistic concurrency.
 

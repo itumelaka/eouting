@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-12 — Production UX, config dan session close-out (v2.2.0)
+
+- `6428b11` menghalang duplicate active outing dengan frontend in-flight state serta atomic backend `ScriptLock`; completed/rejected request kekal membenarkan submission baharu.
+- `69827a6` menambah loading/in-flight protection pada approve/reject Warden serta confirm-out/confirm-in Guard.
+- `fd3128c`, `568d733` dan `4b70c7f` membetulkan dynamic payload, custom field rendering, blank earliest-departure control dan neutral `Maklumat Tambahan`; standard types kekal serasi dan `KLINIK` disahkan melalui config.
+- `74063fc` dan `1ec7c61` menyediakan/stabilkan Admin refresh restore dengan sessionStorage tab, mandatory `loginAdmin` revalidation, 12-hour absolute expiry, lazy Admin startup serta shared auth/restore loader semua role.
+- `3932b71` menambah action sheet foto profil `Ambil Foto` / `Pilih dari Galeri` / `Batal` menggunakan satu processing pipeline; return-selfie tidak berubah.
+- `df77185` menaikkan active asset/cache revision daripada r4 kepada `2.2.0-r5`; mobile/PWA production disahkan memuat UI terkini.
+- Full Node suite semasa lulus **317/317**; `assets/app.js` dan `service-worker.js` lulus syntax check.
+
 ## 2026-08-11 — Announcement Banner V1 production close-out (v2.2.0)
 
 - Mengesahkan `Notis Banner` Admin dan tiga POST action authenticated live pada GAS Version 37.
