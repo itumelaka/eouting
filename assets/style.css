@@ -15,6 +15,11 @@
   --success: #167247;
   --info: #165a9f;
   --shadow: 0 12px 30px rgba(3, 18, 47, 0.1);
+  --control-transition: 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --control-hover-lift: -2px;
+  --control-press-scale: 0.988;
+  --control-hover-shadow: 7px 9px 18px rgba(19, 50, 87, 0.24), inset 2px 2px 4px rgba(255, 255, 255, 0.32);
+  --control-focus-ring: #177ddc;
 }
 
 .student-config-state {
@@ -3473,6 +3478,89 @@ button:disabled,
   }
 }
 
+/* Shared micro-interactions for native buttons and the one label-based action. */
+:where(button, .return-selfie-picker) {
+  touch-action: manipulation;
+  transition:
+    background-color var(--control-transition),
+    border-color var(--control-transition),
+    box-shadow var(--control-transition),
+    color var(--control-transition),
+    filter var(--control-transition),
+    transform var(--control-transition);
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(button, .return-selfie-picker):not(:disabled):not([aria-disabled="true"]):hover {
+    box-shadow: var(--control-hover-shadow);
+    filter: brightness(1.045) saturate(1.035);
+    transform: translateY(var(--control-hover-lift));
+  }
+}
+
+:where(button, .return-selfie-picker):not(:disabled):not([aria-disabled="true"]):active {
+  box-shadow: var(--clay-shadow-pressed, inset 3px 4px 8px rgba(19, 50, 87, 0.22));
+  filter: brightness(0.98);
+  transform: translateY(1px) scale(var(--control-press-scale));
+  transition-duration: 70ms;
+}
+
+:where(.tab-button, .admin-subtab, .quick-filter-button, .admin-management-button).active {
+  transform: translateY(-1px);
+}
+
+:where(button, [role="button"], .return-selfie-picker):focus-visible {
+  outline: 3px solid var(--control-focus-ring);
+  outline-offset: 3px;
+}
+
+:where(button, .return-selfie-picker):disabled,
+:where(button, .return-selfie-picker)[aria-disabled="true"] {
+  transform: none;
+  will-change: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(button, .return-selfie-picker):disabled:hover,
+  :where(button, .return-selfie-picker)[aria-disabled="true"]:hover {
+    box-shadow: inset 2px 2px 5px rgba(64, 78, 95, 0.14);
+    filter: grayscale(0.35);
+    transform: none;
+  }
+}
+
+.has-loading-indicator {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.has-loading-indicator::before {
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  border-top-color: currentColor;
+  content: "";
+  flex: 0 0 auto;
+  height: 14px;
+  width: 14px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .has-loading-indicator::before {
+    animation: studentSubmitSpin 0.75s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .has-loading-indicator::before {
+    animation: none;
+    border-color: currentColor;
+    opacity: 0.72;
+  }
+}
+
 /* Landing role correction: five operational roles plus compact Admin management entry */
 .access-heading {
   align-items: center;
@@ -4480,5 +4568,20 @@ button.profile-photo-frame {
   .admin-student-actions > button,
   .admin-student-form-actions > button {
     width: 100%;
+  }
+}
+
+/* Keep touch and reduced-motion states authoritative over older component hover rules. */
+@media (hover: none) {
+  :where(button, .return-selfie-picker):not(:active):hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, .return-selfie-picker):hover,
+  :where(button, .return-selfie-picker):active,
+  :where(.tab-button, .admin-subtab, .quick-filter-button, .admin-management-button).active {
+    transform: none;
   }
 }

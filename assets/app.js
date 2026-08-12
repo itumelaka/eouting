@@ -826,6 +826,7 @@ function setAdminLoginLoadingV200(isLoading) {
   if (!els.adminLoginButton) return;
   els.adminLoginButton.disabled = Boolean(isLoading);
   els.adminLoginButton.textContent = isLoading ? "Mengesahkan..." : "Masuk sebagai Admin";
+  globalThis.setButtonLoadingVisualV220?.(els.adminLoginButton, isLoading);
 }
 
 function setAdminLoginMessageV200(message, isError) {
@@ -1105,6 +1106,7 @@ async function saveAdminAnnouncementV1(event) {
   }
   els.adminAnnouncementSaveButton.disabled = true;
   els.adminAnnouncementSaveButton.textContent = "Menyimpan...";
+  globalThis.setButtonLoadingVisualV220?.(els.adminAnnouncementSaveButton, true);
   els.adminAnnouncementMessage.textContent = "";
   els.adminAnnouncementMessage.classList.remove("error");
   try {
@@ -1121,6 +1123,7 @@ async function saveAdminAnnouncementV1(event) {
   } finally {
     els.adminAnnouncementSaveButton.disabled = false;
     els.adminAnnouncementSaveButton.textContent = "Simpan";
+    globalThis.setButtonLoadingVisualV220?.(els.adminAnnouncementSaveButton, false);
   }
 }
 
@@ -1154,6 +1157,7 @@ function setAdminSectionV200(section) {
 async function loadAdminMonitoringV210() {
   if (!currentSession || currentSession.role !== "admin") return;
   els.adminMonitoringRefreshButton.disabled = true;
+  globalThis.setButtonLoadingVisualV220?.(els.adminMonitoringRefreshButton, true);
   els.adminMonitoringMessage.textContent = "Memuatkan pemantauan semasa...";
   els.adminMonitoringList.innerHTML = '<div class="empty-state">Memuatkan rekod...</div>';
   try {
@@ -1169,6 +1173,7 @@ async function loadAdminMonitoringV210() {
     els.adminMonitoringList.innerHTML = '<div class="empty-state"><button class="secondary-action" type="button" onclick="loadAdminMonitoringV210()">Cuba Lagi</button></div>';
   } finally {
     els.adminMonitoringRefreshButton.disabled = false;
+    globalThis.setButtonLoadingVisualV220?.(els.adminMonitoringRefreshButton, false);
   }
 }
 
@@ -1249,6 +1254,7 @@ async function loadAdminMasterV210(page) {
     page: page, page_size: 50
   });
   els.adminMasterRefreshButton.disabled = true;
+  globalThis.setButtonLoadingVisualV220?.(els.adminMasterRefreshButton, true);
   els.adminMasterMessage.textContent = "Mencari rekod...";
   try {
     adminMasterV210 = await apiPost("searchAdminMasterRecords", payload);
@@ -1258,7 +1264,7 @@ async function loadAdminMasterV210(page) {
     els.adminMasterBody.innerHTML = '<tr><td colspan="9">Rekod gagal dimuatkan. Cuba lagi.</td></tr>';
     els.adminMasterMessage.textContent = "Carian rekod gagal.";
     els.adminMasterMessage.classList.add("error");
-  } finally { els.adminMasterRefreshButton.disabled = false; }
+  } finally { els.adminMasterRefreshButton.disabled = false; globalThis.setButtonLoadingVisualV220?.(els.adminMasterRefreshButton, false); }
 }
 
 function renderAdminMasterV210() {
@@ -1278,10 +1284,11 @@ function renderAdminMasterV210() {
 async function loadAdminStaffV210() {
   if (!currentSession || currentSession.role !== "admin") return;
   els.adminStaffRefreshButton.disabled = true;
+  globalThis.setButtonLoadingVisualV220?.(els.adminStaffRefreshButton, true);
   els.adminStaffMessage.textContent = "Memuatkan staff...";
   try { adminStaffV210 = await apiPost("getAdminStaff", buildAdminCredentialPayloadV200()); els.adminStaffMessage.textContent = ""; renderAdminStaffV210(); }
   catch (error) { adminStaffV210 = []; els.adminStaffMessage.textContent = "Senarai staff gagal dimuatkan."; els.adminStaffMessage.classList.add("error"); els.adminStaffList.innerHTML = '<div class="empty-state">Tekan Refresh untuk cuba lagi.</div>'; }
-  finally { els.adminStaffRefreshButton.disabled = false; }
+  finally { els.adminStaffRefreshButton.disabled = false; globalThis.setButtonLoadingVisualV220?.(els.adminStaffRefreshButton, false); }
 }
 
 function renderAdminStaffV210() {
@@ -1308,10 +1315,10 @@ async function saveAdminStaffV210(event) {
   if (els.adminStaffSaveButton.disabled) return;
   const staff = { staff_id: els.adminStaffId.value.trim(), role: els.adminStaffRole.value, nama: els.adminStaffName.value.trim(), email: els.adminStaffEmail.value.trim(), no_tel: els.adminStaffPhone.value.trim(), pin: els.adminStaffPin.value.trim(), status: els.adminStaffStatus.value, catatan: els.adminStaffNote.value.trim() };
   if (!window.confirm(`Sahkan simpan staff ${staff.nama}?`)) return;
-  els.adminStaffSaveButton.disabled = true; els.adminStaffEditorMessage.textContent = "Menyimpan...";
+  els.adminStaffSaveButton.disabled = true; globalThis.setButtonLoadingVisualV220?.(els.adminStaffSaveButton, true); els.adminStaffEditorMessage.textContent = "Menyimpan...";
   try { const action = adminEditingStaffV210 ? "updateStaff" : "createStaff"; await apiPost(action, Object.assign(buildAdminCredentialPayloadV200(), { role: staff.role, staff_id: staff.staff_id, staff })); closeAdminStaffEditorV210(); await loadAdminStaffV210(); els.adminStaffMessage.textContent = "Staff berjaya disimpan."; }
   catch (error) { els.adminStaffEditorMessage.textContent = error.message || "Staff gagal disimpan."; els.adminStaffEditorMessage.classList.add("error"); }
-  finally { els.adminStaffSaveButton.disabled = false; }
+  finally { els.adminStaffSaveButton.disabled = false; globalThis.setButtonLoadingVisualV220?.(els.adminStaffSaveButton, false); }
 }
 
 function handleAdminStaffActionV210(event) {
@@ -1539,6 +1546,7 @@ async function handleAdminStudentSubmitV200(event) {
   const verb = adminEditingStudentIdV200 ? "mengemas kini" : "menambah";
   if (!window.confirm(`Sahkan untuk ${verb} pelajar ${student.nama}?`)) return;
   els.adminSaveStudentButton.disabled = true;
+  globalThis.setButtonLoadingVisualV220?.(els.adminSaveStudentButton, true);
   setAdminStudentEditorMessageV200("Menyimpan pelajar...");
   try {
     const payload = Object.assign(buildAdminCredentialPayloadV200(), { student });
@@ -1552,6 +1560,7 @@ async function handleAdminStudentSubmitV200(event) {
     setAdminStudentEditorMessageV200(safeAdminStudentErrorV200(error, "Maklumat pelajar gagal disimpan."), true);
   } finally {
     els.adminSaveStudentButton.disabled = false;
+    globalThis.setButtonLoadingVisualV220?.(els.adminSaveStudentButton, false);
   }
 }
 
@@ -2048,6 +2057,7 @@ function setAdminEditorBusyV200(isBusy) {
   if (!els.adminSaveTypeButton) return;
   els.adminSaveTypeButton.disabled = Boolean(isBusy);
   els.adminSaveTypeButton.textContent = isBusy ? "Menyimpan..." : "Simpan Jenis Outing";
+  globalThis.setButtonLoadingVisualV220?.(els.adminSaveTypeButton, isBusy);
 }
 
 function setAdminDashboardMessageV200(message, isError) {
@@ -2304,6 +2314,19 @@ function setupStatisticsPanel() {
   setStatisticsYearOptions();
 }
 
+function setButtonLoadingVisualV220(button, isLoading) {
+  if (!button) return;
+  const active = Boolean(isLoading);
+  if (button.classList && typeof button.classList.toggle === "function") {
+    button.classList.toggle("has-loading-indicator", active);
+  }
+  if (active && typeof button.setAttribute === "function") {
+    button.setAttribute("aria-busy", "true");
+  } else if (!active && typeof button.removeAttribute === "function") {
+    button.removeAttribute("aria-busy");
+  }
+}
+
 function setLoginFormSubmittingV211(form, isSubmitting, loadingText) {
   if (!form) return false;
   const button = form.querySelector('button[type="submit"]');
@@ -2313,12 +2336,14 @@ function setLoginFormSubmittingV211(form, isSubmitting, loadingText) {
     button.dataset.idleText = button.textContent;
     button.disabled = true;
     button.textContent = loadingText;
+    globalThis.setButtonLoadingVisualV220?.(button, true);
     return true;
   }
   delete form.dataset.submitting;
   if (button) {
     button.disabled = false;
     button.textContent = button.dataset.idleText || button.textContent;
+    globalThis.setButtonLoadingVisualV220?.(button, false);
     delete button.dataset.idleText;
   }
   return true;
@@ -4724,6 +4749,7 @@ async function refreshGuardRecords(source) {
   if (button) {
     button.disabled = true;
     button.textContent = "Memuat semula...";
+    globalThis.setButtonLoadingVisualV220?.(button, true);
   }
 
   try {
@@ -4748,6 +4774,7 @@ async function refreshGuardRecords(source) {
     if (button) {
       button.disabled = false;
       button.textContent = originalText || "Refresh Status";
+      globalThis.setButtonLoadingVisualV220?.(button, false);
     }
   }
 }
@@ -9195,6 +9222,7 @@ async function runStudentRefreshButtonV161(button, source) {
   const originalText = button.textContent;
   button.disabled = true;
   button.textContent = "Memuat semula...";
+  globalThis.setButtonLoadingVisualV220?.(button, true);
 
   try {
     await safeRefreshStudentRecordsV161(source);
@@ -9203,6 +9231,7 @@ async function runStudentRefreshButtonV161(button, source) {
   } finally {
     button.disabled = false;
     button.textContent = originalText || "Refresh Status";
+    globalThis.setButtonLoadingVisualV220?.(button, false);
   }
 }
 
@@ -9279,6 +9308,7 @@ async function refreshMonitoringRecords(source) {
   if (button) {
     button.disabled = true;
     button.textContent = "Memuat...";
+    globalThis.setButtonLoadingVisualV220?.(button, true);
   }
 
   try {
@@ -9301,6 +9331,7 @@ async function refreshMonitoringRecords(source) {
     if (button) {
       button.disabled = false;
       button.textContent = originalText || "Refresh";
+      globalThis.setButtonLoadingVisualV220?.(button, false);
     }
   }
 }
@@ -9566,6 +9597,7 @@ async function refreshWardenRecords(source) {
   if (button) {
     button.disabled = true;
     button.textContent = "Memuat...";
+    globalThis.setButtonLoadingVisualV220?.(button, true);
   }
 
   try {
@@ -9607,6 +9639,7 @@ async function refreshWardenRecords(source) {
     if (button) {
       button.disabled = false;
       button.textContent = originalText || "Refresh Permohonan";
+      globalThis.setButtonLoadingVisualV220?.(button, false);
     }
   }
 }
