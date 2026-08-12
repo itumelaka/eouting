@@ -79,9 +79,11 @@ test("mock mode provides one-shot read error and config-version conflict QA", ()
   assert.match(mockSource, /CONFIG_VERSION_CONFLICT/);
 });
 
-test("Admin PIN remains runtime-only in mock and live frontend flows", () => {
+test("Admin PIN uses only the dedicated tab session in mock and live frontend flows", () => {
   const adminSource = sourceBetween("function showAdminLoginPanelV200", "function setupStudentClassFilter");
-  assert.doesNotMatch(adminSource, /localStorage|sessionStorage/);
+  assert.doesNotMatch(adminSource, /localStorage/);
+  assert.match(adminSource, /sessionStorage/);
+  assert.match(adminSource, /ADMIN_SESSION_STORAGE_KEY/);
   assert.match(adminSource, /adminRuntimeCredential = null/);
   assert.match(adminSource, /els\.adminPinInput\.value = ""/);
 });

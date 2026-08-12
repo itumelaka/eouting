@@ -179,6 +179,8 @@ const REQUEST_TYPE_LABEL = {
 };
 
 const SESSION_STORAGE_KEY = "eouting_session_v1";
+const ADMIN_SESSION_STORAGE_KEY = "eouting_admin_session_v1";
+const ADMIN_SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 const SESSION_DURATION_MS = {
   student: 24 * 60 * 60 * 1000,
   warden: 12 * 60 * 60 * 1000,
@@ -799,11 +801,13 @@ async function handleAdminLoginV200(event) {
       nama_admin: admin.nama_admin || identity,
       pin: pin
     };
+    saveAdminSessionV220(adminRuntimeCredential);
     els.adminPinInput.value = "";
     setAdminLoginMessageV200("Log masuk berjaya.");
     startAdminSessionV200(admin);
   } catch (error) {
     adminRuntimeCredential = null;
+    clearSavedAdminSessionV220();
     els.adminPinInput.value = "";
     setAdminLoginMessageV200("ID atau nama Admin atau PIN tidak sah.", true);
   } finally {
@@ -848,6 +852,86 @@ function startAdminSessionV200(admin) {
   loadAnnouncementBannerV1();
 }
 
+function saveAdminSessionV220(credential) {
+  const adminId = String(credential && credential.admin_id || "").trim();
+  const adminName = String(credential && credential.nama_admin || "").trim();
+  const pin = String(credential && credential.pin || "");
+  if ((!adminId && !adminName) || !pin) return false;
+
+  try {
+    window.sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify({
+      admin_id: adminId,
+      nama_admin: adminName,
+      pin,
+      expiresAt: Date.now() + ADMIN_SESSION_DURATION_MS
+    }));
+    return true;
+  } catch (error) {
+    console.warn("Unable to save Admin browser session.");
+    return false;
+  }
+}
+
+function getSavedAdminSessionV220() {
+  try {
+    const rawSession = window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+    if (!rawSession) return null;
+    const session = JSON.parse(rawSession);
+    const adminId = String(session && session.admin_id || "").trim();
+    const adminName = String(session && session.nama_admin || "").trim();
+    const pin = String(session && session.pin || "");
+    const expiresAt = Number(session && session.expiresAt);
+    if ((!adminId && !adminName) || !pin || !Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
+      clearSavedAdminSessionV220();
+      return false;
+    }
+    return { admin_id: adminId, nama_admin: adminName, pin, expiresAt };
+  } catch (error) {
+    clearSavedAdminSessionV220();
+    return false;
+  }
+}
+
+function clearSavedAdminSessionV220() {
+  try {
+    window.sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Unable to clear Admin browser session.");
+  }
+}
+
+async function restoreSavedAdminSessionV220() {
+  const saved = getSavedAdminSessionV220();
+  if (saved === null) return null;
+  if (saved === false) {
+    showAdminLoginPanelV200();
+    setAdminLoginMessageV200("Sesi Admin tamat atau tidak sah. Sila log masuk semula.", true);
+    return false;
+  }
+
+  try {
+    const admin = await apiPost("loginAdmin", {
+      admin_id: saved.admin_id,
+      nama_admin: saved.nama_admin,
+      pin: saved.pin
+    });
+    adminRuntimeCredential = {
+      admin_id: admin.admin_id || saved.admin_id,
+      nama_admin: admin.nama_admin || saved.nama_admin,
+      pin: saved.pin
+    };
+    startAdminSessionV200(admin);
+    return true;
+  } catch (error) {
+    clearSavedAdminSessionV220();
+    clearAdminRuntimeCredentialV200();
+    currentSession = null;
+    showAdminLoginPanelV200();
+    setAdminLoginMessageV200("Sesi Admin tidak dapat disahkan. Sila log masuk semula.", true);
+    return false;
+  }
+}
+
 function clearAdminRuntimeCredentialV200() {
   adminRuntimeCredential = null;
   adminOutingTypes = [];
@@ -878,6 +962,7 @@ function clearAdminRuntimeCredentialV200() {
 
 function exitAdminSessionV200() {
   closeProfilePhotoPreview();
+  clearSavedAdminSessionV220();
   clearAdminRuntimeCredentialV200();
   currentSession = null;
   els.appWorkspace.classList.remove("active");
@@ -9847,7 +9932,8 @@ async function initApp() {
   if (ALLOW_MOCK_MODE) {
     setMockMode("");
     refreshStudentClassChoicesV200();
-    await restoreSavedSession();
+    const adminRestoreResult = await restoreSavedAdminSessionV220();
+    if (adminRestoreResult === null) await restoreSavedSession();
     return;
   } else {
     updateDataModeIndicator();
@@ -9855,7 +9941,8 @@ async function initApp() {
   await loadLiveMasters();
   refreshStudentClassChoicesV200();
   if (isLiveMode) {
-    await restoreSavedSession();
+    const adminRestoreResult = await restoreSavedAdminSessionV220();
+    if (adminRestoreResult === null) await restoreSavedSession();
   }
   updateFooterActionsVisibility();
 }

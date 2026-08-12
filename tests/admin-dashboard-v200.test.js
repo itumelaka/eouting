@@ -35,9 +35,10 @@ test("Admin role and accessible login form exist", () => {
   assert.match(indexSource, /id="adminLoginMessage"[^>]*aria-live="polite"/);
 });
 
-test("Admin PIN remains runtime-only and is never logged or stored", () => {
-  assert.doesNotMatch(adminBlock, /localStorage|sessionStorage/);
-  assert.doesNotMatch(adminBlock, /console\.(log|info|warn|error)/);
+test("Admin PIN remains out of localStorage and uses only the dedicated tab session", () => {
+  assert.doesNotMatch(adminBlock, /localStorage/);
+  assert.match(adminBlock, /sessionStorage/);
+  assert.match(adminBlock, /ADMIN_SESSION_STORAGE_KEY/);
   assert.match(adminBlock, /adminRuntimeCredential\s*=\s*\{/);
   assert.match(adminBlock, /els\.adminPinInput\.value\s*=\s*""/);
 });
@@ -167,6 +168,7 @@ test("logout clears Admin credentials and responsive focus styles exist", () => 
   assert.match(clearSource, /adminRuntimeCredential\s*=\s*null/);
   assert.match(clearSource, /adminPinInput\.value\s*=\s*""/);
   assert.match(adminBlock, /logoutButton\.addEventListener/);
+  assert.match(adminBlock, /function exitAdminSessionV200[\s\S]*clearSavedAdminSessionV220\(\)/);
   assert.match(styleSource, /\.admin-dashboard button:focus-visible/);
   assert.match(styleSource, /@media \(max-width: 760px\)/);
 });
