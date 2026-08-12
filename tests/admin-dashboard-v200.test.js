@@ -50,7 +50,8 @@ test("successful Admin login opens the Admin Dashboard", () => {
   assert.match(loginSource, /startAdminSessionV200\(admin\)/);
   assert.match(sessionSource, /role:\s*"admin"/);
   assert.match(sessionSource, /els\.adminDashboard\.classList\.add\("active"\)/);
-  assert.match(sessionSource, /loadAdminOutingTypesV200\(\)/);
+  assert.doesNotMatch(sessionSource, /loadAdminOutingTypesV200\(\)/);
+  assert.match(sessionSource, /setAdminSectionV200\("monitoring"\)/);
 });
 
 test("Admin session hides only the main role navigation and keeps Admin sub-navigation visible", () => {

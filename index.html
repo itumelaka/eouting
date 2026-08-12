@@ -25,6 +25,15 @@
     </header>
 
     <main class="app-shell">
+      <section class="auth-loading" id="authLoading" role="status" aria-live="polite" aria-atomic="true" hidden>
+        <div class="auth-loading-card">
+          <div class="auth-loading-orb" aria-hidden="true"><span></span></div>
+          <div>
+            <strong id="authLoadingTitle">Sedang log masuk...</strong>
+            <p id="authLoadingDetail">Mengesahkan akses dan memuatkan paparan</p>
+          </div>
+        </div>
+      </section>
       <section class="access-screen" id="accessScreen">
         <div class="section-heading access-heading">
           <img class="access-logo" src="assets/pwa-logo.png" alt="" aria-hidden="true">

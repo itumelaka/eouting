@@ -293,6 +293,9 @@ const els = {
   todayDay: document.querySelector("#todayDay"),
   currentTime: document.querySelector("#currentTime"),
   appShell: document.querySelector(".app-shell"),
+  authLoading: document.querySelector("#authLoading"),
+  authLoadingTitle: document.querySelector("#authLoadingTitle"),
+  authLoadingDetail: document.querySelector("#authLoadingDetail"),
   accessScreen: document.querySelector("#accessScreen"),
   appWorkspace: document.querySelector("#appWorkspace"),
   studentLoginPanel: document.querySelector("#studentLoginPanel"),
@@ -788,20 +791,17 @@ async function handleAdminLoginV200(event) {
     return;
   }
 
+  const authLoadingToken = showAuthLoadingV220("admin", false);
   setAdminLoginLoadingV200(true);
   setAdminLoginMessageV200("Mengesahkan akses Admin...");
   try {
-    const admin = await apiPost("loginAdmin", {
-      admin_id: identity,
-      nama_admin: identity,
-      pin: pin
-    });
+    const admin = await apiPost("loginAdmin", buildAdminLoginPayloadV220(identity, pin));
     adminRuntimeCredential = {
       admin_id: admin.admin_id || "",
       nama_admin: admin.nama_admin || identity,
       pin: pin
     };
-    saveAdminSessionV220(adminRuntimeCredential);
+    saveAdminSessionV220({ identity, pin });
     els.adminPinInput.value = "";
     setAdminLoginMessageV200("Log masuk berjaya.");
     startAdminSessionV200(admin);
@@ -812,6 +812,7 @@ async function handleAdminLoginV200(event) {
     setAdminLoginMessageV200("ID atau nama Admin atau PIN tidak sah.", true);
   } finally {
     setAdminLoginLoadingV200(false);
+    hideAuthLoadingV220(authLoadingToken);
   }
 }
 
@@ -848,20 +849,26 @@ function startAdminSessionV200(admin) {
   closeAdminEditorV200();
   closeAdminStudentEditorV200();
   setAdminSectionV200("monitoring");
-  loadAdminOutingTypesV200();
   loadAnnouncementBannerV1();
 }
 
+function buildAdminLoginPayloadV220(identity, pin) {
+  const normalizedIdentity = String(identity || "").trim();
+  return {
+    admin_id: normalizedIdentity,
+    nama_admin: normalizedIdentity,
+    pin: String(pin || "")
+  };
+}
+
 function saveAdminSessionV220(credential) {
-  const adminId = String(credential && credential.admin_id || "").trim();
-  const adminName = String(credential && credential.nama_admin || "").trim();
+  const identity = String(credential && credential.identity || "").trim();
   const pin = String(credential && credential.pin || "");
-  if ((!adminId && !adminName) || !pin) return false;
+  if (!identity || !pin) return false;
 
   try {
     window.sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify({
-      admin_id: adminId,
-      nama_admin: adminName,
+      identity,
       pin,
       expiresAt: Date.now() + ADMIN_SESSION_DURATION_MS
     }));
@@ -877,15 +884,14 @@ function getSavedAdminSessionV220() {
     const rawSession = window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
     if (!rawSession) return null;
     const session = JSON.parse(rawSession);
-    const adminId = String(session && session.admin_id || "").trim();
-    const adminName = String(session && session.nama_admin || "").trim();
+    const identity = String(session && session.identity || "").trim();
     const pin = String(session && session.pin || "");
     const expiresAt = Number(session && session.expiresAt);
-    if ((!adminId && !adminName) || !pin || !Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
+    if (!identity || !pin || !Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
       clearSavedAdminSessionV220();
       return false;
     }
-    return { admin_id: adminId, nama_admin: adminName, pin, expiresAt };
+    return { identity, pin, expiresAt };
   } catch (error) {
     clearSavedAdminSessionV220();
     return false;
@@ -909,15 +915,12 @@ async function restoreSavedAdminSessionV220() {
     return false;
   }
 
+  const authLoadingToken = showAuthLoadingV220("admin", true);
   try {
-    const admin = await apiPost("loginAdmin", {
-      admin_id: saved.admin_id,
-      nama_admin: saved.nama_admin,
-      pin: saved.pin
-    });
+    const admin = await apiPost("loginAdmin", buildAdminLoginPayloadV220(saved.identity, saved.pin));
     adminRuntimeCredential = {
-      admin_id: admin.admin_id || saved.admin_id,
-      nama_admin: admin.nama_admin || saved.nama_admin,
+      admin_id: admin.admin_id || "",
+      nama_admin: admin.nama_admin || saved.identity,
       pin: saved.pin
     };
     startAdminSessionV200(admin);
@@ -929,6 +932,8 @@ async function restoreSavedAdminSessionV220() {
     showAdminLoginPanelV200();
     setAdminLoginMessageV200("Sesi Admin tidak dapat disahkan. Sila log masuk semula.", true);
     return false;
+  } finally {
+    hideAuthLoadingV220(authLoadingToken);
   }
 }
 
@@ -961,6 +966,7 @@ function clearAdminRuntimeCredentialV200() {
 }
 
 function exitAdminSessionV200() {
+  hideAuthLoadingV220();
   closeProfilePhotoPreview();
   clearSavedAdminSessionV220();
   clearAdminRuntimeCredentialV200();
@@ -2312,6 +2318,30 @@ function setLoginFormSubmittingV211(form, isSubmitting, loadingText) {
   return true;
 }
 
+let authLoadingSequenceV220 = 0;
+let activeAuthLoadingTokenV220 = 0;
+
+function showAuthLoadingV220(role, isRestore) {
+  const roleNames = { student: "Pelajar", warden: "Warden", guard: "Guard", admin: "Admin" };
+  const roleName = roleNames[String(role || "").toLowerCase()] || "Pengguna";
+  const token = ++authLoadingSequenceV220;
+  activeAuthLoadingTokenV220 = token;
+  if (els.authLoadingTitle) {
+    els.authLoadingTitle.textContent = isRestore ? `Memulihkan sesi ${roleName}...` : "Sedang log masuk...";
+  }
+  if (els.authLoadingDetail) {
+    els.authLoadingDetail.textContent = "Mengesahkan akses dan memuatkan paparan";
+  }
+  if (els.authLoading) els.authLoading.hidden = false;
+  return token;
+}
+
+function hideAuthLoadingV220(token) {
+  if (token && token !== activeAuthLoadingTokenV220) return;
+  activeAuthLoadingTokenV220 = 0;
+  if (els.authLoading) els.authLoading.hidden = true;
+}
+
 function isSafeEnterSubmitTargetV211(target) {
   if (!target || target.isContentEditable) return false;
   const tagName = String(target.tagName || "").toUpperCase();
@@ -2364,6 +2394,7 @@ function setupScopedEnterSubmissionV211() {
 async function handleStudentLoginSubmitV211(event) {
   event.preventDefault();
   if (!setLoginFormSubmittingV211(els.studentLoginPanel, true, "Mengesahkan...")) return;
+  const authLoadingToken = showAuthLoadingV220("student", false);
   try {
   const selectedStudent = students.find((item) => item.id === els.studentLoginSelect.value);
   const enteredMatric = els.matricInput.value.trim().toUpperCase();
@@ -2395,6 +2426,7 @@ async function handleStudentLoginSubmitV211(event) {
   startStudentSession(selectedStudent);
   } finally {
     setLoginFormSubmittingV211(els.studentLoginPanel, false);
+    hideAuthLoadingV220(authLoadingToken);
   }
 }
 
@@ -2403,6 +2435,7 @@ els.studentLoginPanel.addEventListener("submit", handleStudentLoginSubmitV211);
 async function handleWardenLoginSubmitV211(event) {
   event.preventDefault();
   if (!setLoginFormSubmittingV211(els.wardenLoginPanel, true, "Mengesahkan...")) return;
+  const authLoadingToken = showAuthLoadingV220("warden", false);
   try {
   const name = els.wardenSelect.value;
   const pin = els.wardenPinInput ? els.wardenPinInput.value.trim() : "";
@@ -2440,6 +2473,7 @@ async function handleWardenLoginSubmitV211(event) {
   startSession("warden", mockWarden);
   } finally {
     setLoginFormSubmittingV211(els.wardenLoginPanel, false);
+    hideAuthLoadingV220(authLoadingToken);
   }
 }
 
@@ -2448,6 +2482,7 @@ els.wardenLoginPanel.addEventListener("submit", handleWardenLoginSubmitV211);
 async function handleGuardLoginSubmitV211(event) {
   event.preventDefault();
   if (!setLoginFormSubmittingV211(els.guardLoginPanel, true, "Mengesahkan...")) return;
+  const authLoadingToken = showAuthLoadingV220("guard", false);
   try {
   const name = els.guardSelect.value;
   const pin = els.guardPinInput ? els.guardPinInput.value.trim() : "";
@@ -2485,12 +2520,14 @@ async function handleGuardLoginSubmitV211(event) {
   startSession("guard", mockGuard);
   } finally {
     setLoginFormSubmittingV211(els.guardLoginPanel, false);
+    hideAuthLoadingV220(authLoadingToken);
   }
 }
 
 els.guardLoginPanel.addEventListener("submit", handleGuardLoginSubmitV211);
 
 els.logoutButton.addEventListener("click", () => {
+  hideAuthLoadingV220();
   closeProfilePhotoPreview();
   clearSavedSession();
   stopWardenAutoRefresh();
@@ -4211,6 +4248,9 @@ async function restoreSavedSession() {
     return false;
   }
 
+  const authLoadingToken = showAuthLoadingV220(session.role, true);
+  try {
+
   if (session.role === "student") {
     const student = findStudentForSavedSession(session) || {
       id: session.student_id || "",
@@ -4267,6 +4307,9 @@ async function restoreSavedSession() {
 
   clearSavedSession();
   return false;
+  } finally {
+    hideAuthLoadingV220(authLoadingToken);
+  }
 }
 
 function findStudentForSavedSession(session) {
@@ -9938,12 +9981,17 @@ async function initApp() {
   } else {
     updateDataModeIndicator();
   }
+  const adminRestoreResult = await restoreSavedAdminSessionV220();
+  if (adminRestoreResult === true) {
+    isLiveMode = true;
+    dataModeMessage = "";
+    updateDataModeIndicator();
+    updateFooterActionsVisibility();
+    return;
+  }
   await loadLiveMasters();
   refreshStudentClassChoicesV200();
-  if (isLiveMode) {
-    const adminRestoreResult = await restoreSavedAdminSessionV220();
-    if (adminRestoreResult === null) await restoreSavedSession();
-  }
+  if (isLiveMode && adminRestoreResult === null) await restoreSavedSession();
   updateFooterActionsVisibility();
 }
 
