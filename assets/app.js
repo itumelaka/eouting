@@ -4578,16 +4578,32 @@ function normalizeStudentSubmissionDateV220(value) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function buildStudentRequestPayloadV220(student, requestType) {
+function buildStudentRequestPayloadV220(student, requestType, selectedConfig) {
+  const config = selectedConfig || null;
   const leaveDate = normalizeStudentSubmissionDateV220(
     els.leaveDateInput ? els.leaveDateInput.value : ""
   );
   const isWeekend = requestType === REQUEST_TYPE.weekend;
   const isOvernight = requestType === REQUEST_TYPE.overnight;
-  const includeDepartureFields = isWeekend || isOvernight;
-  const returnDate = includeDepartureFields
+  const sameDayOnly = isWeekend || Boolean(config && config.same_day_only === true);
+  const hasDepartureDayRule = Boolean(
+    config && String(config.departure_allowed_days || "").trim()
+  );
+  const includeLeaveDate = isWeekend
+    || isOvernight
+    || Boolean(config && config.require_leave_date === true)
+    || hasDepartureDayRule;
+  const includeReturnDate = isWeekend
+    || isOvernight
+    || Boolean(config && config.require_return_date === true);
+  const configuredReturnTime = String(config && config.fixed_return_time || "").trim();
+  const includeReturnTime = isWeekend
+    || isOvernight
+    || Boolean(config && config.require_return_time === true)
+    || Boolean(configuredReturnTime);
+  const returnDate = includeReturnDate
     ? normalizeStudentSubmissionDateV220(
-        isWeekend
+        sameDayOnly
           ? leaveDate
           : (els.returnDateInput ? els.returnDateInput.value : "")
       )
@@ -4609,12 +4625,12 @@ function buildStudentRequestPayloadV220(student, requestType) {
     telefon_waris: els.guardianPhoneInput.value.trim(),
     hubungan_waris: els.guardianRelationSelect.value,
     catatan_kecemasan: els.emergencyNoteInput.value.trim(),
-    tarikh: includeDepartureFields ? leaveDate : "",
-    hari: includeDepartureFields ? getDayNameFromDateInput(leaveDate) : "",
+    tarikh: includeLeaveDate ? leaveDate : "",
+    hari: includeLeaveDate ? getDayNameFromDateInput(leaveDate) : "",
     tarikh_balik: returnDate,
     hari_balik: getDayNameFromDateInput(returnDate),
-    masa_balik_dijangka: includeDepartureFields
-      ? (isWeekend ? "22:00" : els.expectedReturnTimeInput.value)
+    masa_balik_dijangka: includeReturnTime
+      ? (isWeekend ? "22:00" : configuredReturnTime || els.expectedReturnTimeInput.value)
       : ""
   };
 }
@@ -4690,7 +4706,7 @@ if (!student) {
 
   if (isLiveMode) {
     try {
-      const payload = buildStudentRequestPayloadV220(student, requestType);
+      const payload = buildStudentRequestPayloadV220(student, requestType, selectedConfig);
       const savedRecord = await apiPost("submitRequest", payload);
       els.requestForm.reset();
       updateEmergencyFields();

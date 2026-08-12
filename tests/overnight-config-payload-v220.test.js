@@ -68,6 +68,55 @@ const student = {
   className: "A3"
 };
 
+const customConfig = {
+  type_code: "CUSTOM_CLINIC",
+  require_leave_date: true,
+  require_return_date: true,
+  require_return_time: true,
+  same_day_only: false,
+  fixed_return_time: ""
+};
+
+test("custom configured type sends every required dynamic date and time field", () => {
+  const context = createFixture({
+    leaveDate: "12/08/2026",
+    returnDate: "2026-08-13",
+    returnTime: "18:45"
+  });
+  const payload = context.buildPayload(student, "CUSTOM_CLINIC", customConfig);
+
+  assert.equal(payload.tarikh, "2026-08-12");
+  assert.equal(payload.hari, "Rabu");
+  assert.equal(payload.tarikh_balik, "2026-08-13");
+  assert.equal(payload.masa_balik_dijangka, "18:45");
+});
+
+test("dynamic config does not force a departure date when it is not required", () => {
+  const context = createFixture({ leaveDate: "2026-08-12" });
+  const payload = context.buildPayload(student, "CUSTOM_OPTIONAL", {
+    ...customConfig,
+    type_code: "CUSTOM_OPTIONAL",
+    require_leave_date: false,
+    require_return_date: false,
+    require_return_time: false
+  });
+
+  assert.equal(payload.tarikh, "");
+  assert.equal(payload.hari, "");
+  assert.equal(payload.tarikh_balik, "");
+  assert.equal(payload.masa_balik_dijangka, "");
+});
+
+test("dynamic fixed return time overrides the visible return-time value", () => {
+  const context = createFixture({ returnTime: "18:45" });
+  const payload = context.buildPayload(student, "CUSTOM_FIXED", {
+    ...customConfig,
+    type_code: "CUSTOM_FIXED",
+    fixed_return_time: "21:15"
+  });
+  assert.equal(payload.masa_balik_dijangka, "21:15");
+});
+
 test("visible Pulang Bermalam departure date is built directly into payload.tarikh", () => {
   const context = createFixture();
   const payload = context.buildPayload(student, "PULANG_BERMALAM");
@@ -132,6 +181,6 @@ test("live student submit uses the payload builder instead of transport-time DOM
     appSource.indexOf('els.requestForm.addEventListener("submit"'),
     appSource.indexOf("function setStudentRequestSubmitting")
   );
-  assert.match(submitSource, /const payload = buildStudentRequestPayloadV220\(student, requestType\)/);
+  assert.match(submitSource, /const payload = buildStudentRequestPayloadV220\(student, requestType, selectedConfig\)/);
   assert.doesNotMatch(appSource, /apiPostWithPulangBermalamFields|apiPostWithoutPulangBermalamFields/);
 });
