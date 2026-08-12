@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-12 — Student outing cancellation production close-out (v2.2.0)
+
+- `50da5b6` (`feat: allow students to cancel outing requests`) menambah pembatalan milik Pelajar bagi status `MENUNGGU_KELULUSAN` dan `DILULUSKAN_WARDEN` untuk semua jenis standard/config-driven termasuk `KLINIK`.
+- Mewajibkan `Sebab Batal Permohonan` selepas trim pada 5–500 aksara di frontend dan backend; rekod dikekalkan bersama `sebab_batal_pelajar`, `masa_batal_pelajar` dan `dibatalkan_oleh=PELAJAR`.
+- Menambah status terminal/non-active `DIBATALKAN_PELAJAR` (`Dibatalkan oleh Pelajar`), sejarah Pelajar, re-request selepas batal, exclusion queue Warden/Guard/Public Monitoring dan classification statistik bukan selesai/berjaya.
+- Menggunakan `cancelStudentRequest`, ownership validation, `ScriptLock`, authoritative status re-read dan audit `CANCEL_STUDENT_REQUEST`; approve/reject Warden serta Guard `confirmOut` turut diperkukuh supaya `KELUAR` tidak boleh ditimpa cancellation.
+- `59884b4` (`fix: notify Telegram on all student cancellations`) menghantar tepat satu mesej bagi cancellation pending atau approved dengan nama, nombor matrik, jenis, previous status human-readable, sebab dan masa. Failure hanya warning serta tidak rollback atau duplicate.
+- Production disahkan pada 12 Ogos 2026 menggunakan frontend/cache `2.2.0-r6`, service worker `eouting-cache-v2.2.0-r6` dan GAS Version 39. Full Node baseline semasa ialah **332/332 lulus**.
+
 ## 2026-08-12 — Production UX, config dan session close-out (v2.2.0)
 
 - `6428b11` menghalang duplicate active outing dengan frontend in-flight state serta atomic backend `ScriptLock`; completed/rejected request kekal membenarkan submission baharu.
@@ -8,7 +17,7 @@
 - `74063fc` dan `1ec7c61` menyediakan/stabilkan Admin refresh restore dengan sessionStorage tab, mandatory `loginAdmin` revalidation, 12-hour absolute expiry, lazy Admin startup serta shared auth/restore loader semua role.
 - `3932b71` menambah action sheet foto profil `Ambil Foto` / `Pilih dari Galeri` / `Batal` menggunakan satu processing pipeline; return-selfie tidak berubah.
 - `df77185` menaikkan active asset/cache revision daripada r4 kepada `2.2.0-r5`; mobile/PWA production disahkan memuat UI terkini.
-- Full Node suite semasa lulus **317/317**; `assets/app.js` dan `service-worker.js` lulus syntax check.
+- Baseline pada close-out tersebut ialah **317/317 lulus**; `assets/app.js` dan `service-worker.js` lulus syntax check.
 
 ## 2026-08-11 — Announcement Banner V1 production close-out (v2.2.0)
 

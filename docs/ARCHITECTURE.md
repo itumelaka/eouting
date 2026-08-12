@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r5`. Production menggunakan GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
+Versi repo semasa: **v2.2.0** dengan cache frontend `2.2.0-r6`. Production menggunakan GAS Version 39, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
 
 ## Komponen
 
@@ -126,6 +126,7 @@ Jika credential operasi hilang atau salah, request gagal secara terkawal. Fronte
 Action write lain kekal melalui POST:
 
 - `submitRequest`
+- `cancelStudentRequest`
 - `approveRequest`
 - `rejectRequest`
 - `confirmOut`
@@ -144,6 +145,8 @@ Admin action mengesahkan `admin_id` atau `nama_admin` bersama PIN aktif pada set
 ```text
 Pelajar login -> submitRequest -> OUTING_REQUESTS
   -> Telegram permohonan
+Pelajar login -> cancelStudentRequest -> DIBATALKAN_PELAJAR
+  -> AUDIT_LOG + satu notifikasi Telegram non-blocking
 Warden login -> POST getTodayRecords -> approve/reject
   -> Telegram keputusan
 Guard login -> POST getTodayRecords -> confirmOut/confirmIn
@@ -157,6 +160,14 @@ Pelajar selepas confirmIn -> kamera/preview/compress -> submitReturnSelfie
   -> LockService -> Drive private -> Telegram sendPhoto -> metadata Sheet
 Public Monitoring -> GET getTodayRecords -> mapPublicMonitoringRecord
 ```
+
+### Pembatalan Permohonan Pelajar
+
+Pembatalan ialah transition generik berdasarkan status, bukan jenis outing. Semua jenis standard, `KLINIK` dan jenis custom config-driven menggunakan action POST `cancelStudentRequest` yang sama. Pelajar hanya boleh membatalkan rekod sendiri ketika status authoritative ialah `MENUNGGU_KELULUSAN` atau `DILULUSKAN_WARDEN`; sebab 5–500 aksara di-trim dan disahkan semula oleh backend.
+
+Di dalam `ScriptLock`, backend membaca semula row authoritative, menyemak pemilikan dan status, kemudian menukar rekod tanpa delete kepada `DIBATALKAN_PELAJAR` serta menyimpan sebab, masa dan aktor `PELAJAR`. Status ini terminal/non-active: ia tidak menghalang permohonan baharu, tidak memasuki queue Warden/Guard, tidak dianggap sedang keluar dan tidak dikira sebagai outing selesai/berjaya. Approval/rejection Warden dan `confirmOut` Guard turut melakukan revalidation di bawah lock; jika Guard lebih dahulu menukar status kepada `KELUAR`, cancellation gagal dan tidak boleh menimpa state itu.
+
+Selepas transaksi atomic serta audit `CANCEL_STUDENT_REQUEST` selesai, satu notifikasi Telegram dihantar untuk kedua-dua previous status yang dibenarkan. Mesej menggunakan label status mesra pengguna dan mengandungi nama, nombor matrik, jenis, sebab serta masa. Telegram ialah side effect non-blocking: hasil false atau exception hanya dilog sebagai warning, tanpa rollback atau cubaan pendua.
 
 `getOperationalTodayRecords` menambah hanya `has_profile_photo` dan masa kemas kini. Selepas kad operasi dirender dengan placeholder, frontend membuat satu batch `thumbnail` bagi ID unik yang diperlukan. GAS mengesahkan viewer pada setiap request, menyelesaikan file private, mendapatkan `thumbnailLink` melalui Drive API v3 dan memuat turun thumbnail dengan OAuth server-side. Browser tidak menerima file ID, URL Drive, `thumbnailLink` atau token. Cache thumbnail/full, negative entry, single-flight dan version guard adalah berasingan. Kegagalan thumbnail mengekalkan initials tanpa fallback bulk kepada imej 600×800.
 
@@ -187,6 +198,7 @@ Nilai lifecycle backend:
 - `MENUNGGU_KELULUSAN`
 - `DILULUSKAN_WARDEN`
 - `DITOLAK_WARDEN`
+- `DIBATALKAN_PELAJAR` — terminal/non-active, dipaparkan sebagai `Dibatalkan oleh Pelajar`
 - `KELUAR`
 - `SELESAI`
 
@@ -223,7 +235,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.0-r5` dan query `2.2.0-r5`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.0-r6` dan query `2.2.0-r6`; revision ini tidak menaikkan aplikasi kepada v2.3.0.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
@@ -246,7 +258,7 @@ Frontend tidak menentukan authorization atau validation akhir. Config yang dihan
 
 `confirmOut` turut menyemak tarikh keluar yang diluluskan, configured departure day dan earliest departure time. Policy error yang sepadan dipaparkan kepada Guard dalam wording Melayu yang diallowlist; network/internal error kekal generik dan stack detail tidak didedahkan.
 
-Semakan active request serta append submission berada dalam satu `ScriptLock`. Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` menghalang duplicate; `SELESAI` serta `DITOLAK_WARDEN` tidak. Frontend juga menggunakan satu in-flight lock dan loading feedback. Action approve/reject Warden serta confirm-out/confirm-in Guard mempunyai lock UI masing-masing untuk menolak klik berganda tanpa mengubah boundary backend.
+Semakan active request serta append submission berada dalam satu `ScriptLock`. Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` menghalang duplicate; `SELESAI`, `DITOLAK_WARDEN` serta `DIBATALKAN_PELAJAR` tidak. Frontend juga menggunakan satu in-flight lock dan loading feedback. Action approve/reject Warden serta confirm-out/confirm-in Guard mempunyai lock UI masing-masing untuk menolak klik berganda tanpa mengubah boundary backend.
 
 ## Operasi Admin
 

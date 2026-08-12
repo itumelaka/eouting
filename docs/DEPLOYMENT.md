@@ -1,6 +1,6 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r5` dan service-worker cache `eouting-cache-v2.2.0-r5`. Backend production ialah GAS **Version 37**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026.
+Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r6` dan service-worker cache `eouting-cache-v2.2.0-r6`. Backend production ialah GAS **Version 39**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026.
 
 ## Production verification — 12 Ogos 2026
 
@@ -8,12 +8,15 @@ Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r5` dan se
 - Global login/restore loader disahkan untuk Pelajar, Warden, Guard dan Admin tanpa mendedahkan shell Admin sebelum authentication.
 - Dynamic payload/config fixes disahkan untuk standard types dan custom `KLINIK`; blank earliest-departure time bermaksud tiada sekatan.
 - Student profile-photo action sheet `Ambil Foto` / `Pilih dari Galeri` disahkan pada telefon; return-selfie kekal berasingan.
-- Revision r5 memaksa mobile/PWA mengambil CSS/JS terkini tanpa menukar displayed v2.2.0 atau GAS.
-- Suite semasa lulus **317/317** dan syntax checks `assets/app.js` serta `service-worker.js` lulus.
+- Revision r6 memaksa mobile/PWA mengambil UI pembatalan Pelajar tanpa menukar displayed v2.2.0.
+- Pembatalan production disahkan bagi request pending: sebab wajib diterima, status menjadi `DIBATALKAN_PELAJAR`, rekod masuk sejarah, permohonan baharu dibenarkan dan Telegram diterima.
+- Flow approved menggunakan eligibility/race guard yang sama; cancelled row tidak berada dalam queue Warden/Guard atau status sedang keluar.
+- GAS Version 39 menghantar satu Telegram cancellation bagi previous status pending atau approved; delivery failure kekal non-blocking.
+- Suite semasa lulus **332/332** dan syntax checks `assets/app.js`, `service-worker.js` serta `gas/Code.gs` lulus.
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah r5.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah r6.
 
 Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
@@ -207,7 +210,7 @@ Frontend:
 
 - buka `https://itumelaka.github.io/eouting/`;
 - semak footer dan update popup;
-- semak asset query `2.2.0-r5` dan Cache Storage `eouting-cache-v2.2.0-r5`, khususnya selepas refresh/reopen PWA mobile;
+- semak asset query `2.2.0-r6` dan Cache Storage `eouting-cache-v2.2.0-r6`, khususnya selepas refresh/reopen PWA mobile;
 - login Admin, refresh berulang dan sahkan restore hanya selepas backend validation serta tab bukan default kekal lazy;
 - login Pelajar pada telefon, buka foto profil dan sahkan `Ambil Foto`, `Pilih dari Galeri` serta `Batal`; return-selfie mesti kekal sama;
 - buka Public Monitoring sekali dan pastikan loading, scroll, data serta timestamp betul;
@@ -219,6 +222,8 @@ Backend:
 - POST Pelajar hanya mengembalikan rekod Pelajar tersebut;
 - POST Warden/Guard mengembalikan data operasi selepas credential sah;
 - credential salah ditolak tanpa fallback GET.
+- `cancelStudentRequest` mengesahkan pemilikan, sebab 5–500 aksara dan status authoritative; uji pending serta approved, kemudian sahkan `DIBATALKAN_PELAJAR`, metadata, audit dan tepat satu Telegram;
+- cancelled row tidak muncul dalam queue Warden/Guard, Public Monitoring tidak mendedahkan sebab, dan Pelajar boleh membuat request baharu;
 - `submitReturnSelfie` menolak pemilikan/status/input yang tidak sah dan duplicate submission;
 - imej berada dalam folder Drive private dan Telegram menerima foto sebenar;
 - Public Monitoring tidak mengandungi metadata selfie.

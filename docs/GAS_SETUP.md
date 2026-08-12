@@ -1,12 +1,13 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.2.0 menggunakan GAS Web App **Version 37**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.2.0 menggunakan GAS Web App **Version 39**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp.
 
 ## Tanggungjawab Backend
 
 - membaca `STUDENTS`, `WARDENS`, `GUARDS` dan `OUTING_REQUESTS`;
 - mengesahkan login Pelajar, Warden dan Guard;
 - menghalang duplicate active request;
+- membatalkan permohonan milik Pelajar secara atomic daripada status menunggu atau diluluskan, tanpa memadam rekod;
 - menguatkuasakan approve/reject dan confirm keluar/masuk;
 - menyediakan projection public minimum dan rekod operasi authenticated;
 - mengira statistik agregat;
@@ -44,6 +45,7 @@ Jangan tambah PII atau metadata operasi kepada response public tanpa security re
 - `loginGuard`
 - `getTodayRecords` melalui validation operasi
 - `submitRequest`
+- `cancelStudentRequest`
 - `approveRequest`
 - `rejectRequest`
 - `confirmOut`
@@ -98,7 +100,7 @@ Script Properties Notis Banner dicipta secara automatik apabila Admin menyimpan 
 
 Action `getAnnouncementBannerAdmin` dan `updateAnnouncementBanner` memerlukan credential Admin aktif; update direkod sebagai `UPDATE_ANNOUNCEMENT_BANNER`. `getAnnouncementBanner` mengesahkan Student, Warden/HEP, Guard atau Admin dan memulangkan projection viewer-safe sahaja. Public GET tidak menyediakan banner, nama/nilai Script Property tidak didedahkan dan `updated_by` tidak dihantar kepada ordinary viewer. Teks dibatasi kepada 500 aksara dan dirawat sebagai plain text.
 
-Jangan dokumentasi atau commit nilai sebenar token, chat ID atau folder ID. Notifikasi Telegram lifecycle biasa kekal non-blocking. Untuk `submitReturnSelfie`, `sendPhoto` ialah langkah transaksi yang diperlukan dan kegagalan dikendalikan dengan cleanup.
+Jangan dokumentasi atau commit nilai sebenar token, chat ID atau folder ID. Notifikasi Telegram lifecycle biasa kekal non-blocking. Setiap pembatalan Pelajar yang berjaya daripada `MENUNGGU_KELULUSAN` atau `DILULUSKAN_WARDEN` mencuba tepat satu mesej Telegram selepas transaksi: nama, nombor matrik jika tersedia, jenis outing mesra pengguna, status sebelumnya yang mesra pengguna, sebab dan masa pembatalan. Kegagalan Telegram dicatat mengikut convention backend tetapi tidak menggagalkan atau rollback pembatalan. Percubaan pembatalan yang ditolak tidak menghantar mesej. Untuk `submitReturnSelfie`, `sendPhoto` ialah langkah transaksi yang diperlukan dan kegagalan dikendalikan dengan cleanup.
 
 ## Setup Bukti Selfie v1.7.0
 
@@ -176,13 +178,14 @@ Kekalkan URL deployment sedia ada. `clasp push` tidak menggantikan langkah deplo
 4. Uji login Pelajar dengan nombor matrik betul dan salah.
 5. Uji Warden/Guard POST `getTodayRecords` dengan credential sah dan tidak sah.
 6. Uji approve/reject serta confirm keluar/masuk.
-7. Semak Telegram tanpa mendedahkan token dalam log.
-8. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
-9. Sahkan Public Monitoring tidak mengandungi metadata selfie.
-10. Uji tambah/ganti foto Pelajar, `photo_variant = "thumbnail"` pada Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
-11. Uji klik preview pada Pelajar, Warden/HEP, Guard dan Admin; sahkan modal membuat maksimum satu `photo_variant = "full"` bagi student yang belum dicache, pembukaan kedua menggunakan cache, dan tiada URL/ID Drive didedahkan.
-12. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at`, data URI atau trigger preview.
-13. Jalankan regression suite repo dan pastikan semua ujian lulus.
+7. Uji pembatalan Pelajar bagi status menunggu dan diluluskan: sebab 5–500 aksara, metadata pembatalan, sejarah, kebolehan memohon semula, serta pengecualian daripada queue Warden/Guard.
+8. Semak tepat satu notifikasi Telegram pembatalan bagi setiap transaksi berjaya, termasuk status sebelumnya yang mesra pengguna; simulasi kegagalan Telegram dan sahkan pembatalan kekal berjaya tanpa token didedahkan dalam log.
+9. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
+10. Sahkan Public Monitoring tidak mengandungi metadata selfie atau pembatalan.
+11. Uji tambah/ganti foto Pelajar, `photo_variant = "thumbnail"` pada Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
+12. Uji klik preview pada Pelajar, Warden/HEP, Guard dan Admin; sahkan modal membuat maksimum satu `photo_variant = "full"` bagi student yang belum dicache, pembukaan kedua menggunakan cache, dan tiada URL/ID Drive didedahkan.
+13. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at`, data URI atau trigger preview.
+14. Jalankan regression suite repo dan pastikan semua ujian lulus.
 
 Jika `/exec` masih memulangkan behavior lama selepas `clasp push`, semak Manage deployments dan pastikan version baharu telah dipilih.
 

@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r5` dan production GAS Version 37.
+Panduan ini merujuk eOuting ITU **v2.2.0**, cache revision `2.2.0-r6` dan production GAS Version 39.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline yang disahkan pada 12 Ogos 2026 ialah **317/317 lulus**.
+Baseline yang disahkan pada 12 Ogos 2026 ialah **332/332 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -123,6 +123,7 @@ Suite utama:
 - `tests/admin-session-refresh-v220.test.js`: schema session Admin, payload login/restore sama, backend rejection, absolute expiry, logout dan lazy bootstrap.
 - `tests/auth-loading-v220.test.js`: loader shared semua role, cleanup success/failure/logout dan reduced-motion.
 - `tests/profile-photo-source-v220.test.js`: action sheet kamera/galeri, shared handler, cancellation/failure cleanup dan pengasingan return-selfie.
+- `tests/student-cancellation.test.js`: kelayakan pending/approved, sebab wajib, ownership dan race safety, metadata/audit, sejarah/permohonan semula, pengecualian queue serta tepat satu Telegram non-blocking.
 - `tests/announcement-banner-v1.test.js`: Admin UI/save, authenticated projection, ticker sentiasa aktif, hover/fokus pause, reduced-motion, public privacy dan cleanup panduan Pelajar.
 - `tests/student-directory-security.test.js`: projection direktori Pelajar dan login backend.
 - `tests/student-login-dropdown-privacy.test.js`: dropdown nama tanpa nombor matrik.
@@ -166,6 +167,8 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 9. Dalam mock mode, sahkan badge bertukar kepada `Bukti Selfie Dihantar` tanpa request Drive/Telegram.
 10. Tekan tindakan foto profil dan sahkan action sheet `Ambil Foto`, `Pilih dari Galeri`, `Batal`; kamera mengutamakan depan, galeri tidak memaksa kamera, cancel tidak meninggalkan loading, dan kedua-dua selection melalui validation/compression/upload yang sama.
 11. Jika foto profil sebenar tersedia, sahkan identity menggunakan thumbnail, klik foto dan pastikan modal menunjukkan thumbnail/loading sebelum full image jika cache kosong; pembukaan kedua menggunakan full-image cache. Escape/backdrop/close dan fokus kembali mesti berfungsi. Initials tidak boleh diklik.
+12. Batalkan satu permohonan menunggu dan satu yang telah diluluskan melalui action sheet yang sama; sebab 5–500 aksara wajib, rekod menjadi `DIBATALKAN_PELAJAR` dalam sejarah, tidak muncul dalam queue operasi dan Pelajar boleh memohon semula.
+13. Sahkan pembatalan standard/custom type memaparkan loading yang selamat, klik berulang tidak menduplikasi action/Telegram, dan invalid reason atau status yang tidak boleh dibatalkan ditolak tanpa notifikasi.
 
 ## Smoke Test Warden
 
@@ -176,6 +179,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 5. Uji approve/reject dan Telegram; klik berulang semasa loading mesti tidak menghantar action kedua.
 6. Pastikan credential hilang menghasilkan error, bukan data Public Monitoring.
 7. Klik foto sebenar pada kad Warden/HEP dan sahkan list menggunakan satu batch thumbnail, preview membuat hanya satu request full jika belum dicache, dan approve/reject tidak terganggu.
+8. Sahkan permohonan yang telah dibatalkan Pelajar tidak muncul dalam queue dan race approve/reject tidak menimpa status authoritative.
 
 ## Smoke Test Guard
 
@@ -186,6 +190,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 5. Uji confirm keluar/masuk dan Telegram; klik berulang semasa loading mesti tidak menghantar action kedua.
 6. Klik foto sebenar pada setiap jenis kad Guard dan sahkan satu batch thumbnail digunakan, full preview dimuat on-demand/cached dan tidak mengganggu `Sahkan Keluar`/`Sahkan Masuk`; initials kekal inert.
 7. Untuk `PULANG_BERMALAM`, uji future approved date, disallowed departure day dan sebelum `earliest_departure_time`; policy error mesti jelas dan error network/internal mesti kekal generic.
+8. Sahkan permohonan yang dibatalkan tidak boleh `confirmOut`; dalam race serentak, transaksi pertama yang sah menang dan status `KELUAR` tidak ditimpa cancellation.
 
 ## Smoke Test Public Monitoring
 
@@ -212,7 +217,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 ## PWA dan Cache
 
 - Semak footer v2.2.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r5` dan asset query `2.2.0-r5`; displayed app version kekal v2.2.0.
+- Semak Cache Storage menggunakan `eouting-cache-v2.2.0-r6` dan asset query `2.2.0-r6`; displayed app version kekal v2.2.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

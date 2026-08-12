@@ -14,9 +14,9 @@ Versi repo semasa: **v2.2.0 — Operasi Bersepadu dan Foto Profil Private Dua Pe
 
 Frontend production v2.2.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Revision aset frontend semasa ialah `2.2.0-r5` dan service worker menggunakan `eouting-cache-v2.2.0-r5`. Revision r5 memastikan mobile/PWA menerima pilihan kamera atau galeri bagi foto profil tanpa menaikkan displayed application version.
+Revision aset frontend semasa ialah `2.2.0-r6` dan service worker menggunakan `eouting-cache-v2.2.0-r6`. Revision r6 memastikan mobile/PWA menerima UI pembatalan Pelajar tanpa menaikkan displayed application version.
 
-Backend production semasa menggunakan GAS **Version 37**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
+Backend production semasa menggunakan GAS **Version 39**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
 Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
@@ -76,6 +76,8 @@ Frontend membina medan serta payload daripada konfigurasi jenis yang dipilih. `r
 Jenis custom production `KLINIK` dipaparkan sebagai **Keluar ke Klinik**. Ia ialah outing hari sama tanpa input tarikh keluar/balik manual, memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden dan selfie pulang. Ruang dinamik menggunakan tajuk neutral `Maklumat Tambahan`; `PULANG_BERMALAM` mengekalkan `Maklumat Pulang Bermalam`. Nilai `earliest_departure_time` kosong bermaksud tiada had masa keluar paling awal dan boleh dikosongkan Admin melalui `Kosongkan`.
 
 Submission Pelajar mempunyai lock in-flight frontend dan loading feedback. Di backend, semakan active request serta append berlaku secara atomic di bawah `ScriptLock`; `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` menghalang duplicate, manakala `SELESAI` serta `DITOLAK_WARDEN` membenarkan permohonan baharu. Approve/reject Warden dan confirm-out/confirm-in Guard turut mempunyai perlindungan klik berganda semasa action berjalan.
+
+Pelajar boleh membatalkan rekod sendiri yang masih `MENUNGGU_KELULUSAN` atau `DILULUSKAN_WARDEN` melalui `Batal Permohonan`. `Sebab Batal Permohonan` wajib diisi, di-trim dan mestilah 5–500 aksara pada frontend serta backend. Rekod tidak dipadam: action `cancelStudentRequest` menukarnya secara atomic kepada status terminal/non-active `DIBATALKAN_PELAJAR` (`Dibatalkan oleh Pelajar`), menyimpan sebab/masa/aktor, memindahkannya ke sejarah dan membenarkan permohonan baharu. Flow ini status-driven untuk jenis standard, `KLINIK` dan semua jenis custom config-driven. Setiap pembatalan berjaya menghantar satu notifikasi Telegram yang mengandungi status terdahulu secara mesra pengguna; kegagalan Telegram hanya diberi amaran dan tidak menggagalkan pembatalan.
 
 Konfigurasi production membezakan dua konsep:
 
@@ -186,7 +188,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo yang disahkan pada 12 Ogos 2026 ialah **317/317 lulus**. Syntax checks:
+Baseline repo yang disahkan pada 12 Ogos 2026 ialah **332/332 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -227,6 +229,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 37**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r5`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.0 semasa ialah GAS **Version 39**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.0-r6`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan production **v2.2.0 / GAS Version 37**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan production **v2.2.0 / GAS Version 39**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -24,6 +24,7 @@ Nama dibenarkan pada Public Monitoring read-only v1.6.25. PII dan metadata berik
 - nama/telefon waris;
 - lokasi, tujuan dan maklumat kenderaan;
 - sebab kecemasan penuh dan catatan dalaman;
+- `sebab_batal_pelajar`, `masa_batal_pelajar` dan `dibatalkan_oleh`;
 - nama pegawai/audit metadata;
 - `selfie_status`, `selfie_file_id`, `selfie_url`, `masa_selfie` dan `selfie_telegram_message_id`;
 - PIN, credential dan secret.
@@ -65,7 +66,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.2.0-r5`; displayed app version kekal v2.2.0.
+- Cache source semasa ialah `eouting-cache-v2.2.0-r6`; displayed app version kekal v2.2.0.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -80,6 +81,12 @@ GAS mesti mengesahkan:
 - duplicate active request;
 - rule masa Outing Biasa;
 - credential operasi sebelum mengeluarkan row penuh.
+
+Untuk `cancelStudentRequest`, GAS mengesahkan semula identiti Pelajar aktif melalui `student_id` + `no_matrik`, memastikan request itu milik Pelajar tersebut dan mengesahkan sebab selepas trim pada julat 5–500 aksara. Frontend validation dan visibility butang hanyalah UX; backend tidak mempercayainya.
+
+Cancellation menggunakan `ScriptLock`, kemudian membaca semula row serta status authoritative sebelum write. Hanya `MENUNGGU_KELULUSAN` dan `DILULUSKAN_WARDEN` diterima. Approval/rejection Warden serta Guard `confirmOut` turut dilindungi lock/revalidation supaya hanya satu transition menang; `KELUAR` tidak boleh ditimpa oleh `DIBATALKAN_PELAJAR`. Rekod dikekalkan dan audit `CANCEL_STUDENT_REQUEST` ditulis selepas kejayaan.
+
+Notifikasi Telegram cancellation berlaku selepas transition atomic. Satu cubaan dibuat bagi setiap cancellation berjaya, termasuk previous status pending dan approved. Return false atau exception Telegram dilog sebagai warning tetapi tidak menggagalkan/rollback cancellation dan tidak menyebabkan mesej pendua. Attempt tidak dibuat apabila validation, ownership atau status ditolak.
 
 Untuk `submitReturnSelfie`, GAS turut mengesahkan:
 

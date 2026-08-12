@@ -6,15 +6,15 @@ Status repo semasa: **v2.2.0 — production verified**.
 
 Frontend v2.2.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **12 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.2.0 dengan GAS Version 37. Displayed version kekal v2.2.0, cache/asset source revision ialah `2.2.0-r5` dan service-worker cache ialah `eouting-cache-v2.2.0-r5`. Production beroperasi normal.
+Verdict semasa pada **12 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.2.0 dengan GAS Version 39. Displayed version kekal v2.2.0, cache/asset source revision ialah `2.2.0-r6` dan service-worker cache ialah `eouting-cache-v2.2.0-r6`. Production beroperasi normal.
 
-`Notis Banner` V1 kini live dan verified pada GAS Version 37. Admin mengurus satu banner global melalui Script Properties; Normal/Important, save, authenticated display, timestamp, continuous ticker, pause hover/focus/touch, reduced-motion dan public privacy telah disahkan. Full Node suite semasa lulus **317/317**.
+`Notis Banner` V1 kekal live. Student cancellation dan notifikasi Telegram cancellation kini live serta verified pada GAS Version 39. Full Node suite semasa lulus **332/332**.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.2.0` dan backend production ialah GAS **Version 37**;
+- frontend release ialah `v2.2.0` dan backend production ialah GAS **Version 39**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
@@ -28,8 +28,8 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.2.0`; asset/cache source revision ialah `2.2.0-r5`.
-- Backend GAS production ialah **Version 37** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
+- Metadata displayed frontend/footer/version berada pada `v2.2.0`; asset/cache source revision ialah `2.2.0-r6`.
+- Backend GAS production ialah **Version 39** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -42,6 +42,10 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Pelajar login dengan `student_id` dalaman + nombor matrik yang ditaip.
 - Warden approve/reject dan Guard confirm keluar/masuk menggunakan POST authenticated.
 - Submission Pelajar mempunyai frontend in-flight guard dan atomic backend active-check + append; Warden/Guard actions mempunyai loading protection terhadap duplicate click.
+- Pelajar melihat `Batal Permohonan` hanya ketika pending/approved; sebab wajib 5–500 aksara, status terminal `DIBATALKAN_PELAJAR`, paparan sejarah dan permohonan baharu telah disahkan live.
+- Cancellation ialah status-driven untuk standard, `KLINIK` dan custom type; ownership serta current status disemak di bawah `ScriptLock`, dan `KELUAR` tidak boleh ditimpa.
+- Cancelled row dikecualikan daripada queue Warden/Guard, outside/completed counts dan Public Monitoring reason; Admin/master authenticated boleh melihat label serta sebab.
+- Setiap cancellation pending/approved menghasilkan tepat satu Telegram dengan previous status human-readable; failure kekal non-blocking.
 - Runtime credential staff dipulihkan selepas fresh login.
 - Tiada fallback authenticated kepada public records.
 - Warden Checklist menggunakan emoji dan status kontekstual.
@@ -55,7 +59,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer kekal v2.2.0; asset query dan cache source konsisten pada `2.2.0-r5`.
+- Displayed version/footer kekal v2.2.0; asset query dan cache source konsisten pada `2.2.0-r6`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -114,7 +118,8 @@ Nilai backend `KELUAR` tidak berubah.
 - **v2.2.0:** tujuh modul Admin inline, pengurusan operasi/master data, foto profil private dengan thumbnail batch/full on-demand, identifikasi Warden/Guard/Admin, rolling KPI, Enter UX dan cache delivery. GAS Version 32 serta semua smoke test ketika rollout awal disahkan live pada 9 Ogos 2026.
 - **10 Ogos 2026:** config-driven production diaktifkan dan disahkan pada GAS Version 36; cache revision `2.2.0-r1`, readiness hijau dan rollback flag-false kekal tersedia tanpa redeployment.
 - **11 Ogos 2026:** Announcement Banner V1 dideploy dan disahkan pada GAS Version 37; ticker serta cleanup panduan Pelajar ditutup pada cache `2.2.0-r4`, dengan config-driven kekal Active + Ready.
-- **12 Ogos 2026:** duplicate/action loading, dynamic custom payload dan KLINIK config fixes, Admin refresh restore, global auth loader serta foto profil camera/gallery disahkan. Cache r5 aktif dan mobile/PWA memuat UI terkini.
+- **12 Ogos 2026:** duplicate/action loading, dynamic custom payload dan KLINIK config fixes, Admin refresh restore, global auth loader serta foto profil camera/gallery disahkan pada cache r5 (rekod sejarah sebelum cancellation).
+- **12 Ogos 2026:** Student cancellation dideploy dan disahkan live untuk pending/approved, mandatory reason, status `DIBATALKAN_PELAJAR`, history/re-request, queue Guard/Warden dan Telegram. Cache r6 serta GAS Version 39 aktif; production beroperasi normal.
 
 ## Production Validation v1.7.0
 

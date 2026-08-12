@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.0**, cache revision `2.2.0-r5`, GAS Version 37 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
+Dokumen ini menerangkan flow production semasa **v2.2.0**, cache revision `2.2.0-r6`, GAS Version 39 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
 
 ## Backend Config API v2.0
 
@@ -67,7 +67,7 @@ submitRequest
 
 Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` production membenarkan permohonan pada mana-mana hari, departure Jumaat dan masa paling awal semasa `17:00`; Admin boleh mengubah masa itu mengikut arahan HEP.
 
-Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` dianggap active dan menghalang request baharu; `SELESAI` serta `DITOLAK_WARDEN` membenarkannya. Frontend mempunyai submission in-flight guard dan loading sendiri, tetapi atomic backend lock kekal protection authoritative.
+Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` dianggap active dan menghalang request baharu; `SELESAI`, `DITOLAK_WARDEN` serta `DIBATALKAN_PELAJAR` membenarkannya. Frontend mempunyai submission in-flight guard dan loading sendiri, tetapi atomic backend lock kekal protection authoritative.
 
 ## Student Form Config Rendering — Fasa 5A
 
@@ -141,13 +141,41 @@ Pelajar, Warden, Guard dan Admin berkongsi satu loader untuk fresh login serta s
 ```text
 MENUNGGU_KELULUSAN
   -> DILULUSKAN_WARDEN atau DITOLAK_WARDEN
+  -> DIBATALKAN_PELAJAR oleh Pelajar
 DILULUSKAN_WARDEN
   -> KELUAR
+  -> DIBATALKAN_PELAJAR oleh Pelajar
 KELUAR
   -> SELESAI
 ```
 
-`lewat` ialah flag tambahan. Label kontekstual frontend tidak menukar nilai status backend. Bukti pulang menggunakan `selfie_status` yang berasingan; penghantaran selfie tidak memperkenalkan status lifecycle utama baharu.
+`DIBATALKAN_PELAJAR` ialah terminal/non-active dan berlabel `Dibatalkan oleh Pelajar`; ia tidak boleh beralih ke `KELUAR`/`SELESAI`. `lewat` ialah flag tambahan. Label kontekstual frontend tidak menukar nilai status backend. Bukti pulang menggunakan `selfie_status` yang berasingan; penghantaran selfie tidak memperkenalkan status lifecycle utama baharu.
+
+## Flow Pembatalan Pelajar
+
+```text
+MENUNGGU_KELULUSAN atau DILULUSKAN_WARDEN
+  -> Pelajar tekan Batal Permohonan
+  -> action sheet accessible meminta Sebab Batal Permohonan
+  -> trim + validation frontend 5–500 aksara
+  -> POST cancelStudentRequest dengan identiti Pelajar
+  -> ScriptLock
+       -> revalidate identiti dan pemilikan
+       -> baca semula row/status authoritative
+       -> revalidate sebab 5–500 aksara
+       -> status = DIBATALKAN_PELAJAR
+       -> simpan sebab_batal_pelajar, masa_batal_pelajar, dibatalkan_oleh=PELAJAR
+       -> flush
+  -> AUDIT_LOG CANCEL_STUDENT_REQUEST
+  -> satu notifikasi Telegram non-blocking
+  -> rekod masuk sejarah dan Pelajar boleh memohon semula
+```
+
+Flow ini status-driven dan sama bagi jenis standard, `KLINIK` serta jenis custom masa hadapan. Dialog menyediakan `Sahkan Batal Permohonan`, `Kembali`, loading `Membatalkan...`, duplicate-submit protection, Escape/backdrop close dan focus restoration. Selepas berjaya, sebab serta masa pembatalan kelihatan dalam sejarah authenticated dan butang batal hilang.
+
+Approval/rejection Warden serta `confirmOut` Guard turut membaca semula state di bawah lock. Hanya satu transition menang: jika Guard telah menetapkan `KELUAR`, cancellation ditolak dan tidak boleh menimpa `KELUAR`. Rekod cancelled hilang daripada queue pending/approved Warden dan daripada `Sedia Untuk Keluar`/`Sedang Keluar` Guard. Public Monitoring tidak mendedahkan sebab dan tidak menganggapnya sedia keluar atau sedang keluar; statistik tidak mengiranya sebagai selesai/berjaya.
+
+Telegram cancellation dihantar sekali bagi previous status pending atau approved. Ia mengandungi nama, nombor matrik, jenis, status sebelum batal dalam label manusia, sebab dan masa. Failure hanya dilog sebagai warning, tidak rollback cancellation dan tidak menghasilkan percubaan pendua.
 
 ## Flow Utama
 
@@ -180,7 +208,7 @@ Pelajar, Warden dan Guard refresh melalui laluan authenticated masing-masing
 
 Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown menggunakan `student_id` sebagai value dalaman dan memaparkan nama. Nombor matrik ditaip berasingan dan backend memadankan kedua-dua credential dengan row Google Sheets.
 
-Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords`. Active request menghalang permohonan baharu sehingga selesai atau ditolak.
+Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords`. Active request menghalang permohonan baharu sehingga selesai, ditolak atau dibatalkan. Butang `Batal Permohonan` hanya hadir untuk rekod sendiri yang pending/approved.
 
 Hierarki workspace Pelajar ialah Announcement Banner, navigasi/workspace, `ruleNotice` kuning, tajuk “Permohonan Pelajar” dan borang outing. Banner ialah notis operasi semasa; `ruleNotice` kekal authoritative untuk panduan peraturan kontekstual. Ayat panduan outing pendua di bawah tajuk telah dibuang tanpa mengubah borang.
 
@@ -201,6 +229,8 @@ Warden boleh:
 - approve/reject dengan in-flight lock/loading yang menolak duplicate click;
 - salin senarai nama dengan emoji status.
 
+Rekod `DIBATALKAN_PELAJAR` tidak berada dalam pending approval atau approved/actionable queue Warden. Jika muncul dalam sejarah authenticated, label dan sebab pembatalan boleh dipaparkan.
+
 Checklist memaparkan semua jenis permohonan. Ikon dan label menggunakan status kontekstual pusat.
 
 Kad Warden/HEP dan Guard memuat `photo_variant = "thumbnail"` melalui satu batch authenticated bagi ID operasi unik yang dibenarkan. Request serentak/duplicate ditekan dan kegagalan menggunakan initials. Klik foto sebenar membuka thumbnail/loading modal lalu memuat satu `photo_variant = "full"` jika belum dicache; butang approve/reject/confirm kekal berasingan serta explicit.
@@ -213,6 +243,8 @@ Seksyen utama:
 
 - `Sedia Untuk Keluar`;
 - `Sedang Keluar`.
+
+Rekod `DIBATALKAN_PELAJAR` tidak layak untuk kedua-dua seksyen, `confirmOut` atau `confirmIn`.
 
 Tindakan `Sahkan Keluar` menggunakan penegasan oren dan `Sahkan Masuk` menggunakan penegasan hijau. Kedua-duanya kekal pada handler `confirmOut`/`confirmIn` sedia ada dan tidak dicetuskan oleh shortcut Enter generik.
 

@@ -2,7 +2,7 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (12 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r5`, GAS Version 37, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (12 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r6`, GAS Version 39, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
 
 ## Close-out Production — 12 Ogos 2026
 
@@ -13,8 +13,14 @@ Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan 
 - [x] Admin session refresh disahkan melalui sessionStorage tab + mandatory `loginAdmin` revalidation, absolute expiry 12 jam dan tiada PIN dalam localStorage.
 - [x] Global login/restore loader disahkan untuk Pelajar, Warden, Guard dan Admin; Public Pemantauan kekal berasingan.
 - [x] Student profile photo menawarkan `Ambil Foto`, `Pilih dari Galeri` dan `Batal`; kamera/galeri berkongsi pipeline dan return-selfie tidak berubah.
-- [x] Mobile/PWA disahkan pada revision `2.2.0-r5` dengan cache `eouting-cache-v2.2.0-r5`.
-- [x] Full Node suite semasa lulus **317/317**; syntax checks frontend/service worker lulus.
+- [x] Cancellation pending dan selepas approval disahkan menggunakan button/action sheet yang sama bagi standard serta custom type.
+- [x] Sebab wajib 5–500 aksara disahkan frontend/backend; whitespace-only/terlalu pendek/panjang ditolak.
+- [x] `DIBATALKAN_PELAJAR` masuk sejarah, tidak masuk queue Guard/Warden, tidak dikira sedang keluar/selesai dan membenarkan Pelajar memohon semula.
+- [x] Race Guard `confirmOut` disahkan tidak membenarkan `KELUAR` ditimpa cancellation.
+- [x] Telegram cancellation disahkan bagi pending dan approved dengan tepat satu mesej; failure tidak rollback cancellation.
+- [x] Mobile/PWA disahkan pada revision `2.2.0-r6` dengan cache `eouting-cache-v2.2.0-r6`.
+- [x] GAS Version 39 live dan cancellation smoke test production lulus.
+- [x] Full Node suite semasa lulus **332/332**; syntax checks frontend/service worker/GAS lulus.
 
 ## Close-out Announcement Banner V1 — 11 Ogos 2026
 

@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 37**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 39**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
@@ -12,13 +12,13 @@ Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 37**. 
 - [x] Two-tier photo delivery: unique-ID thumbnail batch, server-side Drive thumbnail, one-student full preview, cache sesi, duplicate suppression dan safe failure.
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
-- [x] GAS Version 37 ialah baseline production semasa; config-driven active, readiness hijau dan Notis Banner V1 live.
-- [x] Cache/asset source revision `2.2.0-r5` dengan displayed app version kekal v2.2.0.
+- [x] GAS Version 39 ialah baseline production semasa; config-driven active, readiness hijau, Notis Banner V1 dan Student cancellation live.
+- [x] Cache/asset source revision `2.2.0-r6` dengan displayed app version kekal v2.2.0.
 - [x] Setiap banner aktif menggunakan ticker kiri berterusan; hover/focus/touch pause dan reduced-motion kekal statik.
 - [x] Controlled activation: submission, Warden approval, early Guard rejection dan safe policy feedback disahkan.
 - [x] Notis Banner V1 live: satu notis Script Properties, Admin edit/aktif/penting, viewer authenticated, safe text, audit dan reduced-motion.
 - [x] Deploy Notis Banner sebagai GAS Version 37 dan sahkan Admin UI/save, Normal banner, authenticated display, timestamp serta public privacy.
-- [x] Full Node suite semasa **317/317** pada 12 Ogos 2026.
+- [x] Full Node suite semasa **332/332** pada 12 Ogos 2026.
 - [x] Buang ayat panduan outing pendua di bawah “Permohonan Pelajar”; kekalkan Announcement Banner, `ruleNotice` dan borang.
 - [x] Atomic duplicate outing protection: frontend in-flight state serta backend `ScriptLock` untuk active-check + append.
 - [x] In-flight loading Warden approve/reject dan Guard confirm-out/confirm-in.
@@ -27,7 +27,10 @@ Senarai kerja semasa selepas activation production **v2.2.0 / GAS Version 37**. 
 - [x] Admin refresh persistence melalui `eouting_admin_session_v1`, 12-hour absolute expiry dan mandatory backend revalidation.
 - [x] Global auth/restore loader Pelajar, Warden, Guard dan Admin dengan operation token serta reduced-motion.
 - [x] Foto profil Pelajar menawarkan kamera depan atau galeri melalui satu shared processing pipeline; return-selfie kekal berasingan.
-- [x] Mobile/PWA production disahkan menggunakan cache r5.
+- [x] Mobile/PWA production disahkan menggunakan cache r6.
+- [x] Student cancellation untuk pending/approved pada semua jenis standard/config-driven, termasuk mandatory reason dan status terminal `DIBATALKAN_PELAJAR`.
+- [x] Cancellation metadata additive, history/re-request, Warden/Guard/Public Monitoring/statistics exclusions dan race-safe `ScriptLock` transition.
+- [x] Telegram cancellation tepat satu mesej bagi pending serta approved; previous status human-readable dan failure non-blocking.
 
 ### eOuting v2.0 — Fasa 2 Schema dan Migration
 
