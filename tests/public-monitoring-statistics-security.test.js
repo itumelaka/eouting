@@ -149,6 +149,7 @@ test("public getTodayRecords returns only the approved named monitoring fields",
       kelas: "A2",
       jenis_permohonan: "KECEMASAN",
       status: "KELUAR",
+      warden_approve_role: "WARDEN",
       lewat: "Tidak",
       belum_masuk: true
     },
@@ -157,13 +158,14 @@ test("public getTodayRecords returns only the approved named monitoring fields",
       kelas: "A3",
       jenis_permohonan: "OUTING_BIASA",
       status: "MENUNGGU_KELULUSAN",
+      warden_approve_role: "WARDEN",
       lewat: "Tidak",
       belum_masuk: false
     }
   ]);
   records.forEach((record) => {
     assert.deepEqual(Object.keys(record).sort(), [
-      "belum_masuk", "jenis_permohonan", "kelas", "lewat", "nama", "status"
+      "belum_masuk", "jenis_permohonan", "kelas", "lewat", "nama", "status", "warden_approve_role"
     ]);
   });
 });
@@ -225,6 +227,7 @@ test("real student, warden and guard runtime sessions build valid POST credentia
 test("fresh staff login responses without PIN retain the entered PIN in runtime credentials", () => {
   const context = vm.createContext({ currentSession: null });
   vm.runInContext([
+    extractFunction(appSource, "normalizeWardenStaffRole", "openProfilePhotoSourceChooser"),
     extractFunction(appSource, "mapLiveStaffSessionUser", "mapLiveRecord"),
     extractFunction(appSource, "buildTodayRecordsAccessPayload", "refreshSystemCaches")
   ].join("\n"), context);
@@ -270,7 +273,10 @@ test("staff runtime credentials are reused by remember-device storage and restor
     SESSION_STORAGE_KEY: "test_session",
     console
   });
-  vm.runInContext(extractFunction(appSource, "saveSession", "getSavedSession"), context);
+  vm.runInContext([
+    extractFunction(appSource, "normalizeWardenStaffRole", "openProfilePhotoSourceChooser"),
+    extractFunction(appSource, "saveSession", "getSavedSession")
+  ].join("\n"), context);
 
   context.saveSession("warden", { name: "WARDEN TEST", nama_warden: "WARDEN TEST", pin: "1234" });
   assert.equal(storedSession.nama_warden, "WARDEN TEST");
@@ -360,6 +366,7 @@ test("full operational records map real names and never emit undefined fields", 
     }
   });
   vm.runInContext([
+    extractFunction(appSource, "normalizeWardenStaffRole", "openProfilePhotoSourceChooser"),
     extractFunction(appSource, "mapLiveRecord", "mapPublicMonitoringRecord"),
     extractFunction(appSource, "mapLiveStatus", "parseDateValue"),
     extractFunction(appSource, "parseDateValue", "setMockMode")
@@ -415,6 +422,7 @@ test("frontend retains the approved public name without retaining extra PII", ()
     }
   });
   vm.runInContext([
+    extractFunction(appSource, "normalizeWardenStaffRole", "openProfilePhotoSourceChooser"),
     extractFunction(appSource, "mapLiveStatus", "parseDateValue"),
     extractFunction(appSource, "mapPublicMonitoringRecord", "mapLiveStatus")
   ].join("\n"), context);
@@ -441,6 +449,7 @@ test("frontend retains the approved public name without retaining extra PII", ()
     jenis_permohonan: "KECEMASAN",
     rawStatus: "KELUAR",
     status: "Sedang Keluar",
+    warden_approve_role: "WARDEN",
     lewat: false,
     lewatText: "Tidak",
     belum_masuk: true
@@ -509,6 +518,7 @@ test("record status display uses one contextual mapping with late precedence", (
     isHostelReturnLateV160: () => false
   });
   vm.runInContext([
+    extractFunction(appSource, "normalizeWardenStaffRole", "openProfilePhotoSourceChooser"),
     extractFunction(appSource, "getContextualStatusDisplay", "getWardenChecklistCopyStatusIcon"),
     extractFunction(appSource, "getWardenChecklistCopyStatusIcon", "getWardenChecklistCopyHeader"),
     extractFunction(appSource, "isSemesterChecklistLate", "initApp")
@@ -537,7 +547,7 @@ test("record status display uses one contextual mapping with late precedence", (
     key: "returned", icon: "✅", label: "Sudah Pulang"
   });
   assert.deepEqual(plain(context.getContextualStatusDisplay({ status: "Diluluskan Warden" })), {
-    key: "approved", icon: "🟢", label: "Diluluskan"
+    key: "approved", icon: "🟢", label: "Diluluskan Warden"
   });
   assert.deepEqual(plain(context.getContextualStatusDisplay({ status: "Menunggu Kelulusan" })), {
     key: "pending", icon: "🟡", label: "Menunggu Kelulusan"

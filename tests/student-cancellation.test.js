@@ -51,6 +51,7 @@ function createBackend(status = "MENUNGGU_KELULUSAN", owner = true, options = {}
       return options.telegramFails ? false : true;
     },
     requestTypeLabel_: (type) => type === "CUSTOM_TYPE" ? "Lawatan Klinik" : type,
+    wardenApprovalStatusLabel_: (record) => record && record.warden_approve_role === "HEP" ? "Diluluskan HEP" : "Diluluskan Warden",
     formatTelegramDateTime_: (value) => value,
     console: { warn: (...args) => warnings.push(args) }
   };

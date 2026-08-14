@@ -819,6 +819,7 @@ function getWardens() {
     .map((row) => ({
       warden_id: row.warden_id || "",
       nama_warden: row.nama_warden || "",
+      staffRole: deriveWardenStaffRole(row),
       email: row.email || "",
       no_tel: row.no_tel || "",
       status: row.status || "",
@@ -876,6 +877,7 @@ function loginWarden(payload) {
   return {
     warden_id: warden.warden_id || "",
     nama_warden: warden.nama_warden || "",
+    staffRole: deriveWardenStaffRole(warden),
     email: warden.email || "",
     no_tel: warden.no_tel || "",
     status: warden.status || "",
@@ -995,6 +997,49 @@ function getOutingConfigReadiness(payload) {
     reasons: assessment.reasons,
     checked_at: now_()
   };
+}
+
+function deriveWardenStaffRole(wardenRecord) {
+  const wardenId = String(wardenRecord && wardenRecord.warden_id || "").trim();
+  if (/^HEP-/i.test(wardenId)) return "HEP";
+  if (/^W-/i.test(wardenId)) return "WARDEN";
+  return "WARDEN";
+}
+
+function getWardenApprovalRoleDirectory_() {
+  const rolesByName = {};
+  getRowsAsObjects_(getSheet_(SHEETS.wardens)).forEach((warden) => {
+    const nameKey = normalizeText_(warden.nama_warden);
+    if (nameKey && !rolesByName[nameKey]) {
+      rolesByName[nameKey] = deriveWardenStaffRole(warden);
+    }
+  });
+  return rolesByName;
+}
+
+function resolveWardenApprovalRole_(record, rolesByName) {
+  if (record && (record.warden_approve_role === "HEP" || record.warden_approve_role === "WARDEN")) {
+    return record.warden_approve_role;
+  }
+  const nameKey = normalizeText_(record && record.warden_approve_by);
+  if (!nameKey) return "WARDEN";
+  const directory = rolesByName || getWardenApprovalRoleDirectory_();
+  return directory[nameKey] === "HEP" ? "HEP" : "WARDEN";
+}
+
+function addWardenApprovalRoles_(rows) {
+  const rolesByName = getWardenApprovalRoleDirectory_();
+  return (rows || []).map((row) => Object.assign({}, row, {
+    warden_approve_role: resolveWardenApprovalRole_(row, rolesByName)
+  }));
+}
+
+function wardenApprovalStatusLabel_(record) {
+  return resolveWardenApprovalRole_(record) === "HEP" ? "Diluluskan HEP" : "Diluluskan Warden";
+}
+
+function wardenApprovalActorLabel_(record) {
+  return resolveWardenApprovalRole_(record) === "HEP" ? "HEP" : "Warden";
 }
 
 function assessOutingConfigReadinessV220_() {
@@ -2247,6 +2292,7 @@ function approveRequest(payload) {
   if (!warden) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
+  const wardenStaffRole = deriveWardenStaffRole(warden);
 
   const found = withScriptLock_(function () {
     const authoritative = findRowByRequestId_(requestId);
@@ -2263,13 +2309,15 @@ function approveRequest(payload) {
     return authoritative;
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
 
-  appendAuditLog("APPROVE_REQUEST", requestId, "Warden", warden.nama_warden, JSON.stringify({
+  appendAuditLog("APPROVE_REQUEST", requestId, wardenStaffRole === "HEP" ? "HEP" : "Warden", warden.nama_warden, JSON.stringify({
     student_name: found.record.nama || "",
     no_matrik: found.record.no_matrik || "",
     jenis_permohonan: found.record.jenis_permohonan || ""
   }));
-  const updatedRecord = findRowByRequestId_(requestId).record;
-  sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("✅", "Permohonan Diluluskan Warden", updatedRecord), updatedRecord));
+  const updatedRecord = Object.assign({}, findRowByRequestId_(requestId).record, {
+    warden_approve_role: wardenStaffRole
+  });
+  sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("✅", "Permohonan " + wardenApprovalStatusLabel_(updatedRecord), updatedRecord), updatedRecord));
   return updatedRecord;
 }
 
@@ -2957,11 +3005,12 @@ function removeStudentProfilePhoto(payload) {
 }
 
 function getTodayRecords() {
-  return getTodayRecordRows_().map((row) => ({
+  return addWardenApprovalRoles_(getTodayRecordRows_()).map((row) => ({
     nama: String(row.nama || ""),
     kelas: String(row.kelas || ""),
     jenis_permohonan: String(row.jenis_permohonan || ""),
     status: String(row.status || ""),
+    warden_approve_role: row.warden_approve_role,
     lewat: String(row.lewat || ""),
     belum_masuk: String(row.status || "") === STATUS.out && !hasCellValue_(row.masa_masuk)
   }));
@@ -3047,7 +3096,7 @@ function validateAnnouncementBannerViewer_(payload) {
 
 function getOperationalTodayRecords(payload) {
   const role = normalizeText_(payload && payload.role);
-  const rows = addProfilePhotoIndicators_(getTodayRecordRows_());
+  const rows = addWardenApprovalRoles_(addProfilePhotoIndicators_(getTodayRecordRows_()));
 
   if (role === "student") {
     const studentId = payload.student_id || payload.id;
@@ -3159,7 +3208,7 @@ function isAdminRecordOverdue_(row, now) {
   return Boolean(outingDate) && (outingDate < today || (outingDate === today && isLate_(now)));
 }
 
-function toAdminOperationalRecord_(row, now) {
+function toAdminOperationalRecord_(row, now, rolesByName) {
   const overdue = isAdminRecordOverdue_(row, now);
   const returnDate = normalizeDateKey_(row.tarikh_balik);
   const returnTime = normalizeStoredTimeOnly_(row.masa_balik_dijangka);
@@ -3184,6 +3233,7 @@ function toAdminOperationalRecord_(row, now) {
     jenis_kenderaan: row.jenis_kenderaan || "",
     butiran_kenderaan: row.butiran_kenderaan || "",
     warden_approve_by: row.warden_approve_by || "",
+    warden_approve_role: resolveWardenApprovalRole_(row, rolesByName),
     masa_approve: row.masa_approve || "",
     guard_keluar_by: row.guard_keluar_by || "",
     guard_masuk_by: row.guard_masuk_by || "",
@@ -3198,10 +3248,11 @@ function toAdminOperationalRecord_(row, now) {
 function getAdminMonitoring(payload) {
   validateAdminCredentials_(payload);
   const now = new Date();
+  const rolesByName = getWardenApprovalRoleDirectory_();
   const activeStatuses = [STATUS.pending, STATUS.approved, STATUS.out];
   const records = getRowsAsObjects_(getSheet_(SHEETS.requests))
     .filter((row) => activeStatuses.indexOf(String(row.status || "")) !== -1)
-    .map((row) => toAdminOperationalRecord_(row, now))
+    .map((row) => toAdminOperationalRecord_(row, now, rolesByName))
     .sort((left, right) => (parseDateForSort_(right.masa_mohon || right.tarikh) || new Date(0)) - (parseDateForSort_(left.masa_mohon || left.tarikh) || new Date(0)));
   const kpis = {
     pending: records.filter((row) => row.status === STATUS.pending).length,
@@ -3228,6 +3279,7 @@ function searchAdminMasterRecords(payload) {
   if (month && (!Number.isInteger(month) || month < 1 || month > 12)) throw new Error("Bulan tidak sah.");
   if (year && (!Number.isInteger(year) || year < 2000 || year > 2200)) throw new Error("Tahun tidak sah.");
   const now = new Date();
+  const rolesByName = getWardenApprovalRoleDirectory_();
   const filtered = getRowsAsObjects_(getSheet_(SHEETS.requests))
     .filter((row) => !query || [row.nama, row.no_matrik, row.student_id, row.request_id].some((value) => normalizeText_(value).indexOf(query) !== -1))
     .filter((row) => !kelas || normalizeText_(row.kelas) === kelas)
@@ -3249,7 +3301,7 @@ function searchAdminMasterRecords(payload) {
     page_size: pageSize,
     total: total,
     total_pages: Math.max(1, Math.ceil(total / pageSize)),
-    records: filtered.slice(start, start + pageSize).map((row) => toAdminOperationalRecord_(row, now))
+    records: filtered.slice(start, start + pageSize).map((row) => toAdminOperationalRecord_(row, now, rolesByName))
   };
 }
 
@@ -3759,9 +3811,9 @@ function buildTelegramSubmitMessage_(record) {
   return buildTelegramStatusMessage_(title, record);
 }
 
-function studentCancellationPreviousStatusLabel_(status) {
+function studentCancellationPreviousStatusLabel_(status, record) {
   if (status === STATUS.pending) return "Menunggu Kelulusan Warden";
-  if (status === STATUS.approved) return "Diluluskan Warden";
+  if (status === STATUS.approved) return wardenApprovalStatusLabel_(record);
   return "Status Tidak Diketahui";
 }
 
@@ -3772,7 +3824,7 @@ function buildTelegramStudentCancellationMessage_(record, previousStatus) {
     "Nama: " + (record.nama || "-"),
     "No. Matrik: " + (record.no_matrik || "-"),
     "Jenis: " + requestTypeLabel_(record.jenis_permohonan),
-    "Status sebelum batal: " + studentCancellationPreviousStatusLabel_(previousStatus),
+    "Status sebelum batal: " + studentCancellationPreviousStatusLabel_(previousStatus, record),
     "Sebab: " + (record.sebab_batal_pelajar || "-"),
     "Masa: " + formatTelegramDateTime_(record.masa_batal_pelajar)
   ].join("\n");
@@ -3820,7 +3872,7 @@ function buildTelegramStatusMessage_(title, record) {
   }
 
   if (record.warden_approve_by) {
-    lines.push("Warden: " + record.warden_approve_by);
+    lines.push(wardenApprovalActorLabel_(record) + ": " + record.warden_approve_by);
   }
 
   if (record.guard_keluar_by) {

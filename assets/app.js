@@ -1195,7 +1195,10 @@ async function loadAdminMonitoringV210() {
   }
 }
 
-function adminMonitoringStatusLabelV210(status) {
+function adminMonitoringStatusLabelV210(status, record) {
+  if (String(status || "").trim().toUpperCase() === "DILULUSKAN_WARDEN" && record) {
+    return approvalStatusLabel(record);
+  }
   const labels = {
     MENUNGGU_KELULUSAN: "Menunggu Kelulusan",
     DILULUSKAN_WARDEN: "Diluluskan",
@@ -1251,7 +1254,7 @@ function renderAdminMonitoringV210(options) {
           <h4>${escapeHtml(row.nama || "-")}</h4>
           <div class="admin-ops-summary">
             <span>${escapeHtml(row.kelas || "-")} · ${escapeHtml(typeof requestTypeLabel === "function" ? requestTypeLabel(row.jenis_permohonan) : (REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan))}</span>
-            <span class="status-badge admin-ops-status ${isOut ? "is-out" : ""}">${escapeHtml(adminMonitoringStatusLabelV210(row.status))}</span>
+            <span class="status-badge admin-ops-status ${isOut ? "is-out" : ""}">${escapeHtml(adminMonitoringStatusLabelV210(row.status, row))}</span>
           </div>
         </div>
       </header>
@@ -1293,7 +1296,7 @@ function renderAdminMasterV210() {
     const typeLabel = typeof requestTypeLabel === "function"
       ? requestTypeLabel(row.jenis_permohonan)
       : (REQUEST_TYPE_LABEL[row.jenis_permohonan] || row.jenis_permohonan);
-    return `<tr><td><strong>${escapeHtml(row.nama)}</strong><small>${escapeHtml(row.no_matrik || row.student_id || "")}</small></td><td>${escapeHtml(row.kelas)}</td><td>${escapeHtml(typeLabel)}</td><td>${escapeHtml(formatDisplayDate(row.tarikh || row.masa_mohon))}</td><td>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</td><td>${escapeHtml(row.masa_masuk ? formatDisplayDateTime(row.masa_masuk) : "-")}</td><td>${escapeHtml(adminMonitoringStatusLabelV210(row.status))}</td><td>${escapeHtml(row.duration || "-")}</td><td><button class="secondary-action compact-action" type="button" data-master-details="${id}">Lihat Butiran</button></td></tr><tr class="admin-master-details" id="admin-master-details-${id}" hidden><td colspan="9"><strong>${escapeHtml(row.request_id)}</strong> · Tujuan: ${escapeHtml(row.tujuan || "-")} · Lokasi: ${escapeHtml(row.lokasi || "-")} · Kenderaan: ${escapeHtml([row.jenis_kenderaan, row.butiran_kenderaan].filter(Boolean).join(" / ") || "-")} · Warden: ${escapeHtml(row.warden_approve_by || "-")} · Keluar oleh: ${escapeHtml(row.guard_keluar_by || "-")} · Masuk oleh: ${escapeHtml(row.guard_masuk_by || "-")}${row.sebab_batal_pelajar ? ` · Sebab: ${escapeHtml(row.sebab_batal_pelajar)}` : ""}</td></tr>`;
+    return `<tr><td><strong>${escapeHtml(row.nama)}</strong><small>${escapeHtml(row.no_matrik || row.student_id || "")}</small></td><td>${escapeHtml(row.kelas)}</td><td>${escapeHtml(typeLabel)}</td><td>${escapeHtml(formatDisplayDate(row.tarikh || row.masa_mohon))}</td><td>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</td><td>${escapeHtml(row.masa_masuk ? formatDisplayDateTime(row.masa_masuk) : "-")}</td><td>${escapeHtml(adminMonitoringStatusLabelV210(row.status, row))}</td><td>${escapeHtml(row.duration || "-")}</td><td><button class="secondary-action compact-action" type="button" data-master-details="${id}">Lihat Butiran</button></td></tr><tr class="admin-master-details" id="admin-master-details-${id}" hidden><td colspan="9"><strong>${escapeHtml(row.request_id)}</strong> · Tujuan: ${escapeHtml(row.tujuan || "-")} · Lokasi: ${escapeHtml(row.lokasi || "-")} · Kenderaan: ${escapeHtml([row.jenis_kenderaan, row.butiran_kenderaan].filter(Boolean).join(" / ") || "-")} · ${escapeHtml(approvalActorLabel(row))}: ${escapeHtml(row.warden_approve_by || "-")} · Keluar oleh: ${escapeHtml(row.guard_keluar_by || "-")} · Masuk oleh: ${escapeHtml(row.guard_masuk_by || "-")}${row.sebab_batal_pelajar ? ` · Sebab: ${escapeHtml(row.sebab_batal_pelajar)}` : ""}</td></tr>`;
   }).join("") : '<tr><td colspan="9">Tiada rekod sepadan.</td></tr>';
   els.adminMasterPage.textContent = `Halaman ${adminMasterV210.page || 1} daripada ${adminMasterV210.total_pages || 1}`;
   els.adminMasterPrev.disabled = (adminMasterV210.page || 1) <= 1;
@@ -2517,7 +2520,7 @@ async function handleWardenLoginSubmitV211(event) {
     return;
   }
 
-  const mockWarden = { name, nama_warden: name, pin };
+  const mockWarden = { name, nama_warden: name, pin, staffRole: "WARDEN" };
   clearStaffLoginSuccessFeedback();
   rememberSessionIfRequested("warden", mockWarden, els.wardenRememberInput);
   startSession("warden", mockWarden);
@@ -3214,6 +3217,7 @@ function mapLiveStaffSessionUser(role, staff, enteredName, enteredPin) {
 
   if (role === "warden") {
     user.nama_warden = name;
+    user.staffRole = normalizeWardenStaffRole(response.staffRole);
     return user;
   }
   if (role === "guard") {
@@ -3267,6 +3271,7 @@ function mapLiveRecord(record) {
       ? record.warden_approve_by || ""
       : "",
     warden_approve_by: record.warden_approve_by || "",
+    warden_approve_role: normalizeWardenStaffRole(record.warden_approve_role),
     rejectedBy: record.status === "DITOLAK_WARDEN" ? record.warden_approve_by || "" : "",
     guardOutBy: record.guard_keluar_by || "",
     guard_keluar_by: record.guard_keluar_by || "",
@@ -3293,6 +3298,7 @@ function mapPublicMonitoringRecord(record) {
     jenis_permohonan: record.jenis_permohonan || REQUEST_TYPE.normal,
     rawStatus: record.status || "",
     status: mapLiveStatus(record.status),
+    warden_approve_role: normalizeWardenStaffRole(record.warden_approve_role),
     lewat: lateText.trim().toLowerCase() === "ya",
     lewatText: lateText,
     belum_masuk: record.belum_masuk === true
@@ -3833,6 +3839,22 @@ function setupStudentProfilePhotoControls() {
   }
 }
 
+function normalizeWardenStaffRole(value) {
+  return String(value || "").trim().toUpperCase() === "HEP" ? "HEP" : "WARDEN";
+}
+
+function approvalStaffRole(record) {
+  return normalizeWardenStaffRole(record && (record.warden_approve_role || record.staffRole));
+}
+
+function approvalStatusLabel(record) {
+  return approvalStaffRole(record) === "HEP" ? "Diluluskan HEP" : "Diluluskan Warden";
+}
+
+function approvalActorLabel(record) {
+  return approvalStaffRole(record) === "HEP" ? "HEP" : "Warden";
+}
+
 function openProfilePhotoSourceChooser() {
   if (studentProfileUploadInFlight || !els.profilePhotoSourceModal) return;
   profilePhotoSourceTrigger = document.activeElement;
@@ -4317,6 +4339,7 @@ function saveSession(role, user) {
   if (role === "warden") {
     session.nama_warden = user.nama_warden || user.name || "";
     session.pin = user.pin || "";
+    session.staffRole = normalizeWardenStaffRole(user.staffRole);
   }
 
   if (role === "guard") {
@@ -4400,7 +4423,8 @@ async function restoreSavedSession() {
     startSession("warden", {
       name: wardenName,
       nama_warden: wardenName,
-      pin: session.pin
+      pin: session.pin,
+      staffRole: normalizeWardenStaffRole(session.staffRole)
     });
     return true;
   }
@@ -4694,7 +4718,7 @@ function monitorRecordCard(record) {
         <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
         <strong>Kenderaan:</strong> ${escapeHtml(record.jenis_kenderaan || "-")}<br>
         <strong>Masa Mohon:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}<br>
-        <strong>Warden:</strong> ${escapeHtml(record.warden_approve_by || record.approvedBy || "-")}<br>
+        <strong>${escapeHtml(approvalActorLabel(record))}:</strong> ${escapeHtml(record.warden_approve_by || record.approvedBy || "-")}<br>
         <strong>Keluar:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_keluar || record.outAt))}<br>
         <strong>Masuk:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_masuk || record.returnedAt))}<br>
         <strong>Lewat:</strong> ${escapeHtml(record.lewatText || (record.lewat ? "Ya" : "-"))}
@@ -5406,7 +5430,7 @@ function studentStatusCard(record) {
   const statusInfo = studentStatusInfo(record);
   const emergencyDetail = emergencyDetailHtml(record);
   const wardenDetail = record.warden_approve_by || record.approvedBy
-    ? `<br><strong>Warden:</strong> ${escapeHtml(record.warden_approve_by || record.approvedBy)}`
+    ? `<br><strong>${escapeHtml(approvalActorLabel(record))}:</strong> ${escapeHtml(record.warden_approve_by || record.approvedBy)}`
     : "";
   const approvalTime = record.masa_approve || record.approvedAt
     ? `<br><strong>Masa Kelulusan:</strong> ${escapeHtml(formatDisplayDateTime(record.masa_approve || record.approvedAt))}`
@@ -5481,7 +5505,7 @@ function studentStatusInfo(record) {
 
   if (status === "DILULUSKAN_WARDEN") {
     return {
-      badge: "Diluluskan Warden",
+      badge: approvalStatusLabel(record),
       badgeClass: "badge-approved",
       message: "Permohonan telah diluluskan. Sila ke pos guard untuk pengesahan keluar."
     };
@@ -6754,7 +6778,7 @@ async function updateStatus(id, status, button) {
       await loadTodayRecords();
       showSuccess(
         status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
-        status === STATUS.approved ? "Diluluskan" : "Ditolak"
+        status === STATUS.approved ? approvalStatusLabel(currentSession.user) : "Ditolak"
       );
       return;
     }
@@ -6770,13 +6794,14 @@ async function updateStatus(id, status, button) {
         approvedAt: status === STATUS.approved ? new Date() : record.approvedAt,
         rejectedAt: status === STATUS.rejected ? new Date() : record.rejectedAt,
         approvedBy: status === STATUS.approved ? currentSession.user.name : record.approvedBy,
+        warden_approve_role: status === STATUS.approved ? normalizeWardenStaffRole(currentSession.user.staffRole) : record.warden_approve_role,
         rejectedBy: status === STATUS.rejected ? currentSession.user.name : record.rejectedBy
       };
     });
     render();
     showSuccess(
       status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
-      status === STATUS.approved ? "Diluluskan" : "Ditolak"
+      status === STATUS.approved ? approvalStatusLabel(currentSession.user) : "Ditolak"
     );
   } catch (error) {
     showModeNotice(`Live API error: ${error.message}`);
@@ -10062,7 +10087,7 @@ function buildWardenChecklistCopyText(records) {
     "",
     "Petunjuk:",
     "🟡 Menunggu kelulusan",
-    "🟢 Diluluskan warden",
+    "🟢 Diluluskan",
     "🚶 Sedang keluar",
     "🌙 Sedang bermalam",
     "🏖️ Sedang bercuti",
@@ -10086,7 +10111,7 @@ function getContextualStatusDisplay(record) {
     return { key: "out", icon: "🚶", label: "Sedang Keluar" };
   }
   if (item.status === STATUS.pending) return { key: "pending", icon: "🟡", label: "Menunggu Kelulusan" };
-  if (item.status === STATUS.approved) return { key: "approved", icon: "🟢", label: "Diluluskan" };
+  if (item.status === STATUS.approved) return { key: "approved", icon: "🟢", label: approvalStatusLabel(item) };
   if (item.status === STATUS.returned) return { key: "returned", icon: "✅", label: "Sudah Pulang" };
   if (item.status === STATUS.rejected) return { key: "rejected", icon: "•", label: "Ditolak" };
   if (item.status === STATUS.studentCancelled) return { key: "cancelled", icon: "•", label: "Dibatalkan oleh Pelajar" };
