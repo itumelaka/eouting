@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan production **v2.2.1 / GAS Version 40**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan production **v2.2.1 / GAS Version 43**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -66,7 +66,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.2.1-r1`; displayed app version ialah v2.2.1.
+- Cache source semasa ialah `eouting-cache-v2.2.1-r4`; displayed app version ialah v2.2.1.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -81,6 +81,12 @@ GAS mesti mengesahkan:
 - duplicate active request;
 - rule masa Outing Biasa;
 - credential operasi sebelum mengeluarkan row penuh.
+
+Role kelulusan HEP/Warden tidak dipercayai daripada frontend. Selepas credential nama + PIN dipadankan kepada row WARDENS aktif, backend memperoleh role daripada `warden_id` (`HEP-*`, `W-*`, fallback WARDEN). Tiada role atau lifecycle tambahan diperkenalkan; status kekal `DILULUSKAN_WARDEN`.
+
+`submitRequest` mengesahkan initial status, menulis nilai mengikut susunan header Sheet sebenar dan membaca semula row persisted. Blank/tidak sah tidak boleh diterima sebagai status baru, dan paparan frontend tidak menaik taraf blank kepada pending secara visual.
+
+Nilai masa sahaja Sheet dinormalkan server-side kepada `HH:mm` dengan `Asia/Kuala_Lumpur` sebelum keluar melalui API atau Telegram. Frontend tidak menggunakan aritmetik offset manual; fallback legacy hanya menghalang nilai epoch 1899 daripada bocor. Perubahan ini mengekalkan timestamp sebenar dan polisi lewat.
 
 Untuk `cancelStudentRequest`, GAS mengesahkan semula identiti Pelajar aktif melalui `student_id` + `no_matrik`, memastikan request itu milik Pelajar tersebut dan mengesahkan sebab selepas trim pada julat 5–500 aksara. Frontend validation dan visibility butang hanyalah UX; backend tidak mempercayainya.
 

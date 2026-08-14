@@ -2,9 +2,18 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (14 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.1, menggunakan cache revision `2.2.1-r1`, GAS Version 40, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (14 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.1, menggunakan cache revision `2.2.1-r4`, service worker `eouting-cache-v2.2.1-r4`, GAS Version 43, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
 
-## Close-out Hotfix Production v2.2.1 — 14 Ogos 2026
+## Close-out Production Fixes v2.2.1 — 14 Ogos 2026
+
+- [x] Commit `868c323` membezakan `Diluluskan HEP` dan `Diluluskan Warden` menggunakan prefix authoritative `WARDENS.warden_id`, tanpa status lifecycle atau kolum baharu.
+- [x] Commit `67b494c` mengesahkan status awal, memetakan append mengikut header Sheet sebenar dan membaca semula status persisted; status kosong dipaparkan sebagai `Status Tidak Diketahui`.
+- [x] Commit `7d4ad23` menormalkan masa sahaja Sheet kepada `HH:mm`, membetulkan paparan `22:00`, Telegram, Guard timing dan late comparison tanpa offset hack.
+- [x] Helper daypart menggunakan `01:00–11:59` Pagi, `12:00–12:59` Tengah Hari, `13:00–18:59` Petang dan `19:00–00:59` Malam.
+- [x] Frontend v2.2.1, revision `2.2.1-r4`, cache `eouting-cache-v2.2.1-r4` dan GAS Version 43 disahkan production.
+- [x] Full Node suite lulus **353/353** pada 14 Ogos 2026.
+
+## Close-out Optional Application-Time Hotfix v2.2.1 — 14 Ogos 2026 (sejarah)
 
 - [x] Commit `39265f1` (`fix: allow clearing outing application times`) disahkan live.
 - [x] Admin boleh mengosongkan `Masa Permohonan Dibuka` dan `Masa Permohonan Ditutup` melalui butang `Kosongkan`.

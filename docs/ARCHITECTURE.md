@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.1** dengan cache frontend `2.2.1-r1`. Production menggunakan GAS Version 40, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy.
+Versi repo semasa: **v2.2.1** dengan cache frontend `2.2.1-r4`. Production menggunakan GAS Version 43, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Full Node baseline semasa ialah **353/353** pada 14 Ogos 2026.
 
 ## Komponen
 
@@ -42,6 +42,8 @@ Google Sheets ialah database dan source of truth. Tab utama:
 - `AUDIT_LOG`
 - `OUTING_TYPES` — source authoritative konfigurasi outing production
 - `ADMIN_USERS` — identiti Admin private
+
+Semua field masa sahaja yang keluar daripada Sheet (`masa_balik_dijangka`, `fixed_return_time`, `application_open_time`, `application_close_time`, `earliest_departure_time`) melalui normalisasi backend kanonik kepada `HH:mm` menggunakan `Asia/Kuala_Lumpur`. Frontend mempunyai pertahanan kecil untuk payload legacy 1899, tanpa menambah atau menolak offset masa secara manual.
 
 ### Notis Banner
 
@@ -212,11 +214,13 @@ Helper pusat frontend membentuk paparan kontekstual tanpa mengubah nilai backend
 - ✅ Sudah Pulang
 - 🔴 Lewat, dengan precedence tertinggi
 
+Status kosong atau tidak dikenali dipaparkan sebagai `Status Tidak Diketahui`; ia tidak dipetakan kepada `MENUNGGU_KELULUSAN`. Helper daypart BM menggunakan `01:00–11:59` Pagi, `12:00–12:59` Tengah Hari, `13:00–18:59` Petang dan `19:00–00:59` Malam. Formatter locale lain masih boleh menggunakan singkatan seperti `PTG`.
+
 Kiraan dan filter operasi terus menggunakan nilai `record.status`, termasuk satu kiraan gabungan `KELUAR`.
 
 ## Warden dan Guard
 
-Warden dan HEP berkongsi role backend `warden`. Mereka menerima rekod operasi penuh melalui POST authenticated untuk Dashboard, approve/reject dan Checklist Permohonan. Checklist menggunakan ikon status kontekstual dan `Copy Senarai Nama`; kad operasi mempunyai identifikasi foto authenticated.
+Warden dan HEP berkongsi role operasi backend `warden`. Role paparan staff diperoleh daripada row WARDENS yang telah diautentikasi: `HEP-*` → `HEP`, `W-*` → `WARDEN`, ID legacy/tidak dikenali → `WARDEN`. Frontend tidak menentukan role ini. Nilai lifecycle kekal `DILULUSKAN_WARDEN`, manakala paparan, audit dan Telegram menggunakan label aktor yang diselesaikan. Mereka menerima rekod operasi penuh melalui POST authenticated untuk Dashboard, approve/reject dan Checklist Permohonan.
 
 Guard menerima rekod operasi penuh melalui POST authenticated. Quick filter Guard ialah Semua, Outing Harian, Pulang Bermalam, Cuti Semester, Kecemasan dan Lewat, dan digunakan pada `Sedia Untuk Keluar` serta `Sedang Keluar`.
 
@@ -235,7 +239,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.1-r1` dan query `2.2.1-r1`.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.1-r4` dan query `2.2.1-r4`.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
@@ -259,6 +263,8 @@ Frontend tidak menentukan authorization atau validation akhir. Config yang dihan
 `confirmOut` turut menyemak tarikh keluar yang diluluskan, configured departure day dan earliest departure time. Policy error yang sepadan dipaparkan kepada Guard dalam wording Melayu yang diallowlist; network/internal error kekal generik dan stack detail tidak didedahkan.
 
 Semakan active request serta append submission berada dalam satu `ScriptLock`. Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` menghalang duplicate; `SELESAI`, `DITOLAK_WARDEN` serta `DIBATALKAN_PELAJAR` tidak. Frontend juga menggunakan satu in-flight lock dan loading feedback. Action approve/reject Warden serta confirm-out/confirm-in Guard mempunyai lock UI masing-masing untuk menolak klik berganda tanpa mengubah boundary backend.
+
+Status awal `submitRequest` disahkan sebelum write. `appendObjectRow_` membina row daripada nama header sebenar pada Sheet, bukan kedudukan object, kemudian submission membaca semula row persisted untuk mengesahkan status authoritative. Ini mengekalkan compatibility jika susunan header berbeza tanpa memperkenalkan schema atau lifecycle baharu.
 
 ## Operasi Admin
 

@@ -32,7 +32,7 @@ Field lain dalam sheet tidak menjadi sebahagian daripada direktori awam.
 warden_id | nama_warden | email | no_tel | pin | status | catatan
 ```
 
-Warden login dan tindakan operasi memerlukan nama + PIN yang sepadan dengan row aktif. PIN tidak boleh dipulangkan melalui direktori awam, dimasukkan ke log atau disimpan dalam repo.
+Warden login dan tindakan operasi memerlukan nama + PIN yang sepadan dengan row aktif. `warden_id` ialah sumber authoritative bagi role paparan approval: prefix `HEP-` menghasilkan HEP, prefix `W-` menghasilkan WARDEN, dan ID legacy/tidak dikenali fallback kepada WARDEN. Tiada kolum `staff_role` atau `approval_role`; lifecycle kekal `DILULUSKAN_WARDEN`. PIN tidak boleh dipulangkan melalui direktori awam, dimasukkan ke log atau disimpan dalam repo.
 
 ## `GUARDS`
 
@@ -68,6 +68,8 @@ Status lifecycle:
 
 Status aktif yang menghalang duplicate request ialah `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR`. `SELESAI`, `DITOLAK_WARDEN` dan `DIBATALKAN_PELAJAR` tidak menghalang permohonan baharu. `DIBATALKAN_PELAJAR` ialah status terminal/non-active berlabel `Dibatalkan oleh Pelajar`; ia tidak dianggap outing selesai/berjaya atau sedang keluar. Backend menjalankan fresh active-check dan append dalam satu `ScriptLock`, jadi perlindungan tidak bergantung pada lock UI frontend sahaja.
 
+`submitRequest` mengesahkan status awal sebelum persistence. `appendObjectRow_` memetakan setiap nilai berdasarkan nama dan susunan header sebenar `OUTING_REQUESTS`, kemudian row dibaca semula untuk mengesahkan status persisted. Blank atau status tidak sah ditolak daripada persistence; jika rekod legacy masih mempunyai status kosong/tidak dikenali, UI memaparkan `Status Tidak Diketahui` dan tidak menganggapnya pending.
+
 Kolum pembatalan Pelajar:
 
 | Kolum | Nilai / format | Tujuan |
@@ -78,7 +80,7 @@ Kolum pembatalan Pelajar:
 
 Cancellation mengekalkan row asal dan hanya mengemas kini status serta metadata; rekod tidak pernah dipadam. Header ditambah secara additive melalui `ensureHeaders_`, dan lookup/write kekal berdasarkan nama header supaya row lama tanpa metadata pembatalan terus serasi. Action `cancelStudentRequest` menulis audit `CANCEL_STUDENT_REQUEST` selepas transition atomic berjaya.
 
-`lewat` ialah flag operasi dan tidak menggantikan status lifecycle. `tarikh_balik`, `hari_balik` dan `masa_balik_dijangka` digunakan oleh Pulang Bermalam/Cuti Semester.
+`lewat` ialah flag operasi dan tidak menggantikan status lifecycle. `tarikh_balik`, `hari_balik` dan `masa_balik_dijangka` digunakan oleh Pulang Bermalam/Cuti Semester. `masa_balik_dijangka` ialah nilai masa sahaja dan dinormalkan kepada `HH:mm` dalam zon `Asia/Kuala_Lumpur` apabila dibaca daripada Sheet; representasi Date epoch 1899 tidak menjadi data API.
 
 `OUTING_HUJUNG_MINGGU` hanya menerima tarikh Sabtu atau Ahad, menggunakan tarikh keluar dan balik yang sama, serta masa balik dijangka `22:00`.
 
@@ -118,7 +120,7 @@ Operational POST `getTodayRecords` kekal berasingan. Selepas credential disahkan
 type_code | display_name | description | active | sort_order | allowed_days | application_open_time | application_close_time | fixed_return_time | same_day_only | require_leave_date | require_return_date | require_return_time | require_guardian_phone | require_guardian_relation | require_emergency_reason | require_purpose | require_location | require_vehicle | require_warden_approval | require_selfie | config_version | created_at | created_by | updated_at | updated_by | departure_allowed_days | earliest_departure_time
 ```
 
-`setupAdminOutingConfigV200()` mencipta tab ini secara idempotent dan seed lima jenis sedia ada. `type_code` ialah identifier immutable: migration tidak menamakan semula atau menimpa row yang sudah wujud. `allowed_days` menentukan hari permohonan boleh dihantar, manakala `departure_allowed_days` menentukan hari pelajar dibenarkan keluar. Kedua-duanya menggunakan nama hari BM uppercase dipisahkan koma. `application_open_time` dan `application_close_time` ialah optional; blank bermaksud tiada opening/closing threshold tetapi `allowed_days` tetap enforced. Explicit empty-string update membersihkan cell melalui `clearContent()` supaya blank tidak menjadi `00:00`, `12:00` atau masa semasa. `earliest_departure_time` ialah masa keluar paling awal dalam format `HH:mm`; nilai kosong bermaksud tiada masa minimum dikonfigurasi. Nilai boolean disimpan sebagai boolean Sheet.
+`setupAdminOutingConfigV200()` mencipta tab ini secara idempotent dan seed lima jenis sedia ada. `type_code` ialah identifier immutable: migration tidak menamakan semula atau menimpa row yang sudah wujud. `allowed_days` menentukan hari permohonan boleh dihantar, manakala `departure_allowed_days` menentukan hari pelajar dibenarkan keluar. Kedua-duanya menggunakan nama hari BM uppercase dipisahkan koma. `application_open_time`, `application_close_time`, `fixed_return_time` dan `earliest_departure_time` ialah nilai masa sahaja yang dibaca sebagai canonical `HH:mm` menggunakan `Asia/Kuala_Lumpur`. Open/close time ialah optional; blank bermaksud tiada threshold tetapi `allowed_days` tetap enforced. Explicit empty-string update membersihkan cell melalui `clearContent()` supaya blank tidak menjadi `00:00`, `12:00` atau masa semasa. Nilai `earliest_departure_time` kosong bermaksud tiada masa minimum dikonfigurasi. Nilai boolean disimpan sebagai boolean Sheet.
 
 Production menggunakan `OUTING_CONFIG_V2_ENABLED=true`, maka `submitRequest` membaca row aktif daripada tab ini. Tetapan Outing ialah interface operasi Admin bagi read/create/update/toggle. Jenis dan label config mengalir kepada Student labels/forms/payload, Telegram, Statistik grouping/filtering, Admin filters, Warden filters/checklists, contextual outing labels dan return-selfie eligibility. Requirement config menentukan `tarikh`, `tarikh_balik` dan `masa_balik_dijangka`; jenis custom tidak memerlukan branch frontend berdasarkan type code. Setiap konfigurasi aktif mesti lulus readiness validation dan regression QA.
 

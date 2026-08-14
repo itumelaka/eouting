@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.1**, cache revision `2.2.1-r1`, GAS Version 40 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
+Dokumen ini menerangkan flow production semasa **v2.2.1**, cache revision `2.2.1-r4`, GAS Version 43 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready), dengan full Node baseline **353/353** pada 14 Ogos 2026.
 
 ## Backend Config API v2.0
 
@@ -151,6 +151,8 @@ KELUAR
 
 `DIBATALKAN_PELAJAR` ialah terminal/non-active dan berlabel `Dibatalkan oleh Pelajar`; ia tidak boleh beralih ke `KELUAR`/`SELESAI`. `lewat` ialah flag tambahan. Label kontekstual frontend tidak menukar nilai status backend. Bukti pulang menggunakan `selfie_status` yang berasingan; penghantaran selfie tidak memperkenalkan status lifecycle utama baharu.
 
+Status awal `submitRequest` disahkan sebelum append. `appendObjectRow_` mengikut susunan header Sheet sebenar, kemudian row persisted dibaca semula untuk memastikan status authoritative ialah status yang dijangka. Blank/tidak dikenali tidak dipetakan kepada pending; paparan selamat ialah `Status Tidak Diketahui`.
+
 ## Flow Pembatalan Pelajar
 
 ```text
@@ -187,7 +189,8 @@ Pelajar pilih nama + masukkan no_matrik
   -> MENUNGGU_KELULUSAN + Telegram
 Warden login nama + PIN
   -> POST getTodayRecords authenticated
-  -> approve atau reject + Telegram
+  -> derive role daripada WARDENS.warden_id
+  -> approve atau reject + Telegram role-aware
 Guard login nama + PIN
   -> POST getTodayRecords authenticated
   -> confirm keluar / masuk + Telegram
@@ -203,6 +206,8 @@ Pelajar refresh rekod sendiri
   -> selfie_status SUDAH_HANTAR
 Pelajar, Warden dan Guard refresh melalui laluan authenticated masing-masing
 ```
+
+Field masa sahaja dinormalkan di boundary GAS kepada `HH:mm` dalam `Asia/Kuala_Lumpur` sebelum digunakan oleh config, rekod operasi, Guard, late comparison atau Telegram. Frontend hanya menggabungkan tarikh dan masa canonical serta mempunyai fallback terkawal untuk payload 1899 legacy; tiada pampasan offset manual. Helper daypart BM mengelaskan `01:00–11:59` sebagai Pagi, `12:00–12:59` sebagai Tengah Hari, `13:00–18:59` sebagai Petang dan `19:00–00:59` sebagai Malam. Formatter locale generik masih boleh menghasilkan singkatan seperti `PTG`.
 
 ## Pelajar
 
@@ -220,7 +225,7 @@ Semasa flag `false`, semua jenis legacy kekal memerlukan bukti selepas Guard men
 
 ## Warden / HEP
 
-Warden dan HEP berkongsi role backend `warden`. Login menggunakan nama + PIN; PIN yang ditaip disimpan dalam runtime session untuk request operasi semasa dan flow remember-device sedia ada kekal berfungsi.
+Warden dan HEP berkongsi role operasi backend `warden`. Selepas authentication terhadap row WARDENS sedia ada, backend memperoleh role staff daripada `warden_id`: `HEP-*` → HEP, `W-*` → WARDEN dan ID legacy/tidak dikenali → WARDEN. Frontend menyimpan `staffRole` untuk paparan tetapi tidak menjadi sumber kepercayaan. Approval tetap menulis lifecycle `DILULUSKAN_WARDEN` dan nama sedia ada dalam `warden_approve_by`; paparan sejarah serta Telegram menyelesaikan label aktor daripada WARDENS. Login menggunakan nama + PIN dan flow remember-device sedia ada kekal berfungsi.
 
 Warden boleh:
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-14 — Approval, status persistence dan time-display production fixes (v2.2.1)
+
+- `868c323` — membezakan paparan dan label Telegram `HEP`/`Warden` daripada prefix authoritative `WARDENS.warden_id`; lifecycle kekal `DILULUSKAN_WARDEN` dan ID tidak dikenali fallback kepada WARDEN.
+- `67b494c` — mengesahkan status awal `submitRequest`, memetakan `appendObjectRow_` mengikut susunan header Sheet sebenar dan membaca semula status persisted. Status kosong/tidak dikenali kini dipaparkan sebagai `Status Tidak Diketahui`, bukan pending palsu.
+- `7d4ad23` — menormalkan nilai masa sahaja Google Sheets kepada `HH:mm` menggunakan `Asia/Kuala_Lumpur`, menghapus kebocoran tarikh 1899/offset sejarah dan membetulkan paparan, Telegram serta late comparison untuk `22:00`.
+- **BM daypart:** helper klasifikasi menggunakan `01:00–11:59` Pagi, `12:00–12:59` Tengah Hari, `13:00–18:59` Petang dan `19:00–00:59` Malam. Formatter locale generik masih boleh memaparkan singkatan seperti `PTG`.
+- **Production:** aplikasi kekal v2.2.1; cache/asset revision `2.2.1-r4`, service worker `eouting-cache-v2.2.1-r4` dan GAS Version 43 live pada 14 Ogos 2026; full Node baseline **353/353**.
+
 ## 2026-08-14 — Optional application-time clearing hotfix (v2.2.1)
 
 - `39265f1` — `fix: allow clearing outing application times`.
