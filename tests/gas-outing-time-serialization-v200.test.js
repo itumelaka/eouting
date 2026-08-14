@@ -46,11 +46,7 @@ function createTimeNormalizerContext(overrides = {}) {
   };
 
   vm.createContext(context);
-  vm.runInContext(
-    extractFunctionSource(gasSource, "getOutingTypeTimeZone_") + "\n" +
-      extractFunctionSource(gasSource, "normalizeStoredTimeOnly_"),
-    context
-  );
+  vm.runInContext(extractFunctionSource(gasSource, "normalizeSheetTimeValue_"), context);
   return context;
 }
 
@@ -58,7 +54,8 @@ test("Sheet Date time cells use spreadsheet timezone and return canonical HH:mm 
   const sheetTimes = new Map([
     [new Date("1899-12-30T02:04:35.000Z").getTime(), "09:00"],
     [new Date("1899-12-30T10:04:35.000Z").getTime(), "17:00"],
-    [new Date("1899-12-30T11:04:35.000Z").getTime(), "18:00"]
+    [new Date("1899-12-30T11:04:35.000Z").getTime(), "18:00"],
+    [new Date("1899-12-30T15:04:35.000Z").getTime(), "22:00"]
   ]);
   const calls = [];
   const context = createTimeNormalizerContext({
@@ -71,38 +68,38 @@ test("Sheet Date time cells use spreadsheet timezone and return canonical HH:mm 
   });
 
   const result = [
-    context.normalizeStoredTimeOnly_(new Date("1899-12-30T02:04:35.000Z")),
-    context.normalizeStoredTimeOnly_(new Date("1899-12-30T10:04:35.000Z")),
-    context.normalizeStoredTimeOnly_(new Date("1899-12-30T11:04:35.000Z"))
+    context.normalizeSheetTimeValue_(new Date("1899-12-30T02:04:35.000Z")),
+    context.normalizeSheetTimeValue_(new Date("1899-12-30T10:04:35.000Z")),
+    context.normalizeSheetTimeValue_(new Date("1899-12-30T11:04:35.000Z")),
+    context.normalizeSheetTimeValue_(new Date("1899-12-30T15:04:35.000Z"))
   ];
 
-  assert.deepEqual(result, ["09:00", "17:00", "18:00"]);
-  assert.equal(calls.length, 3);
+  assert.deepEqual(result, ["09:00", "17:00", "18:00", "22:00"]);
+  assert.equal(calls.length, 4);
   assert.ok(calls.every((call) => call.timeZone === "Asia/Kuala_Lumpur"));
   assert.ok(calls.every((call) => call.format === "HH:mm"));
 });
 
 test("valid HH:mm strings are preserved and do not invoke date formatting", () => {
   const context = createTimeNormalizerContext();
-  assert.equal(context.normalizeStoredTimeOnly_("09:00"), "09:00");
-  assert.equal(context.normalizeStoredTimeOnly_(" 17:00 "), "17:00");
+  assert.equal(context.normalizeSheetTimeValue_("09:00"), "09:00");
+  assert.equal(context.normalizeSheetTimeValue_(" 17:00 "), "17:00");
+  assert.equal(context.normalizeSheetTimeValue_("22:00:00"), "22:00");
 });
 
 test("empty and invalid stored time values normalize to an empty string", () => {
   const context = createTimeNormalizerContext();
-  assert.equal(context.normalizeStoredTimeOnly_(""), "");
-  assert.equal(context.normalizeStoredTimeOnly_(null), "");
-  assert.equal(context.normalizeStoredTimeOnly_(undefined), "");
-  assert.equal(context.normalizeStoredTimeOnly_("25:61"), "");
-  assert.equal(context.normalizeStoredTimeOnly_("not-a-time"), "");
-  assert.equal(context.normalizeStoredTimeOnly_(new Date("invalid")), "");
+  assert.equal(context.normalizeSheetTimeValue_(""), "");
+  assert.equal(context.normalizeSheetTimeValue_(null), "");
+  assert.equal(context.normalizeSheetTimeValue_(undefined), "");
+  assert.equal(context.normalizeSheetTimeValue_("25:61"), "");
+  assert.equal(context.normalizeSheetTimeValue_("not-a-time"), "");
+  assert.equal(context.normalizeSheetTimeValue_(new Date("invalid")), "");
 });
 
-test("script timezone is used only when an active spreadsheet timezone is unavailable", () => {
+test("Sheet Date normalization always uses Asia/Kuala_Lumpur", () => {
   let usedTimeZone = "";
   const context = createTimeNormalizerContext({
-    SpreadsheetApp: { getActive: () => null },
-    Session: { getScriptTimeZone: () => "Asia/Kuching" },
     Utilities: {
       formatDate: (_value, timeZone) => {
         usedTimeZone = timeZone;
@@ -112,23 +109,23 @@ test("script timezone is used only when an active spreadsheet timezone is unavai
   });
 
   assert.equal(
-    context.normalizeStoredTimeOnly_(new Date("1899-12-30T02:04:35.000Z")),
+    context.normalizeSheetTimeValue_(new Date("1899-12-30T02:04:35.000Z")),
     "09:00"
   );
-  assert.equal(usedTimeZone, "Asia/Kuching");
+  assert.equal(usedTimeZone, "Asia/Kuala_Lumpur");
 });
 
 test("shared OUTING_TYPES mapper normalizes all three API time fields", () => {
   const mapperSource = extractFunctionSource(gasSource, "normalizeOutingTypeRecord_");
   assert.match(mapperSource, /OUTING_TYPE_TIME_FIELDS\.forEach/);
-  assert.match(mapperSource, /result\[field\]\s*=\s*normalizeStoredTimeOnly_\(result\[field\]\)/);
+  assert.match(mapperSource, /result\[field\]\s*=\s*normalizeSheetTimeValue_\(result\[field\]\)/);
 
   const adminSource = extractFunctionSource(gasSource, "getAdminOutingTypes");
   const publicSource = extractFunctionSource(gasSource, "getOutingTypes");
   assert.match(adminSource, /\.map\(normalizeOutingTypeRecord_\)/);
   assert.match(publicSource, /\.map\(normalizeOutingTypeRecord_\)/);
   assert.doesNotMatch(
-    extractFunctionSource(gasSource, "normalizeStoredTimeOnly_"),
+    extractFunctionSource(gasSource, "normalizeSheetTimeValue_"),
     /toISOString/
   );
 });
@@ -205,8 +202,7 @@ test("actual Admin list action returns canonical Sheet times at its response bou
 
   vm.createContext(context);
   [
-    "getOutingTypeTimeZone_",
-    "normalizeStoredTimeOnly_",
+    "normalizeSheetTimeValue_",
     "normalizeStoredBoolean_",
     "normalizeOutingTypeRecord_",
     "pickDefined_",

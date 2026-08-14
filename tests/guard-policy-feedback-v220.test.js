@@ -23,7 +23,7 @@ function policyMessage(message) {
 
 test("Guard safely surfaces only approved date, time and day policy messages", () => {
   const dateMessage = "Tarikh keluar yang diluluskan ialah 14 Ogos 2026. Sahkan Keluar hanya boleh dibuat pada tarikh tersebut.";
-  const timeMessage = "Pelajar hanya dibenarkan keluar mulai 5:00 petang.";
+  const timeMessage = "Pelajar hanya dibenarkan keluar mulai 5:00 Petang.";
   const dayMessage = "Pulang Bermalam hanya dibenarkan keluar pada hari Jumaat.";
   assert.equal(policyMessage(dateMessage), dateMessage);
   assert.equal(policyMessage(timeMessage), timeMessage);

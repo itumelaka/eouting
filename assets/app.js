@@ -1896,7 +1896,7 @@ function renderAdminOutingConfigReadinessV220(result) {
 function getSafeGuardPolicyMessageV220(error) {
   const message = String(error && error.message || "").trim();
   const dateRule = /^Tarikh keluar yang diluluskan ialah \d{1,2} (?:Januari|Februari|Mac|April|Mei|Jun|Julai|Ogos|September|Oktober|November|Disember) \d{4}\. Sahkan Keluar hanya boleh dibuat pada tarikh tersebut\.$/;
-  const timeRule = /^Pelajar hanya dibenarkan keluar mulai \d{1,2}:\d{2} (?:pagi|petang|malam|tengah hari|tengah malam)\.$/;
+  const timeRule = /^Pelajar hanya dibenarkan keluar mulai \d{1,2}:\d{2} (?:Pagi|Tengah Hari|Petang|Malam)\.$/;
   const dayRule = /^[A-Za-z0-9À-ÿ ()\/'_-]{1,100} hanya dibenarkan keluar pada hari (?:Ahad|Isnin|Selasa|Rabu|Khamis|Jumaat|Sabtu)(?:(?:, | atau )(?:Ahad|Isnin|Selasa|Rabu|Khamis|Jumaat|Sabtu))*\.$/;
   return dateRule.test(message) || timeRule.test(message) || dayRule.test(message) ? message : "";
 }
@@ -2120,41 +2120,46 @@ function formatAdminTimeOnlyV200(value) {
     return "Tiada masa tetap";
   }
 
-  let hours = null;
-  let minutes = null;
-
-  if (Object.prototype.toString.call(value) === "[object Date]") {
-    if (Number.isNaN(value.getTime())) {
-      return "Masa tidak sah";
-    }
-    hours = value.getUTCHours();
-    minutes = value.getUTCMinutes();
-  } else {
-    const text = String(value).trim();
-    const timeOnlyMatch = text.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/);
-    const isoTimeMatch = text.match(/T([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i);
-    const match = timeOnlyMatch || isoTimeMatch;
-    if (!match) {
-      return "Masa tidak sah";
-    }
-    hours = Number(match[1]);
-    minutes = Number(match[2]);
-  }
+  const normalizedTime = normalizeTimeOnlyValue(value);
+  if (!normalizedTime) return "Masa tidak sah";
+  const [hours, minutes] = normalizedTime.split(":").map(Number);
 
   const displayHour = hours % 12 || 12;
   const displayMinutes = String(minutes).padStart(2, "0");
-  let period = "pagi";
-  if (hours === 0) {
-    period = "tengah malam";
-  } else if (hours === 12) {
-    period = "tengah hari";
-  } else if (hours >= 13 && hours < 19) {
-    period = "petang";
-  } else if (hours >= 19) {
-    period = "malam";
+  return `${displayHour}:${displayMinutes} ${getMalayDaypartLabel(hours, minutes)}`;
+}
+
+function getMalayDaypartLabel(hour, minute) {
+  const totalMinutes = (Number(hour) * 60) + Number(minute || 0);
+  if (totalMinutes >= 60 && totalMinutes < 720) return "Pagi";
+  if (totalMinutes >= 720 && totalMinutes < 780) return "Tengah Hari";
+  if (totalMinutes >= 780 && totalMinutes < 1140) return "Petang";
+  return "Malam";
+}
+
+function normalizeTimeOnlyValue(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return "";
+  const text = String(value).trim();
+  const timeOnlyMatch = text.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/);
+  if (timeOnlyMatch) {
+    return `${timeOnlyMatch[1].padStart(2, "0")}:${timeOnlyMatch[2]}`;
   }
 
-  return `${displayHour}:${displayMinutes} ${period}`;
+  const isDateObject = Object.prototype.toString.call(value) === "[object Date]";
+  const isSheetSentinel = /^1899-12-30T/i.test(text);
+  if (!isDateObject && !isSheetSentinel) return "";
+  const date = isDateObject ? value : new Date(text);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).formatToParts(date).reduce((result, part) => {
+    if (part.type === "hour" || part.type === "minute") result[part.type] = part.value;
+    return result;
+  }, {});
+  return parts.hour && parts.minute ? `${parts.hour}:${parts.minute}` : "";
 }
 
 function setupStudentClassFilter() {
@@ -3700,7 +3705,11 @@ function normalizeStudentOutingTypesV200(rows) {
       ...row,
       type_code: String(row.type_code || "").trim().toUpperCase(),
       display_name: String(row.display_name || "").trim(),
-      sort_order: Number(row.sort_order) || 0
+      sort_order: Number(row.sort_order) || 0,
+      application_open_time: normalizeTimeOnlyValue(row.application_open_time),
+      application_close_time: normalizeTimeOnlyValue(row.application_close_time),
+      earliest_departure_time: normalizeTimeOnlyValue(row.earliest_departure_time),
+      fixed_return_time: normalizeTimeOnlyValue(row.fixed_return_time)
     }))
     .filter((row) => {
       if (!row.type_code || !row.display_name || seen.has(row.type_code)) return false;
@@ -7270,29 +7279,15 @@ function expectedReturnDisplay(record) {
   if (dateText === "-" && timeText === "-") {
     return "-";
   }
-  return `${dateText} ${timeText}`.trim();
+  if (dateText === "-") return timeText;
+  if (timeText === "-") return dateText;
+  return `${dateText}, ${timeText}`;
 }
 
 function formatExpectedReturnTime(value) {
-  if (!value) {
-    return "-";
-  }
-
-  const text = String(value).trim();
-  if (/^1899-12-30T\d{2}:\d{2}/.test(text)) {
-    const sentinel = new Date(text);
-    if (Number.isNaN(sentinel.getTime())) return "-";
-    const malaysiaMinutes = (sentinel.getUTCHours() * 60 + sentinel.getUTCMinutes() + 8 * 60) % (24 * 60);
-    const hours = String(Math.floor(malaysiaMinutes / 60)).padStart(2, "0");
-    const minutes = String(malaysiaMinutes % 60).padStart(2, "0");
-    return formatDisplayTime(parseFlexibleDate(`2000-01-01 ${hours}:${minutes}`));
-  }
-  if (/^\d{2}:\d{2}/.test(text)) {
-    const date = parseFlexibleDate(`2000-01-01 ${text.slice(0, 5)}`);
-    return formatDisplayTime(date);
-  }
-
-  return formatDisplayTime(value) || text;
+  const normalizedTime = normalizeTimeOnlyValue(value);
+  if (!normalizedTime) return "-";
+  return formatDisplayTime(parseFlexibleDate(`2000-01-01 ${normalizedTime}`));
 }
 
 function requestTypeLabel(requestType) {
@@ -7619,7 +7614,7 @@ mapLiveRecord = function mapLiveRecordWithPulangBermalamFields(record) {
     hari: record.hari || mapped.hari || "",
     tarikh_balik: record.tarikh_balik || mapped.tarikh_balik || "",
     hari_balik: record.hari_balik || mapped.hari_balik || "",
-    masa_balik_dijangka: record.masa_balik_dijangka || mapped.masa_balik_dijangka || "",
+    masa_balik_dijangka: normalizeTimeOnlyValue(record.masa_balik_dijangka || mapped.masa_balik_dijangka),
     masa_keluar: record.masa_keluar || mapped.masa_keluar || "",
     masa_masuk: record.masa_masuk || mapped.masa_masuk || "",
     guard_keluar_by: record.guard_keluar_by || mapped.guard_keluar_by || "",
@@ -7673,7 +7668,7 @@ function isAfterReturnLimit(date, record) {
 
 function getExpectedReturnDate(record) {
   const returnDate = record.tarikh_balik || record.returnDate;
-  const returnTime = record.masa_balik_dijangka || record.expectedReturnTime;
+  const returnTime = normalizeTimeOnlyValue(record.masa_balik_dijangka || record.expectedReturnTime);
   if (!returnDate || !returnTime) {
     return null;
   }
@@ -9047,36 +9042,7 @@ function formatDisplayTimeV165(value) {
     return "-";
   }
 
-  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
-    return value.toLocaleTimeString("ms-MY", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Kuala_Lumpur"
-    });
-  }
-
-  const text = String(value).trim();
-  if (!text) {
-    return "-";
-  }
-
-  const timeOnlyMatch = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (timeOnlyMatch) {
-    return `${timeOnlyMatch[1].padStart(2, "0")}:${timeOnlyMatch[2]}`;
-  }
-
-  const parsed = new Date(text);
-  if (!isNaN(parsed.getTime())) {
-    return parsed.toLocaleTimeString("ms-MY", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Kuala_Lumpur"
-    });
-  }
-
-  return text;
+  return normalizeTimeOnlyValue(value) || "-";
 }
 
 function formatExpectedReturnV160(record) {

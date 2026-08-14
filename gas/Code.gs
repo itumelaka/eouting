@@ -148,6 +148,8 @@ const OUTING_TYPE_TIME_FIELDS = [
   "fixed_return_time"
 ];
 
+const SHEET_TIME_ONLY_FIELDS = OUTING_TYPE_TIME_FIELDS.concat(["masa_balik_dijangka"]);
+
 const PUBLIC_OUTING_TYPE_FIELDS = [
   "type_code",
   "display_name",
@@ -635,30 +637,7 @@ function normalizeStoredBooleanStrictV220_(value, fieldName) {
   throw new Error((fieldName || "boolean") + " mesti boolean true atau false.");
 }
 
-function getOutingTypeTimeZone_() {
-  let timeZone = "";
-
-  try {
-    const spreadsheet = SpreadsheetApp.getActive();
-    if (spreadsheet && typeof spreadsheet.getSpreadsheetTimeZone === "function") {
-      timeZone = String(spreadsheet.getSpreadsheetTimeZone() || "").trim();
-    }
-  } catch (error) {
-    timeZone = "";
-  }
-
-  if (!timeZone) {
-    try {
-      timeZone = String(Session.getScriptTimeZone() || "").trim();
-    } catch (error) {
-      timeZone = "";
-    }
-  }
-
-  return timeZone || "Asia/Kuala_Lumpur";
-}
-
-function normalizeStoredTimeOnly_(value) {
+function normalizeSheetTimeValue_(value) {
   if (value === undefined || value === null || value === "") {
     return "";
   }
@@ -667,7 +646,7 @@ function normalizeStoredTimeOnly_(value) {
     if (isNaN(value.getTime())) {
       return "";
     }
-    return Utilities.formatDate(value, getOutingTypeTimeZone_(), "HH:mm");
+    return Utilities.formatDate(value, "Asia/Kuala_Lumpur", "HH:mm");
   }
 
   const text = String(value).trim();
@@ -688,7 +667,7 @@ function normalizeOutingTypeRecord_(row) {
   result.allowed_days = String(result.allowed_days || "").trim().toUpperCase();
   result.departure_allowed_days = String(result.departure_allowed_days || "").trim().toUpperCase();
   OUTING_TYPE_TIME_FIELDS.forEach((field) => {
-    result[field] = normalizeStoredTimeOnly_(result[field]);
+    result[field] = normalizeSheetTimeValue_(result[field]);
   });
   OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
     result[field] = normalizeStoredBoolean_(result[field]);
@@ -706,7 +685,7 @@ function toPublicOutingType_(row) {
 function toAdminOutingType_(row) {
   const result = pickDefined_(row, HEADERS.OUTING_TYPES);
   OUTING_TYPE_TIME_FIELDS.forEach((field) => {
-    result[field] = normalizeStoredTimeOnly_(result[field]);
+    result[field] = normalizeSheetTimeValue_(result[field]);
   });
   return result;
 }
@@ -745,7 +724,9 @@ function findOutingTypeRowByCode_(sheet, typeCode) {
     if (normalizeText_(values[index][typeCodeIndex]) === normalizeText_(typeCode)) {
       const record = {};
       headers.forEach((header, columnIndex) => {
-        record[header] = values[index][columnIndex];
+        record[header] = SHEET_TIME_ONLY_FIELDS.indexOf(header) !== -1
+          ? normalizeSheetTimeValue_(values[index][columnIndex])
+          : values[index][columnIndex];
       });
       return {
         sheet: sheet,
@@ -1111,7 +1092,7 @@ function assessOutingConfigReadinessV220_() {
         stored[field] = normalizeStoredBooleanStrictV220_(stored[field], field);
       });
       OUTING_TYPE_TIME_FIELDS.forEach((field) => {
-        const normalizedTime = normalizeStoredTimeOnly_(stored[field]);
+        const normalizedTime = normalizeSheetTimeValue_(stored[field]);
         if (hasCellValue_(stored[field]) && !normalizedTime) {
           throw new Error(field + " mesti menggunakan format HH:mm.");
         }
@@ -1769,7 +1750,7 @@ function resolveSubmissionOutingTypeConfigV200_(requestType) {
       stored[field] = normalizeStoredBooleanStrictV220_(stored[field], field);
     });
     OUTING_TYPE_TIME_FIELDS.forEach((field) => {
-      const normalizedTime = normalizeStoredTimeOnly_(stored[field]);
+        const normalizedTime = normalizeSheetTimeValue_(stored[field]);
       if (hasCellValue_(stored[field]) && !normalizedTime) {
         throw new Error("INVALID_TIME_CONFIG");
       }
@@ -1969,14 +1950,18 @@ function formatOperationalTimeMalayV220_(timeValue) {
   if (!time) return "";
   const parts = time.split(":");
   const hour = Number(parts[0]);
+  const minuteNumber = Number(parts[1]);
   const minute = parts[1];
   const displayHour = hour % 12 || 12;
-  let period = "pagi";
-  if (hour === 0) period = "tengah malam";
-  else if (hour === 12) period = "tengah hari";
-  else if (hour >= 13 && hour < 19) period = "petang";
-  else if (hour >= 19) period = "malam";
-  return displayHour + ":" + minute + " " + period;
+  return displayHour + ":" + minute + " " + getMalayDaypartLabel_(hour, minuteNumber);
+}
+
+function getMalayDaypartLabel_(hour, minute) {
+  const totalMinutes = (Number(hour) * 60) + Number(minute || 0);
+  if (totalMinutes >= 60 && totalMinutes < 720) return "Pagi";
+  if (totalMinutes >= 720 && totalMinutes < 780) return "Tengah Hari";
+  if (totalMinutes >= 780 && totalMinutes < 1140) return "Petang";
+  return "Malam";
 }
 
 function formatOperationalDateMalayV220_(dateKey) {
@@ -3226,7 +3211,7 @@ function isAdminRecordOverdue_(row, now) {
 function toAdminOperationalRecord_(row, now, rolesByName) {
   const overdue = isAdminRecordOverdue_(row, now);
   const returnDate = normalizeDateKey_(row.tarikh_balik);
-  const returnTime = normalizeStoredTimeOnly_(row.masa_balik_dijangka);
+  const returnTime = normalizeSheetTimeValue_(row.masa_balik_dijangka);
   return {
     request_id: row.request_id || "",
     student_id: row.student_id || "",
@@ -3768,19 +3753,7 @@ function formatTelegramDate_(value) {
 }
 
 function formatTelegramTime_(value) {
-  const text = String(value || "").trim();
-  if (!text) {
-    return "-";
-  }
-
-  if (/^\d{2}:\d{2}/.test(text)) {
-    const date = new Date("2000-01-01T" + text.slice(0, 5) + ":00+08:00");
-    if (!isNaN(date.getTime())) {
-      return Utilities.formatDate(date, "Asia/Kuala_Lumpur", "HH:mm");
-    }
-  }
-
-  return text;
+  return normalizeSheetTimeValue_(value) || "-";
 }
 
 function formatTelegramExpectedReturn_(record) {
@@ -3980,7 +3953,9 @@ function getRowsAsObjects_(sheet) {
     .map((row) => {
       const object = {};
       headers.forEach((header, index) => {
-        object[header] = row[index];
+        object[header] = SHEET_TIME_ONLY_FIELDS.indexOf(header) !== -1
+          ? normalizeSheetTimeValue_(row[index])
+          : row[index];
       });
       return object;
     });
@@ -4012,7 +3987,9 @@ function findRowByRequestId_(requestId) {
     if (String(values[i][requestIdIndex]) === String(requestId)) {
       const record = {};
       headers.forEach((header, index) => {
-        record[header] = values[i][index];
+        record[header] = SHEET_TIME_ONLY_FIELDS.indexOf(header) !== -1
+          ? normalizeSheetTimeValue_(values[i][index])
+          : values[i][index];
       });
       return {
         sheet: sheet,
@@ -4160,7 +4137,7 @@ function isHostelReturnRequest_(record) {
 
 function isHostelReturnLate_(date, record) {
   const returnDateKey = normalizeDateKey_(record.tarikh_balik);
-  const expectedReturnTime = normalizeStoredTimeOnly_(record.masa_balik_dijangka);
+  const expectedReturnTime = normalizeSheetTimeValue_(record.masa_balik_dijangka);
   if (!returnDateKey || !expectedReturnTime) {
     return false;
   }

@@ -219,7 +219,7 @@ test("Guard departure enforcement uses the configured Friday time dynamically", 
   const friday1400 = dateInContext(context, "2026-08-07T06:00:00Z");
   assert.throws(
     () => context.validateGuardDepartureV220_({}, twoPm, friday1359),
-    /2:00 petang/
+    /2:00 Petang/
   );
   assert.doesNotThrow(() => context.validateGuardDepartureV220_({}, twoPm, friday1400));
 
@@ -227,7 +227,7 @@ test("Guard departure enforcement uses the configured Friday time dynamically", 
   const friday1700 = dateInContext(context, "2026-08-07T09:00:00Z");
   assert.throws(
     () => context.validateGuardDepartureV220_({}, fivePm, friday1400),
-    /5:00 petang/
+    /5:00 Petang/
   );
   assert.doesNotThrow(() => context.validateGuardDepartureV220_({}, fivePm, friday1700));
 });

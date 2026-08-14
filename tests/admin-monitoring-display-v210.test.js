@@ -31,6 +31,7 @@ function createFrontendContext() {
     extractFunction(appSource, "formatDisplayTime"),
     extractFunction(appSource, "formatDisplayDate"),
     extractFunction(appSource, "formatDisplayDateTime"),
+    extractFunction(appSource, "normalizeTimeOnlyValue"),
     extractFunction(appSource, "formatExpectedReturnTime"),
     extractFunction(appSource, "formatAdminExpectedReturnV210"),
     extractFunction(appSource, "adminMonitoringStatusLabelV210")
@@ -68,7 +69,11 @@ test("expected return combines Malaysia-local date and time and hides Sheet sent
   );
   assert.equal(
     context.formatAdminExpectedReturnV210({ tarikh_balik: "2026-08-08T16:00:00.000Z", masa_balik_dijangka: "1899-12-30T14:34:35.000Z" }),
-    "09 Ogos 2026, 10:34 PTG"
+    "09 Ogos 2026, 9:30 PTG"
+  );
+  assert.equal(
+    context.formatAdminExpectedReturnV210({ tarikh_balik: "2026-08-16", masa_balik_dijangka: "22:00" }),
+    "16 Ogos 2026, 10:00 PTG"
   );
   assert.equal(context.formatAdminExpectedReturnV210({}), "-");
 });

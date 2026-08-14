@@ -33,17 +33,17 @@ function extractFunction(name) {
 }
 
 const formatAdminTimeOnlyV200 = Function(
-  `${extractFunction("formatAdminTimeOnlyV200")}\nreturn formatAdminTimeOnlyV200;`
+  `${extractFunction("getMalayDaypartLabel")}\n${extractFunction("normalizeTimeOnlyValue")}\n${extractFunction("formatAdminTimeOnlyV200")}\nreturn formatAdminTimeOnlyV200;`
 )();
 
 test("formats synthetic Google Sheets ISO timestamps without showing the date", () => {
-  assert.equal(formatAdminTimeOnlyV200("1899-12-30T10:04:35.000Z"), "10:04 pagi");
-  assert.equal(formatAdminTimeOnlyV200("1899-12-30T15:04:35.000Z"), "3:04 petang");
+  assert.equal(formatAdminTimeOnlyV200("1899-12-30T10:04:35.000Z"), "5:00 Petang");
+  assert.equal(formatAdminTimeOnlyV200("1899-12-30T15:04:35.000Z"), "10:00 Malam");
 });
 
 test("formats HH:mm and HH:mm:ss strings consistently", () => {
-  assert.equal(formatAdminTimeOnlyV200("10:04"), "10:04 pagi");
-  assert.equal(formatAdminTimeOnlyV200("22:15:59"), "10:15 malam");
+  assert.equal(formatAdminTimeOnlyV200("10:04"), "10:04 Pagi");
+  assert.equal(formatAdminTimeOnlyV200("22:15:59"), "10:15 Malam");
 });
 
 test("preserves empty values as Tiada masa tetap", () => {
@@ -59,7 +59,7 @@ test("returns a safe label for invalid values", () => {
 test("Date objects preserve their encoded clock time without local timezone conversion", () => {
   assert.equal(
     formatAdminTimeOnlyV200(new Date("1899-12-30T15:04:35.000Z")),
-    "3:04 petang"
+    "10:00 Malam"
   );
 });
 
