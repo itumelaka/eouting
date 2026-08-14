@@ -3306,6 +3306,7 @@ function mapPublicMonitoringRecord(record) {
 }
 
 function mapLiveStatus(status) {
+  const normalizedStatus = String(status || "").trim();
   const statusMap = {
     MENUNGGU_KELULUSAN: STATUS.pending,
     DILULUSKAN_WARDEN: STATUS.approved,
@@ -3315,7 +3316,7 @@ function mapLiveStatus(status) {
     SELESAI: STATUS.returned
   };
 
-  return statusMap[status] || status || STATUS.pending;
+  return statusMap[normalizedStatus] || normalizedStatus || "Status Tidak Diketahui";
 }
 
 function parseDateValue(value) {

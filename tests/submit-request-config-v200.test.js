@@ -6,6 +6,7 @@ const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const gasSource = fs.readFileSync(path.join(root, "gas", "Code.gs"), "utf8");
+const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const OUTING_HEADERS = [
   "type_code", "display_name", "description", "active", "sort_order", "allowed_days",
   "application_open_time", "application_close_time", "fixed_return_time", "same_day_only",
@@ -161,6 +162,10 @@ function testNow(context, iso = "2026-08-03T02:00:00Z") {
   return vm.runInContext(`new Date(${JSON.stringify(iso)})`, context);
 }
 
+function requestHeaders(context) {
+  return Array.from(vm.runInContext("HEADERS.OUTING_REQUESTS.slice()", context));
+}
+
 function validate(context, config, payload = {}, iso) {
   return context.validateConfigDrivenSubmissionV200_(payload, config, testNow(context, iso));
 }
@@ -210,6 +215,93 @@ test("submitRequest uses the active Sheet config, auto-approval rule and existin
   assert.deepEqual(context.__testLockEvents, [
     "tryLock", "flush", "releaseLock", "tryLock", "releaseLock"
   ]);
+});
+
+test("config-driven approval-required requests persist the canonical pending status", () => {
+  const row = completeConfig({
+    allowed_days: "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU",
+    require_warden_approval: true
+  });
+  const context = createContext({ featureEnabled: true, rows: [row] });
+  const result = context.submitRequest({
+    student_id: "A3-001",
+    no_matrik: "A3001",
+    jenis_permohonan: "lawatan_keluarga"
+  });
+  const persisted = context.findRowByRequestId_(result.request_id).record;
+  assert.equal(result.status, "MENUNGGU_KELULUSAN");
+  assert.equal(persisted.status, "MENUNGGU_KELULUSAN");
+});
+
+test("all five legacy outing types persist the canonical pending status", () => {
+  const cases = [
+    ["OUTING_BIASA", {}],
+    ["OUTING_HUJUNG_MINGGU", {
+      tarikh: "2099-01-04", tarikh_balik: "2099-01-04", masa_balik_dijangka: "22:00"
+    }],
+    ["KECEMASAN", { sebab_kecemasan: "Rawatan segera" }],
+    ["PULANG_BERMALAM", { tarikh_balik: "2099-01-05", masa_balik_dijangka: "18:00" }],
+    ["CUTI_SEMESTER", {
+      tarikh: "2099-01-04", tarikh_balik: "2099-01-10", masa_balik_dijangka: "18:00",
+      lokasi: "Rumah keluarga", telefon_waris: "0123456789"
+    }]
+  ];
+
+  cases.forEach(([jenisPermohonan, extraPayload]) => {
+    const context = createContext({ featureEnabled: false });
+    context.isOutingBiasaOpen_ = () => true;
+    const result = context.submitRequest({
+      student_id: "A3-001",
+      no_matrik: "A3001",
+      jenis_permohonan: jenisPermohonan,
+      ...extraPayload
+    });
+    assert.equal(result.status, "MENUNGGU_KELULUSAN", jenisPermohonan);
+    assert.equal(context.findRowByRequestId_(result.request_id).record.status, "MENUNGGU_KELULUSAN", jenisPermohonan);
+  });
+});
+
+test("request append maps values to the Sheet's actual header order and reads status back", () => {
+  const context = createContext({ featureEnabled: false });
+  context.isOutingBiasaOpen_ = () => true;
+  const headers = requestHeaders(context);
+  const reorderedHeaders = headers.filter((header) => header !== "status").concat("status");
+  context.__testSheets.get("OUTING_REQUESTS").rows = [reorderedHeaders];
+
+  const result = context.submitRequest({
+    student_id: "A3-001", no_matrik: "A3001", jenis_permohonan: "OUTING_BIASA"
+  });
+  const persisted = context.findRowByRequestId_(result.request_id).record;
+
+  assert.equal(persisted.request_id, result.request_id);
+  assert.equal(persisted.nama, "PELAJAR UJIAN");
+  assert.equal(persisted.status, "MENUNGGU_KELULUSAN");
+  assert.equal(result.status, persisted.status);
+});
+
+test("blank or invalid computed initial statuses are rejected before persistence", () => {
+  const context = createContext({ featureEnabled: false });
+  for (const status of [undefined, null, "", " ", "STATUS_REKAAN"]) {
+    assert.throws(() => context.validateInitialRequestStatus_(status), /Status awal permohonan tidak sah/);
+  }
+  assert.equal(context.validateInitialRequestStatus_("MENUNGGU_KELULUSAN"), "MENUNGGU_KELULUSAN");
+  assert.equal(context.validateInitialRequestStatus_("DILULUSKAN_WARDEN"), "DILULUSKAN_WARDEN");
+  assert.equal(context.__testSheets.get("OUTING_REQUESTS").rows.length, 0);
+});
+
+test("blank authoritative status is not mapped to a visual pending state", () => {
+  const start = appSource.indexOf("function mapLiveStatus(status)");
+  const end = appSource.indexOf("function parseDateValue", start);
+  const context = vm.createContext({
+    STATUS: {
+      pending: "Menunggu Kelulusan", approved: "Diluluskan Warden", rejected: "Ditolak Warden",
+      studentCancelled: "Dibatalkan oleh Pelajar", out: "Sedang Keluar", returned: "Sudah Pulang"
+    }
+  });
+  vm.runInContext(appSource.slice(start, end), context);
+  assert.equal(context.mapLiveStatus(""), "Status Tidak Diketahui");
+  assert.notEqual(context.mapLiveStatus(""), "Menunggu Kelulusan");
+  assert.equal(context.mapLiveStatus("MENUNGGU_KELULUSAN"), "Menunggu Kelulusan");
 });
 
 test("enabled resolver rejects missing, inactive and malformed configuration safely", () => {
@@ -379,7 +471,7 @@ test("submitRequest keeps duplicate protection, legacy Pulang Bermalam and contr
   );
   assert.match(submitSource, /hasActiveRequestForStudent_/);
   assert.match(submitSource, /validateOvernightRequest_\(payload, now\)/);
-  assert.match(submitSource, /requiresWardenApproval \? STATUS\.pending : STATUS\.approved/);
+  assert.match(submitSource, /validateInitialRequestStatus_\([\s\S]*requiresWardenApproval \? STATUS\.pending : STATUS\.approved/);
   assert.match(submitSource, /requiresWardenApproval \? "" : "AUTO_CONFIG_V2"/);
   assert.match(submitSource, /auditDetails\.config_version = submissionConfig\.config_version/);
   assert.doesNotMatch(submitSource, /JSON\.stringify\(submissionConfig\)/);

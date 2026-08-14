@@ -2023,6 +2023,14 @@ function validateGuardDepartureV220_(record, config, now) {
   return true;
 }
 
+function validateInitialRequestStatus_(status) {
+  const normalizedStatus = String(status === undefined || status === null ? "" : status).trim();
+  if (normalizedStatus !== STATUS.pending && normalizedStatus !== STATUS.approved) {
+    throw new Error("Status awal permohonan tidak sah. Permohonan tidak disimpan.");
+  }
+  return normalizedStatus;
+}
+
 function submitRequest(payload) {
   const studentId = payload.student_id;
   const noMatrik = payload.no_matrik;
@@ -2097,6 +2105,9 @@ if (!studentId || !noMatrik) {
   }
 
 const requiresWardenApproval = !submissionConfig || submissionConfig.require_warden_approval;
+const computedInitialStatus = validateInitialRequestStatus_(
+  requiresWardenApproval ? STATUS.pending : STATUS.approved
+);
 
 const requestDate = submissionConfig
   ? normalizeDateKey_(payload.tarikh) || formatDate_(now)
@@ -2141,7 +2152,7 @@ const record = withScriptLock_(function () {
     hubungan_waris: payload.hubungan_waris || "",
     catatan_kecemasan: payload.catatan_kecemasan || "",
     masa_mohon: now_(),
-    status: requiresWardenApproval ? STATUS.pending : STATUS.approved,
+    status: computedInitialStatus,
     warden_approve_by: requiresWardenApproval ? "" : "AUTO_CONFIG_V2",
     masa_approve: requiresWardenApproval ? "" : now_(),
     masa_keluar: "",
@@ -2163,7 +2174,11 @@ const record = withScriptLock_(function () {
 
   appendObjectRow_(requestSheet, HEADERS.OUTING_REQUESTS, requestRecord);
   SpreadsheetApp.flush();
-  return requestRecord;
+  const persisted = findRowByRequestId_(requestId);
+  if (!persisted || String(persisted.record.status || "").trim() !== computedInitialStatus) {
+    throw new Error("Status awal permohonan gagal disimpan. Permohonan tidak boleh diteruskan.");
+  }
+  return persisted.record;
 }, "Permohonan sedang diproses. Sila cuba sebentar lagi.");
   const requestId = record.request_id;
   const auditDetails = {
@@ -3973,7 +3988,10 @@ function getRowsAsObjects_(sheet) {
 
 function appendObjectRow_(sheet, headers, object) {
   ensureHeaders_(sheet, headers);
-  const row = headers.map((header) => object[header] !== undefined ? object[header] : "");
+  const actualHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1))
+    .getValues()[0]
+    .map((header) => String(header).trim());
+  const row = actualHeaders.map((header) => object[header] !== undefined ? object[header] : "");
   sheet.appendRow(row);
 }
 
