@@ -1,6 +1,14 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r6` dan service-worker cache `eouting-cache-v2.2.0-r6`. Backend production ialah GAS **Version 39**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026.
+Versi aplikasi semasa: **v2.2.1**, cache/asset source revision `2.2.1-r1` dan service-worker cache `eouting-cache-v2.2.1-r1`. Backend production ialah GAS **Version 40**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026.
+
+## Production verification — 14 Ogos 2026
+
+- Hotfix `39265f1` (`fix: allow clearing outing application times`) live sebagai v2.2.1, revision/cache `2.2.1-r1` dan GAS Version 40.
+- Butang `Kosongkan` bagi masa permohonan dibuka/ditutup disahkan membersihkan cell Sheet melalui `clearContent()` dan blank kekal blank selepas save/refresh.
+- Blank open/close time tidak mengenakan threshold masa; `allowed_days` kekal enforced secara berasingan.
+- Nilai pembukaan `12:00` pada `PULANG_BERMALAM` telah dikosongkan dan permohonan pagi tidak lagi disekat semata-mata oleh opening time.
+- Full Node suite lulus **336/336**.
 
 ## Production verification — 12 Ogos 2026
 
@@ -16,7 +24,7 @@ Versi aplikasi semasa: **v2.2.0**, cache/asset source revision `2.2.0-r6` dan se
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah r6.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah `2.2.1-r1`.
 
 Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
@@ -71,7 +79,7 @@ Urutan backup, migration idempotent, legacy check, readiness hijau dan controlle
 
 ## Release Beta v2.0
 
-Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.2.0`.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.2.1` / `2.2.1-r1`.
 
 Beta pertama hendaklah menguji lima seed dan sekurang-kurangnya satu jenis custom. Gate mesti meliputi `require_selfie=true/false`, `require_warden_approval=true/false`, audit `AUTO_APPROVE_REQUEST`, Guard transition, Telegram, statistik dan filter. `require_warden_approval=false` kekal high-impact walaupun auto-approval kini eksplisit dan diaudit.
 
@@ -210,7 +218,7 @@ Frontend:
 
 - buka `https://itumelaka.github.io/eouting/`;
 - semak footer dan update popup;
-- semak asset query `2.2.0-r6` dan Cache Storage `eouting-cache-v2.2.0-r6`, khususnya selepas refresh/reopen PWA mobile;
+- semak asset query `2.2.1-r1` dan Cache Storage `eouting-cache-v2.2.1-r1`, khususnya selepas refresh/reopen PWA mobile;
 - login Admin, refresh berulang dan sahkan restore hanya selepas backend validation serta tab bukan default kekal lazy;
 - login Pelajar pada telefon, buka foto profil dan sahkan `Ambil Foto`, `Pilih dari Galeri` serta `Batal`; return-selfie mesti kekal sama;
 - buka Public Monitoring sekali dan pastikan loading, scroll, data serta timestamp betul;

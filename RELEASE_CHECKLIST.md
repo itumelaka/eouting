@@ -2,7 +2,17 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (12 Ogos 2026): bahagian v2.0.0 di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.0, menggunakan cache revision `2.2.0-r6`, GAS Version 39, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (14 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.1, menggunakan cache revision `2.2.1-r1`, GAS Version 40, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+
+## Close-out Hotfix Production v2.2.1 — 14 Ogos 2026
+
+- [x] Commit `39265f1` (`fix: allow clearing outing application times`) disahkan live.
+- [x] Admin boleh mengosongkan `Masa Permohonan Dibuka` dan `Masa Permohonan Ditutup` melalui butang `Kosongkan`.
+- [x] Empty string menggunakan `clearContent()` supaya nilai Sheet benar-benar kosong dan kekal kosong selepas save/refresh.
+- [x] Blank open/close time bermaksud tiada threshold masa bagi medan itu; `allowed_days` kekal authoritative.
+- [x] Isu permohonan pagi `PULANG_BERMALAM` akibat nilai pembukaan `12:00` telah diselesaikan.
+- [x] Frontend v2.2.1, revision/cache `2.2.1-r1` dan GAS Version 40 disahkan production.
+- [x] Full Node suite lulus **336/336**.
 
 ## Close-out Production — 12 Ogos 2026
 

@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.0**, cache revision `2.2.0-r6`, GAS Version 39 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
+Dokumen ini menerangkan flow production semasa **v2.2.1**, cache revision `2.2.1-r1`, GAS Version 40 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready).
 
 ## Backend Config API v2.0
 
@@ -65,7 +65,7 @@ submitRequest
 
 `fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN`, mengisi masa approval dan identiti sistem `AUTO_CONFIG_V2`, serta menulis audit `AUTO_APPROVE_REQUEST`. Guard hanya menerima state approved yang sah. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
 
-Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` production membenarkan permohonan pada mana-mana hari, departure Jumaat dan masa paling awal semasa `17:00`; Admin boleh mengubah masa itu mengikut arahan HEP.
+Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. Kedua-dua masa permohonan ialah optional: blank open time bermaksud tiada opening threshold, blank close time bermaksud tiada closing threshold, dan jika kedua-duanya blank tiada sekatan masa dikenakan. `allowed_days` tetap diperiksa secara berasingan dan authoritative. Admin boleh menggunakan `Kosongkan`; explicit blank membersihkan cell Sheet melalui `clearContent()` supaya nilai lama tidak dikekalkan. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` production membenarkan permohonan pada mana-mana hari, departure Jumaat dan masa paling awal semasa `17:00`; Admin boleh mengubah masa itu mengikut arahan HEP.
 
 Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` dianggap active dan menghalang request baharu; `SELESAI`, `DITOLAK_WARDEN` serta `DIBATALKAN_PELAJAR` membenarkannya. Frontend mempunyai submission in-flight guard dan loading sendiri, tetapi atomic backend lock kekal protection authoritative.
 

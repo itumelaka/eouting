@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-14 — Optional application-time clearing hotfix (v2.2.1)
+
+- `39265f1` — `fix: allow clearing outing application times`.
+- **Admin UI:** menambah butang `Kosongkan` khusus bagi `Masa Permohonan Dibuka` dan `Masa Permohonan Ditutup`.
+- **Persistence:** explicit empty string membersihkan cell Sheet melalui `clearContent()` supaya nilai lama tidak dikekalkan selepas clear.
+- **Rules:** blank `application_open_time` bermaksud tiada opening threshold; blank `application_close_time` bermaksud tiada closing threshold. Jika kedua-duanya blank, permohonan tidak dihadkan oleh masa tetapi `allowed_days` kekal dikuatkuasakan.
+- **Production fix:** nilai pembukaan `12:00` pada `PULANG_BERMALAM` kini boleh dibuang dan permohonan pagi tidak lagi ditolak semata-mata kerana opening time apabila medan kosong.
+- **Production:** v2.2.1, cache/asset revision `2.2.1-r1`, service worker `eouting-cache-v2.2.1-r1` dan GAS Version 40 live pada 14 Ogos 2026; full Node baseline **336/336**.
+
 ## 2026-08-12 — Student outing cancellation production close-out (v2.2.0)
 
 - `50da5b6` (`feat: allow students to cancel outing requests`) menambah pembatalan milik Pelajar bagi status `MENUNGGU_KELULUSAN` dan `DILULUSKAN_WARDEN` untuk semua jenis standard/config-driven termasuk `KLINIK`.
