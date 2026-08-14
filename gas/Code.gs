@@ -3962,7 +3962,12 @@ function updateRowByHeaders_(sheet, rowNumber, updates) {
   Object.keys(updates).forEach((key) => {
     const columnIndex = headers.indexOf(key);
     if (columnIndex !== -1) {
-      sheet.getRange(rowNumber, columnIndex + 1).setValue(updates[key]);
+      const range = sheet.getRange(rowNumber, columnIndex + 1);
+      if (updates[key] === "") {
+        range.clearContent();
+      } else {
+        range.setValue(updates[key]);
+      }
     }
   });
 }

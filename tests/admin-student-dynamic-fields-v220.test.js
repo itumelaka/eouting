@@ -12,20 +12,21 @@ function sourceBetween(start, end) {
 }
 
 function createAdminTimeFixture(initialValue = "07:37") {
-  const timeInput = {
-    value: initialValue,
+  const makeTimeInput = (value = "") => ({
+    value,
     focused: false,
     dispatchEvent() {},
     focus() { this.focused = true; }
-  };
+  });
+  const timeInput = makeTimeInput(initialValue);
   const elements = {
     adminEarliestDepartureTimeInput: timeInput,
     adminTypeCodeInput: { value: "KLINIK" },
     adminDisplayNameInput: { value: "Keluar ke Klinik" },
     adminDescriptionInput: { value: "Rawatan" },
     adminSortOrderInput: { value: "6" },
-    adminOpenTimeInput: { value: "" },
-    adminCloseTimeInput: { value: "" },
+    adminOpenTimeInput: makeTimeInput("12:00"),
+    adminCloseTimeInput: makeTimeInput("18:00"),
     adminFixedReturnTimeInput: { value: "" },
     adminAllowedDays: {},
     adminDepartureAllowedDays: {},
@@ -39,9 +40,9 @@ function createAdminTimeFixture(initialValue = "07:37") {
       return container === els.adminAllowedDays ? ["ISNIN"] : [];
     }
     function getAdminRuleInputMapV200() { return []; }
-    ${sourceBetween("function clearAdminEarliestDepartureTimeV220", "async function loadAdminOutingConfigReadinessV220")}
+    ${sourceBetween("function clearAdminTimeInputV200", "async function loadAdminOutingConfigReadinessV220")}
     ${sourceBetween("function collectAdminOutingTypeConfigV200", "async function handleAdminTypeSubmitV200")}
-    globalThis.clearTime = clearAdminEarliestDepartureTimeV220;
+    globalThis.clearTime = clearAdminTimeInputV200;
     globalThis.collect = collectAdminOutingTypeConfigV200;
   `, context);
   return context;
@@ -95,7 +96,7 @@ test("Admin existing earliest time loads and edited values enter the payload", (
 
 test("Admin can explicitly clear earliest time and empty round-trips without a current-time default", () => {
   const context = createAdminTimeFixture("07:37");
-  context.clearTime();
+  context.clearTime(context.elements.adminEarliestDepartureTimeInput);
   assert.equal(context.elements.adminEarliestDepartureTimeInput.value, "");
   assert.equal(context.collect().earliest_departure_time, "");
   assert.equal(context.elements.adminEarliestDepartureTimeInput.focused, true);
@@ -103,6 +104,28 @@ test("Admin can explicitly clear earliest time and empty round-trips without a c
   assert.doesNotMatch(defaultsSource, /adminEarliestDepartureTimeInput|new Date|currentTime/);
   assert.match(htmlSource, /adminClearEarliestDepartureTimeButton/);
   assert.match(htmlSource, /Kosong bermaksud tiada sekatan masa keluar paling awal/);
+});
+
+test("Admin can explicitly clear application open and close times into the update payload", () => {
+  const context = createAdminTimeFixture();
+  context.clearTime(context.elements.adminOpenTimeInput);
+  context.clearTime(context.elements.adminCloseTimeInput);
+
+  assert.equal(context.elements.adminOpenTimeInput.value, "");
+  assert.equal(context.elements.adminCloseTimeInput.value, "");
+  assert.equal(context.elements.adminOpenTimeInput.focused, true);
+  assert.equal(context.elements.adminCloseTimeInput.focused, true);
+  assert.equal(context.collect().application_open_time, "");
+  assert.equal(context.collect().application_close_time, "");
+  assert.match(htmlSource, /id="adminClearOpenTimeButton"[^>]*>Kosongkan</);
+  assert.match(htmlSource, /id="adminClearCloseTimeButton"[^>]*>Kosongkan</);
+});
+
+test("Admin editor assigns backend blanks directly with no time fallback", () => {
+  const editorSource = sourceBetween("function openAdminEditEditorV200", "function closeAdminEditorV200");
+  assert.match(editorSource, /adminOpenTimeInput\.value = type\.application_open_time \|\| ""/);
+  assert.match(editorSource, /adminCloseTimeInput\.value = type\.application_close_time \|\| ""/);
+  assert.doesNotMatch(editorSource, /new Date|currentTime|00:00|12:00/);
 });
 
 test("custom KLINIK uses a neutral section and shows only its configured return-time field", () => {

@@ -54,6 +54,11 @@ class FakeSheet {
         const targetRowIndex = row - 1;
         while (this.rows.length <= targetRowIndex) this.rows.push([]);
         this.rows[targetRowIndex][column - 1] = value;
+      },
+      clearContent: () => {
+        const targetRowIndex = row - 1;
+        while (this.rows.length <= targetRowIndex) this.rows.push([]);
+        this.rows[targetRowIndex][column - 1] = "";
       }
     };
   }
@@ -273,6 +278,35 @@ test("update increments version, preserves creation metadata and audits safe cha
   assert.match(String(audit.details), /departure_allowed_days/);
   assert.match(String(audit.details), /earliest_departure_time/);
   assert.doesNotMatch(String(audit.details), /2468/);
+});
+
+test("update explicitly clears existing application window times and blank survives reread", () => {
+  const { context, sheets } = createContext();
+  seed(context);
+  const before = context.getAdminOutingTypes(adminPayload())
+    .find((type) => type.type_code === "OUTING_BIASA");
+  const sheet = sheets.get("OUTING_TYPES");
+  const closeTimeIndex = OUTING_HEADERS.indexOf("application_close_time");
+  const rowIndex = sheet.rows.findIndex((row) => row[0] === before.type_code);
+  sheet.rows[rowIndex][closeTimeIndex] = "12:00";
+
+  const updated = context.updateOutingType(adminPayload({
+    type_code: before.type_code,
+    expected_config_version: before.config_version,
+    outing_type: {
+      application_open_time: "",
+      application_close_time: ""
+    }
+  }));
+
+  assert.equal(updated.application_open_time, "");
+  assert.equal(updated.application_close_time, "");
+  assert.equal(sheet.rows[rowIndex][OUTING_HEADERS.indexOf("application_open_time")], "");
+  assert.equal(sheet.rows[rowIndex][closeTimeIndex], "");
+  const reloaded = context.getAdminOutingTypes(adminPayload())
+    .find((type) => type.type_code === before.type_code);
+  assert.equal(reloaded.application_open_time, "");
+  assert.equal(reloaded.application_close_time, "");
 });
 
 test("toggle changes only active, increments version and emits activate/deactivate audit", () => {

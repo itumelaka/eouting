@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.2.0-r6">
+    <link rel="stylesheet" href="assets/style.css?v=2.2.1-r1">
   </head>
   <body>
     <header class="app-header">
@@ -503,12 +503,22 @@
                   <label><input type="checkbox" value="SABTU"> Sabtu</label>
                 </div>
                 <div class="admin-form-grid">
-                  <label>Masa Permohonan Dibuka
-                    <input id="adminOpenTimeInput" type="time">
-                  </label>
-                  <label>Masa Permohonan Ditutup
-                    <input id="adminCloseTimeInput" type="time">
-                  </label>
+                  <div class="admin-field-group">
+                    <label for="adminOpenTimeInput">Masa Permohonan Dibuka</label>
+                    <div class="admin-time-clear-control">
+                      <input id="adminOpenTimeInput" type="time">
+                      <button class="secondary-action compact-action" id="adminClearOpenTimeButton" type="button">Kosongkan</button>
+                    </div>
+                    <small class="admin-field-helper">Kosong bermaksud tiada sekatan masa permohonan dibuka.</small>
+                  </div>
+                  <div class="admin-field-group">
+                    <label for="adminCloseTimeInput">Masa Permohonan Ditutup</label>
+                    <div class="admin-time-clear-control">
+                      <input id="adminCloseTimeInput" type="time">
+                      <button class="secondary-action compact-action" id="adminClearCloseTimeButton" type="button">Kosongkan</button>
+                    </div>
+                    <small class="admin-field-helper">Kosong bermaksud tiada sekatan masa permohonan ditutup.</small>
+                  </div>
                 </div>
               </fieldset>
 
@@ -714,7 +724,7 @@
       </section>
 
       <footer class="app-footer">
-      <span id="appVersionText">eOuting ITU • v2.2.0</span>
+      <span id="appVersionText">eOuting ITU • v2.2.1</span>
         <span class="beta-api-indicator" id="betaApiIndicator" hidden>BETA API</span>
       </footer>
     </main>
@@ -764,6 +774,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.2.0-r6"></script>
+    <script src="assets/app.js?v=2.2.1-r1"></script>
   </body>
 </html>

@@ -285,6 +285,63 @@ test("allowed_days and application time window are enforced in Malaysia time", (
   assert.doesNotThrow(() => validate(context, overnight, {}, "2026-08-03T15:00:00Z"));
 });
 
+test("blank application times impose no threshold while configured boundaries remain strict", () => {
+  const context = createContext();
+  const base = Object.fromEntries(OUTING_HEADERS.map((header, index) => [header, completeConfig()[index]]));
+  const unrestricted = context.validateOutingTypeConfig_({
+    ...base,
+    application_open_time: "",
+    application_close_time: ""
+  }, { requireTypeCode: true });
+  assert.doesNotThrow(() => validate(context, unrestricted, {}, "2026-08-02T22:30:00Z")); // Monday 06:30
+  assert.doesNotThrow(() => validate(context, unrestricted, {}, "2026-08-03T14:30:00Z")); // Monday 22:30
+
+  const noOpeningThreshold = context.validateOutingTypeConfig_({
+    ...base,
+    application_open_time: "",
+    application_close_time: "12:00"
+  }, { requireTypeCode: true });
+  assert.doesNotThrow(() => validate(context, noOpeningThreshold, {}, "2026-08-02T23:00:00Z")); // Monday 07:00
+
+  const noClosingThreshold = context.validateOutingTypeConfig_({
+    ...base,
+    application_open_time: "12:00",
+    application_close_time: ""
+  }, { requireTypeCode: true });
+  assert.doesNotThrow(() => validate(context, noClosingThreshold, {}, "2026-08-03T12:00:00Z")); // Monday 20:00
+
+  const noonOpening = context.validateOutingTypeConfig_({
+    ...base,
+    application_open_time: "12:00",
+    application_close_time: ""
+  }, { requireTypeCode: true });
+  assert.throws(
+    () => validate(context, noonOpening, {}, "2026-08-03T01:00:00Z"),
+    /belum dibuka atau telah ditutup/
+  ); // Monday 09:00
+
+  const configuredClosing = context.validateOutingTypeConfig_({
+    ...base,
+    application_open_time: "",
+    application_close_time: "17:00"
+  }, { requireTypeCode: true });
+  assert.throws(
+    () => validate(context, configuredClosing, {}, "2026-08-03T10:00:00Z"),
+    /belum dibuka atau telah ditutup/
+  ); // Monday 18:00
+
+  const wrongDayWithoutTimes = context.validateOutingTypeConfig_({
+    ...base,
+    allowed_days: "SELASA",
+    application_open_time: "",
+    application_close_time: ""
+  }, { requireTypeCode: true });
+  assert.throws(
+    () => validate(context, wrongDayWithoutTimes, {}, "2026-08-03T02:00:00Z"),
+    /tidak dibenarkan pada hari/
+  );
+});
+
 test("fixed_return_time overrides client input and required return time is strict", () => {
   const context = createContext();
   const base = Object.fromEntries(OUTING_HEADERS.map((header, index) => [header, completeConfig()[index]]));
