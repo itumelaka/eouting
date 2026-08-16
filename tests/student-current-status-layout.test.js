@@ -10,7 +10,7 @@ const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const cssSource = fs.readFileSync(path.join(root, "assets", "style.css"), "utf8");
 
 function extractFunction(name) {
-  const start = appSource.lastIndexOf(`function ${name}`);
+  const start = appSource.lastIndexOf(`function ${name}(`);
   assert.notEqual(start, -1, `${name} must exist`);
   const bodyStart = appSource.indexOf("{", start);
   let depth = 0;
@@ -214,6 +214,26 @@ test("compact history sorts newest outing date first and keeps refresh plus annu
   assert.ok(refresh >= 0 && refresh < annual && annual < heading);
   assert.match(appSource, /textContent = "Refresh Status"/);
   assert.match(appSource, /Jumlah Outing \$\{Number\(studentAnnualSummary\.year\)\}/);
+});
+
+test("top Status Semasa keeps live records while lower history uses the authenticated annual response", () => {
+  const renderSource = extractFunction("renderStudent");
+  const annualLoaderSource = extractFunction("loadStudentAnnualSummary");
+  const refreshSource = extractFunction("refreshStudentLiveRecords");
+  const refreshControlsSource = extractFunction("ensureStudentRefreshControls");
+  const startSessionSource = extractFunction("startSession");
+
+  assert.match(renderSource, /const studentRecords = outingRecords\.filter\(isRecordForCurrentStudent\)/);
+  assert.match(renderSource, /selectStudentCurrentRecord\(studentRecords\)/);
+  assert.match(renderSource, /renderStudentCurrentStatus\(currentRecord\)/);
+  assert.match(renderSource, /renderStudentAnnualHistory\(\)/);
+  assert.doesNotMatch(renderSource, /renderStudentHistoryRecords\(studentRecords\)/);
+  assert.match(annualLoaderSource, /normalizeStudentAnnualSummary\(response\)/);
+  assert.match(annualLoaderSource, /renderStudentAnnualHistory\(\)/);
+  assert.match(refreshSource, /requests = \[loadTodayRecords\(\)\]/);
+  assert.match(refreshSource, /requests\.push\(loadStudentAnnualSummary\(\)\)/);
+  assert.match(refreshControlsSource, /refreshStudentLiveRecords\(true\)/);
+  assert.match(startSessionSource, /role === "student"[\s\S]*refreshStudentLiveRecords\(true\)/);
 });
 
 test("no current record uses a compact top empty state", () => {

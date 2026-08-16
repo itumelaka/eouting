@@ -92,19 +92,35 @@ function extractFunctionSource(source, name, nextName) {
   return source.slice(start, end);
 }
 
-test("student annual summary counts only the authenticated student's SELESAI records in the current year", () => {
+test("student annual summary returns the same authenticated current-year SELESAI scope as a minimal newest-first history", () => {
   const year = currentMalaysiaYear();
   const context = createContext([
     { request_id: "R1", tarikh: `${year}-01-03`, jenis_permohonan: "OUTING_BIASA", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "SELESAI" },
     { request_id: "R2", tarikh: `${year}-02-04`, jenis_permohonan: "JENIS_MASA_DEPAN", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "SELESAI" },
+    { request_id: "R6", tarikh: `${year}-05-07`, jenis_permohonan: "KECEMASAN", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "SELESAI" },
+    { request_id: "R7", tarikh: `${year}-06-08`, jenis_permohonan: "PULANG_BERMALAM", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "SELESAI" },
+    { request_id: "R8", tarikh: `${year}-07-09`, jenis_permohonan: "CUTI_SEMESTER", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "SELESAI" },
     { request_id: "R3", tarikh: `${year}-03-05`, jenis_permohonan: "PULANG_BERMALAM", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "KELUAR" },
+    { request_id: "R10", tarikh: `${year}-03-06`, jenis_permohonan: "OUTING_BIASA", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "DITOLAK_WARDEN" },
+    { request_id: "R11", tarikh: `${year}-03-07`, jenis_permohonan: "OUTING_BIASA", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "DIBATALKAN_PELAJAR" },
     { request_id: "R4", tarikh: `${year - 1}-12-30`, jenis_permohonan: "KECEMASAN", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A3", status: "SELESAI" },
-    { request_id: "R5", tarikh: `${year}-04-06`, jenis_permohonan: "OUTING_BIASA", student_id: "S2", no_matrik: "M2", nama: "Bakar", kelas: "A3", status: "SELESAI" }
+    { request_id: "R5", tarikh: `${year}-04-06`, jenis_permohonan: "OUTING_BIASA", student_id: "S2", no_matrik: "M2", nama: "Bakar", kelas: "A3", status: "SELESAI" },
+    { request_id: "R9", tarikh: `${year}-08-10`, jenis_permohonan: "OUTING_BIASA", student_id: "S2", no_matrik: "M1", nama: "Silang", kelas: "A3", status: "SELESAI" }
   ]);
 
   const result = context.getStudentAnnualSummary({ student_id: "S1", no_matrik: "M1" });
   assert.equal(result.year, year);
-  assert.equal(result.total_outings, 2);
+  assert.equal(result.total_outings, 5);
+  assert.equal(result.history_records.length, result.total_outings);
+  assert.deepEqual(Array.from(result.history_records, (record) => record.tarikh), [
+    `${year}-07-09`, `${year}-06-08`, `${year}-05-07`, `${year}-02-04`, `${year}-01-03`
+  ]);
+  result.history_records.forEach((record) => {
+    assert.deepEqual(Object.keys(record).sort(), ["jenis_permohonan", "status", "tarikh"]);
+    assert.equal(record.status, "SELESAI");
+    assert.equal(Object.values(record).includes("Bakar"), false);
+    assert.equal(Object.values(record).includes("Silang"), false);
+  });
   assert.throws(
     () => context.getStudentAnnualSummary({ student_id: "S1", no_matrik: "WRONG" }),
     /Akses sesi pelajar tidak sah/

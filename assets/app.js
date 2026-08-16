@@ -1,4 +1,4 @@
-const APP_VERSION = "2.3.1";
+const APP_VERSION = "2.3.2";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200 = "https://script.google.com/macros/s/AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1/exec";
 const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
@@ -4607,25 +4607,47 @@ async function loadStudentAnnualSummary() {
   }
 
   try {
-    studentAnnualSummary = await apiPost("getStudentAnnualSummary", {
+    const response = await apiPost("getStudentAnnualSummary", {
       student_id: studentId,
       no_matrik: noMatrik
     });
+    studentAnnualSummary = normalizeStudentAnnualSummary(response);
   } catch (error) {
-    studentAnnualSummary = { year: getMalaysiaYearV200(), error: true };
+    studentAnnualSummary = { year: getMalaysiaYearV200(), total_outings: 0, history_records: [], error: true };
   } finally {
     renderStudentAnnualSummary();
+    renderStudentAnnualHistory();
   }
+}
+
+function normalizeStudentAnnualSummary(summary) {
+  const source = summary || {};
+  const historyRecords = Array.isArray(source.history_records) ? source.history_records : [];
+  return {
+    year: Number(source.year || getMalaysiaYearV200()),
+    total_outings: Number(source.total_outings || 0),
+    history_records: historyRecords.map((record) => ({
+      tarikh: record.tarikh || "",
+      jenis_permohonan: record.jenis_permohonan || "",
+      rawStatus: String(record.status || "").trim(),
+      status: mapLiveStatus(record.status)
+    }))
+  };
 }
 
 function buildMockStudentAnnualSummary() {
   const currentYear = getMalaysiaYearV200();
-  const totalOutings = outingRecords.filter((record) => {
+  const historyRecords = outingRecords.filter((record) => {
     const status = record.rawStatus || reverseDisplayStatus(record.status);
     const date = parseFlexibleDate(record.tarikh || record.masa_mohon || record.requestedAt);
     return isRecordForCurrentStudent(record) && status === "SELESAI" && date && date.getFullYear() === currentYear;
-  }).length;
-  return { year: currentYear, total_outings: totalOutings };
+  }).map((record) => ({
+    tarikh: record.tarikh || record.masa_mohon || record.requestedAt || "",
+    jenis_permohonan: record.jenis_permohonan || "",
+    rawStatus: "SELESAI",
+    status: mapLiveStatus("SELESAI")
+  }));
+  return { year: currentYear, total_outings: historyRecords.length, history_records: historyRecords };
 }
 
 function renderStudentAnnualSummary() {
@@ -4644,6 +4666,16 @@ function renderStudentAnnualSummary() {
   const totalOutings = Number(studentAnnualSummary.total_outings || 0);
   els.studentAnnualSummary.innerHTML = `Jumlah Outing ${Number(studentAnnualSummary.year)}: <strong data-rolling-number="${totalOutings}" data-rolling-key="annual">${totalOutings}</strong> kali`;
   animateRollingNumbers(els.studentAnnualSummary, "student-summary");
+}
+
+function renderStudentAnnualHistory() {
+  if (!els.studentRecordsList) {
+    return;
+  }
+  const historyRecords = studentAnnualSummary && !studentAnnualSummary.error && Array.isArray(studentAnnualSummary.history_records)
+    ? studentAnnualSummary.history_records
+    : [];
+  els.studentRecordsList.innerHTML = renderStudentHistoryRecords(historyRecords);
 }
 
 function getMalaysiaYearV200() {
@@ -5656,7 +5688,7 @@ function renderStudent() {
   debugStudentRecords(studentRecords);
   const currentRecord = selectStudentCurrentRecord(studentRecords);
   els.studentCurrentStatus.innerHTML = renderStudentCurrentStatus(currentRecord);
-  els.studentRecordsList.innerHTML = renderStudentHistoryRecords(studentRecords);
+  renderStudentAnnualHistory();
   bindStudentCancellationControls();
   bindStudentHistoryToggles();
   bindStudentReturnSelfieControls();

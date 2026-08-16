@@ -9,10 +9,10 @@ const workerSource = fs.readFileSync(path.join(root, "service-worker.js"), "utf8
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
-const EXPECTED_VERSION = "2.3.1";
-const EXPECTED_ASSET_REVISION = "2.3.1-r1";
+const EXPECTED_VERSION = "2.3.2";
+const EXPECTED_ASSET_REVISION = "2.3.2-r1";
 const EXPECTED_RELEASE_DATE = "2026-08-16";
-const EXPECTED_RELEASE_NOTE = "eOuting v2.3.1 menambah Rekod Outing Saya yang ringkas dengan tarikh, jenis outing dan status semasa/akhir setiap rekod.";
+const EXPECTED_RELEASE_NOTE = "eOuting v2.3.2 menyelaraskan Rekod Outing Saya dengan jumlah outing tahunan menggunakan rekod SELESAI bagi tahun semasa.";
 
 function createWorker(cacheNames = []) {
   const listeners = {};

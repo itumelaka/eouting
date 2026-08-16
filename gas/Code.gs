@@ -3419,15 +3419,23 @@ function getStudentAnnualSummary(payload) {
   }
 
   const year = Number(Utilities.formatDate(new Date(), "Asia/Kuala_Lumpur", "yyyy"));
-  const totalOutings = getRowsAsObjects_(getSheet_(SHEETS.requests))
+  const annualRecords = getRowsAsObjects_(getSheet_(SHEETS.requests))
     .filter((row) => isRecordForStudent_(row, student))
     .filter((row) => String(row.status || "").trim().toUpperCase() === STATUS.done)
-    .filter((row) => isStatsRecordInYear_(row, year))
-    .length;
+    .filter((row) => isStatsRecordInYear_(row, year));
+
+  const historyRecords = annualRecords
+    .map((row) => ({
+      tarikh: normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon),
+      jenis_permohonan: String(row.jenis_permohonan || "").trim(),
+      status: STATUS.done
+    }))
+    .sort((left, right) => String(right.tarikh).localeCompare(String(left.tarikh)));
 
   return {
     year: year,
-    total_outings: totalOutings
+    total_outings: annualRecords.length,
+    history_records: historyRecords
   };
 }
 
@@ -3495,10 +3503,19 @@ function getAdminIndividualStats(payload) {
 function isRecordForStudent_(row, student) {
   const studentId = normalizeText_(student && student.student_id);
   const noMatrik = normalizeText_(student && student.no_matrik);
-  return Boolean(
-    (studentId && normalizeText_(row && row.student_id) === studentId) ||
-    (noMatrik && normalizeText_(row && row.no_matrik) === noMatrik)
-  );
+  const rowStudentId = normalizeText_(row && row.student_id);
+  const rowNoMatrik = normalizeText_(row && row.no_matrik);
+
+  if (rowStudentId && rowNoMatrik) {
+    return Boolean(studentId && noMatrik && rowStudentId === studentId && rowNoMatrik === noMatrik);
+  }
+  if (rowStudentId) {
+    return Boolean(studentId && rowStudentId === studentId);
+  }
+  if (rowNoMatrik) {
+    return Boolean(noMatrik && rowNoMatrik === noMatrik);
+  }
+  return false;
 }
 
 function isStatsRecordInYear_(row, year) {
