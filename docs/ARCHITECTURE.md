@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.2.1** dengan cache frontend `2.2.1-r4`. Production menggunakan GAS Version 43, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Full Node baseline semasa ialah **353/353** pada 14 Ogos 2026.
+Versi repo semasa: **v2.3.2** dengan cache frontend `2.3.2-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Full Node baseline semasa ialah **363/363** pada 16 Ogos 2026.
 
 ## Komponen
 
@@ -125,6 +125,14 @@ nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 
 Jika credential operasi hilang atau salah, request gagal secara terkawal. Frontend tidak fallback kepada GET awam.
 
+`POST getStudentAnnualSummary` mengesahkan Pelajar aktif menggunakan `student_id` + `no_matrik`. Satu set row `SELESAI` bagi tahun semasa menjadi sumber bersama bagi `total_outings` dan `history_records`, jadi kiraan dan senarai tidak boleh menggunakan scope berlainan. Setiap item sejarah hanya mengandungi:
+
+```text
+tarikh | jenis_permohonan | status
+```
+
+Row disusun paling baharu dahulu. Data tujuan, lokasi, kenderaan, approval, Guard, waris dan selfie tidak termasuk dalam response ini.
+
 Action write lain kekal melalui POST:
 
 - `submitRequest`
@@ -147,6 +155,9 @@ Admin action mengesahkan `admin_id` atau `nama_admin` bersama PIN aktif pada set
 ```text
 Pelajar login -> submitRequest -> OUTING_REQUESTS
   -> Telegram permohonan
+Pelajar login/Refresh Status -> POST getTodayRecords -> Status Semasa live/current
+Pelajar login/Refresh Status -> POST getStudentAnnualSummary
+  -> jumlah tahunan + Rekod Outing Saya daripada scope SELESAI tahun semasa yang sama
 Pelajar login -> cancelStudentRequest -> DIBATALKAN_PELAJAR
   -> AUDIT_LOG + satu notifikasi Telegram non-blocking
 Warden login -> POST getTodayRecords -> approve/reject
@@ -239,7 +250,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.2.1-r4` dan query `2.2.1-r4`.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.3.2-r1` dan query `2.3.2-r1`.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

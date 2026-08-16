@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.2.1 menggunakan GAS Web App **Version 40**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.3.2 menggunakan GAS Web App **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp.
 
 ## Tanggungjawab Backend
 
@@ -10,6 +10,7 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - membatalkan permohonan milik Pelajar secara atomic daripada status menunggu atau diluluskan, tanpa memadam rekod;
 - menguatkuasakan approve/reject dan confirm keluar/masuk;
 - menyediakan projection public minimum dan rekod operasi authenticated;
+- menyediakan jumlah serta sejarah minimum authenticated bagi rekod `SELESAI` Pelajar dalam tahun semasa;
 - mengira statistik agregat;
 - menulis `AUDIT_LOG`;
 - menyimpan dan menyediakan satu Notis Banner authenticated melalui Script Properties;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-16 — Student current-status hierarchy dan annual history consistency (v2.3.2)
+
+- `967cfd6` — memindahkan `Status Semasa` Pelajar ke atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan pembatalan/return-selfie yang layak; bahagian bawah dipadatkan kepada Refresh Status, jumlah tahunan dan `Rekod Outing Saya`.
+- `f2f55cc` — menyelaraskan jumlah outing tahunan dan sejarah bawah kepada skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu.
+- Response sejarah tahunan hanya membawa `tarikh`, `jenis_permohonan` dan `status`; tujuan, lokasi, kenderaan, approval, Guard, waris dan data selfie tidak dipulangkan. Semakan ownership Pelajar diperkukuh.
+- **Production:** aplikasi v2.3.2, cache/asset revision `2.3.2-r1`, service worker `eouting-cache-v2.3.2-r1` dan GAS Version 44 live serta disahkan pada 16 Ogos 2026. Smoke test jumlah/sejarah lulus; full Node baseline **363/363**.
+
 ## 2026-08-14 — Approval, status persistence dan time-display production fixes (v2.2.1)
 
 - `868c323` — membezakan paparan dan label Telegram `HEP`/`Warden` daripada prefix authoritative `WARDENS.warden_id`; lifecycle kekal `DILULUSKAN_WARDEN` dan ID tidak dikenali fallback kepada WARDEN.

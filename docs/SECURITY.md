@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan production **v2.2.1 / GAS Version 43**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan production **v2.3.2 / GAS Version 44**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -41,6 +41,8 @@ Rekod operasi menggunakan POST `getTodayRecords` yang berasingan:
 
 Jika credential hilang atau salah, frontend menunjukkan error terkawal. Authenticated flow tidak fallback kepada public GET dan tidak merender data awam seolah-olah data operasi.
 
+Authenticated `getStudentAnnualSummary` mengesahkan Pelajar aktif menggunakan gabungan `student_id` + `no_matrik`. Row `OUTING_REQUESTS` yang mempunyai kedua-dua identifier mesti sepadan pada kedua-duanya; fallback identifier tunggal hanya menyokong row legacy yang memang kehilangan salah satu nilai. Response sejarah tahunan dihadkan kepada `tarikh`, `jenis_permohonan` dan `status`, dan hanya row `SELESAI` tahun semasa yang turut menyumbang kepada `total_outings` dipulangkan. Rekod Pelajar lain serta tujuan, lokasi, kenderaan, approval, Guard, waris dan data selfie tidak dibawa ke frontend.
+
 ## PIN dan Session
 
 PIN ialah basic internal access control, bukan authentication production-grade.
@@ -66,7 +68,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.2.1-r4`; displayed app version ialah v2.2.1.
+- Cache source semasa ialah `eouting-cache-v2.3.2-r1`; displayed app version ialah v2.3.2.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 

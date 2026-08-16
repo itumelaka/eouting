@@ -1,6 +1,6 @@
 # Struktur Database Google Sheets
 
-Google Sheets ialah database dan source of truth eOuting ITU v2.2.1. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
+Google Sheets ialah database dan source of truth eOuting ITU v2.3.2. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
 ## `STUDENTS`
 
@@ -81,6 +81,8 @@ Kolum pembatalan Pelajar:
 Cancellation mengekalkan row asal dan hanya mengemas kini status serta metadata; rekod tidak pernah dipadam. Header ditambah secara additive melalui `ensureHeaders_`, dan lookup/write kekal berdasarkan nama header supaya row lama tanpa metadata pembatalan terus serasi. Action `cancelStudentRequest` menulis audit `CANCEL_STUDENT_REQUEST` selepas transition atomic berjaya.
 
 `lewat` ialah flag operasi dan tidak menggantikan status lifecycle. `tarikh_balik`, `hari_balik` dan `masa_balik_dijangka` digunakan oleh Pulang Bermalam/Cuti Semester. `masa_balik_dijangka` ialah nilai masa sahaja dan dinormalkan kepada `HH:mm` dalam zon `Asia/Kuala_Lumpur` apabila dibaca daripada Sheet; representasi Date epoch 1899 tidak menjadi data API.
+
+`getStudentAnnualSummary` tidak menambah kolum atau sheet. Ia membaca row milik Pelajar yang telah disahkan, memilih hanya `SELESAI` bagi tahun semasa dan menggunakan set yang sama untuk `total_outings` serta `history_records`. Projection sejarah hanya `tarikh`, `jenis_permohonan` dan `status`, disusun paling baharu dahulu.
 
 `OUTING_HUJUNG_MINGGU` hanya menerima tarikh Sabtu atau Ahad, menggunakan tarikh keluar dan balik yang sama, serta masa balik dijangka `22:00`.
 

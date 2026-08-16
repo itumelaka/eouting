@@ -2,7 +2,7 @@
 
 eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Versi repo semasa: **v2.2.1 — Production Verified**.
+Versi repo semasa: **v2.3.2 — Production Verified**.
 
 - Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
 - Backend: Google Apps Script (GAS) Web App
@@ -10,15 +10,17 @@ Versi repo semasa: **v2.2.1 — Production Verified**.
 - Notifikasi: Telegram Bot melalui GAS
 - Repo: [itumelaka/eouting](https://github.com/itumelaka/eouting)
 
-## Status Production v2.2.1
+## Status Production v2.3.2
 
-Frontend production v2.2.1 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
+Frontend production v2.3.2 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Revision aset frontend semasa ialah `2.2.1-r4` dan service worker menggunakan `eouting-cache-v2.2.1-r4`.
+Revision aset frontend semasa ialah `2.3.2-r1` dan service worker menggunakan `eouting-cache-v2.3.2-r1`.
 
-Backend production semasa menggunakan GAS **Version 43**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
+Backend production semasa menggunakan GAS **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
-Fix production 14 Ogos 2026 membezakan paparan kelulusan HEP/Warden daripada prefix `WARDENS.warden_id`, menguatkan persistence status awal menggunakan susunan header Sheet sebenar, menormalkan semua nilai masa sahaja kepada `HH:mm`, dan menyeragamkan helper klasifikasi waktu Bahasa Melayu. Full Node baseline semasa ialah **353/353 lulus**.
+Production yang disahkan pada 16 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Full Node baseline semasa ialah **363/363 lulus**.
+
+`Rekod Outing Saya` menerima hanya `tarikh`, `jenis_permohonan` dan `status` daripada response ringkasan tahunan. Tujuan, lokasi, kenderaan, approval, Guard, waris dan data selfie tidak dihantar. `Status Semasa` di bahagian atas terus menggunakan rekod operasi live/current dan tidak mengambil data daripada sejarah tahunan.
 
 Landing awam menggunakan empat kad kompak dalam grid 2×2 pada desktop/tablet: `Pelajar`, `Warden & HEP`, `Guard` dan `Pemantauan Semasa`. Pada skrin kecil ia menggunakan susunan satu kolum. Akses Admin kekal sebagai control kompak berasingan. Public Statistik telah dibuang; `Pemantauan Semasa` dibuka inline dalam shell landing dan kekal tanpa foto profil.
 
@@ -198,7 +200,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo yang disahkan pada 14 Ogos 2026 ialah **353/353 lulus**. Syntax checks:
+Baseline repo yang disahkan pada 16 Ogos 2026 ialah **363/363 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -239,6 +241,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.2.1 semasa ialah GAS **Version 43**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.2.1-r4`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.3.2 semasa ialah GAS **Version 44**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.3.2-r1`. Rollback segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

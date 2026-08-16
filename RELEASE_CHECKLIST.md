@@ -2,9 +2,18 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (14 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.2.1, menggunakan cache revision `2.2.1-r4`, service worker `eouting-cache-v2.2.1-r4`, GAS Version 43, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (16 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.3.2, menggunakan cache revision `2.3.2-r1`, service worker `eouting-cache-v2.3.2-r1`, GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
 
-## Close-out Production Fixes v2.2.1 — 14 Ogos 2026
+## Close-out Production v2.3.2 — 16 Ogos 2026
+
+- [x] Commit `967cfd6` memindahkan `Status Semasa` ke atas borang dan memadatkan bahagian bawah kepada Refresh Status, jumlah tahunan dan `Rekod Outing Saya`.
+- [x] Commit `f2f55cc` menyelaraskan jumlah outing dan sejarah kepada rekod authenticated `SELESAI` bagi tahun semasa.
+- [x] Response sejarah hanya mengandungi `tarikh`, `jenis_permohonan` dan `status`; ownership Pelajar diperkukuh dan rekod disusun paling baharu dahulu.
+- [x] Frontend v2.3.2, revision `2.3.2-r1`, cache `eouting-cache-v2.3.2-r1` dan GAS Version 44 disahkan production.
+- [x] Smoke test production mengesahkan jumlah tahunan dan sejarah tahunan sepadan.
+- [x] Full Node suite lulus **363/363**.
+
+## Close-out Production Fixes v2.2.1 — 14 Ogos 2026 (sejarah)
 
 - [x] Commit `868c323` membezakan `Diluluskan HEP` dan `Diluluskan Warden` menggunakan prefix authoritative `WARDENS.warden_id`, tanpa status lifecycle atau kolum baharu.
 - [x] Commit `67b494c` mengesahkan status awal, memetakan append mengikut header Sheet sebenar dan membaca semula status persisted; status kosong dipaparkan sebagai `Status Tidak Diketahui`.

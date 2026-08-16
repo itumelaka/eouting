@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.2.1**, cache revision `2.2.1-r4` dan production GAS Version 43.
+Panduan ini merujuk eOuting ITU **v2.3.2**, cache revision `2.3.2-r1` dan production GAS Version 44.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline yang disahkan pada 14 Ogos 2026 ialah **353/353 lulus**.
+Baseline yang disahkan pada 16 Ogos 2026 ialah **363/363 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -124,6 +124,8 @@ Suite utama:
 - `tests/auth-loading-v220.test.js`: loader shared semua role, cleanup success/failure/logout dan reduced-motion.
 - `tests/profile-photo-source-v220.test.js`: action sheet kamera/galeri, shared handler, cancellation/failure cleanup dan pengasingan return-selfie.
 - `tests/student-cancellation.test.js`: kelayakan pending/approved, sebab wajib, ownership dan race safety, metadata/audit, sejarah/permohonan semula, pengecualian queue serta tepat satu Telegram non-blocking.
+- `tests/secure-outing-statistics.test.js`: jumlah dan yearly history menggunakan scope authenticated `SELESAI` yang sama, response minimum, ownership dan newest-first.
+- `tests/student-current-status-layout.test.js`: `Status Semasa` live/current di atas borang, compact yearly history di bawah dan refresh kedua-dua data source.
 - `tests/announcement-banner-v1.test.js`: Admin UI/save, authenticated projection, ticker sentiasa aktif, hover/fokus pause, reduced-motion, public privacy dan cleanup panduan Pelajar.
 - `tests/student-directory-security.test.js`: projection direktori Pelajar dan login backend.
 - `tests/student-login-dropdown-privacy.test.js`: dropdown nama tanpa nombor matrik.
@@ -155,12 +157,12 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## Smoke Test Pelajar
 
-0. Selepas login, sahkan hierarki Announcement Banner → workspace → `ruleNotice` kuning → “Permohonan Pelajar” → borang; ayat panduan pendua tidak wujud.
+0. Selepas login, sahkan `ruleNotice` → identiti → `Status Semasa` → borang → Refresh Status/jumlah tahunan/`Rekod Outing Saya`; ayat panduan pendua tidak wujud.
 1. Pastikan dropdown memaparkan nama dan filter A2/A3 berfungsi.
 2. Pilih pelajar; `student_id` kekal value dalaman.
 3. Masukkan nombor matrik betul dan sahkan login berjaya.
 4. Cuba nombor matrik salah dan sahkan login ditolak.
-5. Hantar permohonan dan semak Rekod Saya.
+5. Hantar permohonan dan semak current/action pada `Status Semasa`; sahkan `Rekod Outing Saya` hanya memaparkan tarikh, jenis dan status bagi rekod `SELESAI` tahun semasa.
 6. Uji `Ingat peranti ini` dan restore session.
 7. Selepas Guard confirm masuk, semak badge `Bukti Selfie Belum Dihantar`.
 8. Uji capture/pilih gambar, preview, ambil semula dan `Hantar Bukti`.
@@ -216,8 +218,8 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## PWA dan Cache
 
-- Semak footer v2.2.1 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.2.1-r4` dan asset query `2.2.1-r4`; displayed app version ialah v2.2.1.
+- Semak footer v2.3.2 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v2.3.2-r1` dan asset query `2.3.2-r1`; displayed app version ialah v2.3.2.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

@@ -1,20 +1,20 @@
 # Project Status eOuting ITU
 
-Status repo semasa: **v2.2.1 — production verified**.
+Status repo semasa: **v2.3.2 — production verified**.
 
-## eOuting v2.2 Production
+## eOuting v2.3 Production
 
-Frontend v2.2.1 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
+Frontend v2.3.2 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **14 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.2.1 dengan GAS Version 43. Displayed version ialah v2.2.1, cache/asset source revision ialah `2.2.1-r4` dan service-worker cache ialah `eouting-cache-v2.2.1-r4`. Production beroperasi normal.
+Verdict semasa pada **16 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.3.2 dengan GAS Version 44. Displayed version ialah v2.3.2, cache/asset source revision ialah `2.3.2-r1` dan service-worker cache ialah `eouting-cache-v2.3.2-r1`. Production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. Hotfix masa permohonan pilihan, paparan role HEP/Warden, persistence status awal, normalisasi masa sahaja dan helper daypart BM telah disahkan pada GAS Version 43. Full Node suite semasa lulus **353/353**.
+`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Full Node suite semasa lulus **363/363**.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.2.1` dan backend production ialah GAS **Version 43**;
+- frontend release ialah `v2.3.2` dan backend production ialah GAS **Version 44**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
@@ -29,8 +29,8 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.2.1`; asset/cache source revision ialah `2.2.1-r4`.
-- Backend GAS production ialah **Version 43** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
+- Metadata displayed frontend/footer/version berada pada `v2.3.2`; asset/cache source revision ialah `2.3.2-r1`.
+- Backend GAS production ialah **Version 44** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -41,6 +41,8 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Warden dan HEP berkongsi role operasi backend `warden`; role paparan diperoleh daripada `WARDENS.warden_id` (`HEP-*` → HEP, `W-*` → WARDEN, unknown → WARDEN) sementara lifecycle kekal `DILULUSKAN_WARDEN`.
 - Jenis `OUTING_BIASA`, `OUTING_HUJUNG_MINGGU`, `KECEMASAN`, `PULANG_BERMALAM`, `CUTI_SEMESTER`.
 - Pelajar login dengan `student_id` dalaman + nombor matrik yang ditaip.
+- `Status Semasa` Pelajar menggunakan rekod operasi live/current dan berada di atas borang; pembatalan serta return-selfie kekal di situ apabila layak.
+- `Rekod Outing Saya` menggunakan response ringkasan tahunan authenticated yang sama dengan jumlah outing: hanya rekod `SELESAI` tahun semasa, tiga medan minimum dan susunan paling baharu dahulu.
 - Warden approve/reject dan Guard confirm keluar/masuk menggunakan POST authenticated.
 - Submission Pelajar mempunyai frontend in-flight guard dan atomic backend active-check + append; Warden/Guard actions mempunyai loading protection terhadap duplicate click.
 - Status awal submission disahkan, ditulis mengikut susunan header Sheet sebenar dan dibaca semula; blank authoritative status dipaparkan sebagai `Status Tidak Diketahui`.
@@ -63,7 +65,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.2.1; asset query dan cache source konsisten pada `2.2.1-r4`.
+- Displayed version/footer ialah v2.3.2; asset query dan cache source konsisten pada `2.3.2-r1`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -125,7 +127,8 @@ Nilai backend `KELUAR` tidak berubah.
 - **12 Ogos 2026:** duplicate/action loading, dynamic custom payload dan KLINIK config fixes, Admin refresh restore, global auth loader serta foto profil camera/gallery disahkan pada cache r5 (rekod sejarah sebelum cancellation).
 - **12 Ogos 2026:** Student cancellation dideploy dan disahkan live untuk pending/approved, mandatory reason, status `DIBATALKAN_PELAJAR`, history/re-request, queue Guard/Warden dan Telegram. Cache r6 serta GAS Version 39 aktif; production beroperasi normal.
 - **14 Ogos 2026:** hotfix `39265f1` dideploy sebagai v2.2.1 / cache r1 / GAS Version 40. Blank application open time disahkan kekal kosong dan isu permohonan pagi `PULANG_BERMALAM` telah diselesaikan; baseline **336/336** lulus.
-- **14 Ogos 2026:** commits `868c323`, `67b494c` dan `7d4ad23` menutup paparan HEP/Warden, persistence status/header-order serta normalisasi masa/daypart. Production semasa menggunakan v2.2.1 / cache r4 / GAS Version 43 dengan baseline **353/353**.
+- **14 Ogos 2026:** commits `868c323`, `67b494c` dan `7d4ad23` menutup paparan HEP/Warden, persistence status/header-order serta normalisasi masa/daypart. Close-out tersebut menggunakan v2.2.1 / cache r4 / GAS Version 43 dengan baseline **353/353**.
+- **16 Ogos 2026:** commit `967cfd6` menutup hierarki `Status Semasa` dan compact history; commit `f2f55cc` menyelaraskan jumlah/sejarah tahunan. Production v2.3.2 / cache `2.3.2-r1` / GAS Version 44 disahkan melalui smoke test dengan baseline **363/363**.
 
 ## Production Validation v1.7.0
 

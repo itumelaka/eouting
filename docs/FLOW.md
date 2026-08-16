@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.2.1**, cache revision `2.2.1-r4`, GAS Version 43 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready), dengan full Node baseline **353/353** pada 14 Ogos 2026.
+Dokumen ini menerangkan flow production semasa **v2.3.2**, cache revision `2.3.2-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready), dengan full Node baseline **363/363** pada 16 Ogos 2026.
 
 ## Backend Config API v2.0
 
@@ -198,6 +198,8 @@ Guard login nama + PIN
      -> BELUM_HANTAR jika bukti diwajibkan
      -> TIDAK_DIPERLUKAN jika config-driven require_selfie=false
 Pelajar refresh rekod sendiri
+  -> POST getTodayRecords untuk Status Semasa live/current
+  -> POST getStudentAnnualSummary untuk jumlah + sejarah SELESAI tahun semasa
   -> lihat “Ambil Selfie & Lapor Pulang”
   -> kamera depan / pilih gambar -> preview -> ambil semula atau hantar
   -> resize kira-kira 1280px + JPEG compression
@@ -213,9 +215,11 @@ Field masa sahaja dinormalkan di boundary GAS kepada `HH:mm` dalam `Asia/Kuala_L
 
 Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown menggunakan `student_id` sebagai value dalaman dan memaparkan nama. Nombor matrik ditaip berasingan dan backend memadankan kedua-dua credential dengan row Google Sheets.
 
-Pelajar hanya menerima rekod sendiri melalui authenticated POST `getTodayRecords`. Active request menghalang permohonan baharu sehingga selesai, ditolak atau dibatalkan. Butang `Batal Permohonan` hanya hadir untuk rekod sendiri yang pending/approved.
+Pelajar hanya menerima rekod sendiri melalui authenticated POST. `getTodayRecords` membekalkan rekod operasi live/current untuk `Status Semasa`; active request menghalang permohonan baharu sehingga selesai, ditolak atau dibatalkan. Butang `Batal Permohonan` hanya hadir untuk rekod sendiri yang pending/approved.
 
-Hierarki workspace Pelajar ialah Announcement Banner, navigasi/workspace, `ruleNotice` kuning, tajuk “Permohonan Pelajar” dan borang outing. Banner ialah notis operasi semasa; `ruleNotice` kekal authoritative untuk panduan peraturan kontekstual. Ayat panduan outing pendua di bawah tajuk telah dibuang tanpa mengubah borang.
+Hierarki workspace Pelajar ialah Announcement Banner, navigasi, `ruleNotice`, identiti, `Status Semasa`, borang outing, kemudian bahagian bawah Refresh Status, jumlah tahunan dan `Rekod Outing Saya`. `Status Semasa` di atas borang ialah kawasan authoritative untuk rekod aktif/actionable serta tindakan pembatalan atau return-selfie apabila layak. Borang dan logic pemilihan current record tidak berubah.
+
+`Rekod Outing Saya` menggunakan `history_records` daripada authenticated `getStudentAnnualSummary`, bukan dataset hari ini. Backend membina `total_outings` dan `history_records` daripada set `SELESAI` tahun semasa yang sama; pending, approved, `KELUAR`, rejected dan cancelled tidak termasuk kerana ia tidak dikira oleh jumlah tahunan. Setiap baris hanya menunjukkan tarikh, jenis outing dan status ringkas, paling baharu dahulu. Initial load dan butang Refresh Status memuat semula current/live status, jumlah tahunan dan sejarah tahunan.
 
 Pelajar boleh upload/ganti foto profil sendiri. Tindakan membuka action sheet `Ambil Foto`, `Pilih dari Galeri` dan `Batal`. Kamera menggunakan `capture="user"`; galeri tidak mempunyai capture. Kedua-duanya berkongsi handler validation, crop 3:4, compression, upload, preview dan cache yang sama. Escape/backdrop/Batal menutup chooser dan memulangkan fokus. Return-selfie tidak berkongsi input atau handler ini.
 

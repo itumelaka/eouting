@@ -1,10 +1,19 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas production fixes **v2.2.1 / GAS Version 43 / cache r4** pada 14 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa selepas production close-out **v2.3.2 / GAS Version 44 / cache `2.3.2-r1`** pada 16 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
-### eOuting v2.2.1 Production Close-out
+### eOuting v2.3.2 Production Close-out
+
+- [x] `Status Semasa` dipindahkan ke atas borang sebagai kawasan authoritative bagi current record, pembatalan dan return-selfie yang layak.
+- [x] Bahagian bawah Pelajar dipadatkan kepada Refresh Status, jumlah tahunan dan `Rekod Outing Saya`.
+- [x] Commit `967cfd6` menutup compact history; commit `f2f55cc` menyelaraskan jumlah/sejarah kepada scope authenticated `SELESAI` tahun semasa.
+- [x] Response sejarah minimum hanya `tarikh`, `jenis_permohonan` dan `status`, dengan ownership diperkukuh dan newest-first.
+- [x] Frontend v2.3.2 / cache `2.3.2-r1` / GAS Version 44 serta smoke test jumlah-sejarah disahkan production.
+- [x] Full Node suite semasa **363/363** pada 16 Ogos 2026.
+
+### eOuting v2.2.1 Production Close-out (sejarah)
 
 - [x] Tujuh modul Admin inline: Pemantauan, Statistik, Rekod Master, Warden/HEP/Guard, Tetapan Pelajar, Tetapan Outing dan Notis Banner.
 - [x] Pengurusan staff, pelajar dan outing type serta Rekod Master search/filter/pagination.
@@ -12,13 +21,13 @@ Senarai kerja semasa selepas production fixes **v2.2.1 / GAS Version 43 / cache 
 - [x] Two-tier photo delivery: unique-ID thumbnail batch, server-side Drive thumbnail, one-student full preview, cache sesi, duplicate suppression dan safe failure.
 - [x] Thumbnail production disahkan untuk Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar; Public Pemantauan kekal photo-free.
 - [x] Statistik individu Admin, annual count Pelajar, rolling KPI/reduced-motion dan scoped Enter submission.
-- [x] GAS Version 43 ialah baseline production semasa; config-driven active, readiness hijau, Notis Banner V1 dan Student cancellation live.
-- [x] Cache/asset source revision `2.2.1-r4` dengan displayed app version v2.2.1.
+- [x] GAS Version 43 ialah baseline production pada close-out 14 Ogos 2026; config-driven active, readiness hijau, Notis Banner V1 dan Student cancellation live.
+- [x] Cache/asset source revision `2.2.1-r4` dengan displayed app version v2.2.1 pada close-out tersebut.
 - [x] Setiap banner aktif menggunakan ticker kiri berterusan; hover/focus/touch pause dan reduced-motion kekal statik.
 - [x] Controlled activation: submission, Warden approval, early Guard rejection dan safe policy feedback disahkan.
 - [x] Notis Banner V1 live: satu notis Script Properties, Admin edit/aktif/penting, viewer authenticated, safe text, audit dan reduced-motion.
 - [x] Deploy Notis Banner sebagai GAS Version 37 dan sahkan Admin UI/save, Normal banner, authenticated display, timestamp serta public privacy.
-- [x] Full Node suite semasa **353/353** pada 14 Ogos 2026.
+- [x] Full Node suite **353/353** pada 14 Ogos 2026.
 - [x] Buang ayat panduan outing pendua di bawah “Permohonan Pelajar”; kekalkan Announcement Banner, `ruleNotice` dan borang.
 - [x] Atomic duplicate outing protection: frontend in-flight state serta backend `ScriptLock` untuk active-check + append.
 - [x] In-flight loading Warden approve/reject dan Guard confirm-out/confirm-in.
