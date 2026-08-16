@@ -1332,6 +1332,85 @@ textarea {
   gap: 8px;
 }
 
+.student-outing-history {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  min-width: 0;
+}
+
+.student-history-refresh,
+.student-refresh-controls {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.student-refresh-controls {
+  margin: 0 !important;
+}
+
+.student-history-refresh .secondary-action {
+  justify-self: start;
+  min-width: min(100%, 180px);
+}
+
+.student-outing-history .student-annual-summary {
+  justify-self: start;
+  margin: 0;
+}
+
+.student-history-compact-list {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(8, 36, 92, 0.1);
+  border-radius: 14px;
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.student-history-compact-row {
+  align-items: center;
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(140px, 1.2fr) minmax(120px, 0.8fr);
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.student-history-compact-row + .student-history-compact-row {
+  border-top: 1px solid rgba(8, 36, 92, 0.09);
+}
+
+.student-history-compact-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.student-history-date,
+.student-history-type {
+  color: var(--deep-navy);
+  font-size: 0.9rem;
+}
+
+.student-history-type {
+  font-weight: 800;
+}
+
+.student-history-status {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.student-history-compact-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+  padding: 10px 12px;
+}
+
 .history-card {
   background: linear-gradient(145deg, #ffffff, #f1f5fb);
   border: 1px solid rgba(8, 36, 92, 0.1);
@@ -4670,6 +4749,21 @@ button.profile-photo-frame {
 }
 
 @media (max-width: 520px) {
+  .student-history-refresh .secondary-action {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .student-history-compact-row {
+    gap: 3px;
+    grid-template-columns: 1fr;
+    padding: 10px 11px;
+  }
+
+  .student-history-status {
+    text-align: left;
+  }
+
   .student-current-status-section {
     border-left-width: 5px;
     margin: 10px 0 16px;

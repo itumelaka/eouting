@@ -1,5 +1,5 @@
 {
-  "version": "2.3.0",
+  "version": "2.3.1",
   "releasedAt": "2026-08-16",
-  "notes": "eOuting v2.3.0 memaparkan Status Semasa pelajar di atas borang bersama tindakan batal permohonan atau hantar bukti selfie yang layak."
+  "notes": "eOuting v2.3.1 menambah Rekod Outing Saya yang ringkas dengan tarikh, jenis outing dan status semasa/akhir setiap rekod."
 }

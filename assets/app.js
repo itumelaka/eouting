@@ -1,4 +1,4 @@
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.3.1";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200 = "https://script.google.com/macros/s/AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1/exec";
 const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
@@ -378,6 +378,7 @@ const els = {
   emergencyNoteInput: document.querySelector("#emergencyNoteInput"),
   studentMessage: document.querySelector("#studentMessage"),
   studentCurrentStatus: document.querySelector("#studentCurrentStatus"),
+  studentHistoryRefreshControls: document.querySelector("#studentHistoryRefreshControls"),
   studentAnnualSummary: document.querySelector("#studentAnnualSummary"),
   studentRecordsList: document.querySelector("#studentRecordsList"),
   studentCancelModal: document.querySelector("#studentCancelModal"),
@@ -4541,6 +4542,7 @@ function ensureStudentRefreshControls() {
   }
 
   const controls = document.createElement("div");
+  controls.className = "student-refresh-controls";
   controls.style.display = "grid";
   controls.style.gap = "6px";
   controls.style.margin = "10px 0";
@@ -4558,7 +4560,11 @@ function ensureStudentRefreshControls() {
 
   controls.appendChild(els.studentRefreshButton);
   controls.appendChild(els.studentLastUpdated);
-  els.studentRecordsList.parentNode.insertBefore(controls, els.studentRecordsList);
+  if (els.studentHistoryRefreshControls) {
+    els.studentHistoryRefreshControls.appendChild(controls);
+  } else {
+    els.studentRecordsList.parentNode.insertBefore(controls, els.studentRecordsList);
+  }
 }
 
 async function refreshStudentLiveRecords(includeAnnualSummary = false) {
@@ -5650,7 +5656,7 @@ function renderStudent() {
   debugStudentRecords(studentRecords);
   const currentRecord = selectStudentCurrentRecord(studentRecords);
   els.studentCurrentStatus.innerHTML = renderStudentCurrentStatus(currentRecord);
-  els.studentRecordsList.innerHTML = renderStudentHistoryRecords(studentRecords, currentRecord);
+  els.studentRecordsList.innerHTML = renderStudentHistoryRecords(studentRecords);
   bindStudentCancellationControls();
   bindStudentHistoryToggles();
   bindStudentReturnSelfieControls();
@@ -5675,12 +5681,14 @@ function renderStudentCurrentStatus(currentRecord) {
     : `<p class="student-current-empty">Tiada permohonan aktif.</p>`;
 }
 
-function renderStudentHistoryRecords(studentRecords, currentRecord) {
+function renderStudentHistoryRecords(studentRecords) {
   const historyRecords = (Array.isArray(studentRecords) ? studentRecords : [])
-    .filter((record) => record !== currentRecord && isStudentHistoryRecord(record));
+    .filter(isStudentHistoryRecord)
+    .slice()
+    .sort((recordA, recordB) => studentHistorySortTimestamp(recordB) - studentHistorySortTimestamp(recordA));
   return historyRecords.length
-    ? historyRecords.map(studentHistoryCard).join("")
-    : emptyState("Belum ada rekod sejarah.");
+    ? historyRecords.map(studentHistoryRow).join("")
+    : `<p class="student-history-compact-empty">Belum ada rekod outing.</p>`;
 }
 
 function isActiveStudentRecord(record) {
@@ -5690,7 +5698,45 @@ function isActiveStudentRecord(record) {
 
 function isStudentHistoryRecord(record) {
   const status = record.rawStatus || reverseDisplayStatus(record.status);
-  return status === "SELESAI" || status === "DITOLAK_WARDEN" || status === "DIBATALKAN_PELAJAR";
+  return [
+    "MENUNGGU_KELULUSAN",
+    "DILULUSKAN_WARDEN",
+    "KELUAR",
+    "SELESAI",
+    "DITOLAK_WARDEN",
+    "DIBATALKAN_PELAJAR"
+  ].includes(status);
+}
+
+function studentHistoryStatusLabel(record) {
+  const status = record && (record.rawStatus || reverseDisplayStatus(record.status));
+  return {
+    MENUNGGU_KELULUSAN: "Menunggu kelulusan",
+    DILULUSKAN_WARDEN: "Diluluskan",
+    KELUAR: "Masih di luar",
+    SELESAI: "Selesai",
+    DITOLAK_WARDEN: "Ditolak",
+    DIBATALKAN_PELAJAR: "Dibatalkan"
+  }[status] || "Status tidak diketahui";
+}
+
+function studentHistoryDateValue(record) {
+  return record && (record.tarikh || record.masa_mohon || record.requestedAt || "");
+}
+
+function studentHistorySortTimestamp(record) {
+  const date = parseFlexibleDate(studentHistoryDateValue(record));
+  return date ? date.getTime() : 0;
+}
+
+function studentHistoryRow(record) {
+  return `
+    <article class="student-history-compact-row" role="listitem">
+      <span class="student-history-date">${escapeHtml(formatDisplayDate(studentHistoryDateValue(record)))}</span>
+      <span class="student-history-type">${escapeHtml(requestTypeLabel(record.jenis_permohonan))}</span>
+      <span class="student-history-status">${escapeHtml(studentHistoryStatusLabel(record))}</span>
+    </article>
+  `;
 }
 
 function studentHistoryCard(record) {

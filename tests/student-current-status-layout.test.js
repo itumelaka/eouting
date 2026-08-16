@@ -41,6 +41,15 @@ function statusContext() {
     isRecordForCurrentStudent: () => true,
     escapeHtml: String,
     formatDisplayDateTime: String,
+    formatDisplayDate: (value) => ({
+      "2026-08-12": "12 Ogos 2026",
+      "2026-08-10": "10 Ogos 2026",
+      "2026-08-09": "9 Ogos 2026",
+      "2026-08-08": "8 Ogos 2026",
+      "2026-08-07": "7 Ogos 2026",
+      "2026-08-06": "6 Ogos 2026"
+    }[value] || "-"),
+    parseFlexibleDate: (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00Z`) : null,
     requestTypeLabel: (value) => value || "-",
     emergencyDetailHtml: () => "",
     approvalActorLabel: () => "Diluluskan Warden",
@@ -61,9 +70,12 @@ function statusContext() {
     "selectStudentCurrentRecord",
     "renderStudentCurrentStatus",
     "isStudentHistoryRecord",
+    "studentHistoryStatusLabel",
+    "studentHistoryDateValue",
+    "studentHistorySortTimestamp",
+    "studentHistoryRow",
     "renderStudentHistoryRecords"
   ].forEach((name) => vm.runInContext(extractFunction(name), context));
-  context.studentHistoryCard = (record) => `<article data-history="${record.request_id}"></article>`;
   context.emptyState = (message) => `<p class="empty-state">${message}</p>`;
   return context;
 }
@@ -82,7 +94,7 @@ test("Student hierarchy places identity and Status Semasa above the request form
   const identity = indexSource.indexOf('class="identity-panel"');
   const current = indexSource.indexOf('id="studentCurrentStatus"');
   const form = indexSource.indexOf('id="requestForm"');
-  const historyHeading = indexSource.indexOf("Rekod Saya");
+  const historyHeading = indexSource.indexOf("Rekod Outing Saya");
   const history = indexSource.indexOf('id="studentRecordsList"');
   assert.ok(identity >= 0 && identity < current);
   assert.ok(current < form);
@@ -130,7 +142,7 @@ test("top current card reuses cancellation and eligible return-selfie actions", 
   assert.match(bindingSource, /findStudentReturnSelfiePanel/);
 });
 
-test("Rekod Saya excludes the selected actionable record and retains historical outcomes", () => {
+test("Rekod Outing Saya includes all lifecycle summaries without duplicating detailed actions", () => {
   const context = statusContext();
   const actionable = record("ACTIONABLE", "SELESAI", {
     masa_masuk: "2026-08-16 22:00:00",
@@ -142,15 +154,66 @@ test("Rekod Saya excludes the selected actionable record and retains historical 
     selfie_status: "SUDAH_HANTAR"
   });
   const cancelled = record("CANCELLED", "DIBATALKAN_PELAJAR");
-  const html = context.renderStudentHistoryRecords(
-    [actionable, rejected, completed, cancelled],
-    actionable
-  );
+  const html = context.renderStudentHistoryRecords([actionable, rejected, completed, cancelled]);
 
-  assert.doesNotMatch(html, /ACTIONABLE/);
-  assert.match(html, /REJECTED/);
-  assert.match(html, /COMPLETED/);
-  assert.match(html, /CANCELLED/);
+  assert.match(html, /Selesai/);
+  assert.match(html, /Ditolak/);
+  assert.match(html, /Dibatalkan/);
+  assert.doesNotMatch(html, /data-student-cancel|data-selfie-submit|button|Lihat Butiran/);
+});
+
+test("compact history maps every lifecycle status to its concise Student label", () => {
+  const context = statusContext();
+  const expected = [
+    ["MENUNGGU_KELULUSAN", "Menunggu kelulusan"],
+    ["DILULUSKAN_WARDEN", "Diluluskan"],
+    ["KELUAR", "Masih di luar"],
+    ["SELESAI", "Selesai"],
+    ["DITOLAK_WARDEN", "Ditolak"],
+    ["DIBATALKAN_PELAJAR", "Dibatalkan"]
+  ];
+  expected.forEach(([status, label], index) => {
+    const item = record(`R-${index}`, status, { tarikh: "2026-08-12" });
+    assert.equal(context.studentHistoryStatusLabel(item), label);
+    assert.match(context.renderStudentHistoryRecords([item]), new RegExp(label));
+  });
+});
+
+test("each compact row contains only Malay date, outing type and concise status", () => {
+  const context = statusContext();
+  const html = context.studentHistoryRow(record("PRIVATE", "KELUAR", {
+    tarikh: "2026-08-12",
+    tujuan: "Butiran tujuan rahsia",
+    lokasi: "Lokasi rahsia",
+    jenis_kenderaan: "Kenderaan rahsia",
+    catatan: "Catatan rahsia",
+    warden_approve_by: "Nama Warden",
+    guard_keluar_by: "Nama Guard",
+    selfie_status: "BELUM_HANTAR"
+  }));
+  assert.match(html, /12 Ogos 2026/);
+  assert.match(html, /OUTING_BIASA/);
+  assert.match(html, /Masih di luar/);
+  assert.doesNotMatch(html, /PRIVATE|rahsia|Warden|Guard|BELUM_HANTAR|button|record-actions|return-selfie/);
+  assert.equal((html.match(/<span/g) || []).length, 3);
+});
+
+test("compact history sorts newest outing date first and keeps refresh plus annual count visible", () => {
+  const context = statusContext();
+  const html = context.renderStudentHistoryRecords([
+    record("OLD", "SELESAI", { tarikh: "2026-08-08" }),
+    record("NEW", "KELUAR", { tarikh: "2026-08-12" }),
+    record("MIDDLE", "DILULUSKAN_WARDEN", { tarikh: "2026-08-10" })
+  ]);
+  assert.ok(html.indexOf("12 Ogos 2026") < html.indexOf("10 Ogos 2026"));
+  assert.ok(html.indexOf("10 Ogos 2026") < html.indexOf("8 Ogos 2026"));
+
+  const refresh = indexSource.indexOf('id="studentHistoryRefreshControls"');
+  const annual = indexSource.indexOf('id="studentAnnualSummary"');
+  const heading = indexSource.indexOf('id="studentOutingHistoryTitle">Rekod Outing Saya');
+  assert.ok(refresh >= 0 && refresh < annual && annual < heading);
+  assert.match(appSource, /textContent = "Refresh Status"/);
+  assert.match(appSource, /Jumlah Outing \$\{Number\(studentAnnualSummary\.year\)\}/);
 });
 
 test("no current record uses a compact top empty state", () => {

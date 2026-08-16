@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.3.0-r1">
+    <link rel="stylesheet" href="assets/style.css?v=2.3.1-r1">
   </head>
   <body>
     <header class="app-header">
@@ -281,11 +281,14 @@
           <button class="primary-action" type="submit">Hantar Permohonan</button>
           <p class="form-message" id="studentMessage"></p>
         </form>
-        <div class="student-record-heading student-record-summary-heading">
-          <h3 class="list-title">Rekod Saya</h3>
+        <section class="student-outing-history" aria-labelledby="studentOutingHistoryTitle">
+          <div class="student-history-refresh" id="studentHistoryRefreshControls"></div>
           <p class="student-annual-summary" id="studentAnnualSummary" aria-live="polite">Jumlah Outing —: —</p>
-        </div>
-        <div class="record-list" id="studentRecordsList"></div>
+          <div class="student-record-heading">
+            <h3 class="list-title" id="studentOutingHistoryTitle">Rekod Outing Saya</h3>
+          </div>
+          <div class="student-history-compact-list" id="studentRecordsList" role="list"></div>
+        </section>
         </section>
 
         <section class="tab-panel" id="warden" aria-labelledby="tab-warden">
@@ -734,7 +737,7 @@
       </section>
 
       <footer class="app-footer">
-      <span id="appVersionText">eOuting ITU • v2.3.0</span>
+      <span id="appVersionText">eOuting ITU • v2.3.1</span>
         <span class="beta-api-indicator" id="betaApiIndicator" hidden>BETA API</span>
       </footer>
     </main>
@@ -784,6 +787,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.3.0-r1"></script>
+    <script src="assets/app.js?v=2.3.1-r1"></script>
   </body>
 </html>
