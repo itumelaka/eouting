@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.2.1-r4">
+    <link rel="stylesheet" href="assets/style.css?v=2.3.0-r1">
   </head>
   <body>
     <header class="app-header">
@@ -167,35 +167,45 @@
         <section class="notice" id="ruleNotice"></section>
 
         <section class="tab-panel active" id="pelajar" aria-labelledby="tab-pelajar">
-        <div class="section-heading">
+        <div class="identity-panel">
+          <div class="student-identity-copy">
+            <div id="studentIdentityProfilePhoto" aria-label="Foto profil pelajar pada identiti"></div>
+            <div>
+              <span>Pelajar</span>
+              <strong id="loggedStudentName">-</strong>
+              <small id="loggedStudentMeta">-</small>
+            </div>
+          </div>
+          <div class="student-profile-photo-panel" id="studentProfilePhotoPanel">
+            <div id="studentProfilePhotoPreview" aria-label="Foto profil pelajar"></div>
+            <div class="student-profile-photo-copy">
+              <strong id="studentProfilePhotoTitle">Tiada Foto Profil</strong>
+              <small id="studentProfilePhotoUpdated"></small>
+              <button class="secondary-action student-profile-photo-picker" id="studentProfilePhotoPicker" type="button">Tambah Foto</button>
+              <input id="studentProfilePhotoCameraInput" class="profile-photo-input" type="file"
+                accept="image/*" capture="user" aria-label="Ambil foto profil">
+              <input id="studentProfilePhotoGalleryInput" class="profile-photo-input" type="file"
+                accept="image/*" aria-label="Pilih foto profil dari galeri">
+              <small class="profile-photo-guidance">Gunakan gambar muka yang jelas seperti gambar ukuran pasport.</small>
+              <p class="form-message student-profile-photo-message" id="studentProfilePhotoMessage" aria-live="polite"></p>
+            </div>
+          </div>
+        </div>
+
+        <section class="student-current-status-section" aria-labelledby="studentCurrentStatusTitle">
+          <div class="student-current-status-heading">
+            <span class="student-current-status-kicker">Status Pelajar</span>
+            <h2 id="studentCurrentStatusTitle">Status Semasa</h2>
+            <p>Semak status terkini dan tindakan yang perlu diselesaikan.</p>
+          </div>
+          <div id="studentCurrentStatus" aria-live="polite"></div>
+        </section>
+
+        <div class="section-heading student-request-heading">
           <h2>Permohonan Pelajar</h2>
         </div>
 
         <form class="form-card" id="requestForm">
-          <div class="identity-panel">
-            <div class="student-identity-copy">
-              <div id="studentIdentityProfilePhoto" aria-label="Foto profil pelajar pada identiti"></div>
-              <div>
-                <span>Pelajar</span>
-                <strong id="loggedStudentName">-</strong>
-                <small id="loggedStudentMeta">-</small>
-              </div>
-            </div>
-            <div class="student-profile-photo-panel" id="studentProfilePhotoPanel">
-              <div id="studentProfilePhotoPreview" aria-label="Foto profil pelajar"></div>
-              <div class="student-profile-photo-copy">
-                <strong id="studentProfilePhotoTitle">Tiada Foto Profil</strong>
-                <small id="studentProfilePhotoUpdated"></small>
-                <button class="secondary-action student-profile-photo-picker" id="studentProfilePhotoPicker" type="button">Tambah Foto</button>
-                <input id="studentProfilePhotoCameraInput" class="profile-photo-input" type="file"
-                  accept="image/*" capture="user" aria-label="Ambil foto profil">
-                <input id="studentProfilePhotoGalleryInput" class="profile-photo-input" type="file"
-                  accept="image/*" aria-label="Pilih foto profil dari galeri">
-                <small class="profile-photo-guidance">Gunakan gambar muka yang jelas seperti gambar ukuran pasport.</small>
-                <p class="form-message student-profile-photo-message" id="studentProfilePhotoMessage" aria-live="polite"></p>
-              </div>
-            </div>
-          </div>
 
           <label for="requestTypeSelect">Jenis Permohonan</label>
           <select id="requestTypeSelect" required>
@@ -724,7 +734,7 @@
       </section>
 
       <footer class="app-footer">
-      <span id="appVersionText">eOuting ITU • v2.2.1</span>
+      <span id="appVersionText">eOuting ITU • v2.3.0</span>
         <span class="beta-api-indicator" id="betaApiIndicator" hidden>BETA API</span>
       </footer>
     </main>
@@ -774,6 +784,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.2.1-r4"></script>
+    <script src="assets/app.js?v=2.3.0-r1"></script>
   </body>
 </html>

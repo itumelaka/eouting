@@ -1,4 +1,4 @@
-const APP_VERSION = "2.2.1";
+const APP_VERSION = "2.3.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec";
 const GITHUB_PAGES_BETA_GAS_WEB_APP_URL_V200 = "https://script.google.com/macros/s/AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1/exec";
 const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
@@ -377,6 +377,7 @@ const els = {
   guardianRelationSelect: document.querySelector("#guardianRelationSelect"),
   emergencyNoteInput: document.querySelector("#emergencyNoteInput"),
   studentMessage: document.querySelector("#studentMessage"),
+  studentCurrentStatus: document.querySelector("#studentCurrentStatus"),
   studentAnnualSummary: document.querySelector("#studentAnnualSummary"),
   studentRecordsList: document.querySelector("#studentRecordsList"),
   studentCancelModal: document.querySelector("#studentCancelModal"),
@@ -5466,9 +5467,10 @@ function studentStatusCard(record) {
   const cancelAction = canStudentCancelRequest(record)
     ? `<div class="record-actions student-cancel-card-actions"><button class="danger-action" type="button" data-student-cancel="${escapeHtml(getRecordId(record))}">Batal Permohonan</button></div>`
     : "";
+  const selfieProof = returnSelfieProofHtml(record);
 
   return `
-    <article class="record-card">
+    <article class="record-card student-current-card" data-student-current-record="${escapeHtml(getRecordId(record))}">
       <div class="record-top">
         <div>
           <h3>${escapeHtml(getRecordId(record))}</h3>
@@ -5497,6 +5499,7 @@ function studentStatusCard(record) {
         <span>Mohon: ${escapeHtml(formatDisplayDateTime(record.masa_mohon || record.requestedAt))}</span>
         <span>Status: ${escapeHtml(statusInfo.badge)}</span>
       </div>
+      ${selfieProof}
       ${cancelAction}
     </article>
   `;
@@ -5645,38 +5648,39 @@ function renderStudent() {
 
   const studentRecords = outingRecords.filter(isRecordForCurrentStudent);
   debugStudentRecords(studentRecords);
-  els.studentRecordsList.innerHTML = renderStudentRecordSections(studentRecords);
+  const currentRecord = selectStudentCurrentRecord(studentRecords);
+  els.studentCurrentStatus.innerHTML = renderStudentCurrentStatus(currentRecord);
+  els.studentRecordsList.innerHTML = renderStudentHistoryRecords(studentRecords, currentRecord);
   bindStudentCancellationControls();
   bindStudentHistoryToggles();
   bindStudentReturnSelfieControls();
   updateStudentSubmitState();
 }
 
-function renderStudentRecordSections(studentRecords) {
-  const activeRecords = studentRecords.filter(isActiveStudentRecord);
-  const historyRecords = studentRecords.filter(isStudentHistoryRecord);
-  const activeHtml = activeRecords.length
-    ? activeRecords.map(studentStatusCard).join("")
-    : emptyState("Tiada permohonan aktif.");
-  const historyHtml = historyRecords.length
-    ? historyRecords.map(studentHistoryCard).join("")
-    : "";
+function selectStudentCurrentRecord(studentRecords) {
+  const records = Array.isArray(studentRecords) ? studentRecords : [];
+  const statusPriority = ["KELUAR", "DILULUSKAN_WARDEN", "MENUNGGU_KELULUSAN"];
+  for (const priorityStatus of statusPriority) {
+    const match = records.find((record) => (
+      (record.rawStatus || reverseDisplayStatus(record.status)) === priorityStatus
+    ));
+    if (match) return match;
+  }
+  return records.find(isReturnSelfieEligible) || null;
+}
 
-  return `
-    <section class="student-record-section">
-      <div class="student-record-heading">
-        <h3>Rekod Aktif</h3>
-      </div>
-      <div class="record-list">${activeHtml}</div>
-    </section>
-    <section class="student-record-section student-history-section">
-      <div class="student-record-heading">
-        <h3>Sejarah Hari Ini</h3>
-        <p>Rekod selesai atau ditolak untuk rujukan hari ini.</p>
-      </div>
-      ${historyHtml ? `<div class="record-list student-history-list">${historyHtml}</div>` : ""}
-    </section>
-  `;
+function renderStudentCurrentStatus(currentRecord) {
+  return currentRecord
+    ? studentStatusCard(currentRecord)
+    : `<p class="student-current-empty">Tiada permohonan aktif.</p>`;
+}
+
+function renderStudentHistoryRecords(studentRecords, currentRecord) {
+  const historyRecords = (Array.isArray(studentRecords) ? studentRecords : [])
+    .filter((record) => record !== currentRecord && isStudentHistoryRecord(record));
+  return historyRecords.length
+    ? historyRecords.map(studentHistoryCard).join("")
+    : emptyState("Belum ada rekod sejarah.");
 }
 
 function isActiveStudentRecord(record) {
@@ -5846,8 +5850,8 @@ async function submitStudentCancellation(event) {
 }
 
 function bindStudentCancellationControls() {
-  if (!els.studentRecordsList) return;
-  els.studentRecordsList.querySelectorAll("[data-student-cancel]").forEach((button) => {
+  if (!els.studentCurrentStatus) return;
+  els.studentCurrentStatus.querySelectorAll("[data-student-cancel]").forEach((button) => {
     button.addEventListener("click", () => openStudentCancellationDialog(button.dataset.studentCancel, button));
   });
   if (!els.studentCancelModal || els.studentCancelModal.dataset.bound === "1") return;
@@ -6354,31 +6358,43 @@ function returnSelfieProofHtml(record) {
   `;
 }
 
-function bindStudentReturnSelfieControls() {
-  if (!els.studentRecordsList) {
-    return;
+function getStudentReturnSelfieRoots() {
+  return [els.studentCurrentStatus, els.studentRecordsList].filter(Boolean);
+}
+
+function findStudentReturnSelfiePanel(requestId) {
+  const selector = `[data-return-selfie="${cssEscapeValue(requestId)}"]`;
+  for (const root of getStudentReturnSelfieRoots()) {
+    const panel = root.querySelector(selector);
+    if (panel) return panel;
   }
-  els.studentRecordsList.querySelectorAll("[data-return-selfie]").forEach((panel) => {
-    const requestId = panel.dataset.returnSelfie;
-    const draft = returnSelfieDrafts.get(requestId);
-    if (!draft || !draft.previewUrl) {
-      return;
-    }
-    const preview = panel.querySelector("[data-selfie-preview]");
-    const previewWrap = panel.querySelector("[data-selfie-preview-wrap]");
-    const message = panel.querySelector("[data-selfie-message]");
-    if (preview) preview.src = draft.previewUrl;
-    if (previewWrap) previewWrap.hidden = false;
-    if (message) message.textContent = "Semak gambar sebelum menghantar.";
-  });
-  els.studentRecordsList.querySelectorAll("[data-selfie-input]").forEach((input) => {
-    input.addEventListener("change", () => previewReturnSelfie(input));
-  });
-  els.studentRecordsList.querySelectorAll("[data-selfie-retake]").forEach((button) => {
-    button.addEventListener("click", () => resetReturnSelfieDraft(button.dataset.selfieRetake));
-  });
-  els.studentRecordsList.querySelectorAll("[data-selfie-submit]").forEach((button) => {
-    button.addEventListener("click", () => submitReturnSelfieFromCard(button.dataset.selfieSubmit));
+  return null;
+}
+
+function bindStudentReturnSelfieControls() {
+  getStudentReturnSelfieRoots().forEach((root) => {
+    root.querySelectorAll("[data-return-selfie]").forEach((panel) => {
+      const requestId = panel.dataset.returnSelfie;
+      const draft = returnSelfieDrafts.get(requestId);
+      if (!draft || !draft.previewUrl) {
+        return;
+      }
+      const preview = panel.querySelector("[data-selfie-preview]");
+      const previewWrap = panel.querySelector("[data-selfie-preview-wrap]");
+      const message = panel.querySelector("[data-selfie-message]");
+      if (preview) preview.src = draft.previewUrl;
+      if (previewWrap) previewWrap.hidden = false;
+      if (message) message.textContent = "Semak gambar sebelum menghantar.";
+    });
+    root.querySelectorAll("[data-selfie-input]").forEach((input) => {
+      input.addEventListener("change", () => previewReturnSelfie(input));
+    });
+    root.querySelectorAll("[data-selfie-retake]").forEach((button) => {
+      button.addEventListener("click", () => resetReturnSelfieDraft(button.dataset.selfieRetake));
+    });
+    root.querySelectorAll("[data-selfie-submit]").forEach((button) => {
+      button.addEventListener("click", () => submitReturnSelfieFromCard(button.dataset.selfieSubmit));
+    });
   });
 }
 
@@ -6410,7 +6426,7 @@ function previewReturnSelfie(input) {
 }
 
 function resetReturnSelfieDraft(requestId) {
-  const panel = els.studentRecordsList.querySelector(`[data-return-selfie="${cssEscapeValue(requestId)}"]`);
+  const panel = findStudentReturnSelfiePanel(requestId);
   if (!panel) {
     return;
   }
@@ -6438,7 +6454,7 @@ function cssEscapeValue(value) {
 async function submitReturnSelfieFromCard(requestId) {
   const record = findRecordById(requestId);
   const draft = returnSelfieDrafts.get(requestId);
-  const panel = els.studentRecordsList.querySelector(`[data-return-selfie="${cssEscapeValue(requestId)}"]`);
+  const panel = findStudentReturnSelfiePanel(requestId);
   const message = panel && panel.querySelector("[data-selfie-message]");
   const buttons = panel ? panel.querySelectorAll("button, input, .return-selfie-picker") : [];
   if (!record || !isReturnSelfieEligible(record)) {

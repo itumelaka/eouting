@@ -1,5 +1,5 @@
 {
-  "version": "2.2.1",
-  "releasedAt": "2026-08-14",
-  "notes": "eOuting v2.2.1 membolehkan Admin mengosongkan masa permohonan dibuka dan ditutup supaya sekatan masa pilihan kekal kosong selepas disimpan."
+  "version": "2.3.0",
+  "releasedAt": "2026-08-16",
+  "notes": "eOuting v2.3.0 memaparkan Status Semasa pelajar di atas borang bersama tindakan batal permohonan atau hantar bukti selfie yang layak."
 }

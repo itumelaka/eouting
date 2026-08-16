@@ -3465,6 +3465,69 @@ button:disabled,
   }
 }
 
+.student-current-status-section {
+  background: linear-gradient(145deg, #f8fcff, #e9f4ff);
+  border: 1px solid rgba(22, 111, 199, 0.2);
+  border-left: 7px solid var(--clay-blue, #166fc7);
+  border-radius: 18px;
+  box-shadow: var(--clay-shadow-soft, 0 8px 20px rgba(3, 18, 47, 0.08));
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 18px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.student-current-status-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.student-current-status-heading h2,
+.student-current-status-heading p {
+  margin: 0;
+}
+
+.student-current-status-heading h2 {
+  color: var(--deep-navy);
+  font-size: 1.2rem;
+}
+
+.student-current-status-heading p {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.student-current-status-kicker {
+  color: var(--info);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.student-current-card {
+  box-shadow: none;
+  margin: 0;
+  min-width: 0;
+}
+
+.student-current-card .record-actions,
+.student-current-card .return-selfie-actions {
+  min-width: 0;
+}
+
+.student-current-empty {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin: 0;
+  padding: 2px 0;
+}
+
+.student-request-heading {
+  margin-top: 20px;
+}
+
 @media (max-width: 520px) {
   .announcement-banner-main {
     align-items: flex-start !important;
@@ -4607,6 +4670,47 @@ button.profile-photo-frame {
 }
 
 @media (max-width: 520px) {
+  .student-current-status-section {
+    border-left-width: 5px;
+    margin: 10px 0 16px;
+    padding: 11px;
+  }
+
+  .student-current-card {
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .student-current-card .record-top,
+  .student-current-card .record-actions {
+    align-items: stretch;
+  }
+
+  .student-current-card .record-top {
+    flex-direction: column;
+  }
+
+  .student-current-card .badge-stack {
+    align-items: flex-start;
+    max-width: 100%;
+  }
+
+  .student-current-card .badge {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .student-current-card .record-actions,
+  .student-current-card .return-selfie-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .student-current-card :where(button, .return-selfie-picker) {
+    min-height: 48px;
+    width: 100%;
+  }
+
   .student-cancel-modal {
     align-items: flex-end;
     padding: 0;
