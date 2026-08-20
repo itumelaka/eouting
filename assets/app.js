@@ -209,6 +209,7 @@ let currentSession = null;
 let isLiveMode = false;
 let dataModeMessage = "";
 let studentRefreshIntervalId = null;
+let studentUrgencyTransitionRefreshKey = "";
 let studentLastUpdatedAt = null;
 let studentCancellationRequestId = "";
 let studentCancellationTrigger = null;
@@ -3292,7 +3293,11 @@ function mapLiveRecord(record) {
     selfie_file_id: record.selfie_file_id || "",
     selfie_url: record.selfie_url || "",
     masa_selfie: record.masa_selfie || "",
-    selfie_telegram_message_id: record.selfie_telegram_message_id || ""
+    selfie_telegram_message_id: record.selfie_telegram_message_id || "",
+    earliest_departure_time: record.earliest_departure_time || "",
+    operational_urgency: record.operational_urgency && typeof record.operational_urgency === "object"
+      ? { ...record.operational_urgency }
+      : null
   };
 }
 
@@ -4693,8 +4698,15 @@ function startStudentAutoRefresh() {
   }
 
   studentRefreshIntervalId = window.setInterval(() => {
-    refreshStudentLiveRecords();
+    handleStudentAutoRefreshTick();
   }, 30000);
+}
+
+function handleStudentAutoRefreshTick() {
+  const transitionRefreshStarted = updateStudentUrgencyDisplay(new Date());
+  if (!transitionRefreshStarted) {
+    refreshStudentLiveRecords();
+  }
 }
 
 function stopStudentAutoRefresh() {
@@ -4702,6 +4714,7 @@ function stopStudentAutoRefresh() {
     window.clearInterval(studentRefreshIntervalId);
     studentRefreshIntervalId = null;
   }
+  studentUrgencyTransitionRefreshKey = "";
 }
 
 function stopMonitoringAutoRefresh() {
@@ -5477,6 +5490,7 @@ function isRecordForStudent(record, student) {
 
 function studentStatusCard(record) {
   const statusInfo = studentStatusInfo(record);
+  const operationalGuidance = studentOperationalGuidanceHtml(record, new Date());
   const emergencyDetail = emergencyDetailHtml(record);
   const wardenDetail = record.warden_approve_by || record.approvedBy
     ? `<br><strong>${escapeHtml(approvalActorLabel(record))}:</strong> ${escapeHtml(record.warden_approve_by || record.approvedBy)}`
@@ -5516,9 +5530,11 @@ function studentStatusCard(record) {
         </div>
         <div class="badge-stack">
           <span class="badge ${statusInfo.badgeClass}">${escapeHtml(statusInfo.badge)}</span>
+          <span class="student-lifecycle-label">Lifecycle: ${escapeHtml(statusInfo.badge)}</span>
         </div>
       </div>
       <p class="record-detail"><strong>Status Semasa:</strong> ${escapeHtml(statusInfo.message)}</p>
+      ${operationalGuidance}
       <div class="record-detail">
         <strong>Tujuan:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
         <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
@@ -5550,7 +5566,7 @@ function studentStatusInfo(record) {
     return {
       badge: "Menunggu Kelulusan Warden",
       badgeClass: "badge-pending",
-      message: "Permohonan anda telah dihantar. Sila tunggu kelulusan warden sebelum bergerak ke pos guard."
+      message: "Permohonan anda sedang menunggu tindakan Warden."
     };
   }
 
@@ -5558,7 +5574,7 @@ function studentStatusInfo(record) {
     return {
       badge: approvalStatusLabel(record),
       badgeClass: "badge-approved",
-      message: "Permohonan telah diluluskan. Sila ke pos guard untuk pengesahan keluar."
+      message: "Anda sudah dibenarkan keluar. Sila lapor kepada Guard untuk pengesahan keluar."
     };
   }
 
@@ -5574,7 +5590,7 @@ function studentStatusInfo(record) {
     return {
       badge: "Sedang Outing",
       badgeClass: "badge-out",
-      message: "Anda sedang outing. Sila pulang sebelum atau pada 10:00 PM."
+      message: "Anda telah disahkan keluar oleh Guard."
     };
   }
 
@@ -5600,6 +5616,234 @@ function studentStatusInfo(record) {
     badgeClass: badgeClass(record.status),
     message: "Sila semak status permohonan anda."
   };
+}
+
+function studentLifecycleStatus(record) {
+  return String(record && (record.rawStatus || reverseDisplayStatus(record.status)) || "").trim().toUpperCase();
+}
+
+function getStudentOperationalUrgency(record) {
+  const urgency = record && record.operational_urgency;
+  return urgency && typeof urgency === "object" ? urgency : null;
+}
+
+function formatStudentOperationalDuration(milliseconds, mode) {
+  const value = Math.max(0, Number(milliseconds) || 0);
+  if (mode === "remaining" && value < 60000) return "Kurang 1 minit";
+  const totalMinutes = mode === "remaining"
+    ? Math.max(1, Math.ceil(value / 60000))
+    : Math.max(1, Math.floor(value / 60000));
+  if (totalMinutes < 60) return `${totalMinutes} minit`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `${hours} jam ${minutes} minit` : `${hours} jam`;
+}
+
+function formatStudentMalaysiaTime(value) {
+  const date = parseFlexibleDate(value);
+  if (!date) return "-";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Asia/Kuala_Lumpur"
+  }).formatToParts(date).reduce((result, part) => {
+    if (part.type !== "literal") result[part.type] = part.value;
+    return result;
+  }, {});
+  const hour = Number(parts.hour);
+  const minute = Number(parts.minute);
+  const displayHour = hour % 12 || 12;
+  const totalMinutes = (hour * 60) + minute;
+  const daypart = totalMinutes >= 60 && totalMinutes < 720
+    ? "Pagi"
+    : totalMinutes >= 720 && totalMinutes < 780
+      ? "Tengah Hari"
+      : totalMinutes >= 780 && totalMinutes < 1140
+        ? "Petang"
+        : "Malam";
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${daypart}`;
+}
+
+function isSameMalaysiaDate(valueA, valueB) {
+  const dateA = parseFlexibleDate(valueA);
+  const dateB = parseFlexibleDate(valueB);
+  if (!dateA || !dateB) return false;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Kuala_Lumpur"
+  });
+  return formatter.format(dateA) === formatter.format(dateB);
+}
+
+function formatStudentExpectedReturn(expectedReturnAt, now) {
+  const expected = parseFlexibleDate(expectedReturnAt);
+  if (!expected) return "-";
+  const evaluatedNow = parseFlexibleDate(now) || new Date();
+  const timeText = formatStudentMalaysiaTime(expected);
+  return isSameMalaysiaDate(expected, evaluatedNow)
+    ? timeText
+    : `${formatDisplayDate(expected)}, ${timeText}`;
+}
+
+function studentNextActionMessage(actionCode, urgencyState) {
+  const messages = {
+    NONE: "Pastikan anda kembali sebelum waktu pulang.",
+    PREPARE_RETURN: "Sila bersedia untuk kembali ke asrama.",
+    RETURN_NOW: "Sila kembali ke asrama dan lapor kepada Guard.",
+    FOLLOW_UP: "Sila kembali segera dan hubungi Warden jika terdapat masalah.",
+    ACTION_REQUIRED: "Sila kembali segera dan hubungi Warden/HEP.",
+    REVIEW_TIMING: "Sila rujuk Warden/HEP jika maklumat ini tidak betul."
+  };
+  if (messages[actionCode]) return messages[actionCode];
+  return urgencyState === "DUE_SOON"
+    ? messages.PREPARE_RETURN
+    : urgencyState === "LATE"
+      ? messages.RETURN_NOW
+      : urgencyState === "CRITICAL"
+        ? messages.FOLLOW_UP
+        : urgencyState === "ACTION_REQUIRED"
+          ? messages.ACTION_REQUIRED
+          : messages.NONE;
+}
+
+function studentUrgencyPresentation(state) {
+  return {
+    NORMAL: { className: "normal", icon: "✓", title: "ANDA SEDANG BERADA DI LUAR", expectedLabel: "Waktu pulang", durationLabel: "Baki", statusText: "Masih dalam tempoh dibenarkan." },
+    DUE_SOON: { className: "due-soon", icon: "◷", title: "MASA PULANG HAMPIR TIBA", expectedLabel: "Waktu pulang", durationLabel: "Baki", statusText: "Waktu pulang semakin hampir." },
+    LATE: { className: "late", icon: "!", title: "ANDA TELAH LEWAT", expectedLabel: "Sepatutnya pulang", durationLabel: "Lewat", statusText: "Waktu pulang telah berlalu." },
+    CRITICAL: { className: "critical", icon: "!", title: "LEWAT — PERLU TINDAKAN", expectedLabel: "Sepatutnya pulang", durationLabel: "Lewat", statusText: "Kepulangan anda memerlukan tindakan segera." },
+    ACTION_REQUIRED: { className: "action-required", icon: "!!", title: "TINDAKAN SEGERA DIPERLUKAN", expectedLabel: "Sepatutnya pulang", durationLabel: "Lewat", statusText: "Sila ambil tindakan sekarang." }
+  }[state] || null;
+}
+
+function studentLifecycleGuidanceHtml(record) {
+  const status = studentLifecycleStatus(record);
+  if (status === "MENUNGGU_KELULUSAN") {
+    const requestedTime = record.masa_mohon || record.requestedAt
+      ? `<div class="student-guidance-fact"><span>Dimohon</span><strong>${escapeHtml(formatStudentMalaysiaTime(record.masa_mohon || record.requestedAt))}</strong></div>`
+      : "";
+    return `
+      <section class="student-lifecycle-guidance" aria-label="Panduan permohonan">
+        <strong class="student-urgency-title">MENUNGGU KELULUSAN</strong>
+        <p>Permohonan anda sedang menunggu tindakan Warden.</p>
+        ${requestedTime}
+      </section>
+    `;
+  }
+  if (status === "DILULUSKAN_WARDEN") {
+    const departureTime = String(record.earliest_departure_time || "").trim();
+    const departureDisplay = /^([01]?\d|2[0-3]):[0-5]\d$/.test(departureTime)
+      ? `<div class="student-guidance-fact"><span>Masa keluar dibenarkan</span><strong>${escapeHtml(formatStudentMalaysiaTime(`2000-01-01T${departureTime}:00+08:00`))}</strong></div>`
+      : "";
+    return `
+      <section class="student-lifecycle-guidance" aria-label="Panduan permohonan diluluskan">
+        <strong class="student-urgency-title">PERMOHONAN DILULUSKAN</strong>
+        <p>Anda sudah dibenarkan keluar.</p>
+        ${departureDisplay}
+        <p class="student-next-action"><strong>Seterusnya:</strong> Sila lapor kepada Guard untuk pengesahan keluar.</p>
+      </section>
+    `;
+  }
+  if (status === "SELESAI") {
+    const returnedTime = record.masa_masuk || record.returnedAt
+      ? `<div class="student-guidance-fact"><span>Masa masuk</span><strong>${escapeHtml(formatStudentMalaysiaTime(record.masa_masuk || record.returnedAt))}</strong></div>`
+      : "";
+    const lateNote = record.lewat === true || record.lewatText === "Ya"
+      ? `<p class="student-completed-late-note">Rekod kepulangan ditanda lewat.</p>`
+      : "";
+    return `
+      <section class="student-lifecycle-guidance student-completed-guidance" aria-label="Kepulangan disahkan">
+        <strong class="student-urgency-title">KEPULANGAN DISAHKAN</strong>
+        ${returnedTime}
+        ${lateNote}
+      </section>
+    `;
+  }
+  return "";
+}
+
+function studentOperationalGuidanceHtml(record, now) {
+  const status = studentLifecycleStatus(record);
+  if (status !== "KELUAR") return studentLifecycleGuidanceHtml(record);
+  const urgency = getStudentOperationalUrgency(record);
+  if (!urgency || urgency.needs_review === true || urgency.timing_valid === false) {
+    return `
+      <section class="student-operational-guidance student-status-review" aria-label="Maklumat waktu pulang perlu disemak">
+        <strong class="student-urgency-title">ⓘ MAKLUMAT WAKTU PULANG PERLU DISEMAK</strong>
+        <p>Sistem tidak dapat menentukan waktu pulang dengan tepat.</p>
+        <p class="student-next-action">${escapeHtml(studentNextActionMessage("REVIEW_TIMING"))}</p>
+      </section>
+    `;
+  }
+  const presentation = studentUrgencyPresentation(String(urgency.state || "").toUpperCase());
+  const expected = parseFlexibleDate(urgency.expected_return_at);
+  if (!presentation || !expected) {
+    return `
+      <section class="student-operational-guidance student-status-review" aria-label="Maklumat waktu pulang perlu disemak">
+        <strong class="student-urgency-title">ⓘ MAKLUMAT WAKTU PULANG PERLU DISEMAK</strong>
+        <p>Sistem tidak dapat menentukan waktu pulang dengan tepat.</p>
+        <p class="student-next-action">${escapeHtml(studentNextActionMessage("REVIEW_TIMING"))}</p>
+      </section>
+    `;
+  }
+  const evaluatedNow = parseFlexibleDate(now) || new Date();
+  const isRemaining = urgency.state === "NORMAL" || urgency.state === "DUE_SOON";
+  const durationMode = isRemaining ? "remaining" : "late";
+  const durationMs = isRemaining
+    ? Math.max(0, expected.getTime() - evaluatedNow.getTime())
+    : Math.max(0, evaluatedNow.getTime() - expected.getTime());
+  const expectedLabel = isSameMalaysiaDate(expected, evaluatedNow) ? presentation.expectedLabel : "Dijangka pulang";
+  const outTime = record.masa_keluar || record.outAt
+    ? `<div class="student-guidance-fact"><span>Keluar</span><strong>${escapeHtml(formatStudentMalaysiaTime(record.masa_keluar || record.outAt))}</strong></div>`
+    : "";
+  const transitionAt = urgency.next_transition_at || "";
+  const transitionKey = `${getRecordId(record)}|${transitionAt}`;
+  return `
+    <section class="student-operational-guidance student-status-${presentation.className}" aria-label="Panduan waktu pulang" data-student-urgency-transition-key="${escapeHtml(transitionKey)}">
+      <strong class="student-urgency-title"><span aria-hidden="true">${presentation.icon}</span> ${presentation.title}</strong>
+      <div class="student-urgency-facts">
+        ${outTime}
+        <div class="student-guidance-fact"><span>${expectedLabel}</span><strong>${escapeHtml(formatStudentExpectedReturn(expected, evaluatedNow))}</strong></div>
+        <div class="student-guidance-fact student-urgency-duration">
+          <span>${presentation.durationLabel}</span>
+          <strong data-student-urgency-countdown data-expected-return-at="${escapeHtml(urgency.expected_return_at)}" data-duration-mode="${durationMode}" data-next-transition-at="${escapeHtml(transitionAt)}">${escapeHtml(formatStudentOperationalDuration(durationMs, durationMode))}</strong>
+        </div>
+      </div>
+      <p class="student-urgency-status">${presentation.statusText}</p>
+      <p class="student-next-action">${escapeHtml(studentNextActionMessage(urgency.next_action_code, urgency.state))}</p>
+    </section>
+  `;
+}
+
+function updateStudentUrgencyDisplay(now) {
+  if (!currentSession || currentSession.role !== "student" || !els.studentCurrentStatus) return false;
+  const evaluatedNow = parseFlexibleDate(now) || new Date();
+  const countdowns = els.studentCurrentStatus.querySelectorAll("[data-student-urgency-countdown]");
+  let transitionRefreshStarted = false;
+  countdowns.forEach((countdown) => {
+    const expected = parseFlexibleDate(countdown.dataset.expectedReturnAt);
+    const durationMode = countdown.dataset.durationMode === "late" ? "late" : "remaining";
+    if (expected) {
+      const durationMs = durationMode === "remaining"
+        ? Math.max(0, expected.getTime() - evaluatedNow.getTime())
+        : Math.max(0, evaluatedNow.getTime() - expected.getTime());
+      countdown.textContent = formatStudentOperationalDuration(durationMs, durationMode);
+    }
+    const nextTransitionAt = parseFlexibleDate(countdown.dataset.nextTransitionAt);
+    const guidance = countdown.closest("[data-student-urgency-transition-key]");
+    const transitionKey = guidance ? guidance.dataset.studentUrgencyTransitionKey : "";
+    if (nextTransitionAt && evaluatedNow.getTime() >= nextTransitionAt.getTime() && transitionKey && studentUrgencyTransitionRefreshKey !== transitionKey) {
+      studentUrgencyTransitionRefreshKey = transitionKey;
+      transitionRefreshStarted = true;
+    }
+  });
+  if (transitionRefreshStarted) {
+    refreshStudentLiveRecords().catch(() => {});
+  }
+  return transitionRefreshStarted;
 }
 
 function reverseDisplayStatus(status) {
@@ -5692,6 +5936,7 @@ function renderStudent() {
   bindStudentCancellationControls();
   bindStudentHistoryToggles();
   bindStudentReturnSelfieControls();
+  updateStudentUrgencyDisplay(new Date());
   updateStudentSubmitState();
 }
 
