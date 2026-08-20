@@ -4873,6 +4873,10 @@ function scanReturnOperationalNotifications_(options) {
   }, "Scan operational notification sedang diproses. Sila cuba sebentar lagi.");
 }
 
+function runReturnOperationalNotificationsDryRun() {
+  return scanReturnOperationalNotifications_({ dryRun: true });
+}
+
 function isOperationalUrgencyLate_(urgency) {
   return Boolean(urgency && urgency.timing_valid && urgency.severity_rank >= 2);
 }

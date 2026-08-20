@@ -286,3 +286,31 @@ test("scanner is backend-only and existing role projections and Telegram/sendPho
   assert.match(gasSource, /function getTodayRecords/);
   assert.match(gasSource, /function getAdminMonitoring/);
 });
+
+test("public activation wrapper is parameterless, hard-coded dry-run-only and not exposed", () => {
+  assert.match(
+    gasSource,
+    /function runReturnOperationalNotificationsDryRun\(\)\s*{\s*return scanReturnOperationalNotifications_\(\{\s*dryRun:\s*true\s*\}\);\s*}/
+  );
+  assert.doesNotMatch(gasSource, /function runReturnOperationalNotificationsDryRun_\s*\(/);
+  assert.deepEqual(
+    Array.from(gasSource.matchAll(/function\s+(runReturnOperationalNotifications\w*)\s*\(/g), (match) => match[1]),
+    ["runReturnOperationalNotificationsDryRun"]
+  );
+
+  const fixture = createFixture([]);
+  let receivedOptions = null;
+  const expectedResult = { dry_run: true, marker: "wrapper-result" };
+  fixture.context.scanReturnOperationalNotifications_ = (options) => {
+    receivedOptions = plain(options);
+    return expectedResult;
+  };
+
+  const result = fixture.context.runReturnOperationalNotificationsDryRun({ dryRun: false });
+  assert.deepEqual(receivedOptions, { dryRun: true });
+  assert.equal(result, expectedResult);
+  assert.doesNotMatch(appSource + indexSource, /runReturnOperationalNotificationsDryRun/);
+
+  const gasRouters = gasSource.slice(gasSource.indexOf("function doGet"), gasSource.indexOf("function setupDatabase"));
+  assert.doesNotMatch(gasRouters, /runReturnOperationalNotificationsDryRun/);
+});
