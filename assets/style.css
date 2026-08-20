@@ -4616,7 +4616,33 @@ button.profile-photo-frame {
 .admin-kpi-card span { display:block; font-weight:800; margin-top:4px; }
 .admin-kpi-card.active { box-shadow:0 0 0 3px rgba(23,134,109,.25); }
 .admin-kpi-card.is-late,.admin-ops-card.is-late { background:#fff0f1; border-color:#c93a50; color:#861d2d; }
+.admin-ops-kpi-due-soon { background:#fff8df; border-color:#c78b16; color:#76510a; }
+.admin-ops-kpi-needs-review { background:#f4efff; border-color:#7457a8; color:#4b3475; }
+.admin-ops-kpi-pending-emergency { background:#fff0f1; border-color:#b83049; color:#861d2d; }
 .admin-last-updated { color:var(--muted-text); font-size:.86rem; }
+.admin-action-queue { background:linear-gradient(145deg,#fffdf7,#f4f8f6); border:1px solid rgba(44,72,112,.14); border-radius:18px; box-shadow:var(--clay-shadow-soft); margin:4px 0 20px; padding:15px; }
+.admin-action-queue-heading { align-items:flex-start; display:flex; justify-content:space-between; margin-bottom:12px; }
+.admin-action-queue-heading h4,.admin-ops-list-title { color:#173e38; margin:0; }
+.admin-action-queue-heading p { color:var(--muted-text); font-size:.85rem; margin:3px 0 0; }
+.admin-action-grid { display:grid; gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.admin-action-card { background:#fff; border:1px solid rgba(44,72,112,.18); border-left:6px solid #64748b; border-radius:14px; display:grid; gap:8px; min-width:0; overflow-wrap:anywhere; padding:13px; }
+.admin-action-card header { display:grid; gap:3px; }
+.admin-action-card header strong { color:#243b36; font-size:1.02rem; }
+.admin-action-label { font-size:.74rem; font-weight:900; letter-spacing:.045em; text-transform:uppercase; }
+.admin-action-identity,.admin-action-guidance,.admin-action-review-copy { margin:0; }
+.admin-action-identity { color:var(--muted-text); font-size:.84rem; }
+.admin-action-guidance { color:#263f39; font-weight:800; line-height:1.4; }
+.admin-action-review-copy { color:#4b3475; line-height:1.4; }
+.admin-action-lifecycle { justify-self:start; }
+.admin-action-facts { display:grid; gap:8px; grid-template-columns:repeat(2,minmax(0,1fr)); margin:0; }
+.admin-action-facts dt { color:var(--muted-text); font-size:.7rem; font-weight:800; text-transform:uppercase; }
+.admin-action-facts dd { font-weight:800; margin:2px 0 0; }
+.admin-action-action-required { background:#fff0f1; border-left-color:#9f1239; }
+.admin-action-critical { background:#fff7ed; border-left-color:#c2410c; }
+.admin-action-needs-review { background:#f5f3ff; border-left-color:#6d4aa2; }
+.admin-action-pending-emergency { background:#fff5f5; border-left-color:#be123c; }
+.admin-action-empty { margin:0; }
+.admin-ops-list-title { margin:0 0 10px; }
 .admin-ops-list,.admin-staff-list { display:grid; gap:12px; }
 .admin-ops-card,.admin-staff-card { background:#fff; border:1px solid rgba(44,72,112,.14); border-radius:16px; box-shadow:var(--clay-shadow-soft); padding:15px; }
 .admin-ops-card { display:grid; gap:12px; }
@@ -4629,6 +4655,10 @@ button.profile-photo-frame {
 .admin-ops-status { align-items:center; align-self:center; display:inline-flex; flex:0 0 auto; line-height:1.2; min-height:0; padding:5px 10px; white-space:nowrap; width:auto; }
 .admin-ops-status.is-out { background:#ffe1ad; color:#7b4300; }
 .admin-ops-late { background:#ffdce1; border:1px solid #d55a6d; border-radius:10px; color:#861d2d; font-weight:900; padding:8px 10px; width:fit-content; }
+.admin-ops-urgency { border:1px solid rgba(44,72,112,.2); border-radius:10px; font-weight:900; padding:8px 10px; width:fit-content; }
+.admin-ops-urgency-due-soon { background:#fff4c7; border-color:#c78b16; color:#76510a; }
+.admin-ops-urgency-late,.admin-ops-urgency-critical,.admin-ops-urgency-action-required { background:#ffdce1; border-color:#d55a6d; color:#861d2d; }
+.admin-ops-urgency-review { background:#eee8ff; border-color:#7457a8; color:#4b3475; }
 .admin-ops-card dl { display:grid; gap:8px 14px; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; }
 .admin-ops-card dt { color:var(--muted-text); font-size:.72rem; font-weight:800; text-transform:uppercase; }
 .admin-ops-card dd { line-height:1.4; margin:3px 0 0; overflow-wrap:anywhere; }
@@ -4646,6 +4676,7 @@ button.profile-photo-frame {
 
 @media (max-width:760px) {
   .admin-subnav { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .admin-action-grid,.admin-action-facts { grid-template-columns:1fr; }
   .admin-ops-card dl,.admin-master-filters { grid-template-columns:1fr; }
   .admin-staff-card { align-items:stretch; flex-direction:column; }
   .admin-monitoring-thumbnail { flex-basis:52px; width:52px; }

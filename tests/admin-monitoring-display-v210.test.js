@@ -107,10 +107,10 @@ test("GAS monitoring boundary canonicalizes Sheet return Date and time-only Date
   assert.doesNotMatch(JSON.stringify(result), /1899-12-30|T16:00:00\.000Z/);
 });
 
-test("missing return components stay blank at the GAS boundary and late indicator remains prominent", () => {
+test("missing return components stay blank at the GAS boundary and backend urgency indicator remains prominent", () => {
   const projection = extractFunction(gasSource, "toAdminOperationalRecord_");
   assert.match(projection, /returnDate && returnTime \? returnDate \+ " " \+ returnTime \+ ":00" : ""/);
   const renderer = extractFunction(appSource, "renderAdminMonitoringV210");
-  assert.match(renderer, /admin-ops-late/);
-  assert.match(renderer, /Lewat · Belum pulang pada waktu dijangka/);
+  assert.match(renderer, /admin-ops-urgency/);
+  assert.match(renderer, /getAdminUrgencyLabelV240/);
 });

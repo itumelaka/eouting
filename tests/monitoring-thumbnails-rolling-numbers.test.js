@@ -34,7 +34,7 @@ function createMonitoringContext(withPhoto) {
         jenis_permohonan: "OUTING_BIASA", status: "MENUNGGU_KELULUSAN", lewat: false
       }]
     },
-    els: { adminMonitoringKpis: { innerHTML: "" }, adminMonitoringList: { innerHTML: "" } },
+    els: { adminMonitoringKpis: { innerHTML: "" }, adminActionQueue: { innerHTML: "" }, adminMonitoringList: { innerHTML: "" } },
     animateRollingNumbers: () => {},
     escapeHtml: (value) => String(value),
     formatAdminMonitoringRequestV210: () => "09 Ogos 2026",
@@ -49,6 +49,10 @@ function createMonitoringContext(withPhoto) {
     extractFunction(appSource, "safeProfilePhotoDataUri"),
     extractFunction(appSource, "profilePhotoMarkup"),
     extractFunction(appSource, "adminMonitoringStatusLabelV210"),
+    appSource.slice(
+      appSource.indexOf("function getAdminOperationalUrgencyV240"),
+      appSource.indexOf("function renderAdminMonitoringV210")
+    ),
     extractFunction(appSource, "renderAdminMonitoringV210")
   ].join("\n"), context);
   if (withPhoto) {

@@ -502,6 +502,7 @@ const els = {
   adminMonitoringMessage: document.querySelector("#adminMonitoringMessage"),
   adminMonitoringUpdated: document.querySelector("#adminMonitoringUpdated"),
   adminMonitoringKpis: document.querySelector("#adminMonitoringKpis"),
+  adminActionQueue: document.querySelector("#adminActionQueue"),
   adminMonitoringList: document.querySelector("#adminMonitoringList"),
   adminMasterRefreshButton: document.querySelector("#adminMasterRefreshButton"),
   adminMasterSearch: document.querySelector("#adminMasterSearch"),
@@ -1181,6 +1182,7 @@ async function loadAdminMonitoringV210() {
   globalThis.setButtonLoadingVisualV220?.(els.adminMonitoringRefreshButton, true);
   els.adminMonitoringMessage.textContent = "Memuatkan pemantauan semasa...";
   els.adminMonitoringList.innerHTML = '<div class="empty-state">Memuatkan rekod...</div>';
+  if (els.adminActionQueue) els.adminActionQueue.innerHTML = '<div class="empty-state">Menyusun keutamaan operasi...</div>';
   try {
     adminMonitoringV210 = await apiPost("getAdminMonitoring", buildAdminCredentialPayloadV200());
     els.adminMonitoringMessage.textContent = "";
@@ -1192,6 +1194,7 @@ async function loadAdminMonitoringV210() {
     els.adminMonitoringMessage.textContent = "Pemantauan gagal dimuatkan.";
     els.adminMonitoringMessage.classList.add("error");
     els.adminMonitoringList.innerHTML = '<div class="empty-state"><button class="secondary-action" type="button" onclick="loadAdminMonitoringV210()">Cuba Lagi</button></div>';
+    if (els.adminActionQueue) els.adminActionQueue.innerHTML = '<div class="empty-state">Queue tindakan tidak tersedia.</div>';
   } finally {
     els.adminMonitoringRefreshButton.disabled = false;
     globalThis.setButtonLoadingVisualV220?.(els.adminMonitoringRefreshButton, false);
@@ -1226,31 +1229,229 @@ function formatAdminMonitoringRequestV210(record) {
   return row.masa_mohon ? formatDisplayDateTime(row.masa_mohon) : formatDisplayDate(row.tarikh);
 }
 
+function getAdminOperationalUrgencyV240(record) {
+  const urgency = record && record.operational_urgency;
+  if (!urgency || typeof urgency !== "object" || Array.isArray(urgency)) return null;
+  const allowedStates = ["NORMAL", "DUE_SOON", "LATE", "CRITICAL", "ACTION_REQUIRED"];
+  const suppliedState = String(urgency.state || "").trim().toUpperCase();
+  const state = urgency.applicable !== false && urgency.timing_valid !== false && allowedStates.indexOf(suppliedState) !== -1
+    ? suppliedState
+    : null;
+  const numericOrNull = (value) => value === null || value === undefined || value === "" || !Number.isFinite(Number(value))
+    ? null
+    : Number(value);
+  return {
+    state: state,
+    severity_rank: numericOrNull(urgency.severity_rank) || 0,
+    expected_return_at: urgency.expected_return_at || null,
+    minutes_to_due: numericOrNull(urgency.minutes_to_due),
+    minutes_late: numericOrNull(urgency.minutes_late),
+    needs_review: urgency.needs_review === true,
+    next_action_code: String(urgency.next_action_code || "").trim().toUpperCase()
+  };
+}
+
+function isAdminActiveOperationalRecordV240(record) {
+  return ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "KELUAR"]
+    .indexOf(String(record && record.status || "").trim().toUpperCase()) !== -1;
+}
+
+function isAdminPendingEmergencyV240(record) {
+  return String(record && record.status || "").trim().toUpperCase() === "MENUNGGU_KELULUSAN" &&
+    String(record && record.jenis_permohonan || "").trim().toUpperCase() === "KECEMASAN";
+}
+
+function getAdminOperationalRequestTimeV240(record) {
+  const parsed = parseFlexibleDate(record && (record.masa_mohon || record.requestedAt || record.tarikh));
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : null;
+}
+
+function getAdminActionKindV240(record) {
+  const status = String(record && record.status || "").trim().toUpperCase();
+  const urgency = getAdminOperationalUrgencyV240(record);
+  if (status === "KELUAR" && urgency && urgency.state === "ACTION_REQUIRED") return "action_required";
+  if (status === "KELUAR" && urgency && urgency.state === "CRITICAL") return "critical";
+  if (isAdminActiveOperationalRecordV240(record) && urgency && urgency.needs_review) return "needs_review";
+  if (isAdminPendingEmergencyV240(record)) return "pending_emergency";
+  return "";
+}
+
+function getAdminOperationalIntelligenceV240(records) {
+  const rows = Array.isArray(records) ? records : [];
+  const kpis = {
+    pending: 0,
+    approved: 0,
+    out: 0,
+    due_soon: 0,
+    late: 0,
+    critical: 0,
+    action_required: 0,
+    needs_review: 0,
+    pending_emergency: 0
+  };
+  const priority = { action_required: 0, critical: 1, needs_review: 2, pending_emergency: 3 };
+  const queue = [];
+
+  rows.forEach((record, index) => {
+    const status = String(record && record.status || "").trim().toUpperCase();
+    const urgency = getAdminOperationalUrgencyV240(record);
+    if (status === "MENUNGGU_KELULUSAN") kpis.pending += 1;
+    if (status === "DILULUSKAN_WARDEN") kpis.approved += 1;
+    if (status === "KELUAR") {
+      kpis.out += 1;
+      if (urgency && urgency.state === "DUE_SOON") kpis.due_soon += 1;
+      if (urgency && urgency.state === "LATE") kpis.late += 1;
+      if (urgency && urgency.state === "CRITICAL") kpis.critical += 1;
+      if (urgency && urgency.state === "ACTION_REQUIRED") kpis.action_required += 1;
+    }
+    if (isAdminActiveOperationalRecordV240(record) && urgency && urgency.needs_review) kpis.needs_review += 1;
+    if (isAdminPendingEmergencyV240(record)) kpis.pending_emergency += 1;
+
+    const kind = getAdminActionKindV240(record);
+    if (!kind) return;
+    queue.push({
+      record: record,
+      kind: kind,
+      priority: priority[kind],
+      minutes_late: urgency && urgency.minutes_late !== null ? urgency.minutes_late : -1,
+      requested_at: getAdminOperationalRequestTimeV240(record),
+      stable_id: String(record.request_id || record.student_id || record.no_matrik || record.nama || "").trim().toUpperCase(),
+      source_index: index
+    });
+  });
+
+  queue.sort((left, right) => {
+    if (left.priority !== right.priority) return left.priority - right.priority;
+    if ((left.kind === "action_required" || left.kind === "critical") && left.minutes_late !== right.minutes_late) {
+      return right.minutes_late - left.minutes_late;
+    }
+    if (left.requested_at !== null && right.requested_at !== null && left.requested_at !== right.requested_at) {
+      return left.requested_at - right.requested_at;
+    }
+    if (left.requested_at !== null && right.requested_at === null) return -1;
+    if (left.requested_at === null && right.requested_at !== null) return 1;
+    const idOrder = left.stable_id.localeCompare(right.stable_id);
+    return idOrder || left.source_index - right.source_index;
+  });
+
+  return { kpis: kpis, queue: queue };
+}
+
+function getAdminUrgencyLabelV240(urgency) {
+  if (urgency && urgency.needs_review) return "Semak Data Masa";
+  const labels = {
+    NORMAL: "Normal",
+    DUE_SOON: "Hampir Waktu Pulang",
+    LATE: "Lewat",
+    CRITICAL: "Kritikal",
+    ACTION_REQUIRED: "Tindakan Segera"
+  };
+  return urgency && labels[urgency.state] ? labels[urgency.state] : "";
+}
+
+function formatAdminUrgencyDurationV240(minutes) {
+  const total = Math.max(0, Math.floor(Number(minutes) || 0));
+  const hours = Math.floor(total / 60);
+  const remainder = total % 60;
+  if (!hours) return `${remainder} minit`;
+  return remainder ? `${hours} jam ${remainder} minit` : `${hours} jam`;
+}
+
+function adminNextActionMessageV240(kind) {
+  const messages = {
+    action_required: "Sila hubungi Warden/HEP dan sahkan status pelajar.",
+    critical: "Perlu susulan segera.",
+    needs_review: "Semak tarikh/masa pulang rekod ini.",
+    pending_emergency: "Permohonan kecemasan masih menunggu tindakan Warden."
+  };
+  return messages[kind] || "Semak rekod operasi ini.";
+}
+
+function renderAdminActionCardV240(item) {
+  const record = item && item.record || {};
+  const urgency = getAdminOperationalUrgencyV240(record);
+  const labels = {
+    action_required: "Tindakan Segera",
+    critical: "Kritikal",
+    needs_review: "Semak Data Masa",
+    pending_emergency: "Kecemasan Menunggu"
+  };
+  const expectedReturn = urgency && urgency.expected_return_at
+    ? formatDisplayDateTime(urgency.expected_return_at)
+    : formatAdminExpectedReturnV210(record);
+  const lateFact = (item.kind === "action_required" || item.kind === "critical") && urgency && urgency.minutes_late !== null
+    ? `<div><dt>Lewat</dt><dd>${escapeHtml(formatAdminUrgencyDurationV240(urgency.minutes_late))}</dd></div>`
+    : "";
+  const expectedFact = item.kind === "action_required" || item.kind === "critical"
+    ? `<div><dt>Sepatutnya pulang</dt><dd>${escapeHtml(expectedReturn)}</dd></div>`
+    : "";
+  const requestedFact = item.kind === "pending_emergency"
+    ? `<div><dt>Dimohon</dt><dd>${escapeHtml(formatAdminMonitoringRequestV210(record))}</dd></div>`
+    : "";
+  const reviewText = item.kind === "needs_review"
+    ? '<p class="admin-action-review-copy">Sistem tidak dapat menentukan waktu pulang dengan tepat.</p>'
+    : "";
+  const typeLabel = typeof requestTypeLabel === "function"
+    ? requestTypeLabel(record.jenis_permohonan)
+    : String(record.jenis_permohonan || "-");
+  return `<article class="admin-action-card admin-action-${item.kind.replace(/_/g, "-")}">
+    <header><span class="admin-action-label">${escapeHtml(labels[item.kind] || "Perlu Tindakan")}</span><strong>${escapeHtml(record.nama || "-")}</strong></header>
+    <p class="admin-action-identity">${escapeHtml(record.no_matrik || record.student_id || "-")} · ${escapeHtml(typeLabel)}</p>
+    <span class="status-badge admin-action-lifecycle">${escapeHtml(adminMonitoringStatusLabelV210(record.status, record))}</span>
+    ${reviewText}
+    ${(expectedFact || lateFact || requestedFact) ? `<dl class="admin-action-facts">${expectedFact}${lateFact}${requestedFact}</dl>` : ""}
+    <p class="admin-action-guidance">${escapeHtml(adminNextActionMessageV240(item.kind))}</p>
+  </article>`;
+}
+
+function renderAdminActionQueueV240(queue) {
+  if (!els.adminActionQueue) return;
+  const items = Array.isArray(queue) ? queue : [];
+  els.adminActionQueue.innerHTML = items.length
+    ? `<div class="admin-action-grid">${items.map(renderAdminActionCardV240).join("")}</div>`
+    : '<div class="empty-state admin-action-empty">Tiada rekod yang memerlukan tindakan segera.</div>';
+}
+
+function matchesAdminMonitoringFilterV240(record, filter) {
+  const status = String(record && record.status || "").trim().toUpperCase();
+  const urgency = getAdminOperationalUrgencyV240(record);
+  if (filter === "all") return true;
+  if (filter === "pending") return status === "MENUNGGU_KELULUSAN";
+  if (filter === "approved") return status === "DILULUSKAN_WARDEN";
+  if (filter === "out" || filter === "not_returned") return status === "KELUAR";
+  if (filter === "due_soon") return status === "KELUAR" && urgency && urgency.state === "DUE_SOON";
+  if (filter === "late") return status === "KELUAR" && urgency && urgency.state === "LATE";
+  if (filter === "critical") return status === "KELUAR" && urgency && urgency.state === "CRITICAL";
+  if (filter === "action_required") return status === "KELUAR" && urgency && urgency.state === "ACTION_REQUIRED";
+  if (filter === "needs_review") return isAdminActiveOperationalRecordV240(record) && urgency && urgency.needs_review;
+  if (filter === "pending_emergency" || filter === "emergency") return isAdminPendingEmergencyV240(record);
+  return true;
+}
+
 function renderAdminMonitoringV210(options) {
   if (!adminMonitoringV210) return;
   const renderOptions = options || {};
-  const kpis = adminMonitoringV210.kpis || {};
+  const intelligence = getAdminOperationalIntelligenceV240(adminMonitoringV210.records || []);
+  const kpis = intelligence.kpis;
   const cards = [
     ["pending", "Menunggu Kelulusan", kpis.pending], ["approved", "Diluluskan / Menunggu Keluar", kpis.approved],
-    ["out", "Sedang Keluar", kpis.out], ["not_returned", "Belum Pulang", kpis.not_returned],
-    ["late", "Lewat", kpis.late], ["emergency", "Kecemasan Aktif", kpis.emergency]
+    ["out", "Sedang Di Luar", kpis.out], ["due_soon", "Hampir Waktu Pulang", kpis.due_soon],
+    ["late", "Lewat", kpis.late], ["critical", "Kritikal", kpis.critical],
+    ["action_required", "Tindakan Segera", kpis.action_required], ["needs_review", "Perlu Semak Masa", kpis.needs_review],
+    ["pending_emergency", "Kecemasan Menunggu", kpis.pending_emergency]
   ];
   if (renderOptions.recordsOnly !== true) {
-    els.adminMonitoringKpis.innerHTML = cards.map(([key, label, count]) => `<button type="button" class="admin-kpi-card ${key === "late" ? "is-late" : ""} ${adminMonitoringFilterV210 === key ? "active" : ""}" data-monitor-filter="${key}"><strong data-rolling-number="${Number(count || 0)}" data-rolling-key="${key}">${Number(count || 0)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
+    els.adminMonitoringKpis.innerHTML = cards.map(([key, label, count]) => `<button type="button" class="admin-kpi-card admin-ops-kpi admin-ops-kpi-${key.replace(/_/g, "-")} ${(key === "late" || key === "critical" || key === "action_required") ? "is-late" : ""} ${adminMonitoringFilterV210 === key ? "active" : ""}" data-monitor-filter="${key}"><strong data-rolling-number="${Number(count || 0)}" data-rolling-key="${key}">${Number(count || 0)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
     animateRollingNumbers(els.adminMonitoringKpis, "admin-monitoring");
   }
-  const rows = (adminMonitoringV210.records || []).filter((row) => {
-    if (adminMonitoringFilterV210 === "all") return true;
-    if (adminMonitoringFilterV210 === "pending") return row.status === "MENUNGGU_KELULUSAN";
-    if (adminMonitoringFilterV210 === "approved") return row.status === "DILULUSKAN_WARDEN";
-    if (adminMonitoringFilterV210 === "out" || adminMonitoringFilterV210 === "not_returned") return row.status === "KELUAR";
-    if (adminMonitoringFilterV210 === "late") return row.lewat === true;
-    if (adminMonitoringFilterV210 === "emergency") return row.jenis_permohonan === "KECEMASAN";
-    return true;
-  });
+  renderAdminActionQueueV240(intelligence.queue);
+  const rows = (adminMonitoringV210.records || []).filter((row) => matchesAdminMonitoringFilterV240(row, adminMonitoringFilterV210));
   els.adminMonitoringList.innerHTML = rows.length ? rows.map((row) => {
     const isOut = row.status === "KELUAR";
-    return `<article class="admin-ops-card ${row.lewat ? "is-late" : ""}">
+    const urgency = getAdminOperationalUrgencyV240(row);
+    const urgencyLabel = isOut ? getAdminUrgencyLabelV240(urgency) : "";
+    const urgentStyle = urgency && (urgency.state === "LATE" || urgency.state === "CRITICAL" || urgency.state === "ACTION_REQUIRED");
+    return `<article class="admin-ops-card ${urgentStyle ? "is-late" : ""}">
       <header class="admin-ops-card-heading">
         ${profilePhotoMarkup(row.student_id, row.nama, "profile-photo-thumbnail admin-monitoring-thumbnail", [row.kelas, row.no_matrik || row.student_id].filter(Boolean).join(" · "))}
         <div class="admin-ops-identity-copy">
@@ -1261,7 +1462,7 @@ function renderAdminMonitoringV210(options) {
           </div>
         </div>
       </header>
-      ${row.lewat ? '<div class="admin-ops-late" role="status">Lewat · Belum pulang pada waktu dijangka</div>' : ""}
+      ${urgencyLabel ? `<div class="admin-ops-urgency admin-ops-urgency-${String(urgency && urgency.state || "review").toLowerCase().replace(/_/g, "-")}" role="status">${escapeHtml(urgencyLabel)}</div>` : ""}
       <dl class="admin-ops-meta">
         <div><dt>Mohon</dt><dd>${escapeHtml(formatAdminMonitoringRequestV210(row))}</dd></div>
         <div><dt>Keluar</dt><dd>${escapeHtml(row.masa_keluar ? formatDisplayDateTime(row.masa_keluar) : "-")}</dd></div>
