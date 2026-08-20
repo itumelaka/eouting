@@ -1,11 +1,21 @@
 # Changelog
 
+## 2026-08-20 — Operational Urgency Foundation Fasa 1 (v2.4.0)
+
+- `dde1fc4` (`feat: add operational urgency foundation`) menambah resolver expected-return dan evaluator urgency backend pusat tanpa menambah lifecycle status atau schema.
+- State derived ialah `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED`, masing-masing bagi lebih 30 minit sebelum, 0–30 minit sebelum, selepas due hingga kurang 30 minit lewat, 30–kurang 60 minit lewat dan sekurang-kurangnya 60 minit lewat.
+- Resolver mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` bagi semua type termasuk custom/config-driven; fallback tarikh/22:00 hanya digunakan untuk legacy daily record yang wajar. Active malformed timing menghasilkan `needs_review=true`.
+- `confirmIn()` kini menggunakan expected-return resolver yang sama di bawah locking sedia ada dan terus menyimpan historical `lewat` sebagai `Ya/Tidak`. Timing yang benar-benar indeterminate disimpan secara konservatif sebagai `Ya` untuk semakan polisi masa hadapan.
+- Projection operational authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`. Public Monitoring kekal pada allowlist enam medan dan tidak menerima precise urgency metadata.
+- Urgency diterbitkan selepas cache source operasi 20 saat dibaca dan tidak dicache sebagai state. Tiada frontend urgency UI, Warden prioritisation, Admin intelligence dashboard, Telegram timed reminder/escalation, guardian shortcut, schema change atau version bump.
+- Full Node baseline semasa ialah **399/399 lulus**.
+
 ## 2026-08-20 — Guard responsive operational-list grid (v2.4.0)
 
 - `d30d8d9` — menjadikan tiga senarai operasi Guard sebagai grid responsif: approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang.
 - Susun atur menggunakan satu kolum di bawah `820px` dan dua kolum sama lebar mulai `820px`, dengan gap `12px`, lebar penuh dan perlindungan overflow.
 - Verifikasi browser production pada `window.innerWidth = 1707` mengesahkan computed columns `570px 570px`, posisi kiri kad berselang sekitar `270px` dan `852px`, serta lebar kad sekitar `570px`; kad tidak merentasi kedua-dua kolum.
-- Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules tidak berubah. Full Node baseline semasa **385/385 lulus**.
+- Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules tidak berubah. Baseline bagi milestone grid ini ialah **385/385 lulus**.
 
 ## 2026-08-16 — Student current-status hierarchy dan annual history consistency (v2.3.2)
 

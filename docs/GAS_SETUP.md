@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production eOuting v2.3.2 menggunakan GAS Web App **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp. Operational Urgency Foundation Fasa 1 direkodkan pada commit `dde1fc4`.
 
 ## Tanggungjawab Backend
 
@@ -9,6 +9,7 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - menghalang duplicate active request;
 - membatalkan permohonan milik Pelajar secara atomic daripada status menunggu atau diluluskan, tanpa memadam rekod;
 - menguatkuasakan approve/reject dan confirm keluar/masuk;
+- menyelesaikan expected-return authoritative dan menerbitkan urgency `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` atau `ACTION_REQUIRED` bagi rekod aktif `KELUAR`;
 - menyediakan projection public minimum dan rekod operasi authenticated;
 - menyediakan jumlah serta sejarah minimum authenticated bagi rekod `SELESAI` Pelajar dalam tahun semasa;
 - mengira statistik agregat;
@@ -33,6 +34,7 @@ Boundary penting:
 
 - `getStudents` hanya mengembalikan `student_id`, `nama`, `kelas`.
 - `getTodayRecords` hanya mengembalikan `nama`, `kelas`, `jenis_permohonan`, `status`, `lewat`, `belum_masuk`.
+- `getTodayRecords` awam tidak mengembalikan nested `operational_urgency` atau timing diagnostic tepat.
 - `getOutingStats` hanya mengembalikan aggregate structures/counts.
 
 Jangan tambah PII atau metadata operasi kepada response public tanpa security review dan regression test.
@@ -59,7 +61,7 @@ Authenticated `getTodayRecords` mengesahkan:
 - Warden: nama Warden + PIN;
 - Guard: nama Guard + PIN.
 
-Pelajar hanya menerima rekod sendiri. Warden dan Guard menerima rekod operasi yang diperlukan. Credential tidak lengkap atau salah mesti menghasilkan error; jangan fallback kepada public GET.
+Pelajar hanya menerima rekod sendiri. Warden dan Guard menerima rekod operasi yang diperlukan. Projection authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`; ia diterbitkan selepas cache source operasi 20 saat dibaca dan tidak dicache sebagai state. Credential tidak lengkap atau salah mesti menghasilkan error; jangan fallback kepada public GET.
 
 ## Credential dan Secret
 

@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan production **v2.3.2 / GAS Version 44**. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 44** selepas Operational Urgency Foundation Fasa 1 (`dde1fc4`). Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -26,6 +26,7 @@ Nama dibenarkan pada Public Monitoring read-only v1.6.25. PII dan metadata berik
 - sebab kecemasan penuh dan catatan dalaman;
 - `sebab_batal_pelajar`, `masa_batal_pelajar` dan `dibatalkan_oleh`;
 - nama pegawai/audit metadata;
+- nested `operational_urgency`, expected-return/evaluated timestamp, minit ke target/lewat, next transition, action code dan timing diagnostic;
 - `selfie_status`, `selfie_file_id`, `selfie_url`, `masa_selfie` dan `selfie_telegram_message_id`;
 - PIN, credential dan secret.
 
@@ -38,6 +39,8 @@ Rekod operasi menggunakan POST `getTodayRecords` yang berasingan:
 - Pelajar: backend sahkan `student_id` + `no_matrik` dan hanya pulangkan rekod Pelajar itu.
 - Warden: backend sahkan nama + PIN dan pulangkan rekod operasi Warden.
 - Guard: backend sahkan nama + PIN dan pulangkan rekod operasi Guard.
+
+Projection authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency` yang role-safe. Urgency tidak ditambah kepada projection GET awam.
 
 Jika credential hilang atau salah, frontend menunjukkan error terkawal. Authenticated flow tidak fallback kepada public GET dan tidak merender data awam seolah-olah data operasi.
 
@@ -68,7 +71,8 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.3.2-r1`; displayed app version ialah v2.3.2.
+- Cache source semasa ialah `eouting-cache-v2.4.0-r1`; displayed app version ialah v2.4.0.
+- Cache operasi backend 20 saat menyimpan source row, bukan derived urgency; `operational_urgency` dihitung selepas cache read menggunakan masa semasa.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
 
@@ -89,6 +93,8 @@ Role kelulusan HEP/Warden tidak dipercayai daripada frontend. Selepas credential
 `submitRequest` mengesahkan initial status, menulis nilai mengikut susunan header Sheet sebenar dan membaca semula row persisted. Blank/tidak sah tidak boleh diterima sebagai status baru, dan paparan frontend tidak menaik taraf blank kepada pending secara visual.
 
 Nilai masa sahaja Sheet dinormalkan server-side kepada `HH:mm` dengan `Asia/Kuala_Lumpur` sebelum keluar melalui API atau Telegram. Frontend tidak menggunakan aritmetik offset manual; fallback legacy hanya menghalang nilai epoch 1899 daripada bocor. Perubahan ini mengekalkan timestamp sebenar dan polisi lewat.
+
+Resolver expected-return mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` untuk semua type termasuk custom/config-driven. Fallback tarikh outing dan 22:00 hanya dibenarkan bagi legacy daily record yang wajar; active malformed timing menghasilkan `needs_review=true`. `confirmIn()` menggunakan resolver sama di bawah lock dan mengekalkan historical `lewat=Ya/Tidak`. Timing yang benar-benar indeterminate disimpan secara konservatif sebagai `Ya`, satu known limitation untuk semakan polisi masa hadapan.
 
 Untuk `cancelStudentRequest`, GAS mengesahkan semula identiti Pelajar aktif melalui `student_id` + `no_matrik`, memastikan request itu milik Pelajar tersebut dan mengesahkan sebab selepas trim pada julat 5–500 aksara. Frontend validation dan visibility butang hanyalah UX; backend tidak mempercayainya.
 

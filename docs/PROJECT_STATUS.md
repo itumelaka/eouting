@@ -8,7 +8,7 @@ Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io
 
 Verdict semasa pada **20 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 44. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r1` dan service-worker cache ialah `eouting-cache-v2.4.0-r1`. Production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Full Node suite semasa lulus **385/385**.
+`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Operational Urgency Foundation Fasa 1 telah lengkap melalui commit `dde1fc4`; full Node suite semasa lulus **399/399**.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
@@ -26,6 +26,11 @@ Production boundary semasa:
 - `PULANG_BERMALAM` boleh dipohon pada mana-mana hari, departure semasa ialah Jumaat dan earliest time `17:00`, boleh diubah Admin mengikut arahan HEP.
 - custom `KLINIK` (`Keluar ke Klinik`) beroperasi sebagai same-day tanpa tarikh manual, memerlukan masa balik, lokasi, kenderaan, kelulusan Warden dan selfie; dynamic section menggunakan `Maklumat Tambahan`;
 - blank `earliest_departure_time` bermaksud tiada sekatan masa paling awal dan Admin boleh mengosongkannya tanpa current-time fallback;
+- operational urgency backend memisahkan `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED` daripada lifecycle;
+- expected-return mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` bagi standard dan custom type, dengan legacy daily fallback sahaja apabila wajar;
+- active malformed timing menghasilkan `needs_review=true`; `confirmIn()` menggunakan resolver sama dan historical `lewat` kekal `Ya/Tidak`;
+- projection operasi authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`, tetapi Public Monitoring kekal pada allowlist enam medan;
+- urgency diterbitkan selepas cache source operasi 20 saat dibaca dan tidak dicache sebagai state;
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
@@ -59,6 +64,9 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Commit `d30d8d9` menggunakan grid responsif khusus untuk approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang: satu kolum di bawah `820px`, dua kolum sama lebar mulai `820px`.
 - Verifikasi browser production pada 20 Ogos 2026 dengan lebar viewport `1707px` menunjukkan computed columns `570px 570px`, posisi kiri berselang sekitar `270px`/`852px` dan lebar kad sekitar `570px`; kad Guard tidak merentasi kedua-dua kolum.
 - Perubahan grid tidak mengubah rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema atau business rules.
+- Operational Urgency Fasa 1 mengelaskan lebih 30 minit sebelum sebagai `NORMAL`, 0–30 minit sebelum sebagai `DUE_SOON`, selepas target hingga kurang 30 minit sebagai `LATE`, 30–kurang 60 minit sebagai `CRITICAL`, dan sekurang-kurangnya 60 minit sebagai `ACTION_REQUIRED`.
+- Exact expected-return ialah `DUE_SOON`; historical `confirmIn` pada exact target menyimpan `Tidak`, manakala actual selepas target menyimpan `Ya`.
+- Tiada schema baharu, frontend urgency UI, Warden prioritisation, Admin intelligence dashboard, Telegram timed reminder/escalation atau guardian shortcut dalam Fasa 1.
 - Public Monitoring membuka inline dalam shell landing, membuat GET awam khusus, mengelakkan overlap dan merender sekali.
 - Public Monitoring mengekalkan data lama apabila refresh gagal.
 - Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
@@ -100,6 +108,8 @@ nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 
 Public response tidak mempunyai nombor matrik, internal/request ID, telefon, waris, lokasi, tujuan, kenderaan, credential atau metadata operasi. Nama kekal dibenarkan pada Public Monitoring read-only; boundary ini diperkenalkan pada v1.6.25 dan diteruskan dalam v1.7.0.
 
+Metadata urgency tepat—termasuk `operational_urgency`, expected-return/evaluated timestamp, minit, next transition, action code dan timing diagnostic—juga tidak termasuk dalam projection awam.
+
 Metadata selfie, foto profil, URL/file ID Drive dan Telegram message ID juga tidak termasuk dalam projection awam.
 
 Operational POST kekal berasingan dan memerlukan credential role sebenar.
@@ -132,7 +142,8 @@ Nilai backend `KELUAR` tidak berubah.
 - **14 Ogos 2026:** hotfix `39265f1` dideploy sebagai v2.2.1 / cache r1 / GAS Version 40. Blank application open time disahkan kekal kosong dan isu permohonan pagi `PULANG_BERMALAM` telah diselesaikan; baseline **336/336** lulus.
 - **14 Ogos 2026:** commits `868c323`, `67b494c` dan `7d4ad23` menutup paparan HEP/Warden, persistence status/header-order serta normalisasi masa/daypart. Close-out tersebut menggunakan v2.2.1 / cache r4 / GAS Version 43 dengan baseline **353/353**.
 - **16 Ogos 2026:** commit `967cfd6` menutup hierarki `Status Semasa` dan compact history; commit `f2f55cc` menyelaraskan jumlah/sejarah tahunan. Production v2.3.2 / cache `2.3.2-r1` / GAS Version 44 disahkan melalui smoke test dengan baseline **363/363**.
-- **20 Ogos 2026:** commit `d30d8d9` menambah grid responsif khusus pada tiga senarai operasi Guard dan disahkan sebagai dua kolum sebenar pada production desktop. Release semasa v2.4.0 / cache `2.4.0-r1` kekal tanpa perubahan rendering/action Guard atau backend; baseline **385/385**.
+- **20 Ogos 2026:** commit `d30d8d9` menambah grid responsif khusus pada tiga senarai operasi Guard dan disahkan sebagai dua kolum sebenar pada production desktop. Milestone v2.4.0 / cache `2.4.0-r1` itu tidak mengubah rendering/action Guard atau backend; baseline ketika itu **385/385**.
+- **20 Ogos 2026:** commit `dde1fc4` menambah Operational Urgency Foundation Fasa 1 pada backend tanpa perubahan schema atau UI; baseline semasa meningkat kepada **399/399**.
 
 ## Production Validation v1.7.0
 
@@ -156,5 +167,6 @@ Ujian production berjaya menggunakan request `OUT-20260726-121316-1479`:
 - Telegram retry queue.
 - Consent/privacy notice refinement.
 - QR code.
-- Late-return escalation.
+- Review polisi bagi timing yang benar-benar indeterminate ketika `confirmIn`; sementara ini historical `lewat` disimpan secara konservatif sebagai `Ya`, manakala active malformed record menggunakan `needs_review=true`.
+- Bina UI/escalation di atas urgency foundation: Student clarity, Warden prioritisation, Admin intelligence dan Telegram timed reminder/escalation masih belum dilaksanakan.
 - Automated reports dan version injection.

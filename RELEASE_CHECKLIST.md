@@ -2,7 +2,7 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (16 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production kini memaparkan aplikasi v2.3.2, menggunakan cache revision `2.3.2-r1`, service worker `eouting-cache-v2.3.2-r1`, GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (20 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Repo memaparkan aplikasi v2.4.0, menggunakan cache revision `2.4.0-r1`, service worker `eouting-cache-v2.4.0-r1`, GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Operational Urgency Foundation Fasa 1 lengkap pada commit `dde1fc4` dengan baseline **399/399** tanpa version, cache, schema atau deployment baharu. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
 
 ## Close-out Production v2.3.2 — 16 Ogos 2026
 

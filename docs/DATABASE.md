@@ -1,6 +1,6 @@
 # Struktur Database Google Sheets
 
-Google Sheets ialah database dan source of truth eOuting ITU v2.3.2. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
+Google Sheets ialah database dan source of truth eOuting ITU v2.4.0. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
 ## `STUDENTS`
 
@@ -80,7 +80,9 @@ Kolum pembatalan Pelajar:
 
 Cancellation mengekalkan row asal dan hanya mengemas kini status serta metadata; rekod tidak pernah dipadam. Header ditambah secara additive melalui `ensureHeaders_`, dan lookup/write kekal berdasarkan nama header supaya row lama tanpa metadata pembatalan terus serasi. Action `cancelStudentRequest` menulis audit `CANCEL_STUDENT_REQUEST` selepas transition atomic berjaya.
 
-`lewat` ialah flag operasi dan tidak menggantikan status lifecycle. `tarikh_balik`, `hari_balik` dan `masa_balik_dijangka` digunakan oleh Pulang Bermalam/Cuti Semester. `masa_balik_dijangka` ialah nilai masa sahaja dan dinormalkan kepada `HH:mm` dalam zon `Asia/Kuala_Lumpur` apabila dibaca daripada Sheet; representasi Date epoch 1899 tidak menjadi data API.
+`lewat` ialah fakta sejarah `Ya/Tidak` dan tidak menggantikan status lifecycle. Operational urgency juga derived dan tidak disimpan sebagai lifecycle atau kolum baharu. Resolver mengutamakan `tarikh_balik + masa_balik_dijangka` bagi setiap standard atau custom/config-driven type yang mempunyai snapshot valid. Legacy daily record sahaja boleh fallback kepada `tarikh` dan 22:00 apabila wajar. `masa_balik_dijangka` dinormalkan kepada `HH:mm` dalam zon `Asia/Kuala_Lumpur`; representasi Date epoch 1899 tidak menjadi data API.
+
+`confirmIn()` menggunakan expected-return resolver yang sama: actual tepat target menyimpan `lewat=Tidak`, manakala actual selepas target menyimpan `lewat=Ya`. Timing yang benar-benar indeterminate disimpan secara konservatif sebagai `Ya`; sebelum selesai, active malformed row diterbitkan dengan `needs_review=true`. Keputusan konservatif ini ialah known limitation/future review item dan tidak memerlukan perubahan schema.
 
 `getStudentAnnualSummary` tidak menambah kolum atau sheet. Ia membaca row milik Pelajar yang telah disahkan, memilih hanya `SELESAI` bagi tahun semasa dan menggunakan set yang sama untuk `total_outings` serta `history_records`. Projection sejarah hanya `tarikh`, `jenis_permohonan` dan `status`, disusun paling baharu dahulu.
 
@@ -108,9 +110,9 @@ Public GET `getTodayRecords` membaca `OUTING_REQUESTS` tetapi memproyeksikan han
 nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 ```
 
-Ia tidak mendedahkan `student_id`, `no_matrik`, `request_id`, e-mel, telefon, waris, lokasi, tujuan, kenderaan, nama pegawai, credential, sebab/masa pembatalan, `selfie_status`, URL/file ID Drive, masa selfie, ID mesej Telegram atau metadata audit/operasi lain. Rekod cancelled tidak dipaparkan sebagai sedang keluar atau sedia keluar.
+Ia tidak mendedahkan `student_id`, `no_matrik`, `request_id`, e-mel, telefon, waris, lokasi, tujuan, kenderaan, nama pegawai, credential, sebab/masa pembatalan, `selfie_status`, URL/file ID Drive, masa selfie, ID mesej Telegram, nested `operational_urgency`, expected-return/evaluated timestamp, minit, transition, action code, timing diagnostic atau metadata audit/operasi lain. Rekod cancelled tidak dipaparkan sebagai sedang keluar atau sedia keluar.
 
-Operational POST `getTodayRecords` kekal berasingan. Selepas credential disahkan, Pelajar menerima rekod sendiri manakala Warden/Guard menerima data operasi yang diperlukan oleh flow mereka. Tiada fallback kepada projection awam.
+Operational POST `getTodayRecords` kekal berasingan. Selepas credential disahkan, Pelajar menerima rekod sendiri manakala Warden/Guard menerima data operasi yang diperlukan oleh flow mereka; projection authenticated Admin turut boleh menerima nested `operational_urgency`. Urgency dihitung selepas cache source 20 saat dibaca, tidak dicache sebagai state dan tidak menambah kolum `OUTING_REQUESTS`. Tiada fallback kepada projection awam.
 
 ## Statistik
 

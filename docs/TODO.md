@@ -1,8 +1,19 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas production close-out **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4` dengan baseline semasa **399/399**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Operational Urgency Foundation — Fasa 1
+
+- [x] Satu resolver expected-return backend mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` bagi semua standard dan custom/config-driven type.
+- [x] Legacy daily fallback kepada tarikh outing dan 22:00 dikekalkan hanya apabila wajar; malformed active timing menghasilkan `needs_review=true`.
+- [x] Urgency kekal berasingan daripada lifecycle dengan state `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED`.
+- [x] Threshold exact: lebih 30 minit sebelum, 0–30 minit sebelum, selepas due hingga kurang 30 minit lewat, 30–kurang 60 minit lewat, dan sekurang-kurangnya 60 minit lewat.
+- [x] `confirmIn()` menggunakan resolver authoritative yang sama, di bawah lock, sambil mengekalkan historical `lewat=Ya/Tidak` dan idempotency.
+- [x] Projection authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`; Public Monitoring kekal tanpa precise urgency metadata.
+- [x] Urgency diterbitkan selepas cache source 20 saat dibaca dan tidak dicache sebagai state; tiada schema change.
+- [x] Commit `dde1fc4`; full Node suite **399/399**.
 
 ### eOuting v2.4.0 Guard Responsive Grid
 
@@ -10,7 +21,7 @@ Senarai kerja semasa selepas production close-out **v2.4.0 / GAS Version 44 / ca
 - [x] Satu kolum digunakan di bawah `820px`; dua kolum sama lebar digunakan mulai `820px`, dengan gap konsisten dan perlindungan overflow.
 - [x] Browser production pada 20 Ogos 2026 mengesahkan computed columns `570px 570px` pada viewport `1707px`, posisi kad berselang sekitar `270px`/`852px` dan kad tidak merentasi kedua-dua kolum.
 - [x] Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules kekal tidak berubah.
-- [x] Full Node suite semasa **385/385** pada 20 Ogos 2026.
+- [x] Full Node suite bagi milestone Guard grid **385/385** pada 20 Ogos 2026.
 
 ### eOuting v2.3.2 Production Close-out (sejarah)
 
@@ -19,7 +30,7 @@ Senarai kerja semasa selepas production close-out **v2.4.0 / GAS Version 44 / ca
 - [x] Commit `967cfd6` menutup compact history; commit `f2f55cc` menyelaraskan jumlah/sejarah kepada scope authenticated `SELESAI` tahun semasa.
 - [x] Response sejarah minimum hanya `tarikh`, `jenis_permohonan` dan `status`, dengan ownership diperkukuh dan newest-first.
 - [x] Frontend v2.3.2 / cache `2.3.2-r1` / GAS Version 44 serta smoke test jumlah-sejarah disahkan production.
-- [x] Full Node suite semasa **363/363** pada 16 Ogos 2026.
+- [x] Full Node suite bagi milestone v2.3.2 **363/363** pada 16 Ogos 2026.
 
 ### eOuting v2.2.1 Production Close-out (sejarah)
 
@@ -189,6 +200,8 @@ Senarai kerja semasa selepas production close-out **v2.4.0 / GAS Version 44 / ca
 - [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Aplikasi`, if still required.
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
+- [ ] Review keputusan konservatif `lewat=Ya` apabila timing benar-benar indeterminate semasa `confirmIn`; active malformed record kini memberi `needs_review=true`.
+- [ ] Fasa seterusnya: Student urgency UI, Warden prioritisation, Admin operational intelligence, Telegram timed reminders/escalations dan guardian shortcut.
 
 ## Security / Access Improvements
 
@@ -212,7 +225,7 @@ Senarai kerja semasa selepas production close-out **v2.4.0 / GAS Version 44 / ca
 - [ ] Refinement notis consent/privacy Pelajar.
 - [x] Admin beta page for managing STUDENTS (A2, A3 dan LI) tanpa schema migration.
 - [ ] Nilai sama ada optimistic version column diperlukan untuk STUDENTS selepas beta concurrency QA.
-- [ ] Late-return escalation notification.
+- [ ] Late-return escalation notification di atas operational urgency foundation.
 - [ ] Optional WhatsApp notification later if required.
 - [ ] Daily/weekly/monthly report automation.
 - [ ] Automated version injection/build step.

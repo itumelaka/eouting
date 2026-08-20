@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.3.2**, cache revision `2.3.2-r1` dan production GAS Version 44.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 44. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline yang disahkan pada 16 Ogos 2026 ialah **363/363 lulus**.
+Baseline semasa selepas Operational Urgency Foundation Fasa 1 ialah **399/399 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -130,6 +130,7 @@ Suite utama:
 - `tests/student-directory-security.test.js`: projection direktori Pelajar dan login backend.
 - `tests/student-login-dropdown-privacy.test.js`: dropdown nama tanpa nombor matrik.
 - `tests/public-monitoring-statistics-security.test.js`: privacy public response, operational POST, credential runtime, statistik agregat dan status kontekstual.
+- `tests/operational-urgency-phase1.test.js`: exact urgency boundaries, same-day/multi-day/custom/legacy target resolution, Malaysia timezone, malformed timing, `confirmIn` historical `lewat`, idempotency dan Public Monitoring privacy.
 - `tests/guard-quick-filter.test.js`: filter Guard dan contextual empty-state.
 - `tests/public-monitoring-lifecycle.test.js`: one-click, scroll, GET awam, single-flight, error/cached refresh dan satu render.
 - `tests/public-monitoring-compact-layout.test.js`: layout ringkas, `Senarai Status Semasa`, ringkasan dan isolation Warden/Guard.
@@ -218,8 +219,8 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 
 ## PWA dan Cache
 
-- Semak footer v2.3.2 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.3.2-r1` dan asset query `2.3.2-r1`; displayed app version ialah v2.3.2.
+- Semak footer v2.4.0 dan popup update.
+- Semak Cache Storage menggunakan `eouting-cache-v2.4.0-r1` dan asset query `2.4.0-r1`; displayed app version ialah v2.4.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

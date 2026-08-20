@@ -18,7 +18,7 @@ Revision aset frontend semasa ialah `2.4.0-r1` dan service worker menggunakan `e
 
 Backend production semasa menggunakan GAS **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
-Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Full Node baseline semasa ialah **385/385 lulus**.
+Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; full Node baseline semasa ialah **399/399 lulus**.
 
 Commit `d30d8d9` menambah grid responsif khusus pada senarai operasi Guard: approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang. Ketiga-tiganya menggunakan satu kolum di bawah `820px` dan dua kolum sama lebar mulai `820px`. Verifikasi browser production pada 20 Ogos 2026 (`window.innerWidth = 1707`) menunjukkan computed columns `570px 570px`, posisi kad berselang sekitar `270px`/`852px` dan lebar kad sekitar `570px`, maka kad tidak merentasi kedua-dua kolum. Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules tidak berubah.
 
@@ -35,6 +35,26 @@ Mod Normal berlabel `MAKLUMAN`, manakala mod Important berlabel `PENTING`. Kedua
 Banner ialah komunikasi sahaja. Contohnya, teks “Pulang Bermalam dibenarkan keluar mulai jam 2.00 petang.” tidak mengubah `earliest_departure_time`. Admin mesti mengemas kini `Admin > Tetapan Outing > Pulang Bermalam > Masa Keluar Paling Awal` secara berasingan jika enforcement sebenar hendak berubah.
 
 Dalam workspace Pelajar, Announcement Banner menyampaikan notis operasi semasa, manakala `ruleNotice` kuning kekal authoritative untuk panduan peraturan kontekstual. Ayat panduan pendua di bawah “Permohonan Pelajar” telah dibuang; banner, `ruleNotice` dan borang outing kekal.
+
+## Operational Urgency Foundation — Fasa 1
+
+Backend kini mempunyai satu resolver sasaran pulang dan evaluator operational urgency yang authoritative untuk rekod aktif `KELUAR`. Lifecycle seperti `KELUAR` dan `SELESAI` kekal berasingan daripada urgency. State urgency ialah `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED`:
+
+| Jarak daripada masa dijangka pulang | Urgency |
+|---|---|
+| Lebih 30 minit sebelum | `NORMAL` |
+| 0–30 minit sebelum, termasuk tepat masa | `DUE_SOON` |
+| Selepas masa dijangka hingga kurang 30 minit lewat | `LATE` |
+| 30 hingga kurang 60 minit lewat | `CRITICAL` |
+| 60 minit lewat atau lebih | `ACTION_REQUIRED` |
+
+Sasaran pulang mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` bagi semua jenis, termasuk jenis custom/config-driven seperti `KLINIK`; data valid tidak lagi tersalah menggunakan fallback 22:00. Fallback tarikh hari sama dan 22:00 hanya dikekalkan bagi rekod legacy harian yang wajar. Rekod aktif dengan timing malformed atau tidak lengkap menerima diagnosis `needs_review=true`, bukan dianggap normal.
+
+`confirmIn()` menggunakan resolver yang sama untuk menyimpan fakta sejarah `lewat` sebagai `Ya` atau `Tidak`. Bagi timing yang benar-benar indeterminate ketika pengesahan masuk, keputusan konservatif ialah `lewat=Ya`; perkara ini kekal known limitation untuk semakan polisi masa hadapan.
+
+Projection operasi authenticated bagi Pelajar, Warden/HEP, Guard dan Admin boleh menerima objek nested `operational_urgency`. Urgency dihitung selepas source row dibaca daripada cache operasi 20 saat dan tidak dicache sebagai state. Public Monitoring kekal pada allowlist enam medan dan tidak menerima masa tepat, kiraan minit, transition, action code atau diagnostic urgency. Tiada schema baharu diperlukan.
+
+Fasa ini belum menambah UI urgency Pelajar, priority sorting Warden, dashboard intelligence Admin, reminder/escalation Telegram berjadual atau shortcut guardian.
 
 ## Architecture Ringkas
 
@@ -202,7 +222,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo yang disahkan pada 20 Ogos 2026 ialah **385/385 lulus**. Syntax checks:
+Baseline repo semasa selepas Operational Urgency Fasa 1 ialah **399/399 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js

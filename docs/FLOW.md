@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production semasa **v2.3.2**, cache revision `2.3.2-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready), dengan full Node baseline **363/363** pada 16 Ogos 2026.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; full Node baseline semasa ialah **399/399**.
 
 ## Backend Config API v2.0
 
@@ -152,6 +152,37 @@ KELUAR
 `DIBATALKAN_PELAJAR` ialah terminal/non-active dan berlabel `Dibatalkan oleh Pelajar`; ia tidak boleh beralih ke `KELUAR`/`SELESAI`. `lewat` ialah flag tambahan. Label kontekstual frontend tidak menukar nilai status backend. Bukti pulang menggunakan `selfie_status` yang berasingan; penghantaran selfie tidak memperkenalkan status lifecycle utama baharu.
 
 Status awal `submitRequest` disahkan sebelum append. `appendObjectRow_` mengikut susunan header Sheet sebenar, kemudian row persisted dibaca semula untuk memastikan status authoritative ialah status yang dijangka. Blank/tidak dikenali tidak dipetakan kepada pending; paparan selamat ialah `Status Tidak Diketahui`.
+
+## Flow Operational Urgency — Fasa 1
+
+Urgency ialah derived state berasingan dan tidak menukar lifecycle:
+
+```text
+normalized operational source row (cache maksimum 20 saat)
+  -> baca current now dalam Asia/Kuala_Lumpur
+  -> jika status bukan KELUAR: applicable=false
+  -> resolve tarikh_balik + masa_balik_dijangka
+       -> fallback tarikh/22:00 hanya untuk legacy daily yang wajar
+       -> malformed/indeterminate: needs_review=true
+  -> derive NORMAL / DUE_SOON / LATE / CRITICAL / ACTION_REQUIRED
+  -> nested operational_urgency dalam projection authenticated
+```
+
+Sempadan evaluator menggunakan exact elapsed time: lebih 30 minit sebelum ialah `NORMAL`; 0–30 minit sebelum termasuk tepat target ialah `DUE_SOON`; selepas target hingga kurang 30 minit ialah `LATE`; 30 hingga kurang 60 minit ialah `CRITICAL`; dan 60 minit atau lebih ialah `ACTION_REQUIRED`.
+
+Target snapshotted yang valid digunakan untuk semua type code, termasuk custom `KLINIK`, maka expected return tidak lagi tersalah fallback kepada 22:00. Urgency dibuat selepas cache read dan tidak disimpan dalam cache atau Sheet.
+
+```text
+Guard confirmIn
+  -> ScriptLock + authoritative row re-read
+  -> resolve expected-return target yang sama
+  -> actual == target: lewat=Tidak
+  -> actual > target: lewat=Ya
+  -> timing indeterminate: lewat=Ya secara konservatif
+  -> status=SELESAI
+```
+
+Historical `lewat` kekal `Ya/Tidak`. Active malformed timing kekal kelihatan sebagai `needs_review=true`; keputusan konservatif semasa `confirmIn` ialah known limitation untuk semakan polisi masa hadapan.
 
 ## Flow Pembatalan Pelajar
 
@@ -305,7 +336,7 @@ Lewat mengatasi paparan status lain. Kiraan/filter masih bergantung pada nilai b
 
 ## Public Monitoring Read-only
 
-Public Monitoring menggunakan GET awam `getTodayRecords`, tidak kira sama ada browser mempunyai sesi lain. Response hanya mengandungi nama, kelas, jenis permohonan, status, lewat dan belum_masuk.
+Public Monitoring menggunakan GET awam `getTodayRecords`, tidak kira sama ada browser mempunyai sesi lain. Response hanya mengandungi nama, kelas, jenis permohonan, status, lewat dan belum_masuk. Ia tidak menerima nested `operational_urgency`, expected-return timestamp, minit ke target/lewat, transition, action code atau timing diagnostic.
 
 Flow pembukaan:
 

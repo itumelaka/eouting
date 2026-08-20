@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.3.2** dengan cache frontend `2.3.2-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Full Node baseline semasa ialah **363/363** pada 16 Ogos 2026.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; full Node baseline semasa ialah **399/399**.
 
 ## Komponen
 
@@ -30,6 +30,25 @@ Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP
 `gas/Code.gs` menyediakan `doGet(e)` dan `doPost(e)`. Backend membaca dan menulis Google Sheets, mengesahkan credential, menguatkuasakan transition status, menyimpan selfie ke Google Drive, menulis audit log dan menghantar Telegram.
 
 Telegram ialah side effect non-blocking bagi notifikasi lifecycle biasa. Untuk `submitReturnSelfie`, penghantaran imej melalui `sendPhoto` ialah sebahagian daripada hasil bukti yang diperlukan; kegagalan sebelum transaksi lengkap mencetuskan cleanup Drive/Telegram. Kegagalan audit selepas transaksi utama berjaya hanya diberi amaran dan tidak membatalkan submission.
+
+### Operational Urgency Foundation — Fasa 1
+
+Backend memisahkan dua dimensi rekod:
+
+```text
+lifecycle: MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+urgency:   NORMAL | DUE_SOON | LATE | CRITICAL | ACTION_REQUIRED
+```
+
+Urgency hanya applicable sebagai active-return escalation bagi lifecycle `KELUAR`. Resolver expected-return mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` tanpa mengehadkannya kepada type code tertentu, maka jenis custom/config-driven dengan timing valid menggunakan target sendiri dan bukan fallback 22:00. Bagi rekod legacy harian sahaja, tarikh boleh fallback kepada `tarikh` dan masa kosong boleh fallback kepada 22:00. Timing malformed atau indeterminate menghasilkan metadata diagnostic dengan `needs_review=true`.
+
+Evaluator menggunakan `Asia/Kuala_Lumpur` dan exact elapsed time. Lebih 30 minit sebelum target ialah `NORMAL`; 0–30 minit sebelum termasuk tepat target ialah `DUE_SOON`; selepas target hingga kurang 30 minit ialah `LATE`; 30 hingga kurang 60 minit ialah `CRITICAL`; dan 60 minit atau lebih ialah `ACTION_REQUIRED`.
+
+`confirmIn()` menggunakan resolver authoritative yang sama dan menyimpan historical `lewat` dalam format schema sedia ada `Ya`/`Tidak`: tepat target ialah `Tidak`, selepas target ialah `Ya`. Timing yang benar-benar indeterminate disimpan secara konservatif sebagai `Ya`; active malformed row pula kekal reviewable melalui `needs_review=true`.
+
+`getOperationalTodayRecords` membaca normalized source rows daripada cache 20 saat, mengambil masa semasa, kemudian menghasilkan nested `operational_urgency` bagi projection authenticated Pelajar, Warden/HEP, Guard dan Admin. State urgency itu sendiri tidak dicache dan tidak ditambah kepada raw Sheet row. Public GET kekal enam medan tanpa timestamp, minit, transition, action code atau diagnostic urgency. Tiada perubahan schema dibuat.
+
+Foundation ini belum mempunyai frontend urgency UI, Warden priority sorting, Admin intelligence dashboard, timed Telegram reminder/escalation atau guardian shortcut.
 
 ### Google Sheets
 
@@ -117,7 +136,7 @@ nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 
 ### Authenticated POST
 
-`POST getTodayRecords` mengesahkan credential sebenar:
+`POST getTodayRecords` mengesahkan credential sebenar dan boleh menyertakan nested `operational_urgency` yang role-safe:
 
 - Pelajar: `student_id` + `no_matrik`, kemudian hanya rekod pelajar itu dipulangkan.
 - Warden: nama Warden + PIN, kemudian rekod operasi penuh dipulangkan.
@@ -250,7 +269,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.3.2-r1` dan query `2.3.2-r1`.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r1` dan query `2.4.0-r1`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency sentiasa diterbitkan selepas cache read menggunakan masa semasa.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
