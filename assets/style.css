@@ -1493,6 +1493,92 @@ textarea {
   box-shadow: 0 12px 30px rgba(22, 90, 159, 0.14);
 }
 
+.warden-priority-card.warden-priority-emergency {
+  border-top-color: var(--danger);
+}
+
+.warden-priority-card.warden-priority-departure {
+  border-top-color: #c76a00;
+}
+
+.warden-priority-cue {
+  border: 1px solid rgba(8, 36, 92, 0.14);
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 10px 11px;
+}
+
+.warden-priority-cue-emergency {
+  background: #fff1f1;
+  border-color: rgba(181, 33, 40, 0.3);
+  color: #762129;
+}
+
+.warden-priority-cue-departure {
+  background: #fff6e8;
+  border-color: rgba(199, 106, 0, 0.3);
+  color: #6e3500;
+}
+
+.warden-priority-heading {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  justify-content: space-between;
+}
+
+.warden-priority-heading strong {
+  color: inherit;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.warden-priority-heading span,
+.warden-priority-cue p,
+.warden-priority-facts span {
+  font-size: 0.82rem;
+}
+
+.warden-priority-cue p {
+  margin: 0;
+}
+
+.warden-priority-facts {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.warden-priority-facts div {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 8px;
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+.warden-priority-facts strong {
+  color: inherit;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 719px) {
+  .warden-priority-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .warden-priority-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .record-top {
   align-items: flex-start;
   display: flex;

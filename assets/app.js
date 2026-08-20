@@ -6571,6 +6571,127 @@ function formatOutingDurationClientV200(totalMinutes) {
   return parts.join(" ");
 }
 
+function isWardenEmergencyRequest(record) {
+  return String(record && record.jenis_permohonan || "").trim().toUpperCase() === REQUEST_TYPE.emergency;
+}
+
+function getWardenDeparturePriority(record, now) {
+  if (!record) return null;
+
+  const timeText = String(record.earliest_departure_time || "").trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timeText)) return null;
+
+  const rawDate = String(record.tarikh || record.requestDate || "").trim();
+  let dateKey = /^\d{4}-\d{2}-\d{2}/.test(rawDate) ? rawDate.slice(0, 10) : "";
+  if (!dateKey) {
+    const parsedDate = parseFlexibleDate(rawDate);
+    if (!parsedDate) return null;
+    const parts = getKualaLumpurParts(parsedDate);
+    dateKey = `${parts.year}-${parts.month}-${parts.day}`;
+  }
+
+  const target = parseFlexibleDate(`${dateKey} ${timeText}`);
+  const evaluatedAt = parseFlexibleDate(now) || new Date();
+  if (!target) return null;
+
+  const targetParts = getKualaLumpurParts(target);
+  if (`${targetParts.year}-${targetParts.month}-${targetParts.day}` !== dateKey) return null;
+
+  const remainingMilliseconds = target.getTime() - evaluatedAt.getTime();
+  if (remainingMilliseconds > 30 * 60 * 1000) return null;
+
+  return {
+    rank: 1,
+    state: remainingMilliseconds <= 0 ? "reached" : "approaching",
+    target,
+    minutes_remaining: Math.max(0, Math.ceil(remainingMilliseconds / 60000))
+  };
+}
+
+function getWardenRequestTimestamp(record) {
+  const parsed = parseFlexibleDate(record && (record.masa_mohon || record.requestedAt));
+  return parsed ? parsed.getTime() : null;
+}
+
+function getWardenPendingPriority(record, now) {
+  if (isWardenEmergencyRequest(record)) {
+    return { rank: 0, kind: "emergency", departure: null };
+  }
+
+  const departure = getWardenDeparturePriority(record, now);
+  if (departure) {
+    return { rank: 1, kind: departure.state, departure };
+  }
+
+  return { rank: 2, kind: "ordinary", departure: null };
+}
+
+function sortWardenPendingRequests(records, now) {
+  return (records || [])
+    .map((record, index) => ({
+      record,
+      index,
+      priority: getWardenPendingPriority(record, now),
+      requestedAt: getWardenRequestTimestamp(record)
+    }))
+    .sort((left, right) => {
+      if (left.priority.rank !== right.priority.rank) {
+        return left.priority.rank - right.priority.rank;
+      }
+      const leftHasTime = Number.isFinite(left.requestedAt);
+      const rightHasTime = Number.isFinite(right.requestedAt);
+      if (leftHasTime && rightHasTime && left.requestedAt !== right.requestedAt) {
+        return left.requestedAt - right.requestedAt;
+      }
+      if (leftHasTime !== rightHasTime) {
+        return leftHasTime ? -1 : 1;
+      }
+      return left.index - right.index;
+    })
+    .map((item) => item.record);
+}
+
+function formatWardenDepartureDuration(minutes) {
+  const safeMinutes = Math.max(0, Math.ceil(Number(minutes) || 0));
+  if (safeMinutes < 1) return "Kurang 1 minit";
+  return `${safeMinutes} minit`;
+}
+
+function wardenPriorityPresentation(record, now) {
+  const priority = getWardenPendingPriority(record, now);
+  if (priority.rank === 0) {
+    const requestedAt = getWardenRequestTimestamp(record);
+    const requestedFact = Number.isFinite(requestedAt)
+      ? `<div><span>Dimohon</span><strong>${escapeHtml(formatDisplayTime(new Date(requestedAt)))}</strong></div>`
+      : "";
+    return `
+      <section class="warden-priority-cue warden-priority-cue-emergency" aria-label="Keutamaan permohonan kecemasan">
+        <div class="warden-priority-heading"><strong>Kecemasan</strong><span>Perlu perhatian segera</span></div>
+        <p>Sila semak maklumat dan ambil tindakan mengikut prosedur.</p>
+        ${requestedFact ? `<div class="warden-priority-facts">${requestedFact}</div>` : ""}
+      </section>
+    `;
+  }
+
+  if (priority.rank === 1 && priority.departure) {
+    const departure = priority.departure;
+    const remainingLabel = departure.state === "reached"
+      ? "Masa keluar telah tiba"
+      : `Baki: ${formatWardenDepartureDuration(departure.minutes_remaining)}`;
+    return `
+      <section class="warden-priority-cue warden-priority-cue-departure" aria-label="Keutamaan masa keluar">
+        <div class="warden-priority-heading"><strong>${departure.state === "reached" ? "Masa keluar telah tiba" : "Masa keluar hampir tiba"}</strong><span>Keutamaan makluman</span></div>
+        <div class="warden-priority-facts">
+          <div><span>Dibenarkan keluar</span><strong>${escapeHtml(formatDisplayTime(departure.target))}</strong></div>
+          <div><span>Status masa</span><strong>${escapeHtml(remainingLabel)}</strong></div>
+        </div>
+      </section>
+    `;
+  }
+
+  return "";
+}
+
 function classSummaryCard(item, index) {
   return `
     <article class="class-summary-card">
@@ -6585,7 +6706,11 @@ function classSummaryCard(item, index) {
 }
 
 function renderWarden() {
-  const pendingRecords = outingRecords.filter((record) => record.status === STATUS.pending);
+  const now = new Date();
+  const pendingRecords = sortWardenPendingRequests(
+    outingRecords.filter((record) => record.status === STATUS.pending),
+    now
+  );
   const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
 
   renderWardenSemesterChecklist(outingRecords);
@@ -7375,7 +7500,17 @@ function recordCard(record, mode) {
   const emergencyDetail = emergencyDetailHtml(record);
   const overnightDetail = overnightDetailHtml(record, mode);
   const actorDetail = actorDetailHtml(record);
-  const cardClass = record.jenis_permohonan === REQUEST_TYPE.overnight ? "record-card overnight-card" : "record-card";
+  const wardenNow = mode === "warden" ? new Date() : null;
+  const wardenPriority = mode === "warden" ? getWardenPendingPriority(record, wardenNow) : null;
+  const wardenPriorityHtml = mode === "warden" ? wardenPriorityPresentation(record, wardenNow) : "";
+  const cardClasses = ["record-card"];
+  if (record.jenis_permohonan === REQUEST_TYPE.overnight) cardClasses.push("overnight-card");
+  if (mode === "warden") {
+    cardClasses.push("warden-priority-card");
+    if (wardenPriority.rank === 0) cardClasses.push("warden-priority-emergency");
+    if (wardenPriority.rank === 1) cardClasses.push("warden-priority-departure");
+  }
+  const cardClass = cardClasses.join(" ");
   const cardAttrs = recordDataAttributes(record);
   const guardActionCue = mode === "guard-out"
     ? `<div class="guard-action-cue guard-action-cue-out"><strong>Tindakan Keluar</strong><span>Pastikan pelajar berada di pos sebelum disahkan meninggalkan kampus.</span></div>`
@@ -7398,6 +7533,7 @@ function recordCard(record, mode) {
           <span class="badge badge-${statusDisplay.key}">${statusDisplay.icon} ${escapeHtml(statusDisplay.label)}</span>
         </div>
       </div>
+      ${wardenPriorityHtml}
       <div class="record-detail">
         <strong>Jenis Permohonan:</strong> ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}<br>
         <strong>Tujuan:</strong> ${escapeHtml(record.purpose)}<br>

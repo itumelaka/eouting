@@ -3335,15 +3335,42 @@ function getOperationalTodayRecords(payload) {
 
   const sourceRows = addWardenApprovalRoles_(addProfilePhotoIndicators_(getTodayRecordRows_()));
   const rows = addOperationalUrgency_(sourceRows, new Date());
-  return authenticatedStudent
-    ? rows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
+  const projectedRows = role === "warden"
+    ? addWardenDeparturePriorityProjection_(rows)
     : rows;
+  return authenticatedStudent
+    ? projectedRows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
+    : projectedRows;
 }
 
 function addOperationalUrgency_(rows, now) {
   return (rows || []).map((row) => Object.assign({}, row, {
     operational_urgency: getOperationalUrgency_(row, now)
   }));
+}
+
+function addWardenDeparturePriorityProjection_(rows) {
+  let outingTypes = [];
+  try {
+    outingTypes = getOutingTypes();
+  } catch (error) {
+    outingTypes = [];
+  }
+
+  const departureTimeByType = {};
+  (outingTypes || []).forEach(function (type) {
+    const typeCode = String(type && type.type_code || "").trim().toUpperCase();
+    if (!typeCode) return;
+    departureTimeByType[typeCode] = normalizeSheetTimeValue_(type.earliest_departure_time);
+  });
+
+  return (rows || []).map(function (row) {
+    const typeCode = String(row && row.jenis_permohonan || "").trim().toUpperCase();
+    const snapshottedTime = normalizeSheetTimeValue_(row && row.earliest_departure_time);
+    return Object.assign({}, row, {
+      earliest_departure_time: snapshottedTime || departureTimeByType[typeCode] || ""
+    });
+  });
 }
 
 function addProfilePhotoIndicators_(rows) {
