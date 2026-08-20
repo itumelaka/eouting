@@ -2921,6 +2921,38 @@ textarea:focus {
   color: #6e3500;
 }
 
+.guard-action-cue-in {
+  background: #dff5eb;
+  border-color: #20a985;
+  color: #075844;
+}
+
+.guard-operational-card {
+  padding: 12px 14px;
+}
+
+.guard-operational-card .record-meta {
+  margin-bottom: 0;
+}
+
+.guard-operational-card .record-top,
+.guard-emergency-safety {
+  margin-bottom: 10px;
+}
+
+.guard-emergency-safety {
+  background: #fff3f1;
+  border: 1px solid rgba(181, 54, 44, 0.28);
+  border-radius: 12px;
+  color: #6f211b;
+  font-size: 0.86rem;
+  padding: 9px 11px;
+}
+
+.guard-operational-card .record-actions {
+  grid-template-columns: 1fr;
+}
+
 .guard-return-card {
   border-top-color: #168164;
   display: flex;

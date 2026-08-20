@@ -175,6 +175,171 @@ const PUBLIC_OUTING_TYPE_FIELDS = [
   "require_selfie"
 ];
 
+const SCRIPT_CACHE = {
+  keys: {
+    students: "eouting:v1:directory:students",
+    wardens: "eouting:v1:directory:wardens",
+    guards: "eouting:v1:directory:guards",
+    outingTypesConfig: "eouting:v1:outing-types:config-v2",
+    outingTypesLegacy: "eouting:v1:outing-types:legacy",
+    profilePhotoIndicators: "eouting:v1:profile-photo-indicators",
+    operationalTodayRecords: "eouting:v1:operational:today-records"
+  },
+  ttl: {
+    students: 600,
+    wardens: 900,
+    guards: 900,
+    outingTypes: 600,
+    profilePhotoIndicators: 600,
+    operationalTodayRecords: 20
+  }
+};
+
+function getScriptCacheGenerationProperty_(name) {
+  if (!SCRIPT_CACHE.keys[name]) throw new Error("Cache key tidak dikenali.");
+  return "EOUTING_CACHE_GENERATION_" + String(name).toUpperCase();
+}
+
+function readScriptCacheGeneration_(name) {
+  try {
+    const stored = PropertiesService.getScriptProperties().getProperty(getScriptCacheGenerationProperty_(name));
+    return String(stored || "0").replace(/[^a-zA-Z0-9_-]/g, "_");
+  } catch (error) {
+    return null;
+  }
+}
+
+function getScriptCacheKey_(name, generation) {
+  const key = SCRIPT_CACHE.keys[name];
+  if (!key) throw new Error("Cache key tidak dikenali.");
+  const resolvedGeneration = generation === undefined ? readScriptCacheGeneration_(name) : generation;
+  if (resolvedGeneration === null) throw new Error("Cache generation tidak tersedia.");
+  return key + ":" + String(resolvedGeneration);
+}
+
+function readScriptCacheJson_(name, generation, validator) {
+  try {
+    const raw = CacheService.getScriptCache().get(getScriptCacheKey_(name, generation));
+    if (raw === null || raw === undefined || raw === "") return null;
+    const parsed = JSON.parse(raw);
+    return validator(parsed) ? parsed : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeScriptCacheJson_(name, generation, value, ttlSeconds) {
+  try {
+    CacheService.getScriptCache().put(getScriptCacheKey_(name, generation), JSON.stringify(value), ttlSeconds);
+  } catch (error) {
+    // CacheService is an optimization only. The Sheet-backed result remains valid.
+  }
+}
+
+function removeScriptCache_(name) {
+  const previousGeneration = readScriptCacheGeneration_(name);
+  let generationAdvanced = false;
+  try {
+    const nextGeneration = Utilities.getUuid();
+    PropertiesService.getScriptProperties().setProperty(getScriptCacheGenerationProperty_(name), nextGeneration);
+    generationAdvanced = true;
+  } catch (generationError) {
+    // Fall through to removal/tombstoning of the last known generation.
+  }
+  if (previousGeneration === null) return;
+  try {
+    CacheService.getScriptCache().remove(getScriptCacheKey_(name, previousGeneration));
+  } catch (removeError) {
+    if (!generationAdvanced) {
+      try {
+        CacheService.getScriptCache().put(getScriptCacheKey_(name, previousGeneration), "null", 1);
+      } catch (tombstoneError) {
+        // Cache reads also fail open to Sheets while CacheService is unavailable.
+      }
+    }
+  }
+}
+
+function getCachedOrLoad_(name, ttlSeconds, validator, loader) {
+  const generation = readScriptCacheGeneration_(name);
+  if (generation === null) return loader();
+  const cached = readScriptCacheJson_(name, generation, validator);
+  if (cached !== null) return cached;
+  const value = loader();
+  writeScriptCacheJson_(name, generation, value, ttlSeconds);
+  return value;
+}
+
+function isCachedObject_(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOnlyCachedFields_(value, allowedFields, requiredFields) {
+  if (!isCachedObject_(value)) return false;
+  const keys = Object.keys(value);
+  if (keys.some((key) => allowedFields.indexOf(key) === -1)) return false;
+  return (requiredFields || []).every((key) => Object.prototype.hasOwnProperty.call(value, key));
+}
+
+function isCachedStudentDirectory_(value) {
+  const fields = ["student_id", "nama", "kelas"];
+  return Array.isArray(value) && value.every((row) => hasOnlyCachedFields_(row, fields, fields));
+}
+
+function isCachedWardenDirectory_(value) {
+  const fields = ["warden_id", "nama_warden", "staffRole", "email", "no_tel", "status", "catatan"];
+  return Array.isArray(value) && value.every((row) => hasOnlyCachedFields_(row, fields, fields));
+}
+
+function isCachedGuardDirectory_(value) {
+  return Array.isArray(value) && value.every((row) => hasOnlyCachedFields_(row, ["nama_guard"], ["nama_guard"]));
+}
+
+function isCachedPublicOutingTypes_(value) {
+  return Array.isArray(value) && value.every((row) => (
+    hasOnlyCachedFields_(row, PUBLIC_OUTING_TYPE_FIELDS, PUBLIC_OUTING_TYPE_FIELDS)
+  ));
+}
+
+function isCachedProfilePhotoIndicators_(value) {
+  if (!isCachedObject_(value)) return false;
+  const fields = ["has_profile_photo", "photo_updated_at"];
+  return Object.keys(value).every((studentId) => (
+    hasOnlyCachedFields_(value[studentId], fields, fields) &&
+    typeof value[studentId].has_profile_photo === "boolean"
+  ));
+}
+
+function isCachedOperationalRows_(value) {
+  const requiredFields = ["request_id", "student_id", "jenis_permohonan", "tarikh", "status"];
+  return Array.isArray(value) && value.every((row) => (
+    hasOnlyCachedFields_(row, HEADERS.OUTING_REQUESTS, requiredFields)
+  ));
+}
+
+function invalidateStudentDirectoryCache_() {
+  removeScriptCache_("students");
+}
+
+function invalidateStaffDirectoryCache_(role) {
+  const normalizedRole = String(role || "").trim().toUpperCase();
+  if (normalizedRole === "WARDEN") removeScriptCache_("wardens");
+  if (normalizedRole === "GUARD") removeScriptCache_("guards");
+}
+
+function invalidatePublicOutingTypesCache_() {
+  removeScriptCache_("outingTypesConfig");
+  removeScriptCache_("outingTypesLegacy");
+}
+
+function invalidateProfilePhotoIndicatorCache_() {
+  removeScriptCache_("profilePhotoIndicators");
+}
+
+function invalidateOperationalRecordsCache_() {
+  removeScriptCache_("operationalTodayRecords");
+}
+
 function doGet(e) {
   try {
     const action = e && e.parameter ? e.parameter.action : "";
@@ -787,39 +952,40 @@ function withScriptLock_(callback, timeoutMessage) {
 }
 
 function getStudents() {
-  const sheet = getSheet_(SHEETS.students);
-  return getRowsAsObjects_(sheet)
-    .filter((row) => isActive_(row.status))
-    .map((row) => pick_(row, ["student_id", "nama", "kelas"]));
+  return getCachedOrLoad_("students", SCRIPT_CACHE.ttl.students, isCachedStudentDirectory_, function () {
+    const sheet = getSheet_(SHEETS.students);
+    return getRowsAsObjects_(sheet)
+      .filter((row) => isActive_(row.status))
+      .map((row) => pick_(row, ["student_id", "nama", "kelas"]));
+  });
 }
 
 function getWardens() {
-  const sheet = getSheet_(SHEETS.wardens);
-  return getRowsAsObjects_(sheet)
-    .filter((row) => isActive_(row.status))
-    .map((row) => ({
-      warden_id: row.warden_id || "",
-      nama_warden: row.nama_warden || "",
-      staffRole: deriveWardenStaffRole(row),
-      email: row.email || "",
-      no_tel: row.no_tel || "",
-      status: row.status || "",
-      catatan: row.catatan || ""
-    }));
+  return getCachedOrLoad_("wardens", SCRIPT_CACHE.ttl.wardens, isCachedWardenDirectory_, function () {
+    const sheet = getSheet_(SHEETS.wardens);
+    return getRowsAsObjects_(sheet)
+      .filter((row) => isActive_(row.status))
+      .map((row) => ({
+        warden_id: row.warden_id || "",
+        nama_warden: row.nama_warden || "",
+        staffRole: deriveWardenStaffRole(row),
+        email: row.email || "",
+        no_tel: row.no_tel || "",
+        status: row.status || "",
+        catatan: row.catatan || ""
+      }));
+  });
 }
 
 function getGuards() {
-  const sheet = getSheet_(SHEETS.guards);
-  return getRowsAsObjects_(sheet)
-    .filter((row) => isActive_(row.status))
-    .map((row) => ({
-      guard_id: row.guard_id || "",
-      nama_guard: row.nama_guard || "",
-      email: row.email || "",
-      no_tel: row.no_tel || "",
-      status: row.status || "",
-      catatan: row.catatan || ""
-    }));
+  return getCachedOrLoad_("guards", SCRIPT_CACHE.ttl.guards, isCachedGuardDirectory_, function () {
+    const sheet = getSheet_(SHEETS.guards);
+    return getRowsAsObjects_(sheet)
+      .filter((row) => isActive_(row.status))
+      .map((row) => ({
+        nama_guard: row.nama_guard || ""
+      }));
+  });
 }
 
 function loginStudent(payload) {
@@ -932,19 +1098,23 @@ function getAdminByCredentials_(adminId, adminName, pin) {
 }
 
 function getOutingTypes() {
-  if (!isOutingConfigV2Enabled_()) {
-    return getLegacyPublicOutingTypes_();
-  }
+  const configEnabled = isOutingConfigV2Enabled_();
+  const cacheName = configEnabled ? "outingTypesConfig" : "outingTypesLegacy";
+  return getCachedOrLoad_(cacheName, SCRIPT_CACHE.ttl.outingTypes, isCachedPublicOutingTypes_, function () {
+    if (!configEnabled) {
+      return getLegacyPublicOutingTypes_();
+    }
 
-  const rows = getRowsAsObjects_(getSheet_(SHEETS.outingTypes));
-  if (rows.length === 0) {
-    return getLegacyPublicOutingTypes_();
-  }
+    const rows = getRowsAsObjects_(getSheet_(SHEETS.outingTypes));
+    if (rows.length === 0) {
+      return getLegacyPublicOutingTypes_();
+    }
 
-  return sortOutingTypes_(rows
-    .map(normalizeOutingTypeRecord_)
-    .filter((row) => row.active))
-    .map(toPublicOutingType_);
+    return sortOutingTypes_(rows
+      .map(normalizeOutingTypeRecord_)
+      .filter((row) => row.active))
+      .map(toPublicOutingType_);
+  });
 }
 
 function getLegacyPublicOutingTypes_() {
@@ -1305,6 +1475,7 @@ function createStudent(payload) {
       throw new Error("no_matrik telah wujud.");
     }
     appendObjectRow_(sheet, HEADERS.STUDENTS, validated);
+    invalidateStudentDirectoryCache_();
     const adminIdentity = getSafeAdminIdentity_(admin);
     appendAuditLog(
       "CREATE_STUDENT",
@@ -1360,6 +1531,7 @@ function updateStudent(payload) {
       throw new Error("Tiada perubahan pelajar untuk disimpan.");
     }
     updateRowByHeaders_(sheet, found.rowNumber, validated);
+    invalidateStudentDirectoryCache_();
     const adminIdentity = getSafeAdminIdentity_(admin);
     appendAuditLog(
       "UPDATE_STUDENT",
@@ -1399,6 +1571,7 @@ function toggleStudentStatus(payload) {
       throw new Error(requestedStatus === "AKTIF" ? "Pelajar sudah aktif." : "Pelajar sudah tidak aktif.");
     }
     updateRowByHeaders_(sheet, found.rowNumber, { status: requestedStatus });
+    invalidateStudentDirectoryCache_();
     const adminIdentity = getSafeAdminIdentity_(admin);
     appendAuditLog(
       requestedStatus === "AKTIF" ? "ACTIVATE_STUDENT" : "DEACTIVATE_STUDENT",
@@ -1511,6 +1684,7 @@ function createStaff(payload) {
     record[config.idField] = validated.staff_id;
     record[config.nameField] = validated.nama;
     appendObjectRow_(sheet, config.headers, record);
+    invalidateStaffDirectoryCache_(config.role);
     appendAuditLog("CREATE_STAFF", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role, status: validated.status }), "STAFF", config.role + ":" + validated.staff_id);
     return toSafeAdminStaff_(record, config);
   });
@@ -1534,6 +1708,7 @@ function updateStaff(payload) {
     updates[config.nameField] = validated.nama;
     if (validated.pin) updates.pin = validated.pin;
     updateRowByHeaders_(sheet, found.rowNumber, updates);
+    invalidateStaffDirectoryCache_(config.role);
     const changedFields = Object.keys(updates).filter((field) => field !== "pin" && String(found.record[field] || "") !== String(updates[field] || ""));
     appendAuditLog("UPDATE_STAFF", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role, changed_fields: changedFields }), "STAFF", config.role + ":" + staffId);
     if (validated.pin) appendAuditLog("RESET_STAFF_PIN", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role }), "STAFF", config.role + ":" + staffId);
@@ -1553,6 +1728,7 @@ function toggleStaffStatus(payload) {
     const status = active ? "Aktif" : "Tidak Aktif";
     if (isActive_(found.record.status) === active) throw new Error(active ? "Staff sudah aktif." : "Staff sudah tidak aktif.");
     updateRowByHeaders_(sheet, found.rowNumber, { status: status });
+    invalidateStaffDirectoryCache_(config.role);
     appendAuditLog(active ? "ACTIVATE_STAFF" : "DEACTIVATE_STAFF", "", "Admin", getSafeAdminIdentity_(admin), JSON.stringify({ role: config.role, status: status }), "STAFF", config.role + ":" + staffId);
     return toSafeAdminStaff_({ ...found.record, status: status }, config);
   });
@@ -1587,6 +1763,7 @@ function createOutingType(payload) {
     };
 
     appendObjectRow_(sheet, HEADERS.OUTING_TYPES, record);
+    invalidatePublicOutingTypesCache_();
     appendAuditLog(
       "CREATE_OUTING_TYPE",
       "",
@@ -1653,6 +1830,7 @@ function updateOutingType(payload) {
     delete updates.created_by;
 
     updateRowByHeaders_(sheet, found.rowNumber, updates);
+    invalidatePublicOutingTypesCache_();
     appendAuditLog(
       "UPDATE_OUTING_TYPE",
       "",
@@ -1703,6 +1881,7 @@ function toggleOutingType(payload) {
       updated_by: adminIdentity
     };
     updateRowByHeaders_(sheet, found.rowNumber, updates);
+    invalidatePublicOutingTypesCache_();
 
     appendAuditLog(
       requestedActive ? "ACTIVATE_OUTING_TYPE" : "DEACTIVATE_OUTING_TYPE",
@@ -2163,6 +2342,7 @@ const record = withScriptLock_(function () {
   if (!persisted || String(persisted.record.status || "").trim() !== computedInitialStatus) {
     throw new Error("Status awal permohonan gagal disimpan. Permohonan tidak boleh diteruskan.");
   }
+  invalidateOperationalRecordsCache_();
   return persisted.record;
 }, "Permohonan sedang diproses. Sila cuba sebentar lagi.");
   const requestId = record.request_id;
@@ -2256,6 +2436,9 @@ function cancelStudentRequest(payload) {
     };
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
 
+  if (typeof invalidateOperationalRecordsCache_ === "function") {
+    invalidateOperationalRecordsCache_();
+  }
   appendAuditLog("CANCEL_STUDENT_REQUEST", requestId, "Student", student.nama, JSON.stringify({
     student_name: student.nama || "",
     no_matrik: student.no_matrik || "",
@@ -2309,6 +2492,7 @@ function approveRequest(payload) {
     return authoritative;
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
 
+  invalidateOperationalRecordsCache_();
   appendAuditLog("APPROVE_REQUEST", requestId, wardenStaffRole === "HEP" ? "HEP" : "Warden", warden.nama_warden, JSON.stringify({
     student_name: found.record.nama || "",
     no_matrik: found.record.no_matrik || "",
@@ -2350,6 +2534,7 @@ function rejectRequest(payload) {
     SpreadsheetApp.flush();
     return authoritative;
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
+  invalidateOperationalRecordsCache_();
 
   appendAuditLog("REJECT_REQUEST", requestId, "Warden", warden.nama_warden, JSON.stringify({
     student_name: found.record.nama || "",
@@ -2401,6 +2586,7 @@ function confirmOut(payload) {
     return Object.assign({}, found.record, { message: "Rekod sudah disahkan keluar." });
   }
 
+  invalidateOperationalRecordsCache_();
   appendAuditLog("CONFIRM_OUT", requestId, "Guard", guard.nama_guard, JSON.stringify({
     student_name: found.record.nama || "",
     no_matrik: found.record.no_matrik || "",
@@ -2456,6 +2642,7 @@ function confirmIn(payload) {
     selfie_status: requiresReturnSelfie ? "BELUM_HANTAR" : "TIDAK_DIPERLUKAN",
     catatan: guardReturnNote || found.record.catatan || ""
   });
+  invalidateOperationalRecordsCache_();
 
   appendAuditLog("CONFIRM_IN", requestId, "Guard", guard.nama_guard, JSON.stringify({
     student_name: found.record.nama || "",
@@ -2579,6 +2766,7 @@ function submitReturnSelfie(payload) {
         masa_selfie: timestamp,
         selfie_telegram_message_id: telegramMessageId
       });
+      invalidateOperationalRecordsCache_();
       completed = true;
     } catch (error) {
       deleteTelegramMessage_(telegramMessageId);
@@ -2812,6 +3000,7 @@ function submitStudentProfilePhoto(payload) {
         photo_updated_at: timestamp
       });
       SpreadsheetApp.flush();
+      invalidateProfilePhotoIndicatorCache_();
       metadataSaved = true;
       if (oldFileId && oldFileId !== newFile.getId()) {
         safelyTrashProfilePhoto_(oldFileId, folder);
@@ -2991,6 +3180,7 @@ function removeStudentProfilePhoto(payload) {
     const folder = oldFileId ? getProfilePhotoFolder_() : null;
     updateRowByHeaders_(sheet, found.rowNumber, { photo_file_id: "", photo_updated_at: "" });
     SpreadsheetApp.flush();
+    invalidateProfilePhotoIndicatorCache_();
     let fileRemoved = false;
     if (oldFileId) {
       fileRemoved = safelyTrashProfilePhoto_(oldFileId, folder);
@@ -3096,45 +3286,51 @@ function validateAnnouncementBannerViewer_(payload) {
 
 function getOperationalTodayRecords(payload) {
   const role = normalizeText_(payload && payload.role);
-  const rows = addWardenApprovalRoles_(addProfilePhotoIndicators_(getTodayRecordRows_()));
+  let authenticatedStudent = null;
 
   if (role === "student") {
     const studentId = payload.student_id || payload.id;
     const noMatrik = payload.no_matrik || payload.matric;
-    const student = findActiveStudent_(studentId, noMatrik);
-    if (!student) {
+    authenticatedStudent = findActiveStudent_(studentId, noMatrik);
+    if (!authenticatedStudent) {
       throw new Error("Akses sesi pelajar tidak sah.");
     }
-    return rows.filter((row) => normalizeText_(row.student_id) === normalizeText_(student.student_id));
-  }
-
-  if (role === "warden") {
+  } else if (role === "warden") {
     const name = payload.nama_warden || payload.warden_name || payload.name;
     if (!findActiveWarden_(name, payload.pin)) {
       throw new Error("Akses sesi warden tidak sah.");
     }
-    return rows;
-  }
-
-  if (role === "guard") {
+  } else if (role === "guard") {
     const name = payload.nama_guard || payload.guard_name || payload.name;
     if (!findActiveGuard_(name, payload.pin)) {
       throw new Error("Akses sesi guard tidak sah.");
     }
-    return rows;
+  } else {
+    throw new Error("Akses sesi diperlukan.");
   }
 
-  throw new Error("Akses sesi diperlukan.");
+  const rows = addWardenApprovalRoles_(addProfilePhotoIndicators_(getTodayRecordRows_()));
+  return authenticatedStudent
+    ? rows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
+    : rows;
 }
 
 function addProfilePhotoIndicators_(rows) {
-  const photoByStudentId = {};
-  getRowsAsObjects_(getSheet_(SHEETS.students)).forEach((student) => {
-    photoByStudentId[normalizeText_(student.student_id)] = {
-      has_profile_photo: hasCellValue_(student.photo_file_id),
-      photo_updated_at: student.photo_updated_at || ""
-    };
-  });
+  const photoByStudentId = getCachedOrLoad_(
+    "profilePhotoIndicators",
+    SCRIPT_CACHE.ttl.profilePhotoIndicators,
+    isCachedProfilePhotoIndicators_,
+    function () {
+      const indicators = {};
+      getRowsAsObjects_(getSheet_(SHEETS.students)).forEach((student) => {
+        indicators[normalizeText_(student.student_id)] = {
+          has_profile_photo: hasCellValue_(student.photo_file_id),
+          photo_updated_at: student.photo_updated_at || ""
+        };
+      });
+      return indicators;
+    }
+  );
   return (rows || []).map((row) => {
     const photo = photoByStudentId[normalizeText_(row.student_id)] || {};
     return Object.assign({}, row, {
@@ -3145,23 +3341,30 @@ function addProfilePhotoIndicators_(rows) {
 }
 
 function getTodayRecordRows_() {
-  const todayKey = formatDate_(new Date());
-  return getRowsAsObjects_(getSheet_(SHEETS.requests))
-    .filter((row) => {
-      const rowDateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
-      const returnDateKey = normalizeDateKey_(row.tarikh_balik);
-      const isTodayActivity = rowDateKey === todayKey ||
-        returnDateKey === todayKey ||
-        isDateValueToday_(row.masa_mohon, todayKey) ||
-        isDateValueToday_(row.masa_approve, todayKey) ||
-        isDateValueToday_(row.masa_keluar, todayKey) ||
-        isDateValueToday_(row.masa_masuk, todayKey) ||
-        isDateValueToday_(row.masa_batal_pelajar, todayKey);
-      const activeRecord = isActiveRequestStatus_(row.status);
-      // Active applications must stay visible even when tarikh is a future leave date.
-      const hostelReturnOpen = isHostelReturnRequest_(row) && isOpenHostelReturnStatus_(row.status);
-      return isTodayActivity || activeRecord || hostelReturnOpen;
-    });
+  return getCachedOrLoad_(
+    "operationalTodayRecords",
+    SCRIPT_CACHE.ttl.operationalTodayRecords,
+    isCachedOperationalRows_,
+    function () {
+      const todayKey = formatDate_(new Date());
+      return getRowsAsObjects_(getSheet_(SHEETS.requests))
+        .filter((row) => {
+          const rowDateKey = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_mohon);
+          const returnDateKey = normalizeDateKey_(row.tarikh_balik);
+          const isTodayActivity = rowDateKey === todayKey ||
+            returnDateKey === todayKey ||
+            isDateValueToday_(row.masa_mohon, todayKey) ||
+            isDateValueToday_(row.masa_approve, todayKey) ||
+            isDateValueToday_(row.masa_keluar, todayKey) ||
+            isDateValueToday_(row.masa_masuk, todayKey) ||
+            isDateValueToday_(row.masa_batal_pelajar, todayKey);
+          const activeRecord = isActiveRequestStatus_(row.status);
+          // Active applications must stay visible even when tarikh is a future leave date.
+          const hostelReturnOpen = isHostelReturnRequest_(row) && isOpenHostelReturnStatus_(row.status);
+          return isTodayActivity || activeRecord || hostelReturnOpen;
+        });
+    }
+  );
 }
 
 function isActiveRequestStatus_(status) {

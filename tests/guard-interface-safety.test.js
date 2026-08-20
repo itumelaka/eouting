@@ -16,24 +16,21 @@ test("Guard keluar and masuk actions have distinct wording and non-danger visual
   assert.match(appSource, /SAHKAN MASUK[\s\S]*TELAH KEMBALI ke kampus[\s\S]*Teruskan dengan Sahkan Masuk/);
 });
 
-test("Guard return card defaults to operational fields and hides history in expandable details", () => {
-  const functionStart = appSource.indexOf("function guardReturnCard");
+test("Guard return card is ultra-compact and retains only action-critical information", () => {
+  const functionStart = appSource.indexOf("function guardOperationalCard");
   const functionEnd = appSource.indexOf("\nfunction getGuardReturnTiming", functionStart);
   const returnCardSource = appSource.slice(functionStart, functionEnd);
-  const collapsedSource = returnCardSource.slice(0, returnCardSource.indexOf('<details class="guard-record-details">'));
 
-  assert.match(collapsedSource, /className[\s\S]*requestTypeLabel[\s\S]*Keluar:[\s\S]*Pulang:/);
-  assert.match(appSource, /guard-return-timing[\s\S]*<details class="guard-record-details">[\s\S]*<summary>Lihat Butiran<\/summary>/);
-  assert.doesNotMatch(collapsedSource, /Tindakan Masuk|Sedang di luar|ID \$\{/);
-  assert.match(returnCardSource, /ID Permohonan:[\s\S]*Jenis Permohonan:[\s\S]*Tujuan:[\s\S]*Lokasi:[\s\S]*Kenderaan:/);
-  assert.match(appSource, /Dalam tempoh dibenarkan/);
-  assert.match(appSource, /`Lewat \$\{formatGuardOverdueDuration/);
+  assert.match(returnCardSource, /profilePhotoMarkup[\s\S]*requestId[\s\S]*className[\s\S]*requestType[\s\S]*statusDisplay/);
+  assert.match(returnCardSource, /TINDAKAN KELUAR[\s\S]*TINDAKAN MASUK/);
+  assert.match(returnCardSource, /Pastikan pelajar berada di pos[\s\S]*Pastikan pelajar telah kembali ke kampus/);
+  assert.doesNotMatch(returnCardSource, /<details|Lihat Butiran|Tujuan:|Lokasi:|Kenderaan:|Pulang:|Keluar:|record-times/);
 });
 
 test("Guard overnight return list uses a responsive two-column grid", () => {
   assert.match(styleSource, /#guardOvernightNotReturnedSection \[data-overnight-not-returned-list\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
   assert.match(styleSource, /@media \(min-width: 720px\) \{[\s\S]*?#guardOvernightNotReturnedSection \[data-overnight-not-returned-list\][\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(styleSource, /\.guard-return-card \.record-actions \{[\s\S]*?grid-template-columns: 1fr/);
+  assert.match(styleSource, /\.guard-operational-card \.record-actions \{[\s\S]*?grid-template-columns: 1fr/);
 });
 
 test("Guard section hierarchy states direction and safe usage", () => {
@@ -44,6 +41,8 @@ test("Guard section hierarchy states direction and safe usage", () => {
 });
 
 test("Guard-only card path leaves other record card modes on the existing renderer", () => {
-  assert.match(appSource, /if \(mode === "guard-in"\) \{\s*return guardReturnCard\(record, actions\);\s*\}/);
-  assert.match(appSource, /mode === "guard-in" \|\| mode === "guard-out"/);
+  assert.match(appSource, /if \(mode === "guard-out" \|\| mode === "guard-in"\) \{\s*return guardOperationalCard\(record, mode, actions\);\s*\}/);
+  const cardStart = appSource.indexOf("function recordCard");
+  const compactStart = appSource.indexOf("\nfunction guardOperationalCard", cardStart);
+  assert.match(appSource.slice(cardStart, compactStart), /record-detail[\s\S]*record-times/);
 });

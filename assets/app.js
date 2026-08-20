@@ -7112,8 +7112,8 @@ function removeGuardPendingState(record) {
 
 function recordCard(record, mode) {
   const actions = actionButtons(record, mode);
-  if (mode === "guard-in") {
-    return guardReturnCard(record, actions);
+  if (mode === "guard-out" || mode === "guard-in") {
+    return guardOperationalCard(record, mode, actions);
   }
 
   const statusDisplay = getContextualStatusDisplay(record);
@@ -7175,50 +7175,57 @@ function recordCard(record, mode) {
   `;
 }
 
-function guardReturnCard(record, actions) {
-  const timing = getGuardReturnTiming(record, new Date());
+function guardOperationalCard(record, mode, actions) {
+  const isCheckout = mode === "guard-out";
   const requestId = getRecordId(record);
   const cardClass = record.jenis_permohonan === REQUEST_TYPE.overnight || record.jenis_permohonan === REQUEST_TYPE.semester
-    ? "record-card overnight-card guard-return-card"
-    : "record-card guard-return-card";
-  const vehicleDetail = record.butiran_kenderaan || "Tiada butiran";
+    ? "record-card overnight-card guard-operational-card"
+    : "record-card guard-operational-card";
+  const studentName = record.studentName || record.nama || "-";
+  const className = record.className || record.kelas || "-";
+  const requestType = requestTypeLabel(record.jenis_permohonan);
+  const statusDisplay = getContextualStatusDisplay(record);
+  const emergencyReason = String(record.sebab_kecemasan || "").trim();
+  const emergencyPhone = String(record.telefon_waris || "").trim();
+  const emergencyNote = String(record.catatan_kecemasan || "").trim();
+  const emergencyRelation = String(record.hubungan_waris || "").trim();
+  const emergencyLines = [];
+  if (emergencyReason) emergencyLines.push(`<strong>Sebab Kecemasan:</strong> ${escapeHtml(emergencyReason)}`);
+  if (emergencyPhone) {
+    emergencyLines.push(
+      `<strong>Waris:</strong> ${escapeDisplayPhone(emergencyPhone)}${emergencyRelation ? ` · ${escapeHtml(emergencyRelation)}` : ""}` +
+      guardianContactHtml(emergencyPhone)
+    );
+  }
+  if (emergencyNote) emergencyLines.push(`<strong>Catatan:</strong> ${escapeHtml(emergencyNote)}`);
+  const emergencySafety = record.jenis_permohonan === REQUEST_TYPE.emergency && emergencyLines.length
+    ? `<div class="guard-emergency-safety">${emergencyLines.join("<br>")}</div>`
+    : "";
+  const actionHeading = isCheckout ? "TINDAKAN KELUAR" : "TINDAKAN MASUK";
+  const actionInstruction = isCheckout
+    ? "Pastikan pelajar berada di pos sebelum disahkan meninggalkan kampus."
+    : "Pastikan pelajar telah kembali ke kampus.";
 
   return `
     <article class="${cardClass}" ${recordDataAttributes(record)}>
-      <div class="guard-return-top">
+      <div class="record-top">
         <div class="record-person">
-          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail", [record.className || record.kelas, record.student_id || record.studentId].filter(Boolean).join(" · "))}
+          ${profilePhotoMarkup(record.student_id || record.studentId, studentName, "profile-photo-thumbnail", [className, record.student_id || record.studentId].filter(Boolean).join(" · "))}
           <div>
-            <h3>${escapeHtml(record.studentName || record.nama || "-")}</h3>
-            <div class="record-meta">${escapeHtml(record.className || record.kelas || "-")} · ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}</div>
+            <h3>${escapeHtml(studentName)}</h3>
+            <div class="record-meta">${escapeHtml(requestId || "-")} | ${escapeHtml(className)}</div>
           </div>
         </div>
-      </div>
-      <div class="guard-return-schedule">
-        <p><span>Keluar:</span> <strong>${escapeHtml(formatDisplayDateTime(record.outAt || record.masa_keluar))}</strong></p>
-        <p><span>Pulang:</span> <strong>${escapeHtml(timing.expectedDisplay)}</strong></p>
-      </div>
-      <div class="guard-return-timing ${timing.isLate ? "is-late" : "is-on-time"}" role="status">
-        <strong>${escapeHtml(timing.label)}</strong>
-      </div>
-      <details class="guard-record-details">
-        <summary>Lihat Butiran</summary>
-        <div class="record-detail">
-          <strong>ID Permohonan:</strong> ${escapeHtml(requestId || "-")}<br>
-          <strong>Jenis Permohonan:</strong> ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}<br>
-          <strong>Tujuan:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
-          <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
-          <strong>Kenderaan:</strong> ${escapeHtml(record.jenis_kenderaan || "-")}<br>
-          <strong>Butiran Kenderaan:</strong> ${escapeHtml(vehicleDetail)}
-          ${emergencyDetailHtml(record)}
-          ${overnightDetailHtml(record, "guard-in")}
-          ${actorDetailHtml(record)}
+        <div class="badge-stack">
+          <span class="badge badge-request-type">${escapeHtml(requestType)}</span>
+          <span class="badge badge-${statusDisplay.key}">${statusDisplay.icon} ${escapeHtml(statusDisplay.label)}</span>
         </div>
-        <div class="record-times">
-          <span>Mohon: ${formatTime(record.requestedAt)}</span>
-          <span>Lulus/Tolak: ${formatTime(record.approvedAt || record.rejectedAt)}</span>
-        </div>
-      </details>
+      </div>
+      ${emergencySafety}
+      <div class="guard-action-cue ${isCheckout ? "guard-action-cue-out" : "guard-action-cue-in"}">
+        <strong>${actionHeading}</strong>
+        <span>${actionInstruction}</span>
+      </div>
       ${actions}
     </article>
   `;

@@ -209,6 +209,7 @@ test("audit failure does not fail or roll back a completed selfie submission", (
     buildReturnSelfieCaption_: () => "caption",
     sendTelegramPhoto_: () => ({ ok: true, messageId: 123 }),
     updateRowByHeaders_: () => {},
+    invalidateOperationalRecordsCache_: () => {},
     deleteTelegramMessage_: () => { calls.deleteTelegram += 1; },
     appendAuditLog: () => {
       calls.audit += 1;

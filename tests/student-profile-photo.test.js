@@ -453,8 +453,8 @@ test("preview remains absent from public monitoring and does not expose Drive id
 });
 
 test("Warden and Guard operational cards render compact photos and neutral placeholders", () => {
-  const card = extractFunction(app, "recordCard", "guardReturnCard");
-  const guardReturn = extractFunction(app, "guardReturnCard", "getGuardReturnTiming");
+  const card = extractFunction(app, "recordCard", "guardOperationalCard");
+  const guardReturn = extractFunction(app, "guardOperationalCard", "getGuardReturnTiming");
   assert.match(card, /profilePhotoMarkup/);
   assert.match(guardReturn, /profilePhotoMarkup/);
   assert.match(app, /profile-photo-placeholder/);
