@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 44. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 berada pada commit `89d6b46`.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 44. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`.
 
 ## Keperluan
 
@@ -100,7 +100,15 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline semasa selepas Student Live Status Clarity Fasa 2 ialah **410/410 lulus**.
+Baseline semasa selepas Warden Approval Prioritisation + Emergency Mode Fasa 3 ialah **420/420 lulus**.
+
+Jalankan focused Phase 3 suite:
+
+```powershell
+node --test tests/warden-approval-priority-phase3.test.js
+```
+
+Focused Phase 3 baseline ialah **10/10 lulus**.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
@@ -127,6 +135,7 @@ Suite utama:
 - `tests/secure-outing-statistics.test.js`: jumlah dan yearly history menggunakan scope authenticated `SELESAI` yang sama, response minimum, ownership dan newest-first.
 - `tests/student-current-status-layout.test.js`: `Status Semasa` live/current di atas borang, compact yearly history di bawah dan refresh kedua-dua data source.
 - `tests/student-live-status-clarity-phase2.test.js`: rendering semua state urgency/review, lifecycle separation, expected-return display, local duration wording, authoritative transition refresh, duplicate suppression serta perlindungan flow Student sedia ada.
+- `tests/warden-approval-priority-phase3.test.js`: emergency-first, departure approaching/reached, oldest-first/stable fallback, Malaysia timezone, non-fabricated timing, non-bypass guidance, Warden-only projection dan responsive priority card.
 - `tests/announcement-banner-v1.test.js`: Admin UI/save, authenticated projection, ticker sentiasa aktif, hover/fokus pause, reduced-motion, public privacy dan cleanup panduan Pelajar.
 - `tests/student-directory-security.test.js`: projection direktori Pelajar dan login backend.
 - `tests/student-login-dropdown-privacy.test.js`: dropdown nama tanpa nombor matrik.

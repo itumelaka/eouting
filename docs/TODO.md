@@ -1,8 +1,20 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 lengkap dalam commit `89d6b46`. Baseline semasa ialah **410/410**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`. Baseline semasa ialah **420/420**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Warden Approval Prioritisation + Emergency Mode — Fasa 3
+
+- [x] Pending Warden disusun mengikut emergency, departure approaching/reached dan ordinary tanpa menambah lifecycle state.
+- [x] Dalam setiap bucket, `masa_mohon` sah disusun oldest-first; row tanpa timestamp menyusul menggunakan fallback deterministic/stable.
+- [x] Compatibility `jenis_permohonan === KECEMASAN` dipusatkan untuk ordering, visual emphasis dan procedural guidance Warden.
+- [x] Emergency priority tidak secara sendiri auto-approve, bypass authority Warden/Guard atau mengubah lifecycle; generic config `require_warden_approval=false`/`AUTO_CONFIG_V2` kekal authoritative dan tidak diubah.
+- [x] Departure priority menggunakan `earliest_departure_time`, tarikh request authoritative dan zon masa Malaysia; timing hilang/malformed tidak mereka priority.
+- [x] Projection Warden mengutamakan masa request-level, menggunakan `OUTING_TYPES` semasa hanya sebagai cloned fallback dan tidak menulis ke `OUTING_REQUESTS` atau Sheet.
+- [x] Student, Guard, Admin dan Public projection tidak diluaskan; authentication, approve/reject, validation, actor recording, checklist/filter/counter dan privacy boundary dikekalkan.
+- [x] Kad priority kompak disahkan pada mobile sekitar 390px dan desktop 1280×720 tanpa horizontal overflow.
+- [x] Commit `5443375` (`feat: prioritize warden emergency approvals`); focused suite **10/10**, full Node suite **420/420**.
 
 ### Student Live Status Clarity — Fasa 2
 
@@ -212,7 +224,8 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
 - [ ] Review keputusan konservatif `lewat=Ya` apabila timing benar-benar indeterminate semasa `confirmIn`; active malformed record kini memberi `needs_review=true`.
-- [ ] Fasa 3+: Warden approval prioritisation, emergency handling mode, Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminders/escalations dengan GAS time-driven trigger dan guardian/waris shortcut.
+- [ ] Fasa 4+: Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminders/escalations dengan GAS time-driven trigger dan guardian/waris shortcut.
+- [ ] Pertimbang snapshot request-level `earliest_departure_time` dalam schema/version masa hadapan; sementara itu perubahan config boleh mentafsir semula priority fallback-only Warden, manakala snapshot request-level sah kekal stabil.
 
 ## Security / Access Improvements
 
@@ -237,8 +250,8 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [x] Admin beta page for managing STUDENTS (A2, A3 dan LI) tanpa schema migration.
 - [ ] Nilai sama ada optimistic version column diperlukan untuk STUDENTS selepas beta concurrency QA.
 - [ ] Late-return escalation notification di atas operational urgency foundation.
-- [ ] Warden approval prioritisation berasaskan urgency tanpa mengubah lifecycle.
-- [ ] Emergency priority configuration/handling mode.
+- [x] Warden approval prioritisation tanpa mengubah lifecycle.
+- [x] Emergency priority presentation/handling compatibility untuk Warden tanpa approval bypass baharu.
 - [ ] Admin operational urgency KPI dan tindakan `Perlu Tindakan`.
 - [ ] Telegram timed return reminder/escalation dengan GAS time-driven trigger.
 - [ ] Guardian/waris shortcut.

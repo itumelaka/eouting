@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-20 — Warden Approval Prioritisation + Emergency Mode / Fasa 3 (v2.4.0)
+
+- `5443375` (`feat: prioritize warden emergency approvals`) mengubah `assets/app.js`, `assets/style.css`, `gas/Code.gs` dan menambah `tests/warden-approval-priority-phase3.test.js`.
+- Pending Warden kini disusun emergency-first, diikuti departure dalam 30 minit/yang telah tiba, kemudian ordinary; setiap bucket menggunakan `masa_mohon` oldest-first dan fallback deterministic bagi timestamp yang tidak boleh digunakan.
+- Emergency compatibility `jenis_permohonan === KECEMASAN` dipusatkan untuk Warden ordering, visual emphasis dan contextual guidance. Ia tidak sendiri auto-approve, bypass Warden/Guard atau menukar lifecycle.
+- Generic config `require_warden_approval=false` kekal boleh menggunakan `AUTO_CONFIG_V2`; Fasa 3 tidak memperkenalkan atau mengubah business rule sedia ada itu.
+- Departure priority menggunakan tarikh request authoritative, `earliest_departure_time` dan zon masa Malaysia; timing hilang/malformed tidak menghasilkan priority rekaan dan Phase 1 return urgency tidak digunakan sebagai approval rank.
+- Backend mengutamakan masa request-level dan menggunakan `OUTING_TYPES.earliest_departure_time` semasa hanya sebagai fallback pada cloned Warden-authenticated projection. Tiada write ke `OUTING_REQUESTS`/Sheet dan projection Student, Guard, Admin serta Public tidak diluaskan.
+- Known limitation: perubahan config selepas submission boleh mentafsir semula fallback-only record; request dengan snapshot departure sah kekal stabil. Snapshot request-level ialah pertimbangan schema masa hadapan.
+- Approve/reject, rejection validation, actor recording, lifecycle/Guard authority, checklist semester/overnight, filter/counter, Student/Guard/Admin UI dan Public Monitoring privacy kekal. Kad priority lulus verifikasi mobile sekitar 390px dan desktop 1280×720.
+- Admin intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation dan trigger, guardian shortcut/access scope, `OUTING_TYPES.operational_priority`, request column/snapshot schema, lifecycle state, threshold urgency, version bump dan deployment tidak termasuk.
+- Focused Phase 3 baseline ialah **10/10 lulus**; full Node baseline semasa ialah **420/420 lulus**.
+
 ## 2026-08-20 — Student Live Status Clarity / Fasa 2 (v2.4.0)
 
 - `89d6b46` (`feat: improve student live outing status`) melengkapkan presentation Student yang menggunakan `operational_urgency` authoritative daripada backend Fasa 1. Perubahan implementation terhad kepada `assets/app.js`, `assets/style.css`, `tests/student-current-status-layout.test.js` dan `tests/student-live-status-clarity-phase2.test.js`.
@@ -8,7 +21,7 @@
 - Timer refresh Student 30 saat sedia ada digunakan semula untuk wording tempoh local. Apabila `next_transition_at` dilepasi, transition key dan single-flight mencetuskan satu refresh authoritative tanpa timer tambahan atau overlap.
 - Metadata hilang/malformed atau `needs_review=true` menghasilkan panduan review selamat tanpa countdown/late state rekaan. `SELESAI`, cancellation, return-selfie, annual summary/history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary dikekalkan.
 - Warden prioritisation, emergency mode, Admin urgency KPI/`Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger dan guardian/waris shortcut kekal Fasa 3+. Tiada schema change, backend threshold change, version bump atau deployment direkodkan bagi Fasa 2.
-- Full Node baseline semasa ialah **410/410 lulus**.
+- Full Node baseline bagi milestone Fasa 2 ialah **410/410 lulus**.
 
 ## 2026-08-20 — Operational Urgency Foundation Fasa 1 (v2.4.0)
 

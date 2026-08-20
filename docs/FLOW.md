@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 disiapkan dalam repo melalui commit `89d6b46`. Full Node baseline semasa ialah **410/410**.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`. Full Node baseline semasa ialah **420/420**.
 
 ## Backend Config API v2.0
 
@@ -217,6 +217,36 @@ tiada countdown atau late state rekaan
 Paparan expected return menggunakan masa bagi rekod hari sama dan tarikh + masa bagi rekod kemudian/bermalam. Target datang daripada snapshot request/backend; frontend tidak membaca semula `OUTING_TYPES`. Wording hard-coded “pulang sebelum 10:00 malam” tidak lagi digunakan.
 
 Flow `SELESAI`, cancellation, return-selfie, annual summary/history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary kekal. Warden priority sorting, emergency mode, Admin urgency KPI/`Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger dan guardian/waris shortcut tidak termasuk dalam Fasa 2.
+
+## Flow Warden Approval Prioritisation + Emergency Mode — Fasa 3
+
+```text
+authenticated Warden records
+        ↓
+pending requests
+        ↓
+emergency classification
+        ↓
+departure-priority classification
+        ↓
+stable oldest-first sorting
+        ↓
+Warden cards/actions
+```
+
+Pending requests dibahagikan kepada emergency, departure approaching/reached, kemudian ordinary. Emergency compatibility menggunakan helper pusat bagi `jenis_permohonan === KECEMASAN`. Bagi non-emergency, departure diberi priority jika `earliest_departure_time` berada dalam 30 minit seterusnya atau telah tiba pada tarikh request authoritative dalam zon masa Malaysia. Timing hilang atau malformed tidak menghasilkan priority. Dalam setiap bucket, `masa_mohon` sah disusun oldest-first; row tanpa timestamp menyusul dengan fallback deterministic/stable.
+
+Backend mengutamakan `earliest_departure_time` request-level yang boleh digunakan. Jika tiada, nilai semasa `OUTING_TYPES` boleh ditambah hanya pada cloned projection Warden authenticated. Nilai fallback tidak ditulis ke `OUTING_REQUESTS` atau Sheet dan tidak dihantar sebagai fallback request-level kepada Student, Guard, Admin atau Public. Akibatnya, config yang berubah selepas submission boleh mentafsir semula priority bagi fallback-only record; snapshot request-level yang sah kekal stabil. Snapshot departure per request ialah pertimbangan schema masa hadapan.
+
+Classification ini hanya mengubah ordering dan presentation. Action approve/reject, authentication, rejection validation, actor recording, lifecycle transition dan Guard authority tidak berubah. Emergency priority tidak auto-approve atau bypass Warden/Guard. Secara berasingan, generic config `require_warden_approval=false` kekal authoritative dan boleh menggunakan `AUTO_CONFIG_V2`; Fasa 3 tidak mengubah flow itu.
+
+```text
+Lifecycle:                MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+Warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
+Return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
+```
+
+Contoh `MENUNGGU_KELULUSAN + emergency approval priority` berbeza daripada `KELUAR + CRITICAL return urgency`. Fasa 3 tidak menambah lifecycle state, request column, `OUTING_TYPES.operational_priority`, Admin urgency queue/KPI, Telegram timed reminder/escalation atau trigger, guardian shortcut/access scope, threshold return urgency, version atau deployment.
 
 ## Flow Pembatalan Pelajar
 

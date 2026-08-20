@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dilengkapkan dalam repo melalui commit `89d6b46`. Full Node baseline semasa ialah **410/410**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`. Full Node baseline semasa ialah **420/420**.
 
 ## Komponen
 
@@ -72,6 +72,26 @@ Satu timer refresh Pelajar 30 saat yang sedia ada digunakan untuk kemas kini tek
 Rekod hari sama memaparkan masa `expected_return_at`; rekod kemudian atau bermalam memaparkan tarikh dan masa. Frontend tidak membaca `OUTING_TYPES` semasa untuk membina semula target kerana snapshot request/backend ialah sumber authoritative. Metadata hilang, malformed atau `needs_review=true` masuk ke paparan review selamat tanpa countdown/state lewat rekaan.
 
 Fasa 2 hanya mengubah presentation Pelajar dalam `assets/app.js` dan `assets/style.css`, dengan regression coverage dalam `tests/student-current-status-layout.test.js` dan `tests/student-live-status-clarity-phase2.test.js`. Lifecycle `SELESAI`, cancellation, return-selfie, annual history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary tidak berubah. Warden prioritisation, emergency mode, Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger dan guardian shortcut kekal Fasa 3+; tiada schema, backend threshold, version atau deployment change dalam Fasa 2.
+
+### Warden Approval Prioritisation + Emergency Mode — Fasa 3
+
+Fasa 3 menambah dimensi approval-priority yang berasingan daripada lifecycle dan return urgency:
+
+```text
+lifecycle:                MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
+return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
+```
+
+Priority hanya menyusun rekod `MENUNGGU_KELULUSAN` untuk Warden. Emergency compatibility dipusatkan pada `jenis_permohonan === KECEMASAN`; ia mempengaruhi sorting, visual emphasis dan contextual guidance, bukan status atau authority. Approve/reject backend dan Guard transition kekal tidak berubah. Generic config `require_warden_approval=false` masih boleh menggunakan `AUTO_CONFIG_V2`; behavior sedia ada itu bukan emergency bypass Fasa 3.
+
+Untuk bucket departure, frontend menggunakan `earliest_departure_time`, tarikh request authoritative dan `Asia/Kuala_Lumpur`; masa dalam 30 minit atau yang telah tiba diberi priority, manakala timing hilang/malformed tidak mereka priority. Dalam setiap bucket, timestamp `masa_mohon` yang sah disusun oldest-first, diikuti rekod tanpa timestamp dengan ordering fallback deterministic/stable.
+
+`getOperationalTodayRecords` hanya memanggil `addWardenDeparturePriorityProjection_` selepas Warden disahkan. Helper mengklon row, mengutamakan `earliest_departure_time` yang dibawa request jika boleh digunakan dan menggunakan nilai `OUTING_TYPES` semasa hanya sebagai compatibility fallback. Projection ini derived dan tidak dipersist: tiada write ke `OUTING_REQUESTS` atau Sheet, dan Student, Guard, Admin serta Public tidak menerima fallback request-level tersebut.
+
+Known limitation/future schema consideration: bagi request tanpa snapshot departure request-level, perubahan `OUTING_TYPES.earliest_departure_time` selepas submission boleh mentafsir semula priority Warden. Request dengan nilai request-level sah kekal stabil. Snapshot masa keluar per request boleh dipertimbangkan dalam schema/version akan datang; Fasa 3 tidak menambah request column, `OUTING_TYPES.operational_priority` atau schema baharu.
+
+Presentation kad Warden adalah compact dan procedural, termasuk cue kecemasan atau departure serta butiran kecemasan/waris yang memang telah diizinkan. Control approval/rejection, validation, actor recording, checklist semester/overnight, filter/counter, authentication dan privacy boundary dikekalkan. Mobile sekitar 390px dan desktop 1280×720 disahkan tanpa overflow. Admin intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation dan trigger, guardian shortcut/access scope serta threshold return urgency kekal Fasa 4+.
 
 ### Google Sheets
 

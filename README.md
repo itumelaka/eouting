@@ -18,7 +18,7 @@ Revision aset frontend semasa ialah `2.4.0-r1` dan service worker menggunakan `e
 
 Backend production semasa menggunakan GAS **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
-Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 telah dilengkapkan dalam repo melalui commit `89d6b46`. Full Node baseline semasa ialah **410/410 lulus**.
+Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375` (`feat: prioritize warden emergency approvals`). Full Node baseline semasa ialah **420/420 lulus**.
 
 Commit `d30d8d9` menambah grid responsif khusus pada senarai operasi Guard: approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang. Ketiga-tiganya menggunakan satu kolum di bawah `820px` dan dua kolum sama lebar mulai `820px`. Verifikasi browser production pada 20 Ogos 2026 (`window.innerWidth = 1707`) menunjukkan computed columns `570px 570px`, posisi kad berselang sekitar `270px`/`852px` dan lebar kad sekitar `570px`, maka kad tidak merentasi kedua-dua kolum. Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules tidak berubah.
 
@@ -65,6 +65,28 @@ Frontend Pelajar tidak mengira threshold atau menukar state urgency sendiri. GAS
 Wording lama Pelajar yang hard-coded “pulang sebelum 10:00 malam” telah dibuang. UI tidak membaca semula `OUTING_TYPES` untuk mereka sasaran pulang; snapshot request/backend kekal authoritative. Jika metadata urgency hilang, malformed atau `needs_review=true`, Pelajar melihat panduan selamat `MAKLUMAT WAKTU PULANG PERLU DISEMAK` tanpa countdown atau state lewat rekaan.
 
 Flow `SELESAI`, pembatalan, return-selfie, ringkasan/sejarah tahunan, foto profil, Announcement Banner/`ruleNotice`, authentication dan privacy boundary sedia ada dikekalkan. Fasa 2 tidak menambah Warden priority sorting, emergency priority configuration/mode, KPI urgency Admin atau `Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger, shortcut guardian/waris, schema/threshold backend, version bump atau deployment. Semua itu kekal kerja Fasa 3+.
+
+## Warden Approval Prioritisation + Emergency Mode — Fasa 3
+
+Commit `5443375` (`feat: prioritize warden emergency approvals`) melengkapkan susunan kerja approval Warden tanpa menambah lifecycle state. Rekod pending disusun mengikut bucket: (1) kecemasan, (2) masa keluar dalam 30 minit atau telah tiba, kemudian (3) pending biasa. Dalam setiap bucket, `masa_mohon` yang sah disusun paling lama menunggu dahulu; rekod tanpa timestamp yang boleh digunakan menyusul dengan fallback ordering yang deterministic/stable. Sorting ini hanya untuk kerja approval Warden.
+
+Keserasian kecemasan kekal `jenis_permohonan === KECEMASAN` dan dipusatkan untuk prioritisation Warden. Ia mempengaruhi ordering, penegasan visual dan panduan kontekstual sahaja; ia tidak secara sendiri auto-approve, memintas kuasa Warden atau Guard, atau menukar lifecycle. Peraturan config generik sedia ada kekal authoritative: jika sesuatu jenis mempunyai `require_warden_approval=false`, flow `AUTO_CONFIG_V2` boleh meluluskannya secara automatik. Fasa 3 tidak memperkenalkan atau mengubah behavior generik itu.
+
+Bagi pending bukan kecemasan, priority departure menggunakan `earliest_departure_time`, tarikh request authoritative dan zon masa Malaysia. Timing hilang atau malformed tidak menghasilkan priority rekaan. Backend mengutamakan nilai request-carried yang boleh digunakan; nilai semasa `OUTING_TYPES` hanya fallback compatibility pada cloned projection Warden authenticated. Fallback itu tidak ditulis semula ke `OUTING_REQUESTS` atau mana-mana Sheet dan tidak meluaskan projection Student, Guard, Admin atau Public.
+
+Known limitation: request tanpa snapshot departure pada tahap request boleh ditafsir menggunakan `OUTING_TYPES.earliest_departure_time` semasa ketika dipaparkan kepada Warden. Perubahan config selepas submission boleh mengubah priority fallback-only, manakala request yang sudah membawa masa request-level yang sah kekal stabil. Snapshot departure per request ialah pertimbangan schema/version masa hadapan, bukan sebahagian Fasa 3.
+
+Kad Warden authenticated boleh memaparkan cue kompak seperti `Kecemasan`, `Perlu perhatian segera`, `Masa keluar hampir tiba` atau `Masa keluar telah tiba`, bersama fakta/prosedur dan butiran kecemasan/waris yang memang telah dibenarkan. Approve/reject, validation rejection, actor approval, transition lifecycle, kuasa Guard, checklist semester/overnight, filter/counter serta UI Student/Guard/Admin/Public kekal. Layout disahkan pada mobile sekitar 390px tanpa overflow dan desktop 1280×720. Fasa 4+—Admin operational intelligence/`Perlu Tindakan`, reminder/escalation Telegram berjadual dan GAS trigger, guardian/waris shortcut atau access scope baharu—belum dilaksanakan.
+
+Tiga dimensi kekal berasingan:
+
+```text
+Lifecycle:                MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+Warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
+Return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
+```
+
+`MENUNGGU_KELULUSAN + emergency approval priority` tidak sama dengan `KELUAR + CRITICAL return urgency`.
 
 ## Architecture Ringkas
 
@@ -232,7 +254,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo semasa selepas Student Live Status Clarity Fasa 2 ialah **410/410 lulus**. Syntax checks:
+Baseline repo semasa selepas Warden Approval Prioritisation + Emergency Mode Fasa 3 ialah **420/420 lulus**. Focused Phase 3 suite `tests/warden-approval-priority-phase3.test.js` ialah **10/10 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js
