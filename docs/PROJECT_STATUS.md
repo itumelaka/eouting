@@ -8,7 +8,7 @@ Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io
 
 Verdict semasa pada **20 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 44. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r1` dan service-worker cache ialah `eouting-cache-v2.4.0-r1`. Production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Operational Urgency Foundation Fasa 1 telah lengkap melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`. Full Node suite semasa lulus **420/420**; focused Phase 3 suite lulus **10/10**.
+`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Operational Urgency Foundation Fasa 1 telah lengkap melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`. Full Node suite semasa lulus **429/429**; focused Phase 4 suite lulus **9/9**. Fasa 5 belum dimulakan.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
@@ -32,6 +32,9 @@ Production boundary semasa:
 - projection operasi authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`, tetapi Public Monitoring kekal pada allowlist enam medan;
 - urgency diterbitkan selepas cache source operasi 20 saat dibaca dan tidak dicache sebagai state;
 - Student `Status Semasa` merender urgency backend, expected return dan review state tanpa mengira threshold sendiri; local timer hanya mengemas kini wording tempoh dan meminta refresh authoritative selepas `next_transition_at`;
+- Pemantauan Admin merender tujuh KPI operational daripada normalized dataset bersama: semua `KELUAR`, exact `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED`, active `needs_review=true` dan pending `KECEMASAN`;
+- queue `Perlu Tindakan` menyusun `ACTION_REQUIRED`, `CRITICAL`, `needs_review` dan pending emergency; ordinary `LATE`, `DUE_SOON`, `NORMAL`, pending bukan kecemasan serta record terminal dikecualikan;
+- Admin menggunakan urgency backend authoritative dan tidak mereka threshold/state; pending emergency tidak memberi Admin approval authority atau memintas Warden;
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
@@ -74,8 +77,8 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Emergency compatibility kekal `jenis_permohonan === KECEMASAN` dan hanya mengubah ordering, visual emphasis serta guidance. Ia tidak sendiri auto-approve, bypass Warden/Guard atau menukar lifecycle. Generic `require_warden_approval=false` dan `AUTO_CONFIG_V2` kekal behavior config sedia ada yang berasingan.
 - Projection departure Warden mengutamakan `earliest_departure_time` request-level dan menggunakan nilai `OUTING_TYPES` semasa hanya sebagai fallback cloned/non-persistent. Tiada write Sheet atau peluasan Student, Guard, Admin dan Public projection.
 - Known limitation: perubahan config selepas submission boleh mentafsir semula priority fallback-only; request dengan snapshot masa request-level sah kekal stabil. Snapshot departure per request ialah pertimbangan schema masa hadapan.
-- Lifecycle, Warden approval priority dan return urgency kekal tiga dimensi berasingan. Approval/reject, actor recording, checklist semester/overnight, filter/counter, Guard authority dan privacy boundary dikekalkan.
-- Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger, guardian shortcut/access scope dan snapshot departure schema kekal belum dilaksanakan sebagai Fasa 4+.
+- Lifecycle, Warden approval priority, return urgency dan Admin action queue kekal empat dimensi berasingan. Approval/reject, actor recording, checklist semester/overnight, filter/counter, Guard authority dan privacy boundary dikekalkan.
+- Admin Operational Intelligence/`Perlu Tindakan` Fasa 4 telah lengkap tanpa GAS/schema change, data guardian baharu atau polling agresif. Telegram timed reminder/escalation, GAS time-driven trigger, guardian shortcut/access scope dan snapshot departure schema kekal belum dilaksanakan sebagai Fasa 5+.
 - Public Monitoring membuka inline dalam shell landing, membuat GET awam khusus, mengelakkan overlap dan merender sekali.
 - Public Monitoring mengekalkan data lama apabila refresh gagal.
 - Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
@@ -155,6 +158,7 @@ Nilai backend `KELUAR` tidak berubah.
 - **20 Ogos 2026:** commit `dde1fc4` menambah Operational Urgency Foundation Fasa 1 pada backend tanpa perubahan schema atau UI; baseline milestone itu ialah **399/399**.
 - **20 Ogos 2026:** commit `89d6b46` melengkapkan Student Live Status Clarity Fasa 2 sebagai presentation frontend yang menggunakan urgency Fasa 1; baseline repo meningkat kepada **410/410** tanpa schema, version atau deployment change.
 - **20 Ogos 2026:** commit `5443375` melengkapkan Warden Approval Prioritisation + Emergency Mode Fasa 3 sebagai repository milestone; baseline repo meningkat kepada **420/420** dan focused suite **10/10** tanpa schema, version atau deployment change.
+- **20 Ogos 2026:** commit `d0be685` (`feat: add admin operational intelligence`) melengkapkan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 sebagai repository milestone; baseline repo meningkat kepada **429/429** dan focused suite **9/9**. Tiada GAS, schema, lifecycle, threshold, version atau deployment change.
 
 ## Production Validation v1.7.0
 
@@ -179,6 +183,6 @@ Ujian production berjaya menggunakan request `OUT-20260726-121316-1479`:
 - Consent/privacy notice refinement.
 - QR code.
 - Review polisi bagi timing yang benar-benar indeterminate ketika `confirmIn`; sementara ini historical `lewat` disimpan secara konservatif sebagai `Ya`, manakala active malformed record menggunakan `needs_review=true`.
-- Bina Fasa 4+ di atas Fasa 1–3: Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation + GAS trigger dan guardian/waris shortcut masih belum dilaksanakan.
+- Bina Fasa 5+ di atas Fasa 1–4: Telegram pre-return reminder, Telegram late escalation, GAS time-driven trigger, guardian/waris shortcut atau phone-call button, access scope baharu, automatic operational messaging serta sebarang schema/lifecycle/threshold hardening masih belum dilaksanakan.
 - Pertimbang snapshot `earliest_departure_time` per request dalam schema/version masa hadapan supaya perubahan config tidak mentafsir semula fallback-only Warden priority.
 - Automated reports dan version injection.

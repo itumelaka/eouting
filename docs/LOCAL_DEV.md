@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 44. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 44. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 pada `d0be685`.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline semasa selepas Warden Approval Prioritisation + Emergency Mode Fasa 3 ialah **420/420 lulus**.
+Baseline semasa selepas Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 ialah **429/429 lulus**.
 
 Jalankan focused Phase 3 suite:
 
@@ -108,7 +108,15 @@ Jalankan focused Phase 3 suite:
 node --test tests/warden-approval-priority-phase3.test.js
 ```
 
-Focused Phase 3 baseline ialah **10/10 lulus**.
+Focused Phase 3 baseline ialah milestone **10/10 lulus**.
+
+Jalankan focused Phase 4 suite:
+
+```powershell
+node --test tests/admin-operational-intelligence-phase4.test.js
+```
+
+Focused Phase 4 baseline ialah **9/9 lulus**. Suite ini meliputi definisi KPI mutually exclusive, inclusion/exclusion dan deterministic ordering queue, invalid urgency safe handling, label BM tanpa raw codes/guardian data, responsive layout, role boundaries serta penggunaan refresh Admin sedia ada tanpa threshold engine atau timer baharu.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.

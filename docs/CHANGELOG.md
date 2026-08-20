@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-20 — Admin Operational Intelligence + Perlu Tindakan / Fasa 4 (v2.4.0)
+
+- Commit `d0be685` (`feat: add admin operational intelligence`) menambah tujuh KPI Pemantauan Admin: semua `KELUAR`, exact `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED`, active `needs_review=true` dan pending `KECEMASAN`.
+- Queue `Perlu Tindakan` mengutamakan `ACTION_REQUIRED`, `CRITICAL`, `needs_review`, kemudian pending emergency. Ordinary `LATE`, `DUE_SOON`, `NORMAL`, pending bukan kecemasan dan record terminal tidak dimasukkan.
+- Dalam bucket lewat, `minutes_late` lebih besar didahulukan; kemudian oldest valid timestamp, timestamped-before-missing, stable identifier dan source position memastikan ordering frontend deterministic tanpa persistence.
+- Backend `operational_urgency` kekal authoritative. Frontend tidak mengelaskan semula threshold atau mereka state apabila metadata malformed/contradictory; review hanya dipaparkan apabila `needs_review=true`.
+- Pending emergency ialah intelligence sahaja dan tidak menambah approval Admin, bypass Warden, lifecycle state atau perubahan `require_warden_approval`. Tiada data guardian/waris, shortcut atau phone button baharu.
+- Existing Admin authentication, views, filters, refresh, totals/actions serta Student/Warden/Guard/Public dan privacy boundary dikekalkan. Tiada GAS, schema, urgency threshold, lifecycle, version, service-worker atau deployment change.
+- Browser repository verification pada desktop `1280×720` dan mobile `390×844` mengesahkan tiada horizontal overflow/clipping, queue satu kolum pada mobile, empat kategori kad muat, tiada raw machine code atau data guardian dan navigation/filter kekal usable. Ini bukan deployment production berasingan.
+- Focused Phase 4 baseline ialah **9/9 lulus**; full Node baseline semasa ialah **429/429 lulus**.
+
 ## 2026-08-20 — Warden Approval Prioritisation + Emergency Mode / Fasa 3 (v2.4.0)
 
 - `5443375` (`feat: prioritize warden emergency approvals`) mengubah `assets/app.js`, `assets/style.css`, `gas/Code.gs` dan menambah `tests/warden-approval-priority-phase3.test.js`.
@@ -11,7 +22,7 @@
 - Known limitation: perubahan config selepas submission boleh mentafsir semula fallback-only record; request dengan snapshot departure sah kekal stabil. Snapshot request-level ialah pertimbangan schema masa hadapan.
 - Approve/reject, rejection validation, actor recording, lifecycle/Guard authority, checklist semester/overnight, filter/counter, Student/Guard/Admin UI dan Public Monitoring privacy kekal. Kad priority lulus verifikasi mobile sekitar 390px dan desktop 1280×720.
 - Admin intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation dan trigger, guardian shortcut/access scope, `OUTING_TYPES.operational_priority`, request column/snapshot schema, lifecycle state, threshold urgency, version bump dan deployment tidak termasuk.
-- Focused Phase 3 baseline ialah **10/10 lulus**; full Node baseline semasa ialah **420/420 lulus**.
+- Focused Phase 3 baseline ialah **10/10 lulus**; full Node baseline bagi milestone Fasa 3 ialah **420/420 lulus**.
 
 ## 2026-08-20 — Student Live Status Clarity / Fasa 2 (v2.4.0)
 

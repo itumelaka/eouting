@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`. Full Node baseline semasa ialah **420/420**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`. Full Node baseline semasa ialah **429/429**.
 
 ## Komponen
 
@@ -91,7 +91,26 @@ Untuk bucket departure, frontend menggunakan `earliest_departure_time`, tarikh r
 
 Known limitation/future schema consideration: bagi request tanpa snapshot departure request-level, perubahan `OUTING_TYPES.earliest_departure_time` selepas submission boleh mentafsir semula priority Warden. Request dengan nilai request-level sah kekal stabil. Snapshot masa keluar per request boleh dipertimbangkan dalam schema/version akan datang; Fasa 3 tidak menambah request column, `OUTING_TYPES.operational_priority` atau schema baharu.
 
-Presentation kad Warden adalah compact dan procedural, termasuk cue kecemasan atau departure serta butiran kecemasan/waris yang memang telah diizinkan. Control approval/rejection, validation, actor recording, checklist semester/overnight, filter/counter, authentication dan privacy boundary dikekalkan. Mobile sekitar 390px dan desktop 1280×720 disahkan tanpa overflow. Admin intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation dan trigger, guardian shortcut/access scope serta threshold return urgency kekal Fasa 4+.
+Presentation kad Warden adalah compact dan procedural, termasuk cue kecemasan atau departure serta butiran kecemasan/waris yang memang telah diizinkan. Control approval/rejection, validation, actor recording, checklist semester/overnight, filter/counter, authentication dan privacy boundary dikekalkan. Mobile sekitar 390px dan desktop 1280×720 disahkan tanpa overflow. Pada close-out Fasa 3, Admin intelligence/`Perlu Tindakan` masih future; ia kini dilengkapkan oleh Fasa 4 tanpa mengubah flow approval Warden.
+
+### Admin Operational Intelligence + Perlu Tindakan — Fasa 4
+
+Pemantauan Admin authenticated menggunakan nested `operational_urgency` yang sama daripada backend Fasa 1. Browser tidak memiliki threshold engine kedua dan tidak mengubah `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED` atau `needs_review`. Metadata malformed/contradictory tidak difabrikasi; review hanya wujud apabila backend memberi `needs_review=true`.
+
+Satu normalized Admin dataset menjadi input bersama untuk KPI dan queue. `Sedang Di Luar` mengira semua `KELUAR`; urgency KPI mengira tepat `KELUAR + DUE_SOON`, `KELUAR + LATE`, `KELUAR + CRITICAL` dan `KELUAR + ACTION_REQUIRED`; `Perlu Semak Masa` mengira active record dengan `needs_review=true`; dan `Kecemasan Menunggu` mengira `MENUNGGU_KELULUSAN + KECEMASAN`. Urgency KPI mutually exclusive, manakala jumlah lifecycle `Sedang Di Luar` boleh overlap.
+
+Queue frontend-derived `Perlu Tindakan` menggunakan bucket `ACTION_REQUIRED -> CRITICAL -> NEEDS_REVIEW -> PENDING_EMERGENCY`. Ordinary `LATE`, `DUE_SOON`, `NORMAL`, pending bukan kecemasan dan record terminal tidak dimasukkan. Dalam dua bucket lewat, `minutes_late` terbesar didahulukan; kemudian timestamp sah oldest-first, timestamped-before-missing, stable request ID dan source position memastikan ordering deterministic. Priority ini tidak ditulis ke Sheet atau schema.
+
+Pending emergency ialah signal operasi kepada Admin sahaja; approval Warden, `require_warden_approval`, lifecycle dan Guard authority tidak berubah. Kad tidak meluaskan data guardian/waris atau menambah shortcut/phone button. Existing Admin refresh path membina semula KPI dan queue daripada response authoritative yang sama tanpa timer/polling baharu. Fasa 4 hanya mengubah frontend dan tests; tiada GAS atau schema change.
+
+Empat lapisan kekal berasingan:
+
+```text
+lifecycle:                MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
+return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
+admin action queue:       ACTION_REQUIRED -> CRITICAL -> NEEDS_REVIEW -> PENDING_EMERGENCY
+```
 
 ### Google Sheets
 
@@ -343,7 +362,7 @@ Status awal `submitRequest` disahkan sebelum write. `appendObjectRow_` membina r
 
 Shell Admin dan identiti sesi kekal visible apabila tujuh modul inline bertukar: `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar`, `Tetapan Outing` dan `Notis Banner`. Statistik menggunakan active-tab yang sama seperti modul lain dan tidak lagi mempunyai workspace atau butang kembali berasingan.
 
-Pemantauan Admin menggunakan satu POST `getAdminMonitoring` untuk KPI dan rekod operasi aktif. Rekod Master menggunakan satu POST `searchAdminMasterRecords` dengan carian, filter dan pagination maksimum 50 rekod. Statistik individu menggunakan `getAdminIndividualStats` selepas credential Admin disahkan. Pengurusan staff menggunakan `getAdminStaff` serta write `createStaff`, `updateStaff` dan `toggleStaffStatus`; semua endpoint memanggil `validateAdminCredentials_()`.
+Pemantauan Admin menggunakan satu POST `getAdminMonitoring` untuk KPI, rekod operasi aktif dan nested urgency authoritative. KPI operational dan queue `Perlu Tindakan` dibina daripada normalized dataset yang sama pada setiap refresh. Queue menggunakan presentation ordering sahaja dan tidak menulis priority ke backend. Rekod Master menggunakan satu POST `searchAdminMasterRecords` dengan carian, filter dan pagination maksimum 50 rekod. Statistik individu menggunakan `getAdminIndividualStats` selepas credential Admin disahkan. Pengurusan staff menggunakan `getAdminStaff` serta write `createStaff`, `updateStaff` dan `toggleStaffStatus`; semua endpoint memanggil `validateAdminCredentials_()`.
 
 `WARDENS` dan `GUARDS` kekal source of truth serta login Warden/Guard sedia ada terus membaca PIN dari tab masing-masing. Write staff dilindungi `LockService`; tiada model authentication atau sheet baharu diperkenalkan.
 

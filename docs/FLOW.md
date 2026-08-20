@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`. Full Node baseline semasa ialah **420/420**.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`. Full Node baseline semasa ialah **429/429**.
 
 ## Backend Config API v2.0
 
@@ -246,7 +246,38 @@ Warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
 Return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
 ```
 
-Contoh `MENUNGGU_KELULUSAN + emergency approval priority` berbeza daripada `KELUAR + CRITICAL return urgency`. Fasa 3 tidak menambah lifecycle state, request column, `OUTING_TYPES.operational_priority`, Admin urgency queue/KPI, Telegram timed reminder/escalation atau trigger, guardian shortcut/access scope, threshold return urgency, version atau deployment.
+Contoh `MENUNGGU_KELULUSAN + emergency approval priority` berbeza daripada `KELUAR + CRITICAL return urgency`. Fasa 3 tidak menambah lifecycle state, request column, `OUTING_TYPES.operational_priority`, Admin urgency queue/KPI, Telegram timed reminder/escalation atau trigger, guardian shortcut/access scope, threshold return urgency, version atau deployment. Admin queue/KPI kemudian ditambah oleh Fasa 4 tanpa mengubah batas Fasa 3 yang lain.
+
+## Flow Admin Operational Intelligence + Perlu Tindakan — Fasa 4
+
+```text
+authenticated Admin monitoring records
+        ↓
+backend operational_urgency
+        ↓
+normalized Admin dataset
+        ↓
+KPI calculation
+        ↓
+Perlu Tindakan queue
+        ↓
+Admin operational cards
+```
+
+KPI dan queue sentiasa menggunakan dataset normalized yang sama selepas laluan refresh Pemantauan Admin sedia ada menerima response authoritative. Tiada urgency engine browser, local state transition, aggressive polling loop atau timer kedua ditambah.
+
+KPI ialah `Sedang Di Luar` bagi semua `KELUAR`; `Hampir Waktu Pulang`, `Lewat`, `Kritikal` dan `Tindakan Segera` bagi exact backend state `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED` pada `KELUAR`; `Perlu Semak Masa` bagi active `needs_review=true`; serta `Kecemasan Menunggu` bagi `MENUNGGU_KELULUSAN + KECEMASAN`. Urgency KPI mutually exclusive, manakala jumlah `Sedang Di Luar` boleh overlap.
+
+Queue hanya memasukkan `KELUAR + ACTION_REQUIRED`, `KELUAR + CRITICAL`, active `needs_review=true` dan pending `KECEMASAN`, mengikut susunan itu. `NORMAL`, `DUE_SOON`, ordinary `LATE`, pending bukan kecemasan dan terminal/completed dikecualikan. Dalam bucket lewat, `minutes_late` paling besar disusun dahulu; kemudian oldest valid request/submission timestamp, timestamped-before-missing, stable request identifier dan source position menjadi deterministic tie-breaker. Ordering ini hanya presentation frontend dan tidak dipersist.
+
+Metadata urgency malformed atau contradictory tidak menghasilkan urgency rekaan; kad review hanya muncul apabila backend memberikan `needs_review=true`. Pending emergency ialah intelligence, bukan approval: Admin tidak memintas Warden, tidak mengubah `require_warden_approval` dan tidak memperoleh approval authority. Kad tidak menambah data guardian/waris, shortcut atau phone button.
+
+```text
+Lifecycle:                MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+Warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
+Return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
+Admin action queue:       ACTION_REQUIRED -> CRITICAL -> NEEDS_REVIEW -> PENDING_EMERGENCY
+```
 
 ## Flow Pembatalan Pelajar
 

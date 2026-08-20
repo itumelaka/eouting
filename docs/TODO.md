@@ -1,8 +1,19 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; dan Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`. Baseline semasa ialah **420/420**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 dalam `d0be685`. Baseline semasa ialah **429/429**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Admin Operational Intelligence + Perlu Tindakan — Fasa 4
+
+- [x] KPI Admin operational merangkumi `Sedang Di Luar`, `Hampir Waktu Pulang`, `Lewat`, `Kritikal`, `Tindakan Segera`, `Perlu Semak Masa` dan `Kecemasan Menunggu` daripada dataset normalized yang sama.
+- [x] Urgency KPI menggunakan exact backend state dan mutually exclusive; lifecycle `Sedang Di Luar` boleh overlap.
+- [x] Queue `Perlu Tindakan` mengutamakan `ACTION_REQUIRED`, `CRITICAL`, active `needs_review`, kemudian pending `KECEMASAN`; ordinary `LATE`, `DUE_SOON`, `NORMAL`, pending bukan kecemasan dan terminal record dikecualikan.
+- [x] Ordering lewat menggunakan `minutes_late` descending, kemudian oldest timestamp, timestamped-before-missing, stable identifier dan source position tanpa persistence.
+- [x] Urgency backend kekal authoritative; malformed/contradictory metadata tidak menghasilkan state rekaan dan review memerlukan `needs_review=true`.
+- [x] Pending emergency kekal informational sahaja; tiada approval Admin, bypass Warden, perubahan `require_warden_approval`, guardian/waris exposure, shortcut atau phone button.
+- [x] Existing refresh path, Admin authentication/views/filters/actions, Student/Warden/Guard/Public dan privacy boundary dikekalkan; tiada GAS/schema/lifecycle/threshold/version/deployment change.
+- [x] Commit `d0be685` (`feat: add admin operational intelligence`); focused suite **9/9**, full Node suite **429/429**.
 
 ### Warden Approval Prioritisation + Emergency Mode — Fasa 3
 
@@ -224,7 +235,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
 - [ ] Review keputusan konservatif `lewat=Ya` apabila timing benar-benar indeterminate semasa `confirmIn`; active malformed record kini memberi `needs_review=true`.
-- [ ] Fasa 4+: Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminders/escalations dengan GAS time-driven trigger dan guardian/waris shortcut.
+- [ ] Fasa 5+: Telegram timed reminders/escalations dengan GAS time-driven trigger, automatic operational messaging dan guardian/waris shortcut atau phone-call button.
 - [ ] Pertimbang snapshot request-level `earliest_departure_time` dalam schema/version masa hadapan; sementara itu perubahan config boleh mentafsir semula priority fallback-only Warden, manakala snapshot request-level sah kekal stabil.
 
 ## Security / Access Improvements
@@ -252,7 +263,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [ ] Late-return escalation notification di atas operational urgency foundation.
 - [x] Warden approval prioritisation tanpa mengubah lifecycle.
 - [x] Emergency priority presentation/handling compatibility untuk Warden tanpa approval bypass baharu.
-- [ ] Admin operational urgency KPI dan tindakan `Perlu Tindakan`.
+- [x] Admin operational urgency KPI dan queue `Perlu Tindakan`.
 - [ ] Telegram timed return reminder/escalation dengan GAS time-driven trigger.
 - [ ] Guardian/waris shortcut.
 - [ ] Optional WhatsApp notification later if required.
