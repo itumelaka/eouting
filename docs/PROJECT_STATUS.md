@@ -1,20 +1,20 @@
 # Project Status eOuting ITU
 
-Status repo semasa: **v2.3.2 — production verified**.
+Status repo semasa: **v2.4.0 — production verified**.
 
-## eOuting v2.3 Production
+## eOuting v2.4 Production
 
-Frontend v2.3.2 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
+Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **16 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.3.2 dengan GAS Version 44. Displayed version ialah v2.3.2, cache/asset source revision ialah `2.3.2-r1` dan service-worker cache ialah `eouting-cache-v2.3.2-r1`. Production beroperasi normal.
+Verdict semasa pada **20 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 44. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r1` dan service-worker cache ialah `eouting-cache-v2.4.0-r1`. Production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Full Node suite semasa lulus **363/363**.
+`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Full Node suite semasa lulus **385/385**.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.3.2` dan backend production ialah GAS **Version 44**;
+- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 44**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
@@ -29,7 +29,7 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.3.2`; asset/cache source revision ialah `2.3.2-r1`.
+- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r1`.
 - Backend GAS production ialah **Version 44** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
@@ -56,6 +56,9 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Tiada fallback authenticated kepada public records.
 - Warden Checklist menggunakan emoji dan status kontekstual.
 - Guard quick filter dan contextual empty-state berfungsi pada kedua-dua seksyen.
+- Commit `d30d8d9` menggunakan grid responsif khusus untuk approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang: satu kolum di bawah `820px`, dua kolum sama lebar mulai `820px`.
+- Verifikasi browser production pada 20 Ogos 2026 dengan lebar viewport `1707px` menunjukkan computed columns `570px 570px`, posisi kiri berselang sekitar `270px`/`852px` dan lebar kad sekitar `570px`; kad Guard tidak merentasi kedua-dua kolum.
+- Perubahan grid tidak mengubah rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema atau business rules.
 - Public Monitoring membuka inline dalam shell landing, membuat GET awam khusus, mengelakkan overlap dan merender sekali.
 - Public Monitoring mengekalkan data lama apabila refresh gagal.
 - Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
@@ -65,7 +68,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.3.2; asset query dan cache source konsisten pada `2.3.2-r1`.
+- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r1`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -129,6 +132,7 @@ Nilai backend `KELUAR` tidak berubah.
 - **14 Ogos 2026:** hotfix `39265f1` dideploy sebagai v2.2.1 / cache r1 / GAS Version 40. Blank application open time disahkan kekal kosong dan isu permohonan pagi `PULANG_BERMALAM` telah diselesaikan; baseline **336/336** lulus.
 - **14 Ogos 2026:** commits `868c323`, `67b494c` dan `7d4ad23` menutup paparan HEP/Warden, persistence status/header-order serta normalisasi masa/daypart. Close-out tersebut menggunakan v2.2.1 / cache r4 / GAS Version 43 dengan baseline **353/353**.
 - **16 Ogos 2026:** commit `967cfd6` menutup hierarki `Status Semasa` dan compact history; commit `f2f55cc` menyelaraskan jumlah/sejarah tahunan. Production v2.3.2 / cache `2.3.2-r1` / GAS Version 44 disahkan melalui smoke test dengan baseline **363/363**.
+- **20 Ogos 2026:** commit `d30d8d9` menambah grid responsif khusus pada tiga senarai operasi Guard dan disahkan sebagai dua kolum sebenar pada production desktop. Release semasa v2.4.0 / cache `2.4.0-r1` kekal tanpa perubahan rendering/action Guard atau backend; baseline **385/385**.
 
 ## Production Validation v1.7.0
 

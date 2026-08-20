@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-20 — Guard responsive operational-list grid (v2.4.0)
+
+- `d30d8d9` — menjadikan tiga senarai operasi Guard sebagai grid responsif: approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang.
+- Susun atur menggunakan satu kolum di bawah `820px` dan dua kolum sama lebar mulai `820px`, dengan gap `12px`, lebar penuh dan perlindungan overflow.
+- Verifikasi browser production pada `window.innerWidth = 1707` mengesahkan computed columns `570px 570px`, posisi kiri kad berselang sekitar `270px` dan `852px`, serta lebar kad sekitar `570px`; kad tidak merentasi kedua-dua kolum.
+- Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules tidak berubah. Full Node baseline semasa **385/385 lulus**.
+
 ## 2026-08-16 — Student current-status hierarchy dan annual history consistency (v2.3.2)
 
 - `967cfd6` — memindahkan `Status Semasa` Pelajar ke atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan pembatalan/return-selfie yang layak; bahagian bawah dipadatkan kepada Refresh Status, jumlah tahunan dan `Rekod Outing Saya`.

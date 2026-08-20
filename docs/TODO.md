@@ -1,10 +1,18 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa selepas production close-out **v2.3.2 / GAS Version 44 / cache `2.3.2-r1`** pada 16 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa selepas production close-out **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
-### eOuting v2.3.2 Production Close-out
+### eOuting v2.4.0 Guard Responsive Grid
+
+- [x] Commit `d30d8d9` menjadikan senarai approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang sebagai grid responsif khusus Guard.
+- [x] Satu kolum digunakan di bawah `820px`; dua kolum sama lebar digunakan mulai `820px`, dengan gap konsisten dan perlindungan overflow.
+- [x] Browser production pada 20 Ogos 2026 mengesahkan computed columns `570px 570px` pada viewport `1707px`, posisi kad berselang sekitar `270px`/`852px` dan kad tidak merentasi kedua-dua kolum.
+- [x] Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules kekal tidak berubah.
+- [x] Full Node suite semasa **385/385** pada 20 Ogos 2026.
+
+### eOuting v2.3.2 Production Close-out (sejarah)
 
 - [x] `Status Semasa` dipindahkan ke atas borang sebagai kawasan authoritative bagi current record, pembatalan dan return-selfie yang layak.
 - [x] Bahagian bawah Pelajar dipadatkan kepada Refresh Status, jumlah tahunan dan `Rekod Outing Saya`.
