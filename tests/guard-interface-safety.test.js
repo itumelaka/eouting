@@ -27,10 +27,31 @@ test("Guard return card is ultra-compact and retains only action-critical inform
   assert.doesNotMatch(returnCardSource, /<details|Lihat Butiran|Tujuan:|Lokasi:|Kenderaan:|Pulang:|Keluar:|record-times/);
 });
 
-test("Guard overnight return list uses a responsive two-column grid", () => {
-  assert.match(styleSource, /#guardOvernightNotReturnedSection \[data-overnight-not-returned-list\] \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
-  assert.match(styleSource, /@media \(min-width: 720px\) \{[\s\S]*?#guardOvernightNotReturnedSection \[data-overnight-not-returned-list\][\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
+test("all Guard operational lists use the same responsive two-column grid", () => {
+  const guardGridStart = styleSource.indexOf("#guardApprovedList,");
+  const guardGridEnd = styleSource.indexOf("@media (max-width: 719px)", guardGridStart);
+  const guardGridSource = styleSource.slice(guardGridStart, guardGridEnd);
+
+  assert.notEqual(guardGridStart, -1);
+  assert.match(guardGridSource, /#guardApprovedList,\s*#guardOutList,\s*#guardOvernightNotReturnedSection \[data-overnight-not-returned-list\] \{[\s\S]*?display: grid;[\s\S]*?gap: 12px;[\s\S]*?grid-template-columns: minmax\(0, 1fr\);[\s\S]*?min-width: 0;[\s\S]*?width: 100%/);
+  assert.match(guardGridSource, /@media \(min-width: 820px\) \{\s*#guardApprovedList,\s*#guardOutList,\s*#guardOvernightNotReturnedSection \[data-overnight-not-returned-list\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(guardGridSource, /#student|#warden|#admin|#dashboard|monitor-/);
   assert.match(styleSource, /\.guard-operational-card \.record-actions \{[\s\S]*?grid-template-columns: 1fr/);
+});
+
+test("Guard card renderer and Sah Keluar/Sah Masuk hooks remain unchanged", () => {
+  const renderStart = appSource.indexOf("function renderGuard");
+  const renderEnd = appSource.indexOf("\nfunction renderDashboard", renderStart);
+  const renderSource = appSource.slice(renderStart, renderEnd);
+  const cardStart = appSource.indexOf("function guardOperationalCard");
+  const cardEnd = appSource.indexOf("\nfunction getGuardReturnTiming", cardStart);
+  const cardSource = appSource.slice(cardStart, cardEnd);
+
+  assert.match(renderSource, /guardApprovedList\.innerHTML[\s\S]*recordCard\(record, "guard-out"\)/);
+  assert.match(renderSource, /guardOutList\.innerHTML[\s\S]*recordCard\(record, "guard-in"\)/);
+  assert.match(renderSource, /\[data-out\][\s\S]*confirmOut\(button\.dataset\.out, button\)/);
+  assert.match(renderSource, /\[data-in\][\s\S]*confirmIn\(button\.dataset\.in, button\)/);
+  assert.match(cardSource, /class="record-top"[\s\S]*class="record-person"[\s\S]*class="badge-stack"[\s\S]*guard-action-cue[\s\S]*\$\{actions\}/);
 });
 
 test("Guard section hierarchy states direction and safe usage", () => {

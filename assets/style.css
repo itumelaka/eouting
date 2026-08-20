@@ -3028,12 +3028,20 @@ textarea:focus {
   margin-top: auto;
 }
 
+#guardApprovedList,
+#guardOutList,
 #guardOvernightNotReturnedSection [data-overnight-not-returned-list] {
   align-items: start;
+  display: grid;
+  gap: 12px;
   grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  width: 100%;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 820px) {
+  #guardApprovedList,
+  #guardOutList,
   #guardOvernightNotReturnedSection [data-overnight-not-returned-list] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
