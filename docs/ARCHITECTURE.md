@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; full Node baseline semasa ialah **399/399**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dilengkapkan dalam repo melalui commit `89d6b46`. Full Node baseline semasa ialah **410/410**.
 
 ## Komponen
 
@@ -48,7 +48,30 @@ Evaluator menggunakan `Asia/Kuala_Lumpur` dan exact elapsed time. Lebih 30 minit
 
 `getOperationalTodayRecords` membaca normalized source rows daripada cache 20 saat, mengambil masa semasa, kemudian menghasilkan nested `operational_urgency` bagi projection authenticated Pelajar, Warden/HEP, Guard dan Admin. State urgency itu sendiri tidak dicache dan tidak ditambah kepada raw Sheet row. Public GET kekal enam medan tanpa timestamp, minit, transition, action code atau diagnostic urgency. Tiada perubahan schema dibuat.
 
-Foundation ini belum mempunyai frontend urgency UI, Warden priority sorting, Admin intelligence dashboard, timed Telegram reminder/escalation atau guardian shortcut.
+Pada close-out Fasa 1, foundation ini belum mempunyai frontend urgency UI, Warden priority sorting, Admin intelligence dashboard, timed Telegram reminder/escalation atau guardian shortcut.
+
+### Student Live Status Clarity — Fasa 2
+
+Pembahagian tanggungjawab kekal tegas:
+
+```text
+GAS/backend
+  -> resolve expected-return target
+  -> classify authoritative urgency state
+  -> supply expected_return_at + next_transition_at
+
+Student frontend
+  -> render lifecycle dan urgency sebagai dimensi berasingan
+  -> update teks tempoh daripada expected_return_at
+  -> refresh GAS apabila next_transition_at dilepasi
+  -> tidak reclassify urgency secara local
+```
+
+Satu timer refresh Pelajar 30 saat yang sedia ada digunakan untuk kemas kini teks tempoh dan pemeriksaan transition. Transition key menekan refresh transition pendua; tiada timer tambahan atau request Pelajar bertindih. Pengiraan local hanya untuk wording tempoh (`Kurang 1 minit`, minit, jam + minit dan bentuk lewat yang setara), bukan untuk sempadan `NORMAL` hingga `ACTION_REQUIRED`.
+
+Rekod hari sama memaparkan masa `expected_return_at`; rekod kemudian atau bermalam memaparkan tarikh dan masa. Frontend tidak membaca `OUTING_TYPES` semasa untuk membina semula target kerana snapshot request/backend ialah sumber authoritative. Metadata hilang, malformed atau `needs_review=true` masuk ke paparan review selamat tanpa countdown/state lewat rekaan.
+
+Fasa 2 hanya mengubah presentation Pelajar dalam `assets/app.js` dan `assets/style.css`, dengan regression coverage dalam `tests/student-current-status-layout.test.js` dan `tests/student-live-status-clarity-phase2.test.js`. Lifecycle `SELESAI`, cancellation, return-selfie, annual history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary tidak berubah. Warden prioritisation, emergency mode, Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger dan guardian shortcut kekal Fasa 3+; tiada schema, backend threshold, version atau deployment change dalam Fasa 2.
 
 ### Google Sheets
 
@@ -234,7 +257,7 @@ Nilai lifecycle backend:
 - `KELUAR`
 - `SELESAI`
 
-Helper pusat frontend membentuk paparan kontekstual tanpa mengubah nilai backend:
+Helper pusat frontend membentuk paparan kontekstual tanpa mengubah nilai backend. Bagi `Status Semasa` Pelajar, lifecycle ini dirender berasingan daripada state authoritative `operational_urgency`:
 
 - 🟡 Menunggu Kelulusan
 - 🟢 Diluluskan

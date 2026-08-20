@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-20 — Student Live Status Clarity / Fasa 2 (v2.4.0)
+
+- `89d6b46` (`feat: improve student live outing status`) melengkapkan presentation Student yang menggunakan `operational_urgency` authoritative daripada backend Fasa 1. Perubahan implementation terhad kepada `assets/app.js`, `assets/style.css`, `tests/student-current-status-layout.test.js` dan `tests/student-live-status-clarity-phase2.test.js`.
+- `Status Semasa` mengekalkan lifecycle berasingan daripada urgency dan menyokong `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED` serta `needs_review=true`; frontend tidak memiliki atau mengira threshold classification.
+- Paparan menggunakan `expected_return_at`: masa bagi rekod hari sama, tarikh + masa bagi rekod kemudian/bermalam. Wording Student hard-coded 10 malam dibuang dan frontend tidak membaca semula `OUTING_TYPES` untuk mereka target.
+- Timer refresh Student 30 saat sedia ada digunakan semula untuk wording tempoh local. Apabila `next_transition_at` dilepasi, transition key dan single-flight mencetuskan satu refresh authoritative tanpa timer tambahan atau overlap.
+- Metadata hilang/malformed atau `needs_review=true` menghasilkan panduan review selamat tanpa countdown/late state rekaan. `SELESAI`, cancellation, return-selfie, annual summary/history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary dikekalkan.
+- Warden prioritisation, emergency mode, Admin urgency KPI/`Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger dan guardian/waris shortcut kekal Fasa 3+. Tiada schema change, backend threshold change, version bump atau deployment direkodkan bagi Fasa 2.
+- Full Node baseline semasa ialah **410/410 lulus**.
+
 ## 2026-08-20 — Operational Urgency Foundation Fasa 1 (v2.4.0)
 
 - `dde1fc4` (`feat: add operational urgency foundation`) menambah resolver expected-return dan evaluator urgency backend pusat tanpa menambah lifecycle status atau schema.
@@ -8,7 +18,7 @@
 - `confirmIn()` kini menggunakan expected-return resolver yang sama di bawah locking sedia ada dan terus menyimpan historical `lewat` sebagai `Ya/Tidak`. Timing yang benar-benar indeterminate disimpan secara konservatif sebagai `Ya` untuk semakan polisi masa hadapan.
 - Projection operational authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`. Public Monitoring kekal pada allowlist enam medan dan tidak menerima precise urgency metadata.
 - Urgency diterbitkan selepas cache source operasi 20 saat dibaca dan tidak dicache sebagai state. Tiada frontend urgency UI, Warden prioritisation, Admin intelligence dashboard, Telegram timed reminder/escalation, guardian shortcut, schema change atau version bump.
-- Full Node baseline semasa ialah **399/399 lulus**.
+- Full Node baseline bagi milestone Fasa 1 ialah **399/399 lulus**.
 
 ## 2026-08-20 — Guard responsive operational-list grid (v2.4.0)
 

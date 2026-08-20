@@ -18,7 +18,7 @@ Revision aset frontend semasa ialah `2.4.0-r1` dan service worker menggunakan `e
 
 Backend production semasa menggunakan GAS **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
-Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; full Node baseline semasa ialah **399/399 lulus**.
+Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 telah dilengkapkan dalam repo melalui commit `89d6b46`. Full Node baseline semasa ialah **410/410 lulus**.
 
 Commit `d30d8d9` menambah grid responsif khusus pada senarai operasi Guard: approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang. Ketiga-tiganya menggunakan satu kolum di bawah `820px` dan dua kolum sama lebar mulai `820px`. Verifikasi browser production pada 20 Ogos 2026 (`window.innerWidth = 1707`) menunjukkan computed columns `570px 570px`, posisi kad berselang sekitar `270px`/`852px` dan lebar kad sekitar `570px`, maka kad tidak merentasi kedua-dua kolum. Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules tidak berubah.
 
@@ -54,7 +54,17 @@ Sasaran pulang mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` bagi s
 
 Projection operasi authenticated bagi Pelajar, Warden/HEP, Guard dan Admin boleh menerima objek nested `operational_urgency`. Urgency dihitung selepas source row dibaca daripada cache operasi 20 saat dan tidak dicache sebagai state. Public Monitoring kekal pada allowlist enam medan dan tidak menerima masa tepat, kiraan minit, transition, action code atau diagnostic urgency. Tiada schema baharu diperlukan.
 
-Fasa ini belum menambah UI urgency Pelajar, priority sorting Warden, dashboard intelligence Admin, reminder/escalation Telegram berjadual atau shortcut guardian.
+Pada close-out Fasa 1, foundation ini belum mempunyai UI urgency Pelajar, priority sorting Warden, dashboard intelligence Admin, reminder/escalation Telegram berjadual atau shortcut guardian.
+
+## Student Live Status Clarity — Fasa 2
+
+Commit `89d6b46` (`feat: improve student live outing status`) melengkapkan presentation Student bagi urgency yang dibina dalam Fasa 1. `Status Semasa` menggunakan nested `operational_urgency` daripada backend dan menyokong `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED` serta `needs_review=true`. Lifecycle kekal kelihatan sebagai konsep berasingan; contohnya, rekod boleh mempunyai `status=KELUAR` dan urgency `CRITICAL` pada masa yang sama. Urgency tidak menggantikan lifecycle.
+
+Frontend Pelajar tidak mengira threshold atau menukar state urgency sendiri. GAS kekal authoritative untuk state, `expected_return_at` dan `next_transition_at`. Frontend hanya memformat masa pulang dijangka—masa sahaja bagi rekod hari sama, tarikh dan masa bagi rekod kemudian/bermalam—serta mengemas kini teks tempoh seperti `Kurang 1 minit`, `24 minit` atau `1 jam 42 minit` daripada `expected_return_at`. Apabila `next_transition_at` dilepasi, timer refresh Pelajar 30 saat yang sedia ada meminta status authoritative baharu; transition key menghalang refresh transition pendua dan tiada timer Pelajar kedua atau request bertindih ditambah.
+
+Wording lama Pelajar yang hard-coded “pulang sebelum 10:00 malam” telah dibuang. UI tidak membaca semula `OUTING_TYPES` untuk mereka sasaran pulang; snapshot request/backend kekal authoritative. Jika metadata urgency hilang, malformed atau `needs_review=true`, Pelajar melihat panduan selamat `MAKLUMAT WAKTU PULANG PERLU DISEMAK` tanpa countdown atau state lewat rekaan.
+
+Flow `SELESAI`, pembatalan, return-selfie, ringkasan/sejarah tahunan, foto profil, Announcement Banner/`ruleNotice`, authentication dan privacy boundary sedia ada dikekalkan. Fasa 2 tidak menambah Warden priority sorting, emergency priority configuration/mode, KPI urgency Admin atau `Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger, shortcut guardian/waris, schema/threshold backend, version bump atau deployment. Semua itu kekal kerja Fasa 3+.
 
 ## Architecture Ringkas
 
@@ -164,7 +174,7 @@ Backend menyimpan nilai status asal seperti `KELUAR`. Frontend memaparkan label 
 | Sudah pulang | ✅ Sudah Pulang |
 | Lewat | 🔴 Lewat |
 
-Status lewat mempunyai precedence paparan tetapi tidak menggantikan nilai lifecycle backend.
+Paparan lewat legacy tidak menggantikan lifecycle backend. Dalam Student Live Status Fasa 2, urgency juga tidak menggantikan lifecycle; contoh `status=KELUAR` bersama urgency `CRITICAL` mengekalkan kedua-dua nilai.
 
 ## Public Monitoring v1.6.25
 
@@ -222,7 +232,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo semasa selepas Operational Urgency Fasa 1 ialah **399/399 lulus**. Syntax checks:
+Baseline repo semasa selepas Student Live Status Clarity Fasa 2 ialah **410/410 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js

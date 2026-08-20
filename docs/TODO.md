@@ -1,8 +1,19 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4` dengan baseline semasa **399/399**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 lengkap dalam commit `89d6b46`. Baseline semasa ialah **410/410**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Student Live Status Clarity — Fasa 2
+
+- [x] Student `Status Semasa` menggunakan nested `operational_urgency` backend dan mengekalkan lifecycle sebagai dimensi berasingan.
+- [x] State `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED` dan `needs_review=true` dirender tanpa threshold classification local.
+- [x] `expected_return_at` menjadi sumber paparan masa hari sama atau tarikh + masa bagi rekod kemudian/bermalam; frontend tidak membaca semula `OUTING_TYPES`.
+- [x] Timer Student 30 saat sedia ada mengemas kini wording tempoh sahaja dan refresh GAS apabila `next_transition_at` dilepasi; transition key/single-flight mencegah duplicate dan overlap tanpa timer tambahan.
+- [x] Metadata hilang/malformed atau `needs_review=true` menghasilkan panduan review selamat tanpa countdown/late state rekaan; wording hard-coded 10 malam telah dibuang.
+- [x] `SELESAI`, cancellation, return-selfie, annual summary/history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary dikekalkan.
+- [x] Perubahan implementation terhad kepada `assets/app.js`, `assets/style.css`, `tests/student-current-status-layout.test.js` dan `tests/student-live-status-clarity-phase2.test.js`.
+- [x] Commit `89d6b46` (`feat: improve student live outing status`); full Node suite **410/410**.
 
 ### Operational Urgency Foundation — Fasa 1
 
@@ -201,7 +212,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
 - [ ] Review keputusan konservatif `lewat=Ya` apabila timing benar-benar indeterminate semasa `confirmIn`; active malformed record kini memberi `needs_review=true`.
-- [ ] Fasa seterusnya: Student urgency UI, Warden prioritisation, Admin operational intelligence, Telegram timed reminders/escalations dan guardian shortcut.
+- [ ] Fasa 3+: Warden approval prioritisation, emergency handling mode, Admin operational intelligence/`Perlu Tindakan`, Telegram timed reminders/escalations dengan GAS time-driven trigger dan guardian/waris shortcut.
 
 ## Security / Access Improvements
 
@@ -226,6 +237,11 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [x] Admin beta page for managing STUDENTS (A2, A3 dan LI) tanpa schema migration.
 - [ ] Nilai sama ada optimistic version column diperlukan untuk STUDENTS selepas beta concurrency QA.
 - [ ] Late-return escalation notification di atas operational urgency foundation.
+- [ ] Warden approval prioritisation berasaskan urgency tanpa mengubah lifecycle.
+- [ ] Emergency priority configuration/handling mode.
+- [ ] Admin operational urgency KPI dan tindakan `Perlu Tindakan`.
+- [ ] Telegram timed return reminder/escalation dengan GAS time-driven trigger.
+- [ ] Guardian/waris shortcut.
 - [ ] Optional WhatsApp notification later if required.
 - [ ] Daily/weekly/monthly report automation.
 - [ ] Automated version injection/build step.

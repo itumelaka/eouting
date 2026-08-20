@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; full Node baseline semasa ialah **399/399**.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 disiapkan dalam repo melalui commit `89d6b46`. Full Node baseline semasa ialah **410/410**.
 
 ## Backend Config API v2.0
 
@@ -184,6 +184,40 @@ Guard confirmIn
 
 Historical `lewat` kekal `Ya/Tidak`. Active malformed timing kekal kelihatan sebagai `needs_review=true`; keputusan konservatif semasa `confirmIn` ialah known limitation untuk semakan polisi masa hadapan.
 
+## Flow Student Live Status Clarity — Fasa 2
+
+Fasa 2 merender foundation backend Fasa 1 tanpa memindahkan threshold classification ke browser:
+
+```text
+authenticated Student record
+      ↓
+operational_urgency daripada GAS
+      ↓
+Student Status Semasa
+      ↓
+local duration text update daripada expected_return_at
+      ↓
+next_transition_at crossed
+      ↓
+authoritative backend refresh
+```
+
+Lifecycle dan urgency terus bergerak sebagai dimensi berasingan. Contoh `status=KELUAR` + `operational_urgency.state=CRITICAL` memaparkan kedua-duanya; `CRITICAL` tidak menulis atau menggantikan `KELUAR`.
+
+Timer Student 30 saat yang sedia ada mengemas kini wording tempoh dan memeriksa `next_transition_at`. Frontend boleh membentuk `Kurang 1 minit`, `24 minit`, `1 jam 42 minit` dan wording lewat yang setara daripada `expected_return_at`, tetapi tidak mengubah `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` atau `ACTION_REQUIRED` secara local. Apabila transition dilepasi, transition key memastikan satu refresh authoritative bagi transition itu; single-flight sedia ada mencegah overlap dan tiada timer kedua ditambah.
+
+```text
+operational_urgency hilang / malformed / needs_review=true
+      ↓
+MAKLUMAT WAKTU PULANG PERLU DISEMAK
+      ↓
+tiada countdown atau late state rekaan
+```
+
+Paparan expected return menggunakan masa bagi rekod hari sama dan tarikh + masa bagi rekod kemudian/bermalam. Target datang daripada snapshot request/backend; frontend tidak membaca semula `OUTING_TYPES`. Wording hard-coded “pulang sebelum 10:00 malam” tidak lagi digunakan.
+
+Flow `SELESAI`, cancellation, return-selfie, annual summary/history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary kekal. Warden priority sorting, emergency mode, Admin urgency KPI/`Perlu Tindakan`, Telegram timed reminder/escalation, GAS time-driven trigger dan guardian/waris shortcut tidak termasuk dalam Fasa 2.
+
 ## Flow Pembatalan Pelajar
 
 ```text
@@ -246,7 +280,7 @@ Field masa sahaja dinormalkan di boundary GAS kepada `HH:mm` dalam `Asia/Kuala_L
 
 Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown menggunakan `student_id` sebagai value dalaman dan memaparkan nama. Nombor matrik ditaip berasingan dan backend memadankan kedua-dua credential dengan row Google Sheets.
 
-Pelajar hanya menerima rekod sendiri melalui authenticated POST. `getTodayRecords` membekalkan rekod operasi live/current untuk `Status Semasa`; active request menghalang permohonan baharu sehingga selesai, ditolak atau dibatalkan. Butang `Batal Permohonan` hanya hadir untuk rekod sendiri yang pending/approved.
+Pelajar hanya menerima rekod sendiri melalui authenticated POST. `getTodayRecords` membekalkan rekod operasi live/current dan nested `operational_urgency` untuk `Status Semasa`; active request menghalang permohonan baharu sehingga selesai, ditolak atau dibatalkan. Student presentation menggunakan state, `expected_return_at` dan `next_transition_at` authoritative daripada backend dan tidak memiliki threshold classification. Butang `Batal Permohonan` hanya hadir untuk rekod sendiri yang pending/approved.
 
 Hierarki workspace Pelajar ialah Announcement Banner, navigasi, `ruleNotice`, identiti, `Status Semasa`, borang outing, kemudian bahagian bawah Refresh Status, jumlah tahunan dan `Rekod Outing Saya`. `Status Semasa` di atas borang ialah kawasan authoritative untuk rekod aktif/actionable serta tindakan pembatalan atau return-selfie apabila layak. Borang dan logic pemilihan current record tidak berubah.
 
