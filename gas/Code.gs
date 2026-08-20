@@ -125,6 +125,21 @@ const REQUEST_TYPE = {
   semester: "CUTI_SEMESTER"
 };
 
+const OPERATIONAL_URGENCY = {
+  thresholdsMs: {
+    dueSoon: 30 * 60 * 1000,
+    critical: 30 * 60 * 1000,
+    actionRequired: 60 * 60 * 1000
+  },
+  severityRank: {
+    NORMAL: 0,
+    DUE_SOON: 1,
+    LATE: 2,
+    CRITICAL: 3,
+    ACTION_REQUIRED: 4
+  }
+};
+
 const OUTING_TYPE_BOOLEAN_FIELDS = [
   "active",
   "same_day_only",
@@ -2612,48 +2627,57 @@ function confirmIn(payload) {
     throw new Error("Guard tidak dijumpai atau tidak aktif.");
   }
 
-  const found = findRowByRequestId_(requestId);
-  if (!found) {
-    throw new Error("Permohonan tidak dijumpai.");
-  }
+  const transition = withScriptLock_(function () {
+    const found = findRowByRequestId_(requestId);
+    if (!found) {
+      throw new Error("Permohonan tidak dijumpai.");
+    }
+    if (hasCellValue_(found.record.masa_masuk)) {
+      return { found: found, alreadyConfirmed: true, late: String(found.record.lewat || "") };
+    }
+    if (found.record.status !== STATUS.out) {
+      throw new Error("Hanya permohonan status KELUAR boleh disahkan masuk.");
+    }
 
-  if (hasCellValue_(found.record.masa_masuk)) {
+    const late = determineHistoricalLateValue_(found.record, now);
+    const guardReturnNote = String(payload.catatan || payload.catatan_masuk || "").trim();
+    const requiresReturnSelfie = normalizeText_(found.record.selfie_status) !== "tidak_diperlukan";
+
+    updateRowByHeaders_(found.sheet, found.rowNumber, {
+      status: STATUS.done,
+      masa_masuk: now_(),
+      guard_masuk_by: guard.nama_guard,
+      lewat: late,
+      selfie_status: requiresReturnSelfie ? "BELUM_HANTAR" : "TIDAK_DIPERLUKAN",
+      catatan: guardReturnNote || found.record.catatan || ""
+    });
+    SpreadsheetApp.flush();
+    return {
+      found: found,
+      alreadyConfirmed: false,
+      late: late,
+      guardReturnNote: guardReturnNote
+    };
+  }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
+  const found = transition.found;
+  if (transition.alreadyConfirmed) {
     return {
       ...found.record,
       message: "Rekod sudah disahkan masuk."
     };
   }
-
-  if (found.record.status !== STATUS.out) {
-    throw new Error("Hanya permohonan status KELUAR boleh disahkan masuk.");
-  }
-
-  const late = isHostelReturnRequest_(found.record)
-    ? (isHostelReturnLate_(now, found.record) ? "Ya" : "Tidak")
-    : (isLate_(now) ? "Ya" : "Tidak");
-  const guardReturnNote = String(payload.catatan || payload.catatan_masuk || "").trim();
-  const requiresReturnSelfie = normalizeText_(found.record.selfie_status) !== "tidak_diperlukan";
-
-  updateRowByHeaders_(found.sheet, found.rowNumber, {
-    status: STATUS.done,
-    masa_masuk: now_(),
-    guard_masuk_by: guard.nama_guard,
-    lewat: late,
-    selfie_status: requiresReturnSelfie ? "BELUM_HANTAR" : "TIDAK_DIPERLUKAN",
-    catatan: guardReturnNote || found.record.catatan || ""
-  });
   invalidateOperationalRecordsCache_();
 
   appendAuditLog("CONFIRM_IN", requestId, "Guard", guard.nama_guard, JSON.stringify({
     student_name: found.record.nama || "",
     no_matrik: found.record.no_matrik || "",
     jenis_permohonan: found.record.jenis_permohonan || "",
-    lewat: late,
-    catatan_masuk: guardReturnNote
+    lewat: transition.late,
+    catatan_masuk: transition.guardReturnNote
   }));
   const updatedRecord = findRowByRequestId_(requestId).record;
   sendTelegramMessage_(buildTelegramStatusMessage_(
-    telegramTitle_(late === "Ya" ? "⚠️" : "🏁", late === "Ya" ? "Pelajar Masuk Lewat" : "Pelajar Selesai Outing", updatedRecord),
+    telegramTitle_(transition.late === "Ya" ? "⚠️" : "🏁", transition.late === "Ya" ? "Pelajar Masuk Lewat" : "Pelajar Selesai Outing", updatedRecord),
     updatedRecord
   ));
   return updatedRecord;
@@ -3309,10 +3333,17 @@ function getOperationalTodayRecords(payload) {
     throw new Error("Akses sesi diperlukan.");
   }
 
-  const rows = addWardenApprovalRoles_(addProfilePhotoIndicators_(getTodayRecordRows_()));
+  const sourceRows = addWardenApprovalRoles_(addProfilePhotoIndicators_(getTodayRecordRows_()));
+  const rows = addOperationalUrgency_(sourceRows, new Date());
   return authenticatedStudent
     ? rows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
     : rows;
+}
+
+function addOperationalUrgency_(rows, now) {
+  return (rows || []).map((row) => Object.assign({}, row, {
+    operational_urgency: getOperationalUrgency_(row, now)
+  }));
 }
 
 function addProfilePhotoIndicators_(rows) {
@@ -3404,15 +3435,13 @@ function isDateValueToday_(value, todayKey) {
 
 function isAdminRecordOverdue_(row, now) {
   if (String(row && row.lewat || "").trim().toLowerCase() === "ya") return true;
-  if (!row || String(row.status || "") !== STATUS.out) return false;
-  if (isHostelReturnRequest_(row)) return isHostelReturnLate_(now, row);
-  const outingDate = normalizeDateKey_(row.tarikh) || normalizeDateKey_(row.masa_keluar);
-  const today = formatDate_(now);
-  return Boolean(outingDate) && (outingDate < today || (outingDate === today && isLate_(now)));
+  return isOperationalUrgencyLate_(getOperationalUrgency_(row, now));
 }
 
 function toAdminOperationalRecord_(row, now, rolesByName) {
-  const overdue = isAdminRecordOverdue_(row, now);
+  const urgency = getOperationalUrgency_(row, now);
+  const overdue = String(row && row.lewat || "").trim().toLowerCase() === "ya" ||
+    isOperationalUrgencyLate_(urgency);
   const returnDate = normalizeDateKey_(row.tarikh_balik);
   const returnTime = normalizeSheetTimeValue_(row.masa_balik_dijangka);
   return {
@@ -3444,7 +3473,8 @@ function toAdminOperationalRecord_(row, now, rolesByName) {
     masa_batal_pelajar: row.masa_batal_pelajar || "",
     dibatalkan_oleh: row.dibatalkan_oleh || "",
     duration_minutes: calculateOutingDurationMinutes_(row),
-    duration: calculateOutingDurationMinutes_(row) > 0 ? formatOutingDuration_(calculateOutingDurationMinutes_(row)) : ""
+    duration: calculateOutingDurationMinutes_(row) > 0 ? formatOutingDuration_(calculateOutingDurationMinutes_(row)) : "",
+    operational_urgency: urgency
   };
 }
 
@@ -4346,6 +4376,197 @@ function isLate_(date) {
   return hour > 22 || (hour === 22 && minute > 0);
 }
 
+function isLegacyDailyReturnType_(requestType) {
+  return requestType === REQUEST_TYPE.normal ||
+    requestType === REQUEST_TYPE.emergency ||
+    requestType === REQUEST_TYPE.weekend;
+}
+
+function isValidMalaysiaDateKey_(dateKey) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ""))) return false;
+  const date = new Date(String(dateKey) + "T00:00:00+08:00");
+  return !isNaN(date.getTime()) &&
+    Utilities.formatDate(date, "Asia/Kuala_Lumpur", "yyyy-MM-dd") === dateKey;
+}
+
+function formatOperationalUrgencyTimestamp_(date) {
+  if (Object.prototype.toString.call(date) !== "[object Date]" || isNaN(date.getTime())) return null;
+  return Utilities.formatDate(date, "Asia/Kuala_Lumpur", "yyyy-MM-dd'T'HH:mm:ss") + "+08:00";
+}
+
+function invalidExpectedReturnTarget_(reasonCode, options) {
+  const details = options || {};
+  return {
+    valid: false,
+    expected_return_at: null,
+    target_ms: null,
+    reason_code: reasonCode,
+    used_date_fallback: Boolean(details.used_date_fallback),
+    used_time_fallback: Boolean(details.used_time_fallback)
+  };
+}
+
+function resolveExpectedReturnTarget_(record) {
+  const row = record || {};
+  const legacyDaily = isLegacyDailyReturnType_(row.jenis_permohonan);
+  const rawReturnDate = hasCellValue_(row.tarikh_balik) ? row.tarikh_balik : "";
+  let returnDateKey = normalizeDateKey_(rawReturnDate);
+  let usedDateFallback = false;
+
+  if (rawReturnDate && (!returnDateKey || !isValidMalaysiaDateKey_(returnDateKey))) {
+    return invalidExpectedReturnTarget_("INVALID_EXPECTED_RETURN_DATE");
+  }
+  if (!returnDateKey) {
+    if (!legacyDaily) {
+      return invalidExpectedReturnTarget_("MISSING_EXPECTED_RETURN_DATE");
+    }
+    returnDateKey = normalizeDateKey_(row.tarikh);
+    usedDateFallback = true;
+    if (!returnDateKey) {
+      return invalidExpectedReturnTarget_("MISSING_EXPECTED_RETURN_DATE", {
+        used_date_fallback: true
+      });
+    }
+    if (!isValidMalaysiaDateKey_(returnDateKey)) {
+      return invalidExpectedReturnTarget_("INVALID_EXPECTED_RETURN_DATE", {
+        used_date_fallback: true
+      });
+    }
+  }
+
+  const rawReturnTime = hasCellValue_(row.masa_balik_dijangka) ? row.masa_balik_dijangka : "";
+  let returnTime = normalizeSheetTimeValue_(rawReturnTime);
+  let usedTimeFallback = false;
+  if (rawReturnTime && !returnTime) {
+    return invalidExpectedReturnTarget_("INVALID_EXPECTED_RETURN_TIME", {
+      used_date_fallback: usedDateFallback
+    });
+  }
+  if (!returnTime) {
+    if (!legacyDaily) {
+      return invalidExpectedReturnTarget_("MISSING_EXPECTED_RETURN_TIME", {
+        used_date_fallback: usedDateFallback
+      });
+    }
+    returnTime = "22:00";
+    usedTimeFallback = true;
+  }
+
+  const expectedReturnAt = returnDateKey + "T" + returnTime + ":00+08:00";
+  const target = new Date(expectedReturnAt);
+  if (isNaN(target.getTime()) ||
+      Utilities.formatDate(target, "Asia/Kuala_Lumpur", "yyyy-MM-dd") !== returnDateKey ||
+      Utilities.formatDate(target, "Asia/Kuala_Lumpur", "HH:mm") !== returnTime) {
+    return invalidExpectedReturnTarget_("INVALID_EXPECTED_RETURN", {
+      used_date_fallback: usedDateFallback,
+      used_time_fallback: usedTimeFallback
+    });
+  }
+
+  return {
+    valid: true,
+    expected_return_at: expectedReturnAt,
+    target_ms: target.getTime(),
+    reason_code: "",
+    used_date_fallback: usedDateFallback,
+    used_time_fallback: usedTimeFallback
+  };
+}
+
+function getOperationalUrgency_(record, now) {
+  const evaluatedAt = formatOperationalUrgencyTimestamp_(now);
+  const status = String(record && record.status || "").trim();
+  if (status !== STATUS.out) {
+    return {
+      applicable: false,
+      state: null,
+      severity_rank: 0,
+      expected_return_at: null,
+      evaluated_at: evaluatedAt,
+      minutes_to_due: null,
+      minutes_late: null,
+      next_transition_at: null,
+      timing_valid: false,
+      reason_code: "NOT_APPLICABLE",
+      needs_review: false,
+      next_action_code: "NONE"
+    };
+  }
+
+  const target = resolveExpectedReturnTarget_(record);
+  if (!target.valid || !evaluatedAt) {
+    return {
+      applicable: true,
+      state: null,
+      severity_rank: 0,
+      expected_return_at: null,
+      evaluated_at: evaluatedAt,
+      minutes_to_due: null,
+      minutes_late: null,
+      next_transition_at: null,
+      timing_valid: false,
+      reason_code: target.reason_code || "INVALID_EXPECTED_RETURN",
+      needs_review: true,
+      next_action_code: "REVIEW_TIMING"
+    };
+  }
+
+  const differenceMs = target.target_ms - now.getTime();
+  const lateMs = Math.max(0, -differenceMs);
+  const minutesToDue = Math.max(0, differenceMs) / 60000;
+  const minutesLate = lateMs / 60000;
+  let state = "NORMAL";
+  let nextActionCode = "NONE";
+  let nextTransitionAt = new Date(target.target_ms - OPERATIONAL_URGENCY.thresholdsMs.dueSoon);
+
+  if (differenceMs <= OPERATIONAL_URGENCY.thresholdsMs.dueSoon && differenceMs >= 0) {
+    state = "DUE_SOON";
+    nextActionCode = "PREPARE_RETURN";
+    nextTransitionAt = new Date(target.target_ms);
+  } else if (lateMs > 0 && lateMs < OPERATIONAL_URGENCY.thresholdsMs.critical) {
+    state = "LATE";
+    nextActionCode = "RETURN_NOW";
+    nextTransitionAt = new Date(target.target_ms + OPERATIONAL_URGENCY.thresholdsMs.critical);
+  } else if (lateMs >= OPERATIONAL_URGENCY.thresholdsMs.critical &&
+      lateMs < OPERATIONAL_URGENCY.thresholdsMs.actionRequired) {
+    state = "CRITICAL";
+    nextActionCode = "FOLLOW_UP";
+    nextTransitionAt = new Date(target.target_ms + OPERATIONAL_URGENCY.thresholdsMs.actionRequired);
+  } else if (lateMs >= OPERATIONAL_URGENCY.thresholdsMs.actionRequired) {
+    state = "ACTION_REQUIRED";
+    nextActionCode = "ACTION_REQUIRED";
+    nextTransitionAt = null;
+  }
+
+  return {
+    applicable: true,
+    state: state,
+    severity_rank: OPERATIONAL_URGENCY.severityRank[state],
+    expected_return_at: target.expected_return_at,
+    evaluated_at: evaluatedAt,
+    minutes_to_due: minutesToDue,
+    minutes_late: minutesLate,
+    next_transition_at: nextTransitionAt ? formatOperationalUrgencyTimestamp_(nextTransitionAt) : null,
+    timing_valid: true,
+    reason_code: "",
+    needs_review: false,
+    next_action_code: nextActionCode
+  };
+}
+
+function isOperationalUrgencyLate_(urgency) {
+  return Boolean(urgency && urgency.timing_valid && urgency.severity_rank >= 2);
+}
+
+function determineHistoricalLateValue_(record, actualReturn) {
+  const target = resolveExpectedReturnTarget_(record);
+  if (!target.valid) {
+    // A false negative is less safe than a reviewable conservative late flag.
+    return "Ya";
+  }
+  return actualReturn.getTime() > target.target_ms ? "Ya" : "Tidak";
+}
+
 function isHostelReturnRequest_(record) {
   return record &&
     (
@@ -4356,14 +4577,8 @@ function isHostelReturnRequest_(record) {
 }
 
 function isHostelReturnLate_(date, record) {
-  const returnDateKey = normalizeDateKey_(record.tarikh_balik);
-  const expectedReturnTime = normalizeSheetTimeValue_(record.masa_balik_dijangka);
-  if (!returnDateKey || !expectedReturnTime) {
-    return false;
-  }
-
-  const expectedReturn = new Date(returnDateKey + "T" + expectedReturnTime.slice(0, 5) + ":00+08:00");
-  return !isNaN(expectedReturn.getTime()) && date.getTime() > expectedReturn.getTime();
+  const target = resolveExpectedReturnTarget_(record);
+  return target.valid && date.getTime() > target.target_ms;
 }
 
 function isOvernightLate_(date, record) {

@@ -100,7 +100,8 @@ function createGasContext({ flag = false, configs = [completeConfig()], requests
       getScriptProperties: () => ({ getProperty: (key) => key === "OUTING_CONFIG_V2_ENABLED" ? String(flag) : "" })
     },
     SpreadsheetApp: {
-      openById: () => ({ getSheetByName: (name) => sheets[name] || null })
+      openById: () => ({ getSheetByName: (name) => sheets[name] || null }),
+      flush() {}
     },
     Utilities: {
       formatDate,

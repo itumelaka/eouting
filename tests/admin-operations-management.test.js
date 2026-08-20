@@ -15,6 +15,13 @@ function createContext(rows) {
         const iso = new Date(date).toISOString();
         if (format === "yyyy-MM-dd") return iso.slice(0, 10);
         if (format === "yyyy-MM-dd HH:mm:ss") return iso.slice(0, 19).replace("T", " ");
+        if (format === "yyyy-MM-dd'T'HH:mm:ss") return iso.slice(0, 19);
+        if (format === "HH:mm") {
+          return new Intl.DateTimeFormat("en-GB", {
+            hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+            timeZone: "Asia/Kuala_Lumpur"
+          }).format(new Date(date));
+        }
         if (format === "H") return String(new Date(date).getUTCHours());
         if (format === "m") return String(new Date(date).getUTCMinutes());
         if (format === "M") return String(new Date(date).getUTCMonth() + 1);
@@ -50,7 +57,7 @@ test("Admin monitoring groups pending, approved, out, overdue and emergency in o
   const context = createContext([
     { request_id: "P1", nama: "Ali", kelas: "A2", status: "MENUNGGU_KELULUSAN", jenis_permohonan: "OUTING_BIASA", tarikh: "2026-08-09", masa_mohon: "2026-08-09 09:00:00" },
     { request_id: "A1", nama: "Bakar", kelas: "A3", status: "DILULUSKAN_WARDEN", jenis_permohonan: "KECEMASAN", tarikh: "2026-08-09", masa_mohon: "2026-08-09 10:00:00" },
-    { request_id: "O1", nama: "Chong", kelas: "LI", status: "KELUAR", jenis_permohonan: "PULANG_BERMALAM", tarikh: "2026-08-01", tarikh_balik: "2020-01-01", masa_balik_dijangka: "20:00", masa_keluar: "2026-08-01 12:00:00" }
+    { request_id: "O1", nama: "Chong", kelas: "LI", status: "KELUAR", jenis_permohonan: "PULANG_BERMALAM", tarikh: "2026-08-01", tarikh_balik: "2020-01-01", masa_balik_dijangka: "20:00", masa_keluar: "2026-08-01 12:00:00", lewat: "Ya" }
   ]);
   assert.throws(() => context.getAdminMonitoring({}), /credentials/i);
   const result = context.getAdminMonitoring({ pin: "2468" });
