@@ -18,7 +18,7 @@ Revision aset frontend semasa ialah `2.4.0-r1` dan service worker menggunakan `e
 
 Backend production semasa menggunakan GAS **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
-Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685` (`feat: add admin operational intelligence`). Full Node baseline semasa ialah **429/429 lulus**.
+Production yang disahkan sehingga 20 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b` (`feat: add telegram return escalation scanner`). Full Node baseline semasa ialah **443/443 lulus**.
 
 Commit `d30d8d9` menambah grid responsif khusus pada senarai operasi Guard: approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang. Ketiga-tiganya menggunakan satu kolum di bawah `820px` dan dua kolum sama lebar mulai `820px`. Verifikasi browser production pada 20 Ogos 2026 (`window.innerWidth = 1707`) menunjukkan computed columns `570px 570px`, posisi kad berselang sekitar `270px`/`852px` dan lebar kad sekitar `570px`, maka kad tidak merentasi kedua-dua kolum. Rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema dan business rules tidak berubah.
 
@@ -111,7 +111,49 @@ Return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUI
 Admin action queue:       ACTION_REQUIRED -> CRITICAL -> NEEDS_REVIEW -> PENDING_EMERGENCY
 ```
 
-`MENUNGGU_KELULUSAN + emergency approval priority`, `KELUAR + CRITICAL return urgency` dan keahlian queue Admin ialah konsep berasingan. Reminder/escalation Telegram, GAS time-driven trigger, shortcut guardian/waris, phone-call button, access scope baharu, schema/lifecycle/threshold change, automatic operational messaging, version bump dan deployment kekal kerja Fasa 5+.
+`MENUNGGU_KELULUSAN + emergency approval priority`, `KELUAR + CRITICAL return urgency` dan keahlian queue Admin ialah konsep berasingan. Pada close-out Fasa 4, reminder/escalation Telegram masih future; scanner backend kini dilengkapkan dalam Fasa 5, tetapi trigger, activation dan deployment kekal belum dibuat.
+
+## Telegram Return Reminder + Late Escalation Scanner — Fasa 5
+
+Commit `54d526b` (`feat: add telegram return escalation scanner`) menambah entry point backend-only `scanReturnOperationalNotifications_(options)`. Scanner hanya menilai lifecycle `KELUAR` melalui `getOperationalUrgency_(record, now)` authoritative daripada Fasa 1; ia tidak mempunyai timing/urgency engine kedua dan tidak menggunakan historical `lewat` sebagai classifier aktif.
+
+Stage notification dan audit mapping adalah tepat:
+
+```text
+DUE_SOON        -> RETURN_REMINDER_SENT
+CRITICAL        -> RETURN_CRITICAL_SENT
+ACTION_REQUIRED -> RETURN_ACTION_REQUIRED_SENT
+```
+
+`NORMAL`, ordinary `LATE`, `needs_review=true`, timing invalid/hilang, lifecycle bukan `KELUAR`, request ID hilang/duplicate dan same-stage event yang sudah diaudit dikecualikan. Event peringatan terdahulu tidak menghalang `RETURN_CRITICAL_SENT`, dan event kritikal tidak menghalang `RETURN_ACTION_REQUIRED_SENT`.
+
+Setiap stage dibatch sehingga maksimum 40 rekod atau 3,500 aksara per mesej; kumpulan lebih besar dipecah secara deterministic. `DUE_SOON` disusun earliest `expected_return_at` dahulu, manakala `CRITICAL`/`ACTION_REQUIRED` menggunakan greatest `minutes_late` dahulu, kemudian request ID dan source position. Mesej tidak mengandungi telefon/hubungan waris, selfie URL/metadata, diagnostic/action code mentah atau token/config Telegram.
+
+Dedup menggunakan `AUDIT_LOG`: `request_id + stage event` disemak sebelum send, dan SENT event hanya ditulis bagi setiap request selepas batch Telegram berjaya. Seluruh read/classify/dedup/send/audit flow berjalan dalam existing `ScriptLock`. Telegram gagal tidak menukar request, lifecycle atau urgency dan tidak menulis successful SENT audit, maka scan masa hadapan boleh retry.
+
+Ini ialah practical idempotency, bukan transactional exactly-once. Telegram dan Google Sheets tidak boleh berada dalam satu atomic transaction; jika Telegram berjaya tetapi write `AUDIT_LOG` gagal, state `SENT_AUDIT_PARTIAL` boleh dilaporkan dan retry kemudian secara teori boleh menghantar duplicate.
+
+Preview selamat tersedia secara konseptual melalui:
+
+```javascript
+scanReturnOperationalNotifications_({ dryRun: true, now: optionalExplicitTime })
+```
+
+Dry-run membaca source, menilai eligibility, menyemak audit dan membina ordered/bounded preview tanpa menghantar Telegram, menulis SENT audit, mengubah request row atau memasang trigger.
+
+Fasa 5 belum mengaktifkan scheduling. Tiada time-driven trigger dicipta, dipasang, diubah atau dipadam; cadence lima minit hanya pertimbangan activation masa hadapan. Live Telegram smoke test tidak dilakukan kerana tiada isolated safe test target, tiada mesej production sengaja dihantar dan destination/configuration Telegram tidak diubah. Existing Script Properties mesti sudah betul sebelum future non-dry execution.
+
+Repository/local browser verification pada viewport mobile kira-kira 425px mengesahkan Student, Warden, Guard, Admin dan Public Monitoring masih load tanpa visible regression atau horizontal overflow. Tiada scanner route dalam `assets/app.js`, `index.html`, `doGet` atau `doPost`; browser tidak boleh memanggil scanner. Notification submission, approval/rejection, pergerakan Guard, cancellation dan return-selfie `sendPhoto` sedia ada kekal tidak berubah.
+
+Dimensi semasa kekal berasingan:
+
+```text
+Lifecycle:          MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+Return urgency:     NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
+Notification audit: RETURN_REMINDER_SENT | RETURN_CRITICAL_SENT | RETURN_ACTION_REQUIRED_SENT
+```
+
+Notification audit ialah sejarah delivery/dedup, bukan lifecycle atau urgency. Fasa 6+ masih merangkumi controlled production dry-run, trigger activation/lima-minit scheduling, guardian/waris shortcut, phone-call button, direct Student/WhatsApp/email notification, Admin acknowledgement, notification-state columns, access scope/lifecycle/threshold changes, destination Telegram baharu, version bump dan deployment.
 
 ## Architecture Ringkas
 
@@ -279,7 +321,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo semasa selepas Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 ialah **429/429 lulus**. Focused Phase 4 suite `tests/admin-operational-intelligence-phase4.test.js` ialah **9/9 lulus**. Focused Phase 3 suite `tests/warden-approval-priority-phase3.test.js` kekal milestone **10/10 lulus**. Syntax checks:
+Baseline repo semasa selepas Telegram Return Reminder + Late Escalation Scanner Fasa 5 ialah **443/443 lulus**. Focused Phase 5 suite `tests/telegram-return-notifications-phase5.test.js` ialah **14/14 lulus**. Focused Phase 4 suite `tests/admin-operational-intelligence-phase4.test.js` kekal milestone **9/9 lulus**. Syntax checks:
 
 ```powershell
 node --check assets/app.js

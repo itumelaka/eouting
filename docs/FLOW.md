@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`. Full Node baseline semasa ialah **429/429**.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 44 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`. Full Node baseline semasa ialah **443/443**.
 
 ## Backend Config API v2.0
 
@@ -278,6 +278,47 @@ Warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
 Return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
 Admin action queue:       ACTION_REQUIRED -> CRITICAL -> NEEDS_REVIEW -> PENDING_EMERGENCY
 ```
+
+## Flow Telegram Return Reminder + Late Escalation — Fasa 5
+
+```text
+scheduled/manual backend call
+        ↓
+scanReturnOperationalNotifications_
+        ↓
+KELUAR rows
+        ↓
+getOperationalUrgency_
+        ↓
+eligible DUE_SOON / CRITICAL / ACTION_REQUIRED stage
+        ↓
+AUDIT_LOG request_id + stage dedup
+        ↓
+bounded deterministic batch
+        ↓
+Telegram send
+        ↓
+successful SENT audit per request
+```
+
+Seluruh non-dry flow berada dalam existing `ScriptLock`: source dan audit dibaca, urgency authoritative dikira, candidate didedup dan disusun, batch dihantar, kemudian successful audit ditulis sebelum lock dilepaskan. Concurrent scan menunggu dan membaca event scan terdahulu. Telegram failure tidak menulis SENT event atau mengubah lifecycle, urgency dan request data; retry masa hadapan masih dibenarkan.
+
+```text
+dryRun=true
+        ↓
+read + classify + audit check + ordered/bounded preview
+        ↓
+skip Telegram send
+skip SENT audit write
+skip request mutation
+skip trigger installation
+```
+
+Optional explicit `now` membolehkan deterministic test. Batch maksimum ialah 40 rekod dan 3,500 aksara; `DUE_SOON` earliest expected return dahulu, `CRITICAL`/`ACTION_REQUIRED` greatest minutes late dahulu, diikuti request ID dan source position. Oversized group dipecah secara deterministic.
+
+Stage mapping ialah `DUE_SOON -> RETURN_REMINDER_SENT`, `CRITICAL -> RETURN_CRITICAL_SENT`, `ACTION_REQUIRED -> RETURN_ACTION_REQUIRED_SENT`. Same-stage event menghalang repeat stage, tetapi reminder tidak menghalang critical dan critical tidak menghalang action-required.
+
+Practical exactly-once limitation kekal: Telegram send dan Sheet audit bukan atomic. Send berjaya diikuti audit failure boleh dilaporkan sebagai `SENT_AUDIT_PARTIAL`; retry kemudian secara teori boleh duplicate. Tiada trigger dipasang dan tiada browser/frontend route kepada scanner.
 
 ## Flow Pembatalan Pelajar
 

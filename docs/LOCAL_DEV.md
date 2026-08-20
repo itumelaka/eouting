@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 44. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 pada `d0be685`.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 44. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 pada `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 pada `54d526b`.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline semasa selepas Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 ialah **429/429 lulus**.
+Baseline semasa selepas Telegram Return Reminder + Late Escalation Scanner Fasa 5 ialah **443/443 lulus**.
 
 Jalankan focused Phase 3 suite:
 
@@ -117,6 +117,22 @@ node --test tests/admin-operational-intelligence-phase4.test.js
 ```
 
 Focused Phase 4 baseline ialah **9/9 lulus**. Suite ini meliputi definisi KPI mutually exclusive, inclusion/exclusion dan deterministic ordering queue, invalid urgency safe handling, label BM tanpa raw codes/guardian data, responsive layout, role boundaries serta penggunaan refresh Admin sedia ada tanpa threshold engine atau timer baharu.
+
+Jalankan focused Phase 5 suite:
+
+```powershell
+node --test tests/telegram-return-notifications-phase5.test.js
+```
+
+Focused Phase 5 baseline ialah **14/14 lulus**. Ia meliputi eligibility/exclusion authoritative, stage progression, audit dedup, batching/order, dry-run, send/audit failure, duplicate source row, ScriptLock pattern, sensitive-data exclusion, trigger absence dan frontend/role boundaries.
+
+Dry-run scanner tersedia secara konseptual dalam GAS untuk QA terkawal:
+
+```javascript
+scanReturnOperationalNotifications_({ dryRun: true, now: optionalExplicitTime })
+```
+
+Jangan menganggap snippet ini arahan production activation. Dry-run tidak send Telegram, menulis SENT audit, mengubah request atau memasang trigger. Tiada safe isolated Telegram target dikenal pasti semasa Fasa 5, maka live smoke test tidak dilakukan. Trigger/non-dry production execution memerlukan acceptance berasingan.
 
 Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.

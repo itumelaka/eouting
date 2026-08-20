@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-20 — Telegram Return Reminder + Late Escalation / Fasa 5 (v2.4.0)
+
+- Commit `54d526b` (`feat: add telegram return escalation scanner`) menambah backend-only `scanReturnOperationalNotifications_(options)` dalam `gas/Code.gs` serta focused suite `tests/telegram-return-notifications-phase5.test.js`.
+- Scanner menggunakan `getOperationalUrgency_()` authoritative dan memetakan `DUE_SOON -> RETURN_REMINDER_SENT`, `CRITICAL -> RETURN_CRITICAL_SENT`, `ACTION_REQUIRED -> RETURN_ACTION_REQUIRED_SENT`; only `KELUAR` dengan timing valid eligible.
+- Existing `AUDIT_LOG` dedup memeriksa `request_id + stage` sebelum send. Successful SENT event ditulis per request selepas delivery; earlier-stage event tidak menghalang later escalation.
+- Batch maksimum 40 rekod/3,500 aksara; `DUE_SOON` earliest return dahulu, stage lewat greatest minutes dahulu, kemudian request ID/source position. Message tidak membawa waris, selfie, diagnostics, raw action code atau secret Telegram.
+- Existing `ScriptLock` merangkumi read/classify/dedup/send/audit. Send gagal tidak menulis SENT event atau mengubah request/lifecycle/urgency dan boleh retry kemudian.
+- `dryRun=true` membaca source/audit dan membina structured preview tanpa Telegram send, SENT audit, request mutation atau trigger installation; explicit `now` menyokong deterministic testing.
+- Practical exactly-once limitation: Telegram dan Google Sheets tidak atomic. Delivery berjaya diikuti audit failure boleh menghasilkan `SENT_AUDIT_PARTIAL` dan theoretical duplicate retry.
+- Browser/local verification pada kira-kira 425px mengesahkan Student, Warden, Guard, Admin dan Public Monitoring masih load tanpa visible regression/overflow; tiada scanner route dalam frontend, `doGet` atau `doPost`.
+- Tiada time-driven trigger, live Telegram smoke send, destination/configuration change, frontend/schema/lifecycle/threshold/version/service-worker change atau deployment. Existing lifecycle Telegram dan return-selfie `sendPhoto` kekal.
+- Focused Phase 5 baseline ialah **14/14 lulus**; full Node baseline semasa ialah **443/443 lulus**.
+
 ## 2026-08-20 — Admin Operational Intelligence + Perlu Tindakan / Fasa 4 (v2.4.0)
 
 - Commit `d0be685` (`feat: add admin operational intelligence`) menambah tujuh KPI Pemantauan Admin: semua `KELUAR`, exact `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED`, active `needs_review=true` dan pending `KECEMASAN`.
@@ -9,7 +22,7 @@
 - Pending emergency ialah intelligence sahaja dan tidak menambah approval Admin, bypass Warden, lifecycle state atau perubahan `require_warden_approval`. Tiada data guardian/waris, shortcut atau phone button baharu.
 - Existing Admin authentication, views, filters, refresh, totals/actions serta Student/Warden/Guard/Public dan privacy boundary dikekalkan. Tiada GAS, schema, urgency threshold, lifecycle, version, service-worker atau deployment change.
 - Browser repository verification pada desktop `1280×720` dan mobile `390×844` mengesahkan tiada horizontal overflow/clipping, queue satu kolum pada mobile, empat kategori kad muat, tiada raw machine code atau data guardian dan navigation/filter kekal usable. Ini bukan deployment production berasingan.
-- Focused Phase 4 baseline ialah **9/9 lulus**; full Node baseline semasa ialah **429/429 lulus**.
+- Focused Phase 4 baseline ialah **9/9 lulus**; full Node baseline bagi milestone Fasa 4 ialah **429/429 lulus**.
 
 ## 2026-08-20 — Warden Approval Prioritisation + Emergency Mode / Fasa 3 (v2.4.0)
 

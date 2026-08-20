@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`. Full Node baseline semasa ialah **429/429**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`. Full Node baseline semasa ialah **443/443**.
 
 ## Komponen
 
@@ -110,6 +110,28 @@ lifecycle:                MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> S
 warden approval priority: EMERGENCY -> DEPARTURE_APPROACHING/REACHED -> ORDINARY
 return urgency:           NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
 admin action queue:       ACTION_REQUIRED -> CRITICAL -> NEEDS_REVIEW -> PENDING_EMERGENCY
+```
+
+### Telegram Return Reminder + Late Escalation Scanner — Fasa 5
+
+`scanReturnOperationalNotifications_(options)` ialah backend-only scanner yang menggunakan `getOperationalUrgency_(record, now)` authoritative. Ia hanya menerima `KELUAR + DUE_SOON/CRITICAL/ACTION_REQUIRED`; timing invalid, `needs_review`, ordinary `LATE`, lifecycle lain dan request ID yang tidak selamat dikecualikan. Tiada threshold classification baharu, historical `lewat` classifier atau frontend invocation path.
+
+Mapping delivery history ialah `DUE_SOON -> RETURN_REMINDER_SENT`, `CRITICAL -> RETURN_CRITICAL_SENT` dan `ACTION_REQUIRED -> RETURN_ACTION_REQUIRED_SENT`. Existing `AUDIT_LOG` membekalkan dedup per `request_id + stage`; earlier-stage event tidak menutup eligibility bagi later stage. Ini history notification sahaja, bukan lifecycle atau return urgency.
+
+Stage batch dibataskan kepada 40 rekod dan 3,500 aksara. `DUE_SOON` menggunakan earliest expected return, stage lewat menggunakan greatest `minutes_late`, kemudian request ID dan source position sebagai deterministic fallback. Message projection sengaja tidak membawa guardian/waris, selfie, diagnostics, raw action code atau secret Telegram.
+
+Scanner menggunakan existing `ScriptLock` merentasi source read, urgency calculation, audit check, batch build, Telegram send dan post-success audit write. Concurrent scan menunggu lock dan kemudian melihat audit yang ditulis scan terdahulu. Send gagal tidak menulis SENT event atau mengubah source/lifecycle/urgency.
+
+Idempotency adalah praktikal, bukan exactly-once transactional. Telegram delivery dan Google Sheets audit write tidak atomic; send berjaya diikuti audit failure boleh menghasilkan `SENT_AUDIT_PARTIAL` dan membuka kemungkinan duplicate pada retry kemudian.
+
+`dryRun=true` menghasilkan structured ordered/bounded preview selepas source/audit read tanpa Telegram send, SENT audit write, request mutation atau trigger installation. Optional explicit `now` menyokong deterministic testing. Scanner tiada route dalam `assets/app.js`, `index.html`, `doGet` atau `doPost`; ordinary browser/session load tidak boleh menjalankannya.
+
+Tiada trigger atau deployment ditambah dalam Fasa 5. Existing `sendTelegramMessage_`, lifecycle messages dan `sendTelegramPhoto_` return-selfie kekal. Trigger activation, cadence lima minit dan production non-dry execution ialah kerja Fasa 6+.
+
+```text
+lifecycle:          MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
+return urgency:     NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
+notification audit: RETURN_REMINDER_SENT | RETURN_CRITICAL_SENT | RETURN_ACTION_REQUIRED_SENT
 ```
 
 ### Google Sheets

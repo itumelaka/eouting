@@ -1,8 +1,20 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`; dan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 dalam `d0be685`. Baseline semasa ialah **429/429**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 dalam `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 dalam `54d526b`. Baseline semasa ialah **443/443**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Telegram Return Reminder + Late Escalation Scanner — Fasa 5
+
+- [x] Backend-only `scanReturnOperationalNotifications_()` menggunakan `getOperationalUrgency_()` authoritative dan hanya memilih `KELUAR + DUE_SOON/CRITICAL/ACTION_REQUIRED`.
+- [x] Stage audit ialah `RETURN_REMINDER_SENT`, `RETURN_CRITICAL_SENT` dan `RETURN_ACTION_REQUIRED_SENT`; earlier event tidak menutup later escalation.
+- [x] Batch maksimum 40 rekod/3,500 aksara dengan ordering deterministic mengikut expected return atau minutes late, request ID dan source position.
+- [x] Existing `AUDIT_LOG` menyokong dedup same-stage; SENT event hanya ditulis selepas successful Telegram delivery.
+- [x] Existing `ScriptLock` melindungi read/classify/dedup/send/audit sequence; send failure tidak mengubah request/lifecycle/urgency atau menulis SENT event.
+- [x] Safe dry-run membina structured preview tanpa Telegram, SENT audit, request mutation atau trigger installation.
+- [x] Practical exactly-once limitation direkod: Telegram success + audit failure boleh menghasilkan `SENT_AUDIT_PARTIAL` dan theoretical duplicate retry.
+- [x] Existing lifecycle Telegram/sendPhoto dan Student/Warden/Guard/Admin/Public kekal; tiada frontend route, schema, trigger, destination/config, version atau deployment change.
+- [x] Commit `54d526b` (`feat: add telegram return escalation scanner`); focused suite **14/14**, full Node suite **443/443**.
 
 ### Admin Operational Intelligence + Perlu Tindakan — Fasa 4
 
@@ -235,7 +247,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
 - [ ] Review keputusan konservatif `lewat=Ya` apabila timing benar-benar indeterminate semasa `confirmIn`; active malformed record kini memberi `needs_review=true`.
-- [ ] Fasa 5+: Telegram timed reminders/escalations dengan GAS time-driven trigger, automatic operational messaging dan guardian/waris shortcut atau phone-call button.
+- [ ] Fasa 6+: controlled production dry-run, trigger activation/five-minute scheduling, guardian/waris shortcut atau phone-call button dan notification channel masa hadapan.
 - [ ] Pertimbang snapshot request-level `earliest_departure_time` dalam schema/version masa hadapan; sementara itu perubahan config boleh mentafsir semula priority fallback-only Warden, manakala snapshot request-level sah kekal stabil.
 
 ## Security / Access Improvements
@@ -264,7 +276,9 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [x] Warden approval prioritisation tanpa mengubah lifecycle.
 - [x] Emergency priority presentation/handling compatibility untuk Warden tanpa approval bypass baharu.
 - [x] Admin operational urgency KPI dan queue `Perlu Tindakan`.
-- [ ] Telegram timed return reminder/escalation dengan GAS time-driven trigger.
+- [x] Backend Telegram return reminder/escalation scanner dengan batching, audit dedup dan dry-run.
+- [ ] Jalankan controlled production dry-run selepas kelulusan operasi.
+- [ ] Aktifkan time-driven trigger/lima-minit scheduling hanya selepas acceptance berasingan.
 - [ ] Guardian/waris shortcut.
 - [ ] Optional WhatsApp notification later if required.
 - [ ] Daily/weekly/monthly report automation.
