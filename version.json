@@ -1,5 +1,5 @@
 {
-  "version": "2.3.2",
-  "releasedAt": "2026-08-16",
-  "notes": "eOuting v2.3.2 menyelaraskan Rekod Outing Saya dengan jumlah outing tahunan menggunakan rekod SELESAI bagi tahun semasa."
+  "version": "2.4.0",
+  "releasedAt": "2026-08-20",
+  "notes": "Performance caching for operational reads and ultra-compact Guard cards."
 }

@@ -59,7 +59,7 @@ test("Admin cards render safe stacked time labels without changing action hooks"
 
 test("Clay UI preserves beta identity and accessibility safeguards", () => {
   assert.match(html, /id="betaApiIndicator"/);
-  assert.match(html, /id="appVersionText">eOuting ITU • v2\.3\.2/);
+  assert.match(html, /id="appVersionText">eOuting ITU • v2\.4\.0/);
   assert.match(css, /\.beta-api-indicator\s*\{/);
   assert.match(css, /:focus-visible/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
