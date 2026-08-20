@@ -140,6 +140,16 @@ const OPERATIONAL_URGENCY = {
   }
 };
 
+const RETURN_OPERATIONAL_NOTIFICATIONS = {
+  maxMessageLength: 3500,
+  maxRecordsPerBatch: 40,
+  stages: [
+    { state: "DUE_SOON", auditEvent: "RETURN_REMINDER_SENT" },
+    { state: "CRITICAL", auditEvent: "RETURN_CRITICAL_SENT" },
+    { state: "ACTION_REQUIRED", auditEvent: "RETURN_ACTION_REQUIRED_SENT" }
+  ]
+};
+
 const OUTING_TYPE_BOOLEAN_FIELDS = [
   "active",
   "same_day_only",
@@ -4579,6 +4589,288 @@ function getOperationalUrgency_(record, now) {
     needs_review: false,
     next_action_code: nextActionCode
   };
+}
+
+function normalizeReturnNotificationScanNow_(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
+    return new Date(value.getTime());
+  }
+  if (value !== undefined && value !== null && String(value).trim()) {
+    const parsed = new Date(String(value).trim());
+    if (!isNaN(parsed.getTime())) return parsed;
+    throw new Error("Masa scan operational notification tidak sah.");
+  }
+  return new Date();
+}
+
+function getReturnNotificationStageConfig_(state) {
+  return RETURN_OPERATIONAL_NOTIFICATIONS.stages.find(function (stage) {
+    return stage.state === state;
+  }) || null;
+}
+
+function getReturnNotificationAuditKeys_(auditRows) {
+  const keys = {};
+  (auditRows || []).forEach(function (row) {
+    const requestId = String(row && row.request_id || "").trim();
+    const action = String(row && row.action || "").trim();
+    if (requestId && action) keys[action + "\n" + requestId] = true;
+  });
+  return keys;
+}
+
+function compareReturnNotificationCandidates_(stage, left, right) {
+  if (stage === "DUE_SOON") {
+    const leftTarget = new Date(left.urgency.expected_return_at).getTime();
+    const rightTarget = new Date(right.urgency.expected_return_at).getTime();
+    if (leftTarget !== rightTarget) return leftTarget - rightTarget;
+  } else {
+    const leftLate = Number(left.urgency.minutes_late) || 0;
+    const rightLate = Number(right.urgency.minutes_late) || 0;
+    if (leftLate !== rightLate) return rightLate - leftLate;
+  }
+  const leftRequestId = String(left.request_id);
+  const rightRequestId = String(right.request_id);
+  if (leftRequestId < rightRequestId) return -1;
+  if (leftRequestId > rightRequestId) return 1;
+  return left.source_index - right.source_index;
+}
+
+function collectReturnNotificationCandidates_(records, auditRows, now) {
+  const auditKeys = getReturnNotificationAuditKeys_(auditRows);
+  const candidatesByStage = {};
+  RETURN_OPERATIONAL_NOTIFICATIONS.stages.forEach(function (stage) {
+    candidatesByStage[stage.state] = [];
+  });
+  const skipped = [];
+  const seenRequestIds = {};
+
+  (records || []).forEach(function (record, sourceIndex) {
+    const requestId = String(record && record.request_id || "").trim();
+    if (!requestId) {
+      skipped.push({ request_id: "", reason: "MISSING_REQUEST_ID" });
+      return;
+    }
+    if (seenRequestIds[requestId]) {
+      skipped.push({ request_id: requestId, reason: "DUPLICATE_REQUEST_ID" });
+      return;
+    }
+    seenRequestIds[requestId] = true;
+
+    const urgency = getOperationalUrgency_(record, now);
+    if (String(record && record.status || "").trim() !== STATUS.out || !urgency.applicable) {
+      skipped.push({ request_id: requestId, reason: "LIFECYCLE_NOT_ELIGIBLE" });
+      return;
+    }
+    if (!urgency.timing_valid || urgency.needs_review || !urgency.expected_return_at) {
+      skipped.push({ request_id: requestId, reason: "TIMING_REVIEW_REQUIRED" });
+      return;
+    }
+
+    const stage = getReturnNotificationStageConfig_(urgency.state);
+    if (!stage) {
+      skipped.push({ request_id: requestId, reason: "STATE_NOT_ELIGIBLE" });
+      return;
+    }
+    if (auditKeys[stage.auditEvent + "\n" + requestId]) {
+      skipped.push({ request_id: requestId, reason: "ALREADY_SENT", stage: stage.state });
+      return;
+    }
+
+    candidatesByStage[stage.state].push({
+      request_id: requestId,
+      record: record,
+      urgency: urgency,
+      source_index: sourceIndex
+    });
+  });
+
+  RETURN_OPERATIONAL_NOTIFICATIONS.stages.forEach(function (stage) {
+    candidatesByStage[stage.state].sort(function (left, right) {
+      return compareReturnNotificationCandidates_(stage.state, left, right);
+    });
+  });
+
+  return { candidates_by_stage: candidatesByStage, skipped: skipped };
+}
+
+function safeReturnNotificationText_(value) {
+  return String(value === undefined || value === null || value === "" ? "Pelajar" : value)
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120) || "Pelajar";
+}
+
+function formatReturnNotificationExpectedTime_(expectedReturnAt) {
+  const match = String(expectedReturnAt || "").match(/T(\d{2}):(\d{2})/);
+  if (!match) return "waktu tidak tersedia";
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return (hour % 12 || 12) + ":" + match[2] + " " + getMalayDaypartLabel_(hour, minute).toLowerCase();
+}
+
+function formatReturnNotificationLateDuration_(minutesLate) {
+  return formatOutingDuration_(Math.max(0, Math.floor(Number(minutesLate) || 0)));
+}
+
+function buildReturnNotificationMessage_(stage, candidates) {
+  const count = candidates.length;
+  let title = "";
+  let summary = "";
+  let footer = "";
+
+  if (stage === "DUE_SOON") {
+    title = "⏰ PERINGATAN WAKTU PULANG";
+    summary = count + " pelajar dijangka pulang dalam tempoh 30 minit.";
+    footer = "Sila pastikan pelajar bersedia untuk kembali mengikut waktu yang ditetapkan.";
+  } else if (stage === "CRITICAL") {
+    title = "⚠️ PELAJAR LEWAT — PERLU SUSULAN";
+    summary = count + " pelajar telah lewat 30 minit atau lebih.";
+    footer = "Sila buat semakan dan susulan segera.";
+  } else if (stage === "ACTION_REQUIRED") {
+    title = "🚨 TINDAKAN SEGERA DIPERLUKAN";
+    summary = count + " pelajar telah lewat 60 minit atau lebih.";
+    footer = "Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.";
+  } else {
+    throw new Error("Stage operational notification tidak dikenali.");
+  }
+
+  const lines = candidates.map(function (candidate) {
+    const name = safeReturnNotificationText_(candidate.record && candidate.record.nama);
+    if (stage === "DUE_SOON") {
+      return "• " + name + " — " + formatReturnNotificationExpectedTime_(candidate.urgency.expected_return_at);
+    }
+    return "• " + name + " — lewat " + formatReturnNotificationLateDuration_(candidate.urgency.minutes_late);
+  });
+
+  return [title, "", summary, ""].concat(lines, ["", footer]).join("\n");
+}
+
+function buildReturnNotificationBatches_(stage, candidates) {
+  const groups = [];
+  let current = [];
+  (candidates || []).forEach(function (candidate) {
+    const proposed = current.concat([candidate]);
+    const proposedMessage = buildReturnNotificationMessage_(stage, proposed);
+    if (current.length && (
+      proposed.length > RETURN_OPERATIONAL_NOTIFICATIONS.maxRecordsPerBatch ||
+      proposedMessage.length > RETURN_OPERATIONAL_NOTIFICATIONS.maxMessageLength
+    )) {
+      groups.push(current);
+      current = [candidate];
+    } else {
+      current = proposed;
+    }
+  });
+  if (current.length) groups.push(current);
+
+  return groups.map(function (group, index) {
+    return {
+      batch_id: stage + "-" + (index + 1),
+      request_ids: group.map(function (candidate) { return candidate.request_id; }),
+      candidates: group,
+      message: buildReturnNotificationMessage_(stage, group)
+    };
+  });
+}
+
+function scanReturnOperationalNotifications_(options) {
+  const config = options || {};
+  const dryRun = config.dryRun === true;
+  const scanNow = normalizeReturnNotificationScanNow_(config.now);
+
+  return withScriptLock_(function () {
+    const records = getTodayRecordRows_();
+    const auditRows = getRowsAsObjects_(getSheet_(SHEETS.audit));
+    const collected = collectReturnNotificationCandidates_(records, auditRows, scanNow);
+    const result = {
+      dry_run: dryRun,
+      evaluated_at: formatOperationalUrgencyTimestamp_(scanNow),
+      eligible_request_ids: [],
+      stages: [],
+      skipped: collected.skipped,
+      sent_batch_count: 0,
+      failed_batch_count: 0,
+      audit_written_count: 0,
+      audit_failed_count: 0,
+      exactly_once_limitation: "Telegram success and AUDIT_LOG write are not one external transaction; an audit-write failure can permit a later duplicate retry."
+    };
+
+    RETURN_OPERATIONAL_NOTIFICATIONS.stages.forEach(function (stageConfig) {
+      const candidates = collected.candidates_by_stage[stageConfig.state];
+      const batches = buildReturnNotificationBatches_(stageConfig.state, candidates);
+      const stageResult = {
+        stage: stageConfig.state,
+        audit_event: stageConfig.auditEvent,
+        candidate_request_ids: candidates.map(function (candidate) { return candidate.request_id; }),
+        batch_count: batches.length,
+        batches: []
+      };
+      result.eligible_request_ids = result.eligible_request_ids.concat(stageResult.candidate_request_ids);
+
+      batches.forEach(function (batch) {
+        const batchResult = {
+          batch_id: batch.batch_id,
+          request_ids: batch.request_ids,
+          message: batch.message,
+          status: dryRun ? "PREVIEW" : "PENDING",
+          audit_written_request_ids: [],
+          audit_failed_request_ids: []
+        };
+        if (!dryRun) {
+          let sent = false;
+          try {
+            sent = sendTelegramMessage_(batch.message) === true;
+          } catch (error) {
+            sent = false;
+          }
+          if (!sent) {
+            batchResult.status = "SEND_FAILED";
+            result.failed_batch_count += 1;
+          } else {
+            result.sent_batch_count += 1;
+            // Telegram and Google Sheets cannot form one transaction. Audit only after
+            // send success gives practical idempotency, but an audit failure can still
+            // allow a later retry to duplicate an already-delivered Telegram message.
+            batch.candidates.forEach(function (candidate) {
+              let auditRecord = false;
+              try {
+                auditRecord = appendAuditLog(
+                  stageConfig.auditEvent,
+                  candidate.request_id,
+                  "System",
+                  "RETURN_NOTIFICATION_SCANNER",
+                  JSON.stringify({
+                    stage: stageConfig.state,
+                    expected_return_at: candidate.urgency.expected_return_at,
+                    evaluated_at: result.evaluated_at,
+                    batch_id: batch.batch_id
+                  }),
+                  "OUTING_REQUEST",
+                  candidate.request_id
+                );
+              } catch (error) {
+                auditRecord = false;
+              }
+              if (auditRecord) {
+                batchResult.audit_written_request_ids.push(candidate.request_id);
+                result.audit_written_count += 1;
+              } else {
+                batchResult.audit_failed_request_ids.push(candidate.request_id);
+                result.audit_failed_count += 1;
+              }
+            });
+            batchResult.status = batchResult.audit_failed_request_ids.length ? "SENT_AUDIT_PARTIAL" : "SENT";
+          }
+        }
+        stageResult.batches.push(batchResult);
+      });
+      result.stages.push(stageResult);
+    });
+
+    return result;
+  }, "Scan operational notification sedang diproses. Sila cuba sebentar lagi.");
 }
 
 function isOperationalUrgencyLate_(urgency) {
