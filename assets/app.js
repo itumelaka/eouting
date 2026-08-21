@@ -133,7 +133,9 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "removeStudentProfilePhoto",
   "getAnnouncementBannerAdmin",
   "updateAnnouncementBanner",
-  "getAnnouncementBanner"
+  "getAnnouncementBanner",
+  "getNoGuardDepartureConfig",
+  "updateNoGuardDepartureConfig"
 ]);
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
 
@@ -284,8 +286,10 @@ let mockAnnouncementBannerV1 = {
   updated_at: new Date().toISOString(),
   updated_by: "ADMIN-MOCK"
 };
+let mockNoGuardDepartureEnabled = false;
 const guardActionLocks = {};
 const wardenActionLocks = {};
+const departureConfirmationActionLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 const RETURN_SELFIE_STATUS = {
   pending: "BELUM_HANTAR",
@@ -391,6 +395,7 @@ const els = {
   studentRefreshButton: null,
   studentLastUpdated: null,
   wardenList: document.querySelector("#wardenList"),
+  wardenDepartureConfirmationList: document.querySelector("#wardenDepartureConfirmationList"),
   wardenApprovedList: document.querySelector("#wardenApprovedList"),
   wardenSemesterChecklist: null,
   wardenSemesterCount: null,
@@ -498,6 +503,11 @@ const els = {
   adminAnnouncementState: document.querySelector("#adminAnnouncementState"),
   adminAnnouncementMessage: document.querySelector("#adminAnnouncementMessage"),
   adminAnnouncementSaveButton: document.querySelector("#adminAnnouncementSaveButton"),
+  adminNoGuardDepartureForm: document.querySelector("#adminNoGuardDepartureForm"),
+  adminNoGuardDepartureEnabled: document.querySelector("#adminNoGuardDepartureEnabled"),
+  adminNoGuardDepartureState: document.querySelector("#adminNoGuardDepartureState"),
+  adminNoGuardDepartureMessage: document.querySelector("#adminNoGuardDepartureMessage"),
+  adminNoGuardDepartureSaveButton: document.querySelector("#adminNoGuardDepartureSaveButton"),
   adminMonitoringRefreshButton: document.querySelector("#adminMonitoringRefreshButton"),
   adminMonitoringMessage: document.querySelector("#adminMonitoringMessage"),
   adminMonitoringUpdated: document.querySelector("#adminMonitoringUpdated"),
@@ -751,6 +761,7 @@ function setupAdminDashboardV200() {
   if (els.adminStaffTab) els.adminStaffTab.addEventListener("click", () => setAdminSectionV200("staff"));
   if (els.adminAnnouncementTab) els.adminAnnouncementTab.addEventListener("click", () => setAdminSectionV200("announcement"));
   if (els.adminAnnouncementForm) els.adminAnnouncementForm.addEventListener("submit", saveAdminAnnouncementV1);
+  if (els.adminNoGuardDepartureForm) els.adminNoGuardDepartureForm.addEventListener("submit", saveAdminNoGuardDepartureConfig);
   if (els.adminMonitoringRefreshButton) els.adminMonitoringRefreshButton.addEventListener("click", loadAdminMonitoringV210);
   if (els.adminMonitoringKpis) els.adminMonitoringKpis.addEventListener("click", (event) => {
     const button = event.target.closest("[data-monitor-filter]");
@@ -1090,6 +1101,54 @@ function updateAnnouncementTickerV1() {
   else measure();
 }
 
+async function loadAdminNoGuardDepartureConfig() {
+  if (!currentSession || currentSession.role !== "admin" || !els.adminNoGuardDepartureForm) return;
+  els.adminNoGuardDepartureMessage.textContent = "Memuatkan tetapan fallback...";
+  els.adminNoGuardDepartureMessage.classList.remove("error");
+  try {
+    const config = await apiPost("getNoGuardDepartureConfig", buildAdminCredentialPayloadV200());
+    renderAdminNoGuardDepartureConfig(config);
+    els.adminNoGuardDepartureMessage.textContent = "";
+  } catch (error) {
+    els.adminNoGuardDepartureMessage.textContent = "Tetapan fallback gagal dimuatkan. Sila cuba lagi.";
+    els.adminNoGuardDepartureMessage.classList.add("error");
+  }
+}
+
+function renderAdminNoGuardDepartureConfig(config) {
+  if (!els.adminNoGuardDepartureForm) return;
+  const enabled = Boolean(config && config.enabled === true);
+  els.adminNoGuardDepartureEnabled.checked = enabled;
+  els.adminNoGuardDepartureState.textContent = enabled ? "ON · Aktif" : "OFF · Tidak aktif";
+}
+
+async function saveAdminNoGuardDepartureConfig(event) {
+  event.preventDefault();
+  if (!currentSession || currentSession.role !== "admin" || els.adminNoGuardDepartureSaveButton.disabled) return;
+  const enabled = els.adminNoGuardDepartureEnabled.checked;
+  els.adminNoGuardDepartureSaveButton.disabled = true;
+  els.adminNoGuardDepartureSaveButton.textContent = "Menyimpan...";
+  globalThis.setButtonLoadingVisualV220?.(els.adminNoGuardDepartureSaveButton, true);
+  els.adminNoGuardDepartureMessage.textContent = "";
+  els.adminNoGuardDepartureMessage.classList.remove("error");
+  try {
+    const config = await apiPost("updateNoGuardDepartureConfig", Object.assign(
+      buildAdminCredentialPayloadV200(),
+      { enabled: enabled }
+    ));
+    mockNoGuardDepartureEnabled = Boolean(config && config.enabled === true);
+    renderAdminNoGuardDepartureConfig(config);
+    els.adminNoGuardDepartureMessage.textContent = "Tetapan fallback berjaya disimpan.";
+  } catch (error) {
+    els.adminNoGuardDepartureMessage.textContent = cleanApiError(error.message || "Tetapan fallback gagal disimpan.");
+    els.adminNoGuardDepartureMessage.classList.add("error");
+  } finally {
+    els.adminNoGuardDepartureSaveButton.disabled = false;
+    els.adminNoGuardDepartureSaveButton.textContent = "Simpan Tetapan";
+    globalThis.setButtonLoadingVisualV220?.(els.adminNoGuardDepartureSaveButton, false);
+  }
+}
+
 async function loadAdminAnnouncementV1() {
   if (!currentSession || currentSession.role !== "admin" || !els.adminAnnouncementForm) return;
   els.adminAnnouncementMessage.textContent = "Memuatkan notis banner...";
@@ -1172,7 +1231,10 @@ function setAdminSectionV200(section) {
   if (nextSection === "master" && !adminMasterV210.records.length) loadAdminMasterV210(1);
   if (nextSection === "students" && !adminStudentsV200.length) loadAdminStudentsV200();
   if (nextSection === "staff" && !adminStaffV210.length) loadAdminStaffV210();
-  if (nextSection === "outing" && !adminOutingTypes.length) loadAdminOutingTypesV200();
+  if (nextSection === "outing") {
+    if (!adminOutingTypes.length) loadAdminOutingTypesV200();
+    loadAdminNoGuardDepartureConfig();
+  }
   if (nextSection === "announcement") loadAdminAnnouncementV1();
 }
 
@@ -3023,6 +3085,14 @@ async function mockAdminApiPostV200(action, payload) {
       status: "AKTIF"
     };
   }
+  if (action === "getNoGuardDepartureConfig") {
+    return { enabled: mockNoGuardDepartureEnabled };
+  }
+  if (action === "updateNoGuardDepartureConfig") {
+    if (typeof request.enabled !== "boolean") throw new Error("enabled mesti boolean.");
+    mockNoGuardDepartureEnabled = request.enabled;
+    return { enabled: mockNoGuardDepartureEnabled };
+  }
   if (action === "getAdminIndividualStats") {
     return buildMockAdminIndividualStatsV200(request);
   }
@@ -3498,7 +3568,10 @@ function mapLiveRecord(record) {
     earliest_departure_time: record.earliest_departure_time || "",
     operational_urgency: record.operational_urgency && typeof record.operational_urgency === "object"
       ? { ...record.operational_urgency }
-      : null
+      : null,
+    departure_confirmation_pending: record.departure_confirmation_pending === true,
+    departure_confirmation_requested_at: record.departure_confirmation_requested_at || "",
+    no_guard_departure_enabled: record.no_guard_departure_enabled === true
   };
 }
 
@@ -5720,6 +5793,9 @@ function studentStatusCard(record) {
   const cancelAction = canStudentCancelRequest(record)
     ? `<div class="record-actions student-cancel-card-actions"><button class="danger-action" type="button" data-student-cancel="${escapeHtml(getRecordId(record))}">Batal Permohonan</button></div>`
     : "";
+  const departureConfirmationAction = typeof studentDepartureConfirmationActionHtml === "function"
+    ? studentDepartureConfirmationActionHtml(record)
+    : "";
   const selfieProof = returnSelfieProofHtml(record);
 
   return `
@@ -5755,9 +5831,69 @@ function studentStatusCard(record) {
         <span>Status: ${escapeHtml(statusInfo.badge)}</span>
       </div>
       ${selfieProof}
+      ${departureConfirmationAction}
       ${cancelAction}
     </article>
   `;
+}
+
+function studentDepartureConfirmationActionHtml(record) {
+  if (!isNoGuardDepartureEnabledForRecord(record)) return "";
+  if (studentLifecycleStatus(record) !== "DILULUSKAN_WARDEN") return "";
+  if (record.departure_confirmation_pending) {
+    return `<div class="notice" role="status">Menunggu Pengesahan Keluar oleh Warden</div>`;
+  }
+  return `
+    <div class="record-actions student-departure-confirmation-actions">
+      <button class="secondary-action" type="button" data-request-departure-confirmation="${escapeHtml(getRecordId(record))}">Mohon Pengesahan Keluar</button>
+    </div>
+  `;
+}
+
+function isNoGuardDepartureEnabledForRecord(record) {
+  return Boolean(record && record.no_guard_departure_enabled === true) ||
+    Boolean(ALLOW_MOCK_MODE && mockNoGuardDepartureEnabled);
+}
+
+function bindStudentDepartureConfirmationControls() {
+  if (!els.studentCurrentStatus) return;
+  els.studentCurrentStatus.querySelectorAll("[data-request-departure-confirmation]").forEach((button) => {
+    button.addEventListener("click", () => requestStudentDepartureConfirmation(button.dataset.requestDepartureConfirmation, button));
+  });
+}
+
+async function requestStudentDepartureConfirmation(requestId, button) {
+  if (!currentSession || currentSession.role !== "student" || departureConfirmationActionLocks[requestId]) return;
+  const record = findRecordById(requestId);
+  if (!record || !isNoGuardDepartureEnabledForRecord(record) || !isRecordForCurrentStudent(record) || studentLifecycleStatus(record) !== "DILULUSKAN_WARDEN") {
+    showWarning("Permohonan ini tidak lagi layak untuk pengesahan keluar Warden.");
+    return;
+  }
+  departureConfirmationActionLocks[requestId] = "student";
+  const loadingState = setOperationalActionLoading(button, "Memohon...");
+  try {
+    if (isLiveMode) {
+      const user = currentSession.user || {};
+      await apiPost("requestDepartureConfirmation", {
+        request_id: requestId,
+        student_id: user.student_id || user.studentId || user.id || "",
+        no_matrik: user.no_matrik || user.noMatrik || ""
+      });
+      await loadTodayRecords();
+    } else {
+      updateLocalRecord(requestId, (current) => ({
+        ...current,
+        departure_confirmation_pending: true,
+        departure_confirmation_requested_at: new Date()
+      }));
+    }
+    showSuccess("Permohonan pengesahan keluar telah dihantar kepada Warden.", "Menunggu Pengesahan Keluar");
+  } catch (error) {
+    showError(error.message || "Permohonan pengesahan keluar gagal.", "Tindakan Gagal");
+  } finally {
+    clearOperationalActionLoading(loadingState);
+    delete departureConfirmationActionLocks[requestId];
+  }
 }
 
 function studentStatusInfo(record) {
@@ -6135,6 +6271,7 @@ function renderStudent() {
   els.studentCurrentStatus.innerHTML = renderStudentCurrentStatus(currentRecord);
   renderStudentAnnualHistory();
   bindStudentCancellationControls();
+  bindStudentDepartureConfirmationControls();
   bindStudentHistoryToggles();
   bindStudentReturnSelfieControls();
   updateStudentUrgencyDisplay(new Date());
@@ -6913,6 +7050,9 @@ function renderWarden() {
     now
   );
   const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
+  const departureConfirmationRecords = approvedRecords.filter((record) => (
+    isNoGuardDepartureEnabledForRecord(record) && record.departure_confirmation_pending === true
+  ));
 
   renderWardenSemesterChecklist(outingRecords);
 
@@ -6924,6 +7064,10 @@ function renderWarden() {
     ? approvedRecords.map((record) => recordCard(record, "dashboard")).join("")
     : emptyState("Tiada permohonan diluluskan yang menunggu pengesahan guard.");
 
+  els.wardenDepartureConfirmationList.innerHTML = departureConfirmationRecords.length
+    ? departureConfirmationRecords.map(wardenDepartureConfirmationCard).join("")
+    : emptyState("Tiada permohonan menunggu pengesahan keluar Warden.");
+
   els.wardenList.querySelectorAll("[data-approve]").forEach((button) => {
     button.addEventListener("click", () => updateStatus(button.dataset.approve, STATUS.approved, button));
   });
@@ -6931,6 +7075,68 @@ function renderWarden() {
   els.wardenList.querySelectorAll("[data-reject]").forEach((button) => {
     button.addEventListener("click", () => updateStatus(button.dataset.reject, STATUS.rejected, button));
   });
+  els.wardenDepartureConfirmationList.querySelectorAll("[data-warden-remote-checkout]").forEach((button) => {
+    button.addEventListener("click", () => confirmWardenRemoteCheckout(button.dataset.wardenRemoteCheckout, button));
+  });
+}
+
+function wardenDepartureConfirmationCard(record) {
+  return `
+    <article class="record-card" ${recordDataAttributes(record)}>
+      <div class="record-top">
+        <div class="record-person">
+          ${profilePhotoMarkup(record.student_id || record.studentId, record.studentName || record.nama, "profile-photo-thumbnail", [record.className || record.kelas, record.student_id || record.studentId].filter(Boolean).join(" · "))}
+          <div><h3>${escapeHtml(record.studentName || record.nama || "-")}</h3><div class="record-meta">${escapeHtml(record.no_matrik || "-")} | ${escapeHtml(record.className || record.kelas || "-")}</div></div>
+        </div>
+        <span class="badge badge-approved">Diluluskan</span>
+      </div>
+      <div class="record-detail">
+        <strong>Jenis Permohonan:</strong> ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}<br>
+        <strong>Tujuan:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
+        <strong>Lokasi:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
+        <strong>Dimohon:</strong> ${escapeHtml(formatDisplayDateTime(record.departure_confirmation_requested_at))}<br>
+        <strong>Dijangka Pulang:</strong> ${escapeHtml(expectedReturnDisplay(record))}
+      </div>
+      <div class="record-actions"><button class="action-button out-button" type="button" data-warden-remote-checkout="${escapeHtml(getRecordId(record))}">Sahkan Keluar</button></div>
+    </article>
+  `;
+}
+
+async function confirmWardenRemoteCheckout(requestId, button) {
+  if (!currentSession || currentSession.role !== "warden" || departureConfirmationActionLocks[requestId]) return;
+  const record = findRecordById(requestId);
+  if (!record || !isNoGuardDepartureEnabledForRecord(record) || record.status !== STATUS.approved || !record.departure_confirmation_pending) {
+    showWarning("Rekod ini sudah tidak menunggu pengesahan keluar Warden.");
+    return;
+  }
+  departureConfirmationActionLocks[requestId] = "warden";
+  const loadingState = setOperationalActionLoading(button, "Mengesahkan keluar...");
+  try {
+    if (isLiveMode) {
+      await apiPost("confirmWardenRemoteCheckout", {
+        request_id: requestId,
+        nama_warden: currentSession.user.nama_warden || currentSession.user.name || "",
+        pin: currentSession.user.pin || ""
+      });
+      await loadTodayRecords();
+    } else {
+      const checkoutAt = new Date();
+      updateLocalRecord(requestId, (current) => ({
+        ...current,
+        status: STATUS.out,
+        rawStatus: "KELUAR",
+        outAt: checkoutAt,
+        masa_keluar: checkoutAt,
+        departure_confirmation_pending: false
+      }));
+    }
+    showSuccess("Pelajar telah disahkan keluar oleh Warden.", "Sahkan Keluar");
+  } catch (error) {
+    showError(error.message || "Pengesahan keluar gagal.", "Tindakan Gagal");
+  } finally {
+    clearOperationalActionLoading(loadingState);
+    delete departureConfirmationActionLocks[requestId];
+  }
 }
 
 function isReturnSelfieSubmitted(record) {
@@ -10465,6 +10671,9 @@ async function refreshWardenRecords(source) {
       if (els.wardenApprovedList) {
         els.wardenApprovedList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
       }
+      if (els.wardenDepartureConfirmationList) {
+        els.wardenDepartureConfirmationList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
+      }
       if (els.wardenSemesterList) {
         els.wardenSemesterList.innerHTML = emptyState("Permohonan warden gagal dimuat. Sila cuba Refresh Permohonan.");
       }
@@ -10509,6 +10718,12 @@ function setWardenLoadingState(isLoading, clearCurrentView) {
     els.wardenApprovedList.classList.toggle("is-loading", isLoading);
     if (clearCurrentView) {
       els.wardenApprovedList.innerHTML = "";
+    }
+  }
+  if (els.wardenDepartureConfirmationList) {
+    els.wardenDepartureConfirmationList.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) {
+      els.wardenDepartureConfirmationList.innerHTML = "";
     }
   }
   if (els.wardenSemesterList) {

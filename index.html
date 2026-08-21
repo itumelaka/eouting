@@ -298,6 +298,8 @@
         </div>
         <h3 class="list-title">Menunggu Kelulusan</h3>
         <div class="record-list" id="wardenList"></div>
+        <h3 class="list-title">Menunggu Pengesahan Keluar</h3>
+        <div class="record-list" id="wardenDepartureConfirmationList"></div>
         <h3 class="list-title">Telah Diluluskan</h3>
         <div class="record-list" id="wardenApprovedList"></div>
         </section>
@@ -475,6 +477,14 @@
             </div>
 
             <p class="form-message admin-dashboard-message" id="adminDashboardMessage" aria-live="polite"></p>
+            <form class="admin-announcement-form" id="adminNoGuardDepartureForm">
+              <h4>Fallback Pengesahan Keluar Tanpa Guard</h4>
+              <label><input id="adminNoGuardDepartureEnabled" type="checkbox"> Aktifkan fungsi</label>
+              <small class="admin-field-helper">Apabila aktif, pelajar yang telah diluluskan boleh memohon pengesahan keluar jika Guard tiada, dan Warden membuat pengesahan akhir.</small>
+              <p class="admin-announcement-state" id="adminNoGuardDepartureState">Belum dimuatkan.</p>
+              <p class="form-message" id="adminNoGuardDepartureMessage" aria-live="polite"></p>
+              <button class="primary-action" id="adminNoGuardDepartureSaveButton" type="submit">Simpan Tetapan</button>
+            </form>
             <div class="admin-type-list" id="adminTypeList" aria-live="polite"></div>
 
             <section class="admin-editor" id="adminTypeEditor" hidden aria-labelledby="adminEditorTitle">

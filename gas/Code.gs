@@ -11,6 +11,7 @@ const SHEETS = {
 };
 
 const OUTING_CONFIG_V2_PROPERTY = "OUTING_CONFIG_V2_ENABLED";
+const NO_GUARD_DEPARTURE_PROPERTY = "NO_GUARD_DEPARTURE_ENABLED";
 
 const ANNOUNCEMENT_BANNER_PROPERTIES = {
   text: "ANNOUNCEMENT_BANNER_TEXT",
@@ -115,6 +116,11 @@ const STATUS = {
   out: "KELUAR",
   done: "SELESAI",
   studentCancelled: "DIBATALKAN_PELAJAR"
+};
+
+const DEPARTURE_CONFIRMATION_AUDIT = {
+  requested: "DEPARTURE_CONFIRMATION_REQUESTED",
+  wardenCheckout: "WARDEN_REMOTE_CHECKOUT"
 };
 
 const REQUEST_TYPE = {
@@ -412,6 +418,8 @@ function doPost(e) {
     if (action === "getAdminOutingTypes") return jsonResponse(getAdminOutingTypes(payload));
     if (action === "getAnnouncementBannerAdmin") return jsonResponse(getAnnouncementBannerAdmin(payload));
     if (action === "updateAnnouncementBanner") return jsonResponse(updateAnnouncementBanner(payload));
+    if (action === "getNoGuardDepartureConfig") return jsonResponse(getNoGuardDepartureConfig(payload));
+    if (action === "updateNoGuardDepartureConfig") return jsonResponse(updateNoGuardDepartureConfig(payload));
     if (action === "getAnnouncementBanner") return jsonResponse(getAnnouncementBanner(payload));
     if (action === "getOutingConfigReadiness") return jsonResponse(getOutingConfigReadiness(payload));
     if (action === "createOutingType") return jsonResponse(createOutingType(payload));
@@ -426,8 +434,10 @@ function doPost(e) {
     if (action === "toggleStudentStatus") return jsonResponse(toggleStudentStatus(payload));
     if (action === "submitRequest") return jsonResponse(submitRequest(payload));
     if (action === "cancelStudentRequest") return jsonResponse(cancelStudentRequest(payload));
+    if (action === "requestDepartureConfirmation") return jsonResponse(requestDepartureConfirmation(payload));
     if (action === "approveRequest") return jsonResponse(approveRequest(payload));
     if (action === "rejectRequest") return jsonResponse(rejectRequest(payload));
+    if (action === "confirmWardenRemoteCheckout") return jsonResponse(confirmWardenRemoteCheckout(payload));
     if (action === "confirmOut") return jsonResponse(confirmOut(payload));
     if (action === "confirmIn") return jsonResponse(confirmIn(payload));
     if (action === "submitReturnSelfie") return jsonResponse(submitReturnSelfie(payload));
@@ -2487,6 +2497,156 @@ function cancelStudentRequest(payload) {
   return transition.record;
 }
 
+function getDepartureConfirmationAuditState_(requestId, auditRows) {
+  const normalizedRequestId = String(requestId || "").trim();
+  const state = { requested: false, requested_at: "", completed: false, completed_at: "" };
+  (auditRows || []).forEach(function (row) {
+    if (String(row && row.request_id || "").trim() !== normalizedRequestId) return;
+    const action = String(row && row.action || "").trim();
+    if (action === DEPARTURE_CONFIRMATION_AUDIT.requested && !state.requested) {
+      state.requested = true;
+      state.requested_at = row.timestamp || "";
+    }
+    if (action === DEPARTURE_CONFIRMATION_AUDIT.wardenCheckout) {
+      state.completed = true;
+      state.completed_at = row.timestamp || "";
+    }
+  });
+  return state;
+}
+
+function addDepartureConfirmationProjection_(rows) {
+  let auditRows = [];
+  try {
+    auditRows = getRowsAsObjects_(getSheet_(SHEETS.audit));
+  } catch (error) {
+    auditRows = [];
+  }
+  const featureEnabled = isNoGuardDepartureEnabled_();
+  return (rows || []).map(function (row) {
+    const auditState = getDepartureConfirmationAuditState_(row.request_id, auditRows);
+    const pending = String(row.status || "").trim() === STATUS.approved && auditState.requested && !auditState.completed;
+    return Object.assign({}, row, {
+      departure_confirmation_pending: pending,
+      departure_confirmation_requested_at: pending ? auditState.requested_at : "",
+      no_guard_departure_enabled: featureEnabled
+    });
+  });
+}
+
+function requestDepartureConfirmation(payload) {
+  const data = payload || {};
+  const requestId = String(data.request_id || "").trim();
+  const studentId = String(data.student_id || data.id || "").trim();
+  const noMatrik = String(data.no_matrik || data.matric || "").trim();
+  if (!requestId || !studentId || !noMatrik) {
+    throw new Error("request_id, student_id dan no_matrik diperlukan.");
+  }
+
+  const student = findActiveStudent_(studentId, noMatrik);
+  if (!student) throw new Error("Akses sesi pelajar tidak sah.");
+  if (!isNoGuardDepartureEnabled_()) {
+    throw new Error("Fallback pengesahan keluar tanpa Guard dinyahaktifkan oleh Admin.");
+  }
+
+  return withScriptLock_(function () {
+    const found = findRowByRequestId_(requestId);
+    if (!found) throw new Error("Permohonan tidak dijumpai.");
+    const ownsRequest = normalizeText_(found.record.student_id) === normalizeText_(student.student_id) &&
+      normalizeText_(found.record.no_matrik) === normalizeText_(student.no_matrik);
+    if (!ownsRequest) throw new Error("Anda tidak dibenarkan memohon pengesahan untuk pelajar lain.");
+    if (String(found.record.status || "").trim() !== STATUS.approved) {
+      throw new Error("Hanya permohonan yang telah diluluskan Warden boleh memohon pengesahan keluar.");
+    }
+
+    const auditState = getDepartureConfirmationAuditState_(requestId, getRowsAsObjects_(getSheet_(SHEETS.audit)));
+    if (auditState.completed) throw new Error("Pengesahan keluar Warden telah selesai.");
+    if (!auditState.requested) {
+      const auditRecord = appendAuditLog(
+        DEPARTURE_CONFIRMATION_AUDIT.requested,
+        requestId,
+        "Student",
+        student.nama,
+        JSON.stringify({
+          student_name: student.nama || "",
+          no_matrik: student.no_matrik || "",
+          jenis_permohonan: found.record.jenis_permohonan || "",
+          mode: "REMOTE_NO_GUARD"
+        })
+      );
+      if (!auditRecord) throw new Error("Permohonan pengesahan keluar gagal direkodkan.");
+      SpreadsheetApp.flush();
+      auditState.requested = true;
+      auditState.requested_at = auditRecord.timestamp || "";
+    }
+    return Object.assign({}, found.record, {
+      departure_confirmation_pending: true,
+      departure_confirmation_requested_at: auditState.requested_at
+    });
+  }, "Permohonan pengesahan keluar sedang diproses. Sila cuba sebentar lagi.");
+}
+
+function confirmWardenRemoteCheckout(payload) {
+  const data = payload || {};
+  const requestId = String(data.request_id || "").trim();
+  const wardenName = String(data.warden_name || data.nama_warden || data.user_name || "").trim();
+  const pin = String(data.pin === undefined || data.pin === null ? "" : data.pin).trim();
+  if (!requestId || !wardenName || !pin) {
+    throw new Error("request_id, nama warden dan PIN diperlukan.");
+  }
+
+  const warden = findActiveWarden_(wardenName, pin);
+  if (!warden) throw new Error("Warden tidak dijumpai atau tidak aktif.");
+  if (!isNoGuardDepartureEnabled_()) {
+    throw new Error("Fallback pengesahan keluar tanpa Guard dinyahaktifkan oleh Admin.");
+  }
+  const wardenRole = deriveWardenStaffRole(warden);
+
+  const result = withScriptLock_(function () {
+    const found = findRowByRequestId_(requestId);
+    if (!found) throw new Error("Permohonan tidak dijumpai.");
+    const auditState = getDepartureConfirmationAuditState_(requestId, getRowsAsObjects_(getSheet_(SHEETS.audit)));
+    if (auditState.completed && String(found.record.status || "").trim() === STATUS.out) {
+      return { record: found.record, alreadyConfirmed: true };
+    }
+    if (String(found.record.status || "").trim() !== STATUS.approved) {
+      throw new Error("Permohonan ini sudah tidak menunggu pengesahan keluar Warden.");
+    }
+    if (!auditState.requested || auditState.completed) {
+      throw new Error("Tiada permohonan pengesahan keluar yang belum selesai.");
+    }
+
+    const checkoutAt = now_();
+    updateRowByHeaders_(found.sheet, found.rowNumber, { status: STATUS.out, masa_keluar: checkoutAt });
+    SpreadsheetApp.flush();
+    const auditRecord = appendAuditLog(
+      DEPARTURE_CONFIRMATION_AUDIT.wardenCheckout,
+      requestId,
+      wardenRole === "HEP" ? "HEP" : "Warden",
+      warden.nama_warden,
+      JSON.stringify({
+        student_name: found.record.nama || "",
+        no_matrik: found.record.no_matrik || "",
+        jenis_permohonan: found.record.jenis_permohonan || "",
+        actor_role: wardenRole,
+        mode: "REMOTE_NO_GUARD",
+        masa_keluar: checkoutAt
+      })
+    );
+    if (!auditRecord) throw new Error("Pengesahan keluar berlaku tetapi audit gagal direkodkan. Sila hubungi Admin.");
+    SpreadsheetApp.flush();
+    return {
+      record: Object.assign({}, found.record, { status: STATUS.out, masa_keluar: checkoutAt }),
+      alreadyConfirmed: false
+    };
+  }, "Pengesahan keluar sedang diproses. Sila cuba sebentar lagi.");
+
+  invalidateOperationalRecordsCache_();
+  return result.alreadyConfirmed
+    ? Object.assign({}, result.record, { message: "Rekod sudah disahkan keluar oleh Warden." })
+    : result.record;
+}
+
 function approveRequest(payload) {
   const requestId = String(payload.request_id || "").trim();
   const wardenName = String(payload.warden_name || payload.nama_warden || payload.user_name || "").trim();
@@ -3240,6 +3400,34 @@ function getTodayRecords() {
   }));
 }
 
+function isNoGuardDepartureEnabled_() {
+  if (typeof PropertiesService === "undefined") return false;
+  const value = PropertiesService.getScriptProperties().getProperty(NO_GUARD_DEPARTURE_PROPERTY);
+  return normalizeText_(value) === "true";
+}
+
+function readNoGuardDepartureConfig_() {
+  return { enabled: isNoGuardDepartureEnabled_() };
+}
+
+function getNoGuardDepartureConfig(payload) {
+  validateAdminCredentials_(payload);
+  return readNoGuardDepartureConfig_();
+}
+
+function updateNoGuardDepartureConfig(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const enabled = requireBoolean_(payload && payload.enabled, "enabled");
+  return withScriptLock_(function () {
+    PropertiesService.getScriptProperties().setProperty(NO_GUARD_DEPARTURE_PROPERTY, String(enabled));
+    appendAuditLog(
+      "UPDATE_NO_GUARD_DEPARTURE_CONFIG", "", "Admin", getSafeAdminIdentity_(admin),
+      JSON.stringify({ enabled: enabled }), "SYSTEM_CONFIG", NO_GUARD_DEPARTURE_PROPERTY
+    );
+    return readNoGuardDepartureConfig_();
+  }, "Tetapan fallback pengesahan keluar sedang dikemas kini. Sila cuba sebentar lagi.");
+}
+
 function getAnnouncementBannerAdmin(payload) {
   validateAdminCredentials_(payload);
   return readAnnouncementBannerConfig_();
@@ -3348,9 +3536,12 @@ function getOperationalTodayRecords(payload) {
   const projectedRows = role === "warden"
     ? addWardenDeparturePriorityProjection_(rows)
     : rows;
-  return authenticatedStudent
-    ? projectedRows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
+  const roleProjectedRows = role === "warden" || role === "student"
+    ? addDepartureConfirmationProjection_(projectedRows)
     : projectedRows;
+  return authenticatedStudent
+    ? roleProjectedRows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
+    : roleProjectedRows;
 }
 
 function addOperationalUrgency_(rows, now) {
