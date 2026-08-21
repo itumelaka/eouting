@@ -20,6 +20,7 @@ function between(source, start, end) {
 function createFixture(options = {}) {
   const audits = (options.audits || []).map((row) => ({ ...row }));
   const updates = [];
+  const telegramMessages = [];
   let lockCalls = 0;
   const properties = new Map();
   if (options.featureEnabled !== false) properties.set("NO_GUARD_DEPARTURE_ENABLED", "true");
@@ -27,9 +28,10 @@ function createFixture(options = {}) {
     request_id: "R1", student_id: options.owner === false ? "S2" : "S1",
     no_matrik: options.owner === false ? "M2" : "M1", nama: "Ali",
     jenis_permohonan: "PULANG_BERMALAM", status: options.status || "DILULUSKAN_WARDEN",
-    masa_keluar: options.masa_keluar || "", guard_keluar_by: options.guard_keluar_by || ""
+    lokasi: "Klinik Merlimau", masa_keluar: options.masa_keluar || "", guard_keluar_by: options.guard_keluar_by || ""
   };
   const context = {
+    EOUTING_APP_URL: "https://itumelaka.github.io/eouting/",
     DEPARTURE_CONFIRMATION_AUDIT: {
       requested: "DEPARTURE_CONFIRMATION_REQUESTED", wardenCheckout: "WARDEN_REMOTE_CHECKOUT"
     },
@@ -52,6 +54,9 @@ function createFixture(options = {}) {
     normalizeText_: (value) => String(value || "").trim().toLowerCase(),
     isNoGuardDepartureEnabled_: () => properties.get("NO_GUARD_DEPARTURE_ENABLED") === "true",
     now_: () => "2026-08-21 18:05:00",
+    formatTelegramDateTime_: () => "21/08/2026 18:05",
+    requestTypeLabel_: () => "Pulang Bermalam",
+    safeTelegramCaptionValue_: (value) => String(value || "-").replace(/[\u0000-\u001F\u007F]/g, " ").trim(),
     updateRowByHeaders_: (_sheet, _rowNumber, values) => {
       updates.push({ ...values });
       row = { ...row, ...values };
@@ -65,13 +70,16 @@ function createFixture(options = {}) {
     SpreadsheetApp: { flush() {} },
     invalidateOperationalRecordsCache_: () => {},
     hasCellValue_: (value) => value !== "" && value !== null && value !== undefined,
-    sendTelegramMessage_: () => { throw new Error("Telegram must not be called"); },
+    sendTelegramMessage_: (message) => {
+      telegramMessages.push(message);
+      return options.telegramResult !== false;
+    },
     console
   };
   vm.createContext(context);
   vm.runInContext(between(gasSource, "function getDepartureConfirmationAuditState_", "function approveRequest"), context);
   vm.runInContext(between(gasSource, "function confirmOut", "function confirmIn"), context);
-  return { context, audits, updates, properties, get row() { return row; }, get lockCalls() { return lockCalls; } };
+  return { context, audits, updates, telegramMessages, properties, get row() { return row; }, get lockCalls() { return lockCalls; } };
 }
 
 const requestPayload = { request_id: "R1", student_id: "S1", no_matrik: "M1" };
@@ -87,8 +95,34 @@ test("approved owner may request once without changing lifecycle or departure fi
   assert.equal(fixture.row.status, "DILULUSKAN_WARDEN");
   assert.equal(fixture.row.masa_keluar, "");
   assert.equal(fixture.row.guard_keluar_by, "");
+  assert.equal(fixture.telegramMessages.length, 1);
+  assert.match(fixture.telegramMessages[0], /🚪 PENGESAHAN KELUAR TANPA GUARD/);
+  assert.match(fixture.telegramMessages[0], /Pelajar: Ali/);
+  assert.match(fixture.telegramMessages[0], /Jenis: Pulang Bermalam/);
+  assert.match(fixture.telegramMessages[0], /Lokasi: Klinik Merlimau/);
+  assert.match(fixture.telegramMessages[0], /Masa Mohon: 21\/08\/2026 18:05/);
+  assert.match(fixture.telegramMessages[0], /https:\/\/itumelaka\.github\.io\/eouting\//);
 
   fixture.context.requestDepartureConfirmation(requestPayload);
+  assert.equal(fixture.audits.filter((row) => row.action === "DEPARTURE_CONFIRMATION_REQUESTED").length, 1);
+  assert.equal(fixture.telegramMessages.length, 1);
+});
+
+test("Telegram failure preserves the new pending request without departure mutation or retry spam", () => {
+  const fixture = createFixture({ telegramResult: false });
+  const result = fixture.context.requestDepartureConfirmation(requestPayload);
+  assert.equal(result.departure_confirmation_pending, true);
+  assert.equal(result.status, "DILULUSKAN_WARDEN");
+  assert.equal(fixture.audits.filter((row) => row.action === "DEPARTURE_CONFIRMATION_REQUESTED").length, 1);
+  assert.equal(fixture.telegramMessages.length, 1);
+  assert.equal(fixture.updates.length, 0);
+  assert.equal(fixture.row.masa_keluar, "");
+  assert.equal(fixture.row.guard_keluar_by, "");
+  const projected = fixture.context.addDepartureConfirmationProjection_([{ request_id: "R1", status: "DILULUSKAN_WARDEN" }])[0];
+  assert.equal(projected.departure_confirmation_pending, true);
+
+  fixture.context.requestDepartureConfirmation(requestPayload);
+  assert.equal(fixture.telegramMessages.length, 1);
   assert.equal(fixture.audits.filter((row) => row.action === "DEPARTURE_CONFIRMATION_REQUESTED").length, 1);
 });
 
@@ -249,8 +283,10 @@ test("operational projection stays private to Student/Warden and Guard flow rema
   assert.match(guard, /record\.status === STATUS\.approved/);
   assert.match(guard, /confirmOut\(button\.dataset\.out, button\)/);
   const backend = between(gasSource, "function getDepartureConfirmationAuditState_", "function approveRequest");
-  assert.doesNotMatch(backend, /sendTelegramMessage_|scanReturnOperationalNotifications_|trigger/i);
+  assert.match(backend, /sendTelegramMessage_\(result\.telegram_message\)/);
+  assert.doesNotMatch(backend, /scanReturnOperationalNotifications_|trigger/i);
   assert.doesNotMatch(backend, /guard_keluar_by\s*:/);
+  assert.match(between(gasSource, "function buildTelegramSubmitMessage_", "function studentCancellationPreviousStatusLabel_"), /appendEOutingWardenLink_/);
 });
 
 test("MVP adds no request-sheet schema field or lifecycle status", () => {

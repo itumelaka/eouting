@@ -108,6 +108,10 @@ test("authoritative DUE_SOON, CRITICAL and ACTION_REQUIRED map to their exact au
   assert.equal(stage(result, "CRITICAL").audit_event, "RETURN_CRITICAL_SENT");
   assert.deepEqual(stage(result, "ACTION_REQUIRED").candidate_request_ids, ["ACTION"]);
   assert.equal(stage(result, "ACTION_REQUIRED").audit_event, "RETURN_ACTION_REQUIRED_SENT");
+  for (const state of ["DUE_SOON", "CRITICAL", "ACTION_REQUIRED"]) {
+    assert.match(stage(result, state).batches[0].message, /https:\/\/itumelaka\.github\.io\/eouting\//);
+    assert.match(stage(result, state).batches[0].message, /Buka eOuting Warden\/HEP/);
+  }
 });
 
 test("NORMAL, ordinary LATE, needs_review and every non-KELUAR lifecycle are excluded", () => {

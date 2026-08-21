@@ -12,6 +12,7 @@ const SHEETS = {
 
 const OUTING_CONFIG_V2_PROPERTY = "OUTING_CONFIG_V2_ENABLED";
 const NO_GUARD_DEPARTURE_PROPERTY = "NO_GUARD_DEPARTURE_ENABLED";
+const EOUTING_APP_URL = "https://itumelaka.github.io/eouting/";
 
 const ANNOUNCEMENT_BANNER_PROPERTIES = {
   text: "ANNOUNCEMENT_BANNER_TEXT",
@@ -2534,6 +2535,28 @@ function addDepartureConfirmationProjection_(rows) {
   });
 }
 
+function appendEOutingWardenLink_(message) {
+  return [
+    String(message || "").trim(),
+    "",
+    "🔗 Buka eOuting Warden/HEP:",
+    EOUTING_APP_URL
+  ].join("\n");
+}
+
+function buildTelegramDepartureConfirmationRequestMessage_(record, requestedAt) {
+  return appendEOutingWardenLink_([
+    "🚪 PENGESAHAN KELUAR TANPA GUARD",
+    "",
+    "Pelajar: " + safeTelegramCaptionValue_(record && record.nama),
+    "Jenis: " + safeTelegramCaptionValue_(requestTypeLabel_(record && record.jenis_permohonan)),
+    "Lokasi: " + safeTelegramCaptionValue_(record && record.lokasi),
+    "Masa Mohon: " + formatTelegramDateTime_(requestedAt),
+    "",
+    "Pelajar sedang menunggu pengesahan keluar oleh Warden."
+  ].join("\n"));
+}
+
 function requestDepartureConfirmation(payload) {
   const data = payload || {};
   const requestId = String(data.request_id || "").trim();
@@ -2549,7 +2572,7 @@ function requestDepartureConfirmation(payload) {
     throw new Error("Fallback pengesahan keluar tanpa Guard dinyahaktifkan oleh Admin.");
   }
 
-  return withScriptLock_(function () {
+  const result = withScriptLock_(function () {
     const found = findRowByRequestId_(requestId);
     if (!found) throw new Error("Permohonan tidak dijumpai.");
     const ownsRequest = normalizeText_(found.record.student_id) === normalizeText_(student.student_id) &&
@@ -2561,6 +2584,7 @@ function requestDepartureConfirmation(payload) {
 
     const auditState = getDepartureConfirmationAuditState_(requestId, getRowsAsObjects_(getSheet_(SHEETS.audit)));
     if (auditState.completed) throw new Error("Pengesahan keluar Warden telah selesai.");
+    let telegramMessage = "";
     if (!auditState.requested) {
       const auditRecord = appendAuditLog(
         DEPARTURE_CONFIRMATION_AUDIT.requested,
@@ -2578,12 +2602,30 @@ function requestDepartureConfirmation(payload) {
       SpreadsheetApp.flush();
       auditState.requested = true;
       auditState.requested_at = auditRecord.timestamp || "";
+      telegramMessage = buildTelegramDepartureConfirmationRequestMessage_(found.record, auditState.requested_at);
     }
-    return Object.assign({}, found.record, {
-      departure_confirmation_pending: true,
-      departure_confirmation_requested_at: auditState.requested_at
-    });
+    return {
+      record: Object.assign({}, found.record, {
+        departure_confirmation_pending: true,
+        departure_confirmation_requested_at: auditState.requested_at
+      }),
+      telegram_message: telegramMessage
+    };
   }, "Permohonan pengesahan keluar sedang diproses. Sila cuba sebentar lagi.");
+
+  if (result.telegram_message) {
+    try {
+      if (sendTelegramMessage_(result.telegram_message) !== true &&
+          typeof console !== "undefined" && console && typeof console.warn === "function") {
+        console.warn("DEPARTURE_CONFIRMATION_REQUESTED Telegram notification failed.");
+      }
+    } catch (telegramError) {
+      if (typeof console !== "undefined" && console && typeof console.warn === "function") {
+        console.warn("DEPARTURE_CONFIRMATION_REQUESTED Telegram notification failed.");
+      }
+    }
+  }
+  return result.record;
 }
 
 function confirmWardenRemoteCheckout(payload) {
@@ -4274,7 +4316,7 @@ function buildTelegramSubmitMessage_(record) {
     title = "🏫 Permohonan CUTI SEMESTER Baru";
   }
 
-  return buildTelegramStatusMessage_(title, record);
+  return appendEOutingWardenLink_(buildTelegramStatusMessage_(title, record));
 }
 
 function studentCancellationPreviousStatusLabel_(status, record) {
@@ -4935,7 +4977,7 @@ function buildReturnNotificationMessage_(stage, candidates) {
     return "• " + name + " — lewat " + formatReturnNotificationLateDuration_(candidate.urgency.minutes_late);
   });
 
-  return [title, "", summary, ""].concat(lines, ["", footer]).join("\n");
+  return appendEOutingWardenLink_([title, "", summary, ""].concat(lines, ["", footer]).join("\n"));
 }
 
 function buildReturnNotificationBatches_(stage, candidates) {
