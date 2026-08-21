@@ -1,8 +1,17 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 46 / cache `2.4.0-r1`** pada 21 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 dalam `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 dalam `54d526b`. Fasa 5 kini implemented, deployed dan activated. Baseline kanonik semasa ialah **444/444**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 50 / cache `2.4.0-r1`** pada 21 Ogos 2026. Fasa 1–5 lengkap/deployed/activated. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented/deployed dan currently enabled melalui Admin. Baseline kanonik semasa ialah **465/465**. Fasa 6 belum bermula; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### No-Guard Departure — sambungan operasi selepas Fasa 5
+
+- [x] Commit `0dcafdc` menambah fallback generik ber-gate tanpa class/type restriction, self-checkout Student, Guard impersonation, lifecycle status atau kolum baharu.
+- [x] Admin toggle `NO_GUARD_DEPARTURE_ENABLED` menggunakan safe default false; production kini ON, tetapi Admin tidak mendapat checkout authority.
+- [x] `DEPARTURE_CONFIRMATION_REQUESTED` menjadi pending/dedup authority dan `WARDEN_REMOTE_CHECKOUT` merekod Warden actor/mode `REMOTE_NO_GUARD`; `guard_keluar_by` kekal blank.
+- [x] Commit `ac929e5` memulihkan canonical manifest selepas failed Version 47 dan menambah regression bagi Admin auth, No-Guard ON/OFF serta dynamic A2/A3/LI fixtures.
+- [x] Commit `64963de` / Version 49 menambah one-time request Telegram serta canonical operational eOuting links; live request/waiting UI/message telah disahkan.
+- [x] Commit `1d750ab` / Version 50 menambah replay-safe Warden checkout completion Telegram; failure tidak rollback lifecycle dan full suite **465/465**.
 
 ### Telegram Return Reminder + Late Escalation Scanner — Fasa 5
 
@@ -248,7 +257,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 46 / cache `2.4.0-r1`** pa
 - [x] Jadikan statistik, label Telegram, Rekod Master dan Checklist Warden config-aware untuk jenis custom.
 - [x] Tambah readiness read-only Admin untuk schema, config aktif, pendua, versi, hari/masa dan konsistensi consumer.
 - [x] Deploy hardening, sahkan readiness production, lakukan controlled activation dan deploy Guard feedback sebagai GAS Version 36.
-- [ ] Telegram inline button/link to open Warden/Guard/Pemantauan page.
+- [ ] Optional deep-link terus ke Warden page/request; canonical eOuting URL biasa sudah ditambah kepada operational messages yang disokong.
 - [ ] Dedicated `Kemas Kini Aplikasi` button separate from `Muat Semula Aplikasi`, if still required.
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
@@ -274,7 +283,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 46 / cache `2.4.0-r1`** pa
 - [ ] QR code.
 - [ ] Admin/Warden evidence review UI.
 - [ ] Automated cleanup selfie selepas retention period.
-- [ ] Telegram retry queue untuk kegagalan sementara.
+- [ ] Optional Telegram retry strategy untuk kegagalan No-Guard request/completion; automatic retry belum dilaksanakan.
 - [ ] Refinement notis consent/privacy Pelajar.
 - [x] Admin beta page for managing STUDENTS (A2, A3 dan LI) tanpa schema migration.
 - [ ] Nilai sama ada optimistic version column diperlukan untuk STUDENTS selepas beta concurrency QA.

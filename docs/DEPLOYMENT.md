@@ -1,12 +1,35 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r1` dan service-worker cache `eouting-cache-v2.4.0-r1`. Backend production ialah GAS **Version 46**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 pada `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 pada `54d526b`. Fasa 5 kini implemented, deployed dan activated; full Node baseline kanonik semasa ialah **444/444**.
+Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r1` dan service-worker cache `eouting-cache-v2.4.0-r1`. Backend production ialah GAS **Version 50**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready; No-Guard Departure kini enabled melalui Admin. Fasa 1–5 lengkap/deployed/activated dan No-Guard ialah sambungan selepas Fasa 5, bukan Fasa 6. Full Node baseline kanonik semasa ialah **465/465**.
+
+## No-Guard deployment chronology — Versions 47–50
+
+- **Version 47 — `eOuting v2.4.0 No-Guard Departure MVP`:** deployed, kemudian gagal kerana immutable deployment manifest tiada established Web App execution/access block. Valid Admin login ditolak dan class dinamik LI hilang. Rollback segera dibuat kepada Version 46. Tiada data corruption; No-Guard business logic bukan root cause.
+- **Version 48 — `eOuting v2.4.0 No-Guard Departure MVP manifest fix`:** commit `ac929e5` memulihkan manifest, Admin/Student login, A2/A3/LI dynamic class regression, Admin config endpoint dan Web App authority. Safe OFF diverifikasi, kemudian ciri diaktifkan melalui Admin dan Student approved request memaparkan `Mohon Pengesahan Keluar`.
+- **Version 49 — `eOuting v2.4.0 No-Guard Telegram alerts`:** commit `64963de` menambah one-time request Telegram serta canonical eOuting URL kepada operational messages yang disokong. Live verification mengesahkan waiting UI dan request alert dengan Student/type/location/time/link.
+- **Version 50 — `eOuting v2.4.0 Warden remote checkout Telegram`:** commit `1d750ab` menambah one-time completion Telegram selepas transition/audit/flush berjaya. Deployment Version 50 berjaya dan automated baseline ialah 465/465; live visual verification completion message belum direkodkan.
+
+Deployment Web App production kekal ID `AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f` pada URL `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Manifest kanonik sebelum setiap immutable version mesti disahkan:
+
+```json
+{
+  "timeZone": "Asia/Kuala_Lumpur",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS"
+  }
+}
+```
+
+Gunakan existing deployment in-place, pilih immutable version yang dimaksudkan, biarkan `@HEAD` tidak disentuh, elakkan Web App pendua, kemudian uji Admin login dan class dinamik termasuk contoh non-A2/A3. Pastikan tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit kekal.
 
 ## Phase 5 production synchronization dan activation — 21 Ogos 2026
 
 - Historical documented current baseline sebelum audit ialah Version 44. Audit deployment mendapati actual production ketika itu ialah Version 45 tanpa description; origin Version 45 tidak diketahui dan tidak diandaikan.
 - Existing production deployment `AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f` dikemas kini in-place kepada Version 46 dengan description `eOuting v2.4.0 Phase 1-5 operational safety sync`. URL kekal sama dan tiada Web App atau API executable deployment baharu dicipta.
-- Manifest production kekal timezone `Asia/Singapore`, access `ANYONE_ANONYMOUS` dan execute-as `USER_DEPLOYING`.
+- Manifest production ketika baseline itu menggunakan timezone kanonik `Asia/Kuala_Lumpur`, access `ANYONE_ANONYMOUS` dan execute-as `USER_DEPLOYING`.
 - Sebelum sync, latest Apps Script HEAD/manual dry-run mengelaskan `OUT-20260820-234127-3513` sebagai `ACTION_REQUIRED`, tetapi deployed PWA memaparkan `MAKLUMAT WAKTU PULANG PERLU DISEMAK`. Selepas Version 46, Student dan Admin sama-sama menunjukkan lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, expected return `2026-08-20 22:00` dan queue Admin `Perlu Tindakan -> Tindakan Segera`. Kesimpulan: deployment lama menyajikan code revision lebih lama daripada latest project source; data tidak corrupt.
 - Controlled dry-run melalui `runReturnOperationalNotificationsDryRun()` pada `2026-08-20T23:49:09+08:00` menghasilkan satu PREVIEW `ACTION_REQUIRED`, zero send/failure/audit write dan trigger count sifar. Wrapper maintenance ini parameterless, hard-coded dry-run dan tidak exposed melalui frontend/HTTP routes.
 - Satu controlled real Telegram send berjaya bagi test request; `RETURN_ACTION_REQUIRED_SENT` menaikkan `AUDIT_LOG` 1036 -> 1037 dan same-stage check memulangkan `ALREADY_SENT` tanpa send kedua.

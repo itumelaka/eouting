@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 46, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Deployment yang sama dikemas kini in-place daripada actual pre-sync Version 45; URL serta manifest `Asia/Singapore` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING` kekal. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`. Fasa 5 kini implemented, deployed dan activated. Full Node baseline kanonik semasa ialah **444/444**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 50, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Manifest kanonik ialah `Asia/Kuala_Lumpur` / `V8` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING`. Config-driven mode kekal aktif dan ready; No-Guard Departure pula currently enabled melalui Admin tetapi mempunyai safe default `false`. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Fasa 1–5 lengkap, deployed dan activated; No-Guard ialah sambungan operasi selepas Fasa 5, bukan Fasa 6. Full Node baseline kanonik semasa ialah **465/465**.
 
 ## Komponen
 
@@ -30,6 +30,26 @@ Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP
 `gas/Code.gs` menyediakan `doGet(e)` dan `doPost(e)`. Backend membaca dan menulis Google Sheets, mengesahkan credential, menguatkuasakan transition status, menyimpan selfie ke Google Drive, menulis audit log dan menghantar Telegram.
 
 Telegram ialah side effect non-blocking bagi notifikasi lifecycle biasa. Untuk `submitReturnSelfie`, penghantaran imej melalui `sendPhoto` ialah sebahagian daripada hasil bukti yang diperlukan; kegagalan sebelum transaksi lengkap mencetuskan cleanup Drive/Telegram. Kegagalan audit selepas transaksi utama berjaya hanya diberi amaran dan tidak membatalkan submission.
+
+### No-Guard Departure — fallback terkawal
+
+Architecture mengekalkan dua laluan keluar tanpa status atau database component baharu:
+
+```text
+normal:   DILULUSKAN_WARDEN -> Guard confirmOut -> KELUAR
+fallback: DILULUSKAN_WARDEN -> Student request -> DEPARTURE_CONFIRMATION_REQUESTED
+          -> Warden queue -> Warden remote confirm -> KELUAR -> WARDEN_REMOTE_CHECKOUT
+```
+
+Eligibility bersifat generik berdasarkan ownership Pelajar, lifecycle approved yang masih unresolved, feature gate dan authentication; ia bukan rule kelas atau jenis outing. Student request tidak menukar lifecycle dan tidak memberi authority self-checkout. Warden authentication diperlukan untuk transition akhir. Admin endpoint hanya membaca/menukar `NO_GUARD_DEPARTURE_ENABLED` dan tidak memberi Admin kuasa checkout. Property hilang, malformed atau selain string tepat `"true"` fail closed kepada disabled; production close-out kini enabled.
+
+Request dan confirmation menggunakan existing `ScriptLock` serta authoritative re-read. Guard-first menyebabkan fallback tidak lagi actionable, manakala Warden-first menjadikan Guard departure kedua tidak sah. Warden transition menetapkan `masa_keluar`, membiarkan `guard_keluar_by` blank dan menulis `WARDEN_REMOTE_CHECKOUT` dengan actor role `WARDEN` serta mode `REMOTE_NO_GUARD`. Pending fallback berasal daripada `AUDIT_LOG` event `DEPARTURE_CONFIRMATION_REQUESTED`, bukan lifecycle status atau kolum baharu.
+
+Selepas request audit berjaya, satu Telegram `🚪 PENGESAHAN KELUAR TANPA GUARD` dibina dengan canonical `EOUTING_APP_URL`. Audit request ialah dedup authority; duplicate pending tidak menghantar lagi. Send gagal tidak rollback request dan tiada retry automatik. Selepas row transition, `WARDEN_REMOTE_CHECKOUT` audit dan Spreadsheet flush berjaya, satu Telegram `✅ PENGESAHAN KELUAR OLEH WARDEN` dihantar. Failure tidak rollback `KELUAR`, `masa_keluar` atau audit; replay tidak menghantar lagi dan tiada retry automatik. Tiada notification audit `DEPARTURE_CONFIRMATION_TELEGRAM_SENT`.
+
+`EOUTING_APP_URL=https://itumelaka.github.io/eouting/` digunakan pada submission baharu termasuk kecemasan, No-Guard request, Phase 5 `DUE_SOON`/`CRITICAL`/`ACTION_REQUIRED`, dan Warden remote completion. Approval/rejection lifecycle sahaja, cancellation dan normal Guard movement tidak termasuk dalam claim ini.
+
+Web App contract `USER_DEPLOYING + ANYONE_ANONYMOUS` membolehkan static frontend memanggil API sementara authorization aplikasi kekal pada validation backend. `ANYONE_ANONYMOUS` ialah transport-level access, bukan unrestricted business authority.
 
 ### Operational Urgency Foundation — Fasa 1
 

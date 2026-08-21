@@ -86,6 +86,8 @@ Cancellation mengekalkan row asal dan hanya mengemas kini status serta metadata;
 
 `getStudentAnnualSummary` tidak menambah kolum atau sheet. Ia membaca row milik Pelajar yang telah disahkan, memilih hanya `SELESAI` bagi tahun semasa dan menggunakan set yang sama untuk `total_outings` serta `history_records`. Projection sejarah hanya `tarikh`, `jenis_permohonan` dan `status`, disusun paling baharu dahulu.
 
+No-Guard Departure tidak menambah kolum `OUTING_REQUESTS`. Pending fallback ialah derived state daripada `AUDIT_LOG` event `DEPARTURE_CONFIRMATION_REQUESTED` bagi request yang masih `DILULUSKAN_WARDEN`; ia bukan lifecycle status. Warden confirmation menukar row kepada `KELUAR`, menetapkan `masa_keluar` authoritative dan sengaja mengekalkan `guard_keluar_by` kosong. Identiti Warden berada dalam audit `WARDEN_REMOTE_CHECKOUT`, bukan dalam medan Guard.
+
 `OUTING_HUJUNG_MINGGU` hanya menerima tarikh Sabtu atau Ahad, menggunakan tarikh keluar dan balik yang sama, serta masa balik dijangka `22:00`.
 
 Kolum bukti selfie v1.7.0:
@@ -166,11 +168,20 @@ Untuk submission config-driven, audit `SUBMIT_REQUEST` hanya menambah `config_ve
 
 Kemas kini Announcement Banner direkod sebagai `UPDATE_ANNOUNCEMENT_BANNER`. Audit menyimpan identiti Admin dan ringkasan tindakan yang diperlukan, bukan secret atau nama/nilai Script Property.
 
+No-Guard menggunakan dua audit event sedia ada tanpa notification audit tambahan:
+
+- `DEPARTURE_CONFIRMATION_REQUESTED` — request Pelajar yang authenticated untuk rekod sendiri; event ini juga menjadi dedup authority bagi Telegram request.
+- `WARDEN_REMOTE_CHECKOUT` — transition akhir oleh Warden authenticated, `user_role=WARDEN`, details mode `REMOTE_NO_GUARD`; row menjadi `KELUAR` dan `guard_keluar_by` kekal neutral.
+
+Tiada event `DEPARTURE_CONFIRMATION_TELEGRAM_SENT`. Kegagalan Telegram tidak memadam atau mengubah kedua-dua audit/lifecycle yang telah committed.
+
 ## Announcement Banner V1 — Script Properties
 
 V1 menyokong satu banner global, maka ia menggunakan Script Properties dan bukannya Google Sheet. Tiada sheet `ANNOUNCEMENTS`, migration sheet atau setup property manual. Jika property banner belum wujud, backend menganggap banner tidak aktif; simpanan pertama melalui `Admin > Notis Banner` mencipta atau mengemas kini teks, status aktif/penting, masa dan identiti pengemas kini.
 
 Nama property dan nilai dalaman tidak menjadi sebahagian daripada projection viewer. Konfigurasi banner ialah data komunikasi sahaja dan tidak dirujuk oleh `OUTING_TYPES`, submission validation atau enforcement Guard.
+
+No-Guard menggunakan Script Property `NO_GUARD_DEPARTURE_ENABLED`, bukan Sheet atau kolum schema. Parser ialah strict: hanya nilai tepat `"true"` mengaktifkan ciri; property hilang, malformed atau nilai lain bermaksud disabled. Safe default ialah `false`, manakala current production state pada close-out ini ialah enabled melalui Admin UI. Property secret/value mentah tidak dimasukkan ke public projection.
 
 ## Kawalan Akses
 
@@ -187,7 +198,7 @@ Pengurusan Pelajar menggunakan schema STUDENTS yang diluaskan secara additive ol
 student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan | photo_file_id | photo_updated_at
 ```
 
-`kelas` dibenarkan ialah A2, A3 atau LI; LI bermaksud Pelajar Latihan Industri (LI). `student_id` immutable dan unik, manakala `no_matrik` juga unik. Nilai no. matrik dan no. telefon dirawat sebagai teks untuk mengekalkan sifar di hadapan. Tiada kolum version ditambah; write serentak dilindungi dengan `LockService` dan duplicate recheck.
+`kelas` ialah nilai data yang diterbitkan secara dinamik daripada rekod Student; ia tidak dihadkan oleh business rule kepada A2/A3/LI. A2, A3 dan LI digunakan dalam regression fixture untuk memastikan class termasuk non-A2/A3 kekal tersedia. `student_id` immutable dan unik, manakala `no_matrik` juga unik. Nilai no. matrik dan no. telefon dirawat sebagai teks untuk mengekalkan sifar di hadapan. Tiada kolum version ditambah; write serentak dilindungi dengan `LockService` dan duplicate recheck.
 
 ## WARDENS dan GUARDS
 

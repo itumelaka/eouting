@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 46** selepas aktivasi production Fasa 5. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, expected-return, guardian atau internal diagnostic exposure.
+Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 50** selepas aktivasi Fasa 5 dan sambungan No-Guard Departure. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, fallback config, expected-return, guardian atau internal diagnostic exposure.
 
 ## Public Data Boundary
 
@@ -101,6 +101,12 @@ Untuk `cancelStudentRequest`, GAS mengesahkan semula identiti Pelajar aktif mela
 Cancellation menggunakan `ScriptLock`, kemudian membaca semula row serta status authoritative sebelum write. Hanya `MENUNGGU_KELULUSAN` dan `DILULUSKAN_WARDEN` diterima. Approval/rejection Warden serta Guard `confirmOut` turut dilindungi lock/revalidation supaya hanya satu transition menang; `KELUAR` tidak boleh ditimpa oleh `DIBATALKAN_PELAJAR`. Rekod dikekalkan dan audit `CANCEL_STUDENT_REQUEST` ditulis selepas kejayaan.
 
 Notifikasi Telegram cancellation berlaku selepas transition atomic. Satu cubaan dibuat bagi setiap cancellation berjaya, termasuk previous status pending dan approved. Return false atau exception Telegram dilog sebagai warning tetapi tidak menggagalkan/rollback cancellation dan tidak menyebabkan mesej pendua. Attempt tidak dibuat apabila validation, ownership atau status ditolak.
+
+No-Guard backend gate tidak bergantung pada button hiding. Student mesti authenticated, request mesti miliknya sendiri dan lifecycle mesti `DILULUSKAN_WARDEN`; Student hanya boleh menulis request audit dan tidak boleh menukar diri kepada `KELUAR`. Warden mesti authenticated untuk remote checkout. Admin credential hanya membenarkan configuration ON/OFF dan tidak memberi checkout authority.
+
+Feature gate `NO_GUARD_DEPARTURE_ENABLED` fail closed: missing, malformed atau selain string tepat `"true"` ialah disabled. `ScriptLock` dan authoritative re-read melindungi ownership, lifecycle, race dan replay. Warden fallback menetapkan `masa_keluar` tetapi tidak memalsukan `guard_keluar_by`; actor Warden direkod dalam `WARDEN_REMOTE_CHECKOUT`. Guard-first dan Warden-first masing-masing mencegah transition kedua.
+
+No guardian/waris data ditambah kepada No-Guard card atau Telegram. Public Monitoring tidak menerima pending audit, config flag atau internal fallback metadata. Request/completion Telegram failure tidak rollback committed state dan tiada automatic retry; duplicate request/replay tidak menghantar semula.
 
 Untuk `submitReturnSelfie`, GAS turut mengesahkan:
 
@@ -221,6 +227,8 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 - Network, unrelated dan internal failures menggunakan mesej retry generic; stack, line number dan internal exception tidak didedahkan.
 
 ## Telegram dan Deployment Secrets
+
+Web App manifest mesti mengekalkan `timeZone=Asia/Kuala_Lumpur`, runtime `V8`, `executeAs=USER_DEPLOYING` dan `access=ANYONE_ANONYMOUS`. Static GitHub Pages frontend memerlukan anonymous transport access untuk memanggil Web App; application-level authentication/authorization masih mengawal tindakan dan data. `ANYONE_ANONYMOUS` tidak bermaksud pengguna anonymous memperoleh authority Student, Warden, Guard atau Admin. Kehilangan Web App block pada Version 47 menyebabkan auth/class regression dan rollback, bukan data corruption.
 
 Jangan commit:
 

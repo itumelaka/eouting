@@ -1,9 +1,25 @@
 # Changelog
 
+## 2026-08-21 — Warden remote checkout Telegram / Version 50 (v2.4.0)
+
+- Commit `1d750ab` (`feat: notify warden remote checkout`) adds one `✅ PENGESAHAN KELUAR OLEH WARDEN` message after `DILULUSKAN_WARDEN -> KELUAR`, successful `WARDEN_REMOTE_CHECKOUT` audit and Spreadsheet flush.
+- The message includes Student, display request type, location, authenticated Warden name, authoritative `masa_keluar`, status `KELUAR` and canonical eOuting URL.
+- Replay, Guard-first, disabled feature, validation, auth and lock failures do not send. Telegram failure does not roll back row, time or audit and has no automatic retry.
+- Version 50 is deployed on the existing production deployment. Automated full regression is **465/465**. Real production visual confirmation of this completion message is not yet recorded.
+
+## 2026-08-21 — No-Guard request alerts and manifest recovery / Versions 47–49 (v2.4.0)
+
+- Commit `0dcafdc` (`feat: add configurable no-guard departure fallback`) implements the generic fallback. Student requests only create `DEPARTURE_CONFIRMATION_REQUESTED`; authenticated Warden performs `WARDEN_REMOTE_CHECKOUT`. Normal Guard flow remains primary, `guard_keluar_by` stays blank, and no lifecycle status or `OUTING_REQUESTS` column was added.
+- Admin toggle `NO_GUARD_DEPARTURE_ENABLED` has strict safe default `false`; missing/malformed/non-`"true"` values disable it. Admin controls configuration only. Production is currently enabled.
+- Version 47 (`eOuting v2.4.0 No-Guard Departure MVP`) was deployed with an immutable manifest missing the established Web App execution/access block. Valid Admin login failed and dynamically derived LI disappeared. Production immediately rolled back to Version 46. This was manifest configuration failure, not No-Guard business logic or data corruption.
+- Commit `ac929e5` (`fix: restore web app deployment manifest`) protects canonical `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING` and `ANYONE_ANONYMOUS`, plus Admin auth independence from the No-Guard toggle and dynamic A2/A3/LI regression fixtures. Version 48 restored normal Web App authority, Admin/Student login, dynamic classes and the Admin toggle; No-Guard was then enabled.
+- Commit `64963de` (`feat: add no-guard telegram alerts`) and Version 49 add one `🚪 PENGESAHAN KELUAR TANPA GUARD` alert per newly created request and append canonical eOuting URL to the supported operational Warden/HEP messages. Duplicate pending request does not send again; failed delivery leaves request/queue intact with no automatic retry.
+- Version 49 was visually verified live: Student entered `Menunggu Pengesahan Keluar oleh Warden`, and Telegram arrived with Student/type/location/time plus clickable eOuting URL. LI was a regression fixture, never a feature restriction.
+
 ## 2026-08-21 — Phase 5 Production Activation — Telegram Operational Notifications (v2.4.0)
 
 - Production audit established the activation path accurately: historical documented baseline Version 44, actual pre-sync production Version 45 with no description, then controlled in-place synchronization of the existing deployment to Version 46 with description `eOuting v2.4.0 Phase 1-5 operational safety sync`. The Version 45 origin was not determined or inferred.
-- Existing deployment ID `AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f` and production URL were preserved; no new Web App or API executable deployment was created. Manifest behavior remained `Asia/Singapore`, `ANYONE_ANONYMOUS` and `USER_DEPLOYING`.
+- Existing deployment ID `AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f` and production URL were preserved; no new Web App or API executable deployment was created. Canonical timezone was `Asia/Kuala_Lumpur`, with `ANYONE_ANONYMOUS` and `USER_DEPLOYING` Web App behavior.
 - Before synchronization, latest Apps Script HEAD/manual dry-run classified `OUT-20260820-234127-3513` as `ACTION_REQUIRED` while the deployed PWA showed `MAKLUMAT WAKTU PULANG PERLU DISEMAK`. After Version 46, Student and Admin agreed on lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, expected return `2026-08-20 22:00` and Admin `Perlu Tindakan -> Tindakan Segera`. The deployed Web App had been serving an older code revision; this was not data corruption.
 - Parameterless maintenance wrapper `runReturnOperationalNotificationsDryRun()` remains hard-coded to `dryRun: true`, is absent from frontend/`doGet`/`doPost` and is separate from the scheduled trigger. Production dry-run at `2026-08-20T23:49:09+08:00` produced one PREVIEW `ACTION_REQUIRED` batch with zero sends, failures and audit writes; 52 other records were lifecycle-ineligible and trigger count remained zero at that stage.
 - Exactly one controlled real production send targeted `OUT-20260820-234127-3513` at about `2026-08-21 07:27:38 +08:00`: lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, `timing_valid=true`, `needs_review=false`, expected return `2026-08-20T22:00:00+08:00`, approximately 9 jam 27 minit late. The user independently confirmed exactly one Telegram message arrived with the following operational content:
@@ -22,7 +38,7 @@ Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.
 - First natural scheduled execution ran `21 Aug 2026, 08:10:59`, completed in `21.761` seconds and showed `0%` trigger error rate. `AUDIT_LOG` remained 1037, no new notification was observed and the controlled test request retained one matching SENT audit, providing production evidence of audit-backed dedup.
 - Post-Version-46 browser verification passed at desktop `1280x720` and mobile `390x844`: Student urgency/expected return, Warden approval controls, Guard movement controls, Admin KPIs/`Perlu Tindakan` and Public Monitoring privacy boundary were preserved; no horizontal overflow or browser console error was observed.
 - Practical limitation remains: Telegram delivery and Sheets audit write are not atomic, so Phase 5 offers audit-backed practical idempotency rather than guaranteed transactional exactly-once delivery.
-- Canonical regression baseline is **444/444**, with focused Phase 5 **15/15**. Temporary installer verification totals **446/446** full and **17/17** focused are not the committed baseline. Phase 5 is implemented, deployed and activated; Phase 6 has not started.
+- This Phase 5 close-out used canonical regression baseline **444/444**, with focused Phase 5 **15/15**. Temporary installer verification totals **446/446** full and **17/17** focused were not that committed baseline. Current post–Phase 5 baseline is **465/465**; Phase 6 has not started.
 
 ## 2026-08-20 — Telegram Return Reminder + Late Escalation / Fasa 5 (v2.4.0)
 

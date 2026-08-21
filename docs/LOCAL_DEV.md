@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 46. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 pada `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 pada `54d526b`. Fasa 5 scheduling production aktif melalui satu trigger private scanner setiap lima minit.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 50. Fasa 1–5 lengkap dan No-Guard Departure ialah sambungan operasi selepas Fasa 5. Production No-Guard kini enabled melalui Admin; Phase 5 scheduling kekal satu trigger private scanner setiap lima minit.
 
 ## Keperluan
 
@@ -100,7 +100,15 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline kanonik semasa selepas Telegram Return Reminder + Late Escalation Scanner Fasa 5 ialah **444/444 lulus**. Temporary installer verification pernah menghasilkan **446/446**, tetapi test/helper sementara telah dibuang dan jumlah itu bukan baseline semasa.
+Baseline kanonik semasa selepas No-Guard Departure dan Warden checkout Telegram ialah **465/465 lulus**. Temporary installer verification Phase 5 pernah menghasilkan **446/446**, tetapi itu ialah milestone sejarah dan bukan baseline semasa.
+
+Focused regression yang paling relevan:
+
+```powershell
+node --test tests/no-guard-departure-mvp.test.js tests/no-guard-auth-directory-regression.test.js tests/telegram-return-notifications-phase5.test.js
+```
+
+Coverage meliputi safe-default/config ON-OFF, Student ownership tanpa self-checkout, Warden authentication, dynamic A2/A3/LI fixtures, Guard/Warden race ordering, audit-backed pending/dedup, Telegram failure semantics, completion single-send dan canonical eOuting URL. Nama/PIN fixture seperti `ADMIN-MOCK`/`2468` atau Pelajar LI Regression ialah data test-only, bukan credential production atau business restriction.
 
 Jalankan focused Phase 3 suite:
 

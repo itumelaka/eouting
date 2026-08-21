@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 46**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. Existing deployment diselaraskan in-place daripada actual pre-sync Version 45; manifest kekal `Asia/Singapore`, `ANYONE_ANONYMOUS` dan `USER_DEPLOYING`. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp. Operational Urgency Foundation Fasa 1 direkodkan pada commit `dde1fc4`; Phase 5 scanner production aktif melalui tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 50**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. Manifest kanonik ialah `Asia/Kuala_Lumpur`, runtime `V8`, `ANYONE_ANONYMOUS` dan `USER_DEPLOYING`. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready. `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false dan kini enabled melalui Admin. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy. Phase 5 scanner production kekal tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit.
 
 ## Tanggungjawab Backend
 
@@ -9,6 +9,7 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - menghalang duplicate active request;
 - membatalkan permohonan milik Pelajar secara atomic daripada status menunggu atau diluluskan, tanpa memadam rekod;
 - menguatkuasakan approve/reject dan confirm keluar/masuk;
+- menguatkuasakan No-Guard fallback generik: request milik Student tidak mengubah lifecycle, Warden authenticated sahaja boleh mengesahkan remote checkout, dan Guard identity tidak difabrikasi;
 - menyelesaikan expected-return authoritative dan menerbitkan urgency `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` atau `ACTION_REQUIRED` bagi rekod aktif `KELUAR`;
 - menyediakan projection public minimum dan rekod operasi authenticated;
 - menyediakan jumlah serta sejarah minimum authenticated bagi rekod `SELESAI` Pelajar dalam tahun semasa;
@@ -99,6 +100,14 @@ OUTING_CONFIG_V2_ENABLED=true
 
 Emergency rollback ialah menukarnya kepada `false`; ini mengaktifkan semula laluan legacy tanpa push atau deployment. Reactivation kepada `true` hanya dibuat apabila chip Admin menunjukkan readiness hijau.
 
+Script Property No-Guard:
+
+```text
+NO_GUARD_DEPARTURE_ENABLED=true|false
+```
+
+Parser fail closed: missing, malformed atau nilai selain string tepat `"true"` bermaksud disabled. Safe default ialah false; production close-out kini enabled melalui `Admin > Tetapan Outing > Fallback Pengesahan Keluar Tanpa Guard`. Admin mengawal config sahaja dan tidak memperoleh remote checkout authority. Apabila disabled, request/confirmation baharu disekat tetapi audit history kekal.
+
 Script Properties Notis Banner dicipta secara automatik apabila Admin menyimpan buat kali pertama: teks, status aktif/penting, masa dan identiti pengemas kini. Tiada setup property manual atau sheet `ANNOUNCEMENTS` diperlukan. Jika semua property belum wujud, backend menganggap banner tidak aktif. Nilai ini hanya untuk paparan dan tidak menggantikan konfigurasi `OUTING_TYPES`.
 
 Action `getAnnouncementBannerAdmin` dan `updateAnnouncementBanner` memerlukan credential Admin aktif; update direkod sebagai `UPDATE_ANNOUNCEMENT_BANNER`. `getAnnouncementBanner` mengesahkan Student, Warden/HEP, Guard atau Admin dan memulangkan projection viewer-safe sahaja. Public GET tidak menyediakan banner, nama/nilai Script Property tidak didedahkan dan `updated_by` tidak dihantar kepada ordinary viewer. Teks dibatasi kepada 500 aksara dan dirawat sebagai plain text.
@@ -157,7 +166,7 @@ Semak syntax GAS:
 Get-Content gas/Code.gs -Raw | node --check -
 ```
 
-`gas/Code.gs` ialah source GAS executable kanonik. `.claspignore` mengehadkan upload kepada fail itu dan `appsscript.json`; jangan letakkan snapshot `.gs` arkib dalam skop clasp kecuali ia diabaikan secara eksplisit.
+`gas/Code.gs` ialah source GAS executable kanonik. `.claspignore` mengehadkan upload kepada fail itu dan `appsscript.json`; jangan letakkan snapshot `.gs` arkib dalam skop clasp kecuali ia diabaikan secara eksplisit. Sebelum version/deploy, validasikan manifest tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` dan `webapp.access=ANYONE_ANONYMOUS`. Version 47 membuktikan immutable version boleh gagal walaupun source business logic betul jika Web App block hilang.
 
 Push code:
 
@@ -179,16 +188,19 @@ Kekalkan URL deployment sedia ada. `clasp push` tidak menggantikan langkah deplo
 2. Uji `/exec?action=getTodayRecords` dan sahkan hanya enam field public.
 3. Uji `getStudents` dan sahkan nombor matrik tidak wujud.
 4. Uji login Pelajar dengan nombor matrik betul dan salah.
-5. Uji Warden/Guard POST `getTodayRecords` dengan credential sah dan tidak sah.
-6. Uji approve/reject serta confirm keluar/masuk.
-7. Uji pembatalan Pelajar bagi status menunggu dan diluluskan: sebab 5–500 aksara, metadata pembatalan, sejarah, kebolehan memohon semula, serta pengecualian daripada queue Warden/Guard.
-8. Semak tepat satu notifikasi Telegram pembatalan bagi setiap transaksi berjaya, termasuk status sebelumnya yang mesra pengguna; simulasi kegagalan Telegram dan sahkan pembatalan kekal berjaya tanpa token didedahkan dalam log.
-9. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
-10. Sahkan Public Monitoring tidak mengandungi metadata selfie atau pembatalan.
-11. Uji tambah/ganti foto Pelajar, `photo_variant = "thumbnail"` pada Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
-12. Uji klik preview pada Pelajar, Warden/HEP, Guard dan Admin; sahkan modal membuat maksimum satu `photo_variant = "full"` bagi student yang belum dicache, pembukaan kedua menggunakan cache, dan tiada URL/ID Drive didedahkan.
-13. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at`, data URI atau trigger preview.
-14. Jalankan regression suite repo dan pastikan semua ujian lulus.
+5. Uji login Admin serta class options dinamik termasuk contoh non-A2/A3 dengan No-Guard ON dan OFF.
+6. Sahkan deployment production sedia ada dikemas kini in-place, `@HEAD` tidak disentuh dan tiada Web App pendua.
+7. Sahkan tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit.
+8. Uji Warden/Guard POST `getTodayRecords` dengan credential sah dan tidak sah.
+9. Uji approve/reject serta confirm keluar/masuk.
+10. Uji pembatalan Pelajar bagi status menunggu dan diluluskan: sebab 5–500 aksara, metadata pembatalan, sejarah, kebolehan memohon semula, serta pengecualian daripada queue Warden/Guard.
+11. Semak tepat satu notifikasi Telegram pembatalan bagi setiap transaksi berjaya, termasuk status sebelumnya yang mesra pengguna; simulasi kegagalan Telegram dan sahkan pembatalan kekal berjaya tanpa token didedahkan dalam log.
+12. Uji `submitReturnSelfie`, semak folder Drive private dan sahkan Telegram menerima foto melalui `sendPhoto`.
+13. Sahkan Public Monitoring tidak mengandungi metadata selfie atau pembatalan.
+14. Uji tambah/ganti foto Pelajar, `photo_variant = "thumbnail"` pada Warden/Guard/Admin dan confirmed Admin removal; sahkan folder profil kekal private dan berasingan daripada selfie.
+15. Uji klik preview pada Pelajar, Warden/HEP, Guard dan Admin; sahkan modal membuat maksimum satu `photo_variant = "full"` bagi student yang belum dicache, pembukaan kedua menggunakan cache, dan tiada URL/ID Drive didedahkan.
+16. Sahkan Public Monitoring tidak mengandungi `has_profile_photo`, `photo_file_id`, `photo_updated_at`, data URI atau trigger preview.
+17. Jalankan regression suite repo dan pastikan semua ujian lulus.
 
 Jika `/exec` masih memulangkan behavior lama selepas `clasp push`, semak Manage deployments dan pastikan version baharu telah dipilih.
 

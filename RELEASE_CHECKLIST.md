@@ -2,7 +2,23 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (20 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Repo memaparkan aplikasi v2.4.0, menggunakan cache revision `2.4.0-r1`, service worker `eouting-cache-v2.4.0-r1`, GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang sama. Config-driven production kekal aktif dan ready. Operational Urgency Foundation Fasa 1 lengkap pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 lengkap dalam repo pada commit `89d6b46` dengan baseline semasa **410/410**. Fasa 2 tidak menaikkan version/cache/GAS, mengubah schema atau merekodkan deployment berasingan. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (21 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r1`; backend production ialah GAS Version 50 pada deployment/URL sedia ada. No-Guard Departure ialah sambungan operasi selepas Fasa 5 dan kini enabled melalui Admin. Baseline penuh ialah **465/465**. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+
+## Guardrail release GAS semasa
+
+Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
+
+- [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
+- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **465/465**, bersama syntax checks dan `git diff --check`.
+- [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
+- [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
+- [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.
+- [ ] Kemas kini **deployment Web App production sedia ada** in-place; jangan cipta Web App pendua dan jangan ubah deployment ID/URL.
+- [ ] Pilih immutable version baharu yang dimaksudkan; jangan ubah deployment `@HEAD`.
+- [ ] Selepas deployment, smoke-test Admin, Pelajar dengan class dinamik, Warden, Guard dan endpoint production.
+- [ ] Sahkan hanya satu trigger `scanReturnOperationalNotifications_` kekal, time-driven setiap lima minit.
+
+Version 47 merekodkan pengajaran penting: deployment No-Guard MVP menggunakan immutable manifest tanpa block Web App yang established, lalu Admin login ditolak dan kelas dinamik LI hilang. Ini bukan data corruption dan bukan kegagalan business logic No-Guard; production segera rollback kepada Version 46. Version 48 memulihkan manifest serta login/class dinamik. Version 49 menambah request Telegram/operational URL, dan Version 50 menambah completion Telegram Warden. Version 50 deployed tetapi completion Telegram belum direkod sebagai visually verified live.
 
 ## Close-out Production v2.3.2 — 16 Ogos 2026
 

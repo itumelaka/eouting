@@ -6,19 +6,21 @@ Status repo semasa: **v2.4.0 — production verified**.
 
 Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **21 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 46. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r1` dan service-worker cache ialah `eouting-cache-v2.4.0-r1`. Production beroperasi normal.
+Verdict semasa pada **21 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 50. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r1` dan service-worker cache ialah `eouting-cache-v2.4.0-r1`. Production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. `Status Semasa` kini berada di atas borang dan kekal authoritative untuk tindakan semasa. Bahagian bawah memaparkan Refresh Status, jumlah tahunan dan `Rekod Outing Saya`; jumlah serta sejarah menggunakan rekod authenticated `SELESAI` bagi tahun semasa. Operational Urgency Foundation Fasa 1 telah lengkap melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`. Fasa 5 berstatus **IMPLEMENTED + DEPLOYED + ACTIVATED**. Full Node suite kanonik semasa lulus **444/444**; focused Phase 5 suite lulus **15/15**. Fasa 6 belum dimulakan.
+`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1, 2, 3, 4 dan 5 semuanya complete; Fasa 5 berstatus **IMPLEMENTED + DEPLOYED + ACTIVATED**. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented dan deployed melalui Versions 47–50, serta currently enabled melalui Admin. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **465/465**. Fasa 6 belum dimulakan.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 46**;
+- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 50**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
 - `TELEGRAM_ENABLED=true` kekal aktif;
+- `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false tetapi current production state ialah enabled; Admin hanya mengawal config dan Warden kekal fallback confirmer;
+- canonical Web App contract ialah `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING`, `ANYONE_ANONYMOUS`;
 - readiness hijau dan chip Admin memaparkan `Config Active`;
 - `require_selfie`, audit auto-approval, statistik, Telegram, filter operasi dan label contextual membaca config secara dinamik;
 - application rules dan departure rules dipisahkan melalui `allowed_days`/application window serta `departure_allowed_days`/`earliest_departure_time`;
@@ -35,11 +37,14 @@ Production boundary semasa:
 - Pemantauan Admin merender tujuh KPI operational daripada normalized dataset bersama: semua `KELUAR`, exact `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED`, active `needs_review=true` dan pending `KECEMASAN`;
 - queue `Perlu Tindakan` menyusun `ACTION_REQUIRED`, `CRITICAL`, `needs_review` dan pending emergency; ordinary `LATE`, `DUE_SOON`, `NORMAL`, pending bukan kecemasan serta record terminal dikecualikan;
 - Admin menggunakan urgency backend authoritative dan tidak mereka threshold/state; pending emergency tidak memberi Admin approval authority atau memintas Warden;
+- No-Guard pending berasal daripada `DEPARTURE_CONFIRMATION_REQUESTED` dalam `AUDIT_LOG`, bukan status/kolum baharu; Student request kekal `DILULUSKAN_WARDEN` dan Warden authenticated menulis `WARDEN_REMOTE_CHECKOUT` ketika transition akhir;
+- request/completion Telegram masing-masing single-send dan replay-safe; failure tidak rollback request atau `KELUAR`, tetapi automatic retry belum tersedia;
+- Version 49 request alert telah visually verified live; Version 50 completion alert deployed + automated-test covered tetapi belum direkod sebagai visually verified live;
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
 - Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r1`.
-- Backend GAS production ialah **Version 46** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
+- Backend GAS production ialah **Version 50** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -166,6 +171,10 @@ Nilai backend `KELUAR` tidak berubah.
 - **20 Ogos 2026:** commit `54d526b` (`feat: add telegram return escalation scanner`) melengkapkan backend scanner Fasa 5 sebagai repository milestone; baseline repo meningkat kepada **443/443** dan focused suite **14/14**. Tiada frontend, schema, lifecycle, threshold, version, trigger activation, live smoke send atau deployment change.
 - **21 Ogos 2026:** audit production mendapati actual pre-sync Web App ialah Version 45 tanpa description, berbeza daripada historical documented baseline Version 44. Existing deployment dikemas kini in-place kepada Version 46 (`eOuting v2.4.0 Phase 1-5 operational safety sync`) tanpa URL/manifest change. Punca mismatch ialah deployed Web App menggunakan code revision lebih lama daripada latest Apps Script HEAD, bukan data corruption.
 - **21 Ogos 2026:** controlled dry-run dan satu controlled `ACTION_REQUIRED` Telegram send bagi `OUT-20260820-234127-3513` berjaya; audit `RETURN_ACTION_REQUIRED_SENT` ditulis sekali dan retry menghasilkan `ALREADY_SENT`. Tepat satu five-minute scanner trigger kemudian diaktifkan. Natural run pertama completed tanpa notification/audit duplicate. Browser production desktop `1280×720` dan mobile `390×844` mengesahkan Student, Warden, Guard, Admin dan Public Monitoring berfungsi tanpa overflow atau console error.
+- **Version 47:** No-Guard MVP deployment gagal kerana immutable manifest kehilangan Web App block, menyebabkan Admin auth dan dynamic LI regression; rollback segera ke Version 46, tanpa data corruption.
+- **Version 48:** canonical manifest `Asia/Kuala_Lumpur` / `V8` / `USER_DEPLOYING` / `ANYONE_ANONYMOUS` memulihkan login, class dinamik, Admin toggle dan Web App authority.
+- **Version 49:** No-Guard request Telegram + operational eOuting URL deployed; waiting UI dan request alert disahkan live.
+- **Version 50:** Warden remote checkout completion Telegram deployed dengan single-send/failure-safe behavior; automated baseline **465/465**, tetapi live visual confirmation completion message masih outstanding.
 
 ## Production Validation v1.7.0
 

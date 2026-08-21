@@ -1,6 +1,39 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 46 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Operational Urgency Foundation Fasa 1 disiapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`. Fasa 5 kini implemented, deployed dan activated; full Node baseline kanonik semasa ialah **444/444**.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 50 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Fasa 1–5 implemented, deployed dan activated. No-Guard Departure ialah sambungan operasi selepas Fasa 5, currently enabled melalui Admin; full Node baseline kanonik semasa ialah **465/465**.
+
+## Flow keluar normal dan No-Guard
+
+Normal Guard flow kekal primary/default:
+
+```text
+DILULUSKAN_WARDEN
+  -> Guard authenticated pilih Sahkan Keluar
+  -> confirmOut
+  -> masa_keluar + guard_keluar_by
+  -> KELUAR
+```
+
+Fallback apabila Guard tidak tersedia:
+
+```text
+DILULUSKAN_WARDEN
+  -> Student authenticated bagi request sendiri pilih Mohon Pengesahan Keluar
+  -> DEPARTURE_CONFIRMATION_REQUESTED (lifecycle masih DILULUSKAN_WARDEN)
+  -> satu Telegram 🚪 kepada Warden/HEP + canonical eOuting URL
+  -> Warden queue: Menunggu Pengesahan Keluar
+  -> Warden authenticated pilih Sahkan Keluar
+  -> authoritative re-read + DILULUSKAN_WARDEN -> KELUAR
+  -> masa_keluar; guard_keluar_by kekal blank
+  -> WARDEN_REMOTE_CHECKOUT (actor WARDEN, mode REMOTE_NO_GUARD)
+  -> satu Telegram ✅ completion + canonical eOuting URL
+```
+
+Student tidak pernah self-checkout dan request sahaja tidak menghasilkan `KELUAR`. Eligibility tidak bergantung pada class A2/A3/LI atau jenis outing tertentu. `ScriptLock` dan re-read melindungi race/replay: Guard-first menutup fallback; Warden-first menolak Guard departure kedua. Duplicate pending request tidak mengulang audit/Telegram, dan replay Warden tidak mengulang completion Telegram.
+
+`NO_GUARD_DEPARTURE_ENABLED` hanya aktif bagi nilai tepat `"true"`; safe default ialah false tetapi production close-out kini ON. Apabila OFF, Student request baharu dan Warden fallback confirmation ditolak, sejarah audit kekal, dan unresolved request boleh actionable semula apabila ON. Admin hanya mengawal toggle, bukan authority checkout.
+
+Jika request Telegram gagal, request/waiting UI/queue kekal dan tiada retry automatik. Jika completion Telegram gagal selepas transition, audit dan flush, `KELUAR`, `masa_keluar` dan audit kekal committed, `guard_keluar_by` kekal blank, serta tiada rollback atau automatic retry.
 
 ## Backend Config API v2.0
 
