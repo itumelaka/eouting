@@ -2557,6 +2557,20 @@ function buildTelegramDepartureConfirmationRequestMessage_(record, requestedAt) 
   ].join("\n"));
 }
 
+function buildTelegramWardenRemoteCheckoutMessage_(record, wardenName) {
+  return appendEOutingWardenLink_([
+    "✅ PENGESAHAN KELUAR OLEH WARDEN",
+    "",
+    "Pelajar: " + safeTelegramCaptionValue_(record && record.nama),
+    "Jenis: " + safeTelegramCaptionValue_(requestTypeLabel_(record && record.jenis_permohonan)),
+    "Lokasi: " + safeTelegramCaptionValue_(record && record.lokasi),
+    "Disahkan Oleh: " + safeTelegramCaptionValue_(wardenName),
+    "Masa Keluar: " + formatTelegramDateTime_(record && record.masa_keluar),
+    "",
+    "Status pelajar kini: KELUAR"
+  ].join("\n"));
+}
+
 function requestDepartureConfirmation(payload) {
   const data = payload || {};
   const requestId = String(data.request_id || "").trim();
@@ -2677,13 +2691,27 @@ function confirmWardenRemoteCheckout(payload) {
     );
     if (!auditRecord) throw new Error("Pengesahan keluar berlaku tetapi audit gagal direkodkan. Sila hubungi Admin.");
     SpreadsheetApp.flush();
+    const updatedRecord = Object.assign({}, found.record, { status: STATUS.out, masa_keluar: checkoutAt });
     return {
-      record: Object.assign({}, found.record, { status: STATUS.out, masa_keluar: checkoutAt }),
-      alreadyConfirmed: false
+      record: updatedRecord,
+      alreadyConfirmed: false,
+      telegram_message: buildTelegramWardenRemoteCheckoutMessage_(updatedRecord, warden.nama_warden)
     };
   }, "Pengesahan keluar sedang diproses. Sila cuba sebentar lagi.");
 
   invalidateOperationalRecordsCache_();
+  if (!result.alreadyConfirmed && result.telegram_message) {
+    try {
+      if (sendTelegramMessage_(result.telegram_message) !== true &&
+          typeof console !== "undefined" && console && typeof console.warn === "function") {
+        console.warn("WARDEN_REMOTE_CHECKOUT Telegram notification failed.");
+      }
+    } catch (telegramError) {
+      if (typeof console !== "undefined" && console && typeof console.warn === "function") {
+        console.warn("WARDEN_REMOTE_CHECKOUT Telegram notification failed.");
+      }
+    }
+  }
   return result.alreadyConfirmed
     ? Object.assign({}, result.record, { message: "Rekod sudah disahkan keluar oleh Warden." })
     : result.record;

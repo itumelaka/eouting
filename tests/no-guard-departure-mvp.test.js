@@ -164,7 +164,9 @@ test("audit projection includes only approved unresolved requests", () => {
 
 test("Warden remote confirmation authenticates, requires an unresolved request, and writes a neutral departure", () => {
   const requested = { timestamp: "2026-08-21 18:00:00", action: "DEPARTURE_CONFIRMATION_REQUESTED", request_id: "R1" };
-  assert.throws(() => createFixture({ invalidWarden: true, audits: [requested] }).context.confirmWardenRemoteCheckout(wardenPayload), /tidak dijumpai/);
+  const invalid = createFixture({ invalidWarden: true, audits: [requested] });
+  assert.throws(() => invalid.context.confirmWardenRemoteCheckout(wardenPayload), /tidak dijumpai/);
+  assert.equal(invalid.telegramMessages.length, 0);
   assert.throws(() => createFixture().context.confirmWardenRemoteCheckout(wardenPayload), /Tiada permohonan/);
 
   const fixture = createFixture({ audits: [requested] });
@@ -177,6 +179,33 @@ test("Warden remote confirmation authenticates, requires an unresolved request, 
   assert.equal(audit.user_role, "Warden");
   assert.equal(JSON.parse(audit.details).actor_role, "WARDEN");
   assert.equal(JSON.parse(audit.details).mode, "REMOTE_NO_GUARD");
+  assert.equal(fixture.telegramMessages.length, 1);
+  assert.match(fixture.telegramMessages[0], /✅ PENGESAHAN KELUAR OLEH WARDEN/);
+  assert.match(fixture.telegramMessages[0], /Pelajar: Ali/);
+  assert.match(fixture.telegramMessages[0], /Jenis: Pulang Bermalam/);
+  assert.match(fixture.telegramMessages[0], /Lokasi: Klinik Merlimau/);
+  assert.match(fixture.telegramMessages[0], /Disahkan Oleh: Warden A/);
+  assert.match(fixture.telegramMessages[0], /Masa Keluar: 21\/08\/2026 18:05/);
+  assert.match(fixture.telegramMessages[0], /Status pelajar kini: KELUAR/);
+  assert.match(fixture.telegramMessages[0], /https:\/\/itumelaka\.github\.io\/eouting\//);
+});
+
+test("Warden Telegram failure preserves KELUAR, authoritative time, audit and neutral Guard identity", () => {
+  const requested = { timestamp: "2026-08-21 18:00:00", action: "DEPARTURE_CONFIRMATION_REQUESTED", request_id: "R1" };
+  const fixture = createFixture({ audits: [requested], telegramResult: false });
+  const result = fixture.context.confirmWardenRemoteCheckout(wardenPayload);
+  assert.equal(result.status, "KELUAR");
+  assert.equal(result.masa_keluar, "2026-08-21 18:05:00");
+  assert.equal(fixture.row.status, "KELUAR");
+  assert.equal(fixture.row.masa_keluar, "2026-08-21 18:05:00");
+  assert.equal(fixture.row.guard_keluar_by, "");
+  assert.equal(fixture.audits.filter((row) => row.action === "WARDEN_REMOTE_CHECKOUT").length, 1);
+  assert.equal(fixture.telegramMessages.length, 1);
+
+  const duplicate = fixture.context.confirmWardenRemoteCheckout(wardenPayload);
+  assert.match(duplicate.message, /sudah disahkan keluar oleh Warden/);
+  assert.equal(fixture.telegramMessages.length, 1);
+  assert.equal(fixture.audits.filter((row) => row.action === "WARDEN_REMOTE_CHECKOUT").length, 1);
 });
 
 test("disabled feature blocks Warden remote confirmation without affecting the pending audit", () => {
@@ -185,6 +214,7 @@ test("disabled feature blocks Warden remote confirmation without affecting the p
   assert.throws(() => fixture.context.confirmWardenRemoteCheckout(wardenPayload), /dinyahaktifkan oleh Admin/);
   assert.equal(fixture.updates.length, 0);
   assert.equal(fixture.audits.length, 1);
+  assert.equal(fixture.telegramMessages.length, 0);
 });
 
 test("Admin reads, enables and disables the strict Script Properties setting with audit", () => {
@@ -232,9 +262,11 @@ test("duplicate Warden confirmation is idempotent and Guard-first blocks Warden 
   const duplicate = fixture.context.confirmWardenRemoteCheckout(wardenPayload);
   assert.match(duplicate.message, /sudah disahkan keluar oleh Warden/);
   assert.equal(fixture.audits.filter((row) => row.action === "WARDEN_REMOTE_CHECKOUT").length, 1);
+  assert.equal(fixture.telegramMessages.length, 1);
 
   const guardFirst = createFixture({ audits: [requested], status: "KELUAR", masa_keluar: "2026-08-21 18:03:00", guard_keluar_by: "Guard A" });
   assert.throws(() => guardFirst.context.confirmWardenRemoteCheckout(wardenPayload), /sudah tidak menunggu/);
+  assert.equal(guardFirst.telegramMessages.length, 0);
 });
 
 test("Warden-first prevents a second Guard departure transition", () => {
