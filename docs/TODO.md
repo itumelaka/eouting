@@ -1,6 +1,6 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pada 20 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 dalam `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 dalam `54d526b`. Baseline semasa ialah **443/443**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 46 / cache `2.4.0-r1`** pada 21 Ogos 2026. Operational Urgency Foundation Fasa 1 lengkap dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 dalam `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 dalam `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 dalam `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 dalam `54d526b`. Fasa 5 kini implemented, deployed dan activated. Baseline kanonik semasa ialah **444/444**. Rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
 
@@ -13,8 +13,14 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [x] Existing `ScriptLock` melindungi read/classify/dedup/send/audit sequence; send failure tidak mengubah request/lifecycle/urgency atau menulis SENT event.
 - [x] Safe dry-run membina structured preview tanpa Telegram, SENT audit, request mutation atau trigger installation.
 - [x] Practical exactly-once limitation direkod: Telegram success + audit failure boleh menghasilkan `SENT_AUDIT_PARTIAL` dan theoretical duplicate retry.
-- [x] Existing lifecycle Telegram/sendPhoto dan Student/Warden/Guard/Admin/Public kekal; tiada frontend route, schema, trigger, destination/config, version atau deployment change.
-- [x] Commit `54d526b` (`feat: add telegram return escalation scanner`); focused suite **14/14**, full Node suite **443/443**.
+- [x] Existing lifecycle Telegram/sendPhoto dan Student/Warden/Guard/Admin/Public kekal; tiada frontend route, schema, destination/config, lifecycle atau urgency-threshold change.
+- [x] Controlled production dry-run mengesahkan satu PREVIEW `ACTION_REQUIRED` tanpa Telegram/audit write.
+- [x] Existing deployment diselaraskan in-place daripada actual pre-sync Version 45 kepada Version 46; ID, URL dan manifest behavior dikekalkan.
+- [x] Satu controlled real `ACTION_REQUIRED` Telegram send berjaya dan pengguna mengesahkan tepat satu mesej diterima.
+- [x] `RETURN_ACTION_REQUIRED_SENT` ditulis sekali dan same-stage dedup memulangkan `ALREADY_SENT` tanpa send kedua.
+- [x] Tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit dipasang; temporary installer/tests dibuang selepas canonical source dipulihkan.
+- [x] First natural trigger run completed pada `21 Aug 2026, 08:10:59` dalam `21.761` saat, tanpa audit atau notification duplicate.
+- [x] Commit `54d526b` (`feat: add telegram return escalation scanner`); current focused suite **15/15**, full Node suite **444/444**. Temporary activation totals **17/17** dan **446/446** bukan baseline semasa.
 
 ### Admin Operational Intelligence + Perlu Tindakan — Fasa 4
 
@@ -247,7 +253,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
 - [ ] Review keputusan konservatif `lewat=Ya` apabila timing benar-benar indeterminate semasa `confirmIn`; active malformed record kini memberi `needs_review=true`.
-- [ ] Fasa 6+: controlled production dry-run, trigger activation/five-minute scheduling, guardian/waris shortcut atau phone-call button dan notification channel masa hadapan.
+- [ ] Fasa 6+: guardian/waris shortcut atau phone-call button, notification observability/long-term trigger monitoring dan notification channel masa hadapan.
 - [ ] Pertimbang snapshot request-level `earliest_departure_time` dalam schema/version masa hadapan; sementara itu perubahan config boleh mentafsir semula priority fallback-only Warden, manakala snapshot request-level sah kekal stabil.
 
 ## Security / Access Improvements
@@ -272,14 +278,19 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 44 / cache `2.4.0-r1`** pa
 - [ ] Refinement notis consent/privacy Pelajar.
 - [x] Admin beta page for managing STUDENTS (A2, A3 dan LI) tanpa schema migration.
 - [ ] Nilai sama ada optimistic version column diperlukan untuk STUDENTS selepas beta concurrency QA.
-- [ ] Late-return escalation notification di atas operational urgency foundation.
+- [x] Late-return escalation notification di atas operational urgency foundation.
 - [x] Warden approval prioritisation tanpa mengubah lifecycle.
 - [x] Emergency priority presentation/handling compatibility untuk Warden tanpa approval bypass baharu.
 - [x] Admin operational urgency KPI dan queue `Perlu Tindakan`.
 - [x] Backend Telegram return reminder/escalation scanner dengan batching, audit dedup dan dry-run.
-- [ ] Jalankan controlled production dry-run selepas kelulusan operasi.
-- [ ] Aktifkan time-driven trigger/lima-minit scheduling hanya selepas acceptance berasingan.
+- [x] Jalankan controlled production dry-run selepas kelulusan operasi.
+- [x] Selaraskan existing production Web App deployment kepada Version 46 tanpa menukar deployment ID/URL.
+- [x] Jalankan satu controlled real Telegram send dan sahkan audit/dedup production.
+- [x] Aktifkan tepat satu time-driven trigger/lima-minit dan sahkan first natural execution.
 - [ ] Guardian/waris shortcut.
+- [ ] Phone-call button untuk flow operasi yang diluluskan.
+- [ ] Long-term trigger monitoring dan notification observability improvements.
+- [ ] Additional notification channels selepas acceptance berasingan.
 - [ ] Optional WhatsApp notification later if required.
 - [ ] Daily/weekly/monthly report automation.
 - [ ] Automated version injection/build step.

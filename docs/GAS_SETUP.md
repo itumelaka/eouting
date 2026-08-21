@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 44**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp. Operational Urgency Foundation Fasa 1 direkodkan pada commit `dde1fc4`.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 46**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. Existing deployment diselaraskan in-place daripada actual pre-sync Version 45; manifest kekal `Asia/Singapore`, `ANYONE_ANONYMOUS` dan `USER_DEPLOYING`. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready dan `OUTING_TYPES` ialah source authoritative. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy dan tidak boleh dihantar melalui clasp. Operational Urgency Foundation Fasa 1 direkodkan pada commit `dde1fc4`; Phase 5 scanner production aktif melalui tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit.
 
 ## Tanggungjawab Backend
 

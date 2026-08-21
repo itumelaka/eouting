@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 44, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`. Full Node baseline semasa ialah **443/443**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 46, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Deployment yang sama dikemas kini in-place daripada actual pre-sync Version 45; URL serta manifest `Asia/Singapore` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING` kekal. Config-driven mode kekal aktif dan ready sejak 10 Ogos 2026. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Operational Urgency Foundation Fasa 1 dilengkapkan dalam commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`. Fasa 5 kini implemented, deployed dan activated. Full Node baseline kanonik semasa ialah **444/444**.
 
 ## Komponen
 
@@ -124,9 +124,24 @@ Scanner menggunakan existing `ScriptLock` merentasi source read, urgency calcula
 
 Idempotency adalah praktikal, bukan exactly-once transactional. Telegram delivery dan Google Sheets audit write tidak atomic; send berjaya diikuti audit failure boleh menghasilkan `SENT_AUDIT_PARTIAL` dan membuka kemungkinan duplicate pada retry kemudian.
 
-`dryRun=true` menghasilkan structured ordered/bounded preview selepas source/audit read tanpa Telegram send, SENT audit write, request mutation atau trigger installation. Optional explicit `now` menyokong deterministic testing. Scanner tiada route dalam `assets/app.js`, `index.html`, `doGet` atau `doPost`; ordinary browser/session load tidak boleh menjalankannya.
+`runReturnOperationalNotificationsDryRun()` ialah wrapper maintenance public yang parameterless dan hard-coded kepada `dryRun: true`. Ia menghasilkan structured ordered/bounded preview selepas source/audit read tanpa Telegram send, SENT audit write, request mutation atau trigger installation. Wrapper tidak berada dalam `doGet`/`doPost` atau frontend dan caller tidak boleh menukarnya kepada non-dry mode. Optional explicit `now` kekal hanya capability internal/test scanner.
 
-Tiada trigger atau deployment ditambah dalam Fasa 5. Existing `sendTelegramMessage_`, lifecycle messages dan `sendTelegramPhoto_` return-selfie kekal. Trigger activation, cadence lima minit dan production non-dry execution ialah kerja Fasa 6+.
+Lapisan scheduling production ialah tepat satu Apps Script time-driven trigger setiap lima minit, ID `9156626915782557696`, yang terus menyasarkan private `scanReturnOperationalNotifications_`. Ia tidak menyasarkan wrapper maintenance. Scheduled invocation tidak memberi options, maka scanner berjalan dalam normal non-dry production mode:
+
+```text
+Apps Script 5-minute trigger
+  -> scanReturnOperationalNotifications_()
+  -> operational KELUAR rows
+  -> getOperationalUrgency_ authoritative
+  -> DUE_SOON / CRITICAL / ACTION_REQUIRED
+  -> AUDIT_LOG request_id + stage dedup
+  -> bounded Telegram batch
+  -> successful RETURN_*_SENT audit
+```
+
+Private scanner tidak selectable dalam Add Trigger UI kerana trailing `_`; temporary idempotent installer yang fixed kepada handler/cadence itu digunakan sekali dengan duplicate guard, kemudian dibuang. Canonical source dipulihkan dan dipush semula tanpa menghapuskan trigger. Tiada API executable deployment diwujudkan.
+
+Controlled dry-run dan real `ACTION_REQUIRED` send bagi `OUT-20260820-234127-3513` mengesahkan classification, Telegram delivery, `RETURN_ACTION_REQUIRED_SENT` dan `ALREADY_SENT`. Natural run pertama pada `21 Aug 2026, 08:10:59` selesai dalam `21.761` saat dengan error rate dipaparkan `0%`; audit kekal 1037 dan tiada duplicate test notification. Idempotency tetap praktikal, bukan exactly-once transactional: Telegram delivery dan Sheet audit write tidak atomic, jadi delivery berjaya diikuti audit failure masih boleh menyebabkan retry duplicate secara teori.
 
 ```text
 lifecycle:          MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI

@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 44** selepas Operational Urgency Foundation Fasa 1 (`dde1fc4`). Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 46** selepas aktivasi production Fasa 5. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, expected-return, guardian atau internal diagnostic exposure.
 
 ## Public Data Boundary
 

@@ -1,6 +1,23 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r1` dan service-worker cache `eouting-cache-v2.4.0-r1`. Backend production ialah GAS **Version 44**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 pada `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 pada `54d526b`. Full Node baseline semasa ialah **443/443**. Fasa 3–5 ialah repository implementation milestones tanpa version/cache/GAS/schema deployment baharu. Scanner Fasa 5 belum diaktifkan melalui scheduled trigger; tiada separate deployment, trigger activation, live Telegram smoke send atau destination/configuration change dibuat.
+Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r1` dan service-worker cache `eouting-cache-v2.4.0-r1`. Backend production ialah GAS **Version 46**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready sejak 10 Ogos 2026. Operational Urgency Foundation Fasa 1 berada pada commit `dde1fc4`; Student Live Status Clarity Fasa 2 pada `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 pada `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 pada `d0be685`; dan Telegram Return Reminder + Late Escalation Scanner Fasa 5 pada `54d526b`. Fasa 5 kini implemented, deployed dan activated; full Node baseline kanonik semasa ialah **444/444**.
+
+## Phase 5 production synchronization dan activation — 21 Ogos 2026
+
+- Historical documented current baseline sebelum audit ialah Version 44. Audit deployment mendapati actual production ketika itu ialah Version 45 tanpa description; origin Version 45 tidak diketahui dan tidak diandaikan.
+- Existing production deployment `AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f` dikemas kini in-place kepada Version 46 dengan description `eOuting v2.4.0 Phase 1-5 operational safety sync`. URL kekal sama dan tiada Web App atau API executable deployment baharu dicipta.
+- Manifest production kekal timezone `Asia/Singapore`, access `ANYONE_ANONYMOUS` dan execute-as `USER_DEPLOYING`.
+- Sebelum sync, latest Apps Script HEAD/manual dry-run mengelaskan `OUT-20260820-234127-3513` sebagai `ACTION_REQUIRED`, tetapi deployed PWA memaparkan `MAKLUMAT WAKTU PULANG PERLU DISEMAK`. Selepas Version 46, Student dan Admin sama-sama menunjukkan lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, expected return `2026-08-20 22:00` dan queue Admin `Perlu Tindakan -> Tindakan Segera`. Kesimpulan: deployment lama menyajikan code revision lebih lama daripada latest project source; data tidak corrupt.
+- Controlled dry-run melalui `runReturnOperationalNotificationsDryRun()` pada `2026-08-20T23:49:09+08:00` menghasilkan satu PREVIEW `ACTION_REQUIRED`, zero send/failure/audit write dan trigger count sifar. Wrapper maintenance ini parameterless, hard-coded dry-run dan tidak exposed melalui frontend/HTTP routes.
+- Satu controlled real Telegram send berjaya bagi test request; `RETURN_ACTION_REQUIRED_SENT` menaikkan `AUDIT_LOG` 1036 -> 1037 dan same-stage check memulangkan `ALREADY_SENT` tanpa send kedua.
+- Tepat satu time-driven trigger setiap lima minit kini menyasarkan `scanReturnOperationalNotifications_`, ID `9156626915782557696`. Wrapper dry-run bukan trigger target. Scheduled call tanpa options ialah non-dry production mode.
+- First natural execution pada `21 Aug 2026, 08:10:59` completed dalam `21.761` saat dengan displayed error rate `0%`; audit kekal 1037 dan tiada notification baharu diperhatikan.
+
+### Trigger verification dan containment
+
+Dalam Apps Script, halaman Triggers mesti menunjukkan tepat satu scanner trigger: handler `scanReturnOperationalNotifications_`, event source time-driven dan cadence setiap lima minit. Semak halaman Executions untuk timestamp, duration dan status scheduled run. Trigger tambahan bagi handler sama ialah anomaly.
+
+Jika duplicate runaway bagi request/stage yang sama disahkan, emergency containment ialah disable/remove **hanya** scanner trigger tersebut dan hentikan scheduled delivery untuk investigation. Jangan padam atau ubah `AUDIT_LOG` untuk “membaiki” dedup; sejarah audit diperlukan untuk diagnosis. Telegram delivery dan audit write bukan atomic, maka audit-backed idempotency tidak menjamin transactional exactly-once.
 
 ## Production verification — Student hierarchy dan annual history (16 Ogos 2026)
 

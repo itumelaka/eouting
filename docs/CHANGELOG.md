@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-08-21 — Phase 5 Production Activation — Telegram Operational Notifications (v2.4.0)
+
+- Production audit established the activation path accurately: historical documented baseline Version 44, actual pre-sync production Version 45 with no description, then controlled in-place synchronization of the existing deployment to Version 46 with description `eOuting v2.4.0 Phase 1-5 operational safety sync`. The Version 45 origin was not determined or inferred.
+- Existing deployment ID `AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f` and production URL were preserved; no new Web App or API executable deployment was created. Manifest behavior remained `Asia/Singapore`, `ANYONE_ANONYMOUS` and `USER_DEPLOYING`.
+- Before synchronization, latest Apps Script HEAD/manual dry-run classified `OUT-20260820-234127-3513` as `ACTION_REQUIRED` while the deployed PWA showed `MAKLUMAT WAKTU PULANG PERLU DISEMAK`. After Version 46, Student and Admin agreed on lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, expected return `2026-08-20 22:00` and Admin `Perlu Tindakan -> Tindakan Segera`. The deployed Web App had been serving an older code revision; this was not data corruption.
+- Parameterless maintenance wrapper `runReturnOperationalNotificationsDryRun()` remains hard-coded to `dryRun: true`, is absent from frontend/`doGet`/`doPost` and is separate from the scheduled trigger. Production dry-run at `2026-08-20T23:49:09+08:00` produced one PREVIEW `ACTION_REQUIRED` batch with zero sends, failures and audit writes; 52 other records were lifecycle-ineligible and trigger count remained zero at that stage.
+- Exactly one controlled real production send targeted `OUT-20260820-234127-3513` at about `2026-08-21 07:27:38 +08:00`: lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, `timing_valid=true`, `needs_review=false`, expected return `2026-08-20T22:00:00+08:00`, approximately 9 jam 27 minit late. The user independently confirmed exactly one Telegram message arrived with the following operational content:
+
+```text
+🚨 TINDAKAN SEGERA DIPERLUKAN
+
+1 pelajar telah lewat 60 minit atau lebih.
+
+• NAMA SAYA TESTING SATU — lewat 9 jam 27 minit
+
+Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.
+```
+- Successful delivery wrote exactly one `RETURN_ACTION_REQUIRED_SENT` at `2026-08-21 07:27:40 +08:00`; `AUDIT_LOG` increased 1036 -> 1037. Same request/stage verification returned `ALREADY_SENT` and caused no second send.
+- Exactly one five-minute time-driven trigger is live for private `scanReturnOperationalNotifications_` (trigger ID `9156626915782557696`). A temporary installer was needed because the trailing-underscore function was not selectable in the trigger UI. It fixed the handler and `everyMinutes(5)`, checked existing project triggers first, refused duplicates, accepted no configurable handler/interval, did not run scanner/Telegram and did not delete triggers. The installer/tests were removed and canonical source restored without removing the trigger. An earlier authorization attempt was cancelled before the installer body executed and created no trigger.
+- First natural scheduled execution ran `21 Aug 2026, 08:10:59`, completed in `21.761` seconds and showed `0%` trigger error rate. `AUDIT_LOG` remained 1037, no new notification was observed and the controlled test request retained one matching SENT audit, providing production evidence of audit-backed dedup.
+- Post-Version-46 browser verification passed at desktop `1280x720` and mobile `390x844`: Student urgency/expected return, Warden approval controls, Guard movement controls, Admin KPIs/`Perlu Tindakan` and Public Monitoring privacy boundary were preserved; no horizontal overflow or browser console error was observed.
+- Practical limitation remains: Telegram delivery and Sheets audit write are not atomic, so Phase 5 offers audit-backed practical idempotency rather than guaranteed transactional exactly-once delivery.
+- Canonical regression baseline is **444/444**, with focused Phase 5 **15/15**. Temporary installer verification totals **446/446** full and **17/17** focused are not the committed baseline. Phase 5 is implemented, deployed and activated; Phase 6 has not started.
+
 ## 2026-08-20 — Telegram Return Reminder + Late Escalation / Fasa 5 (v2.4.0)
 
 - Commit `54d526b` (`feat: add telegram return escalation scanner`) menambah backend-only `scanReturnOperationalNotifications_(options)` dalam `gas/Code.gs` serta focused suite `tests/telegram-return-notifications-phase5.test.js`.
@@ -11,7 +35,7 @@
 - Practical exactly-once limitation: Telegram dan Google Sheets tidak atomic. Delivery berjaya diikuti audit failure boleh menghasilkan `SENT_AUDIT_PARTIAL` dan theoretical duplicate retry.
 - Browser/local verification pada kira-kira 425px mengesahkan Student, Warden, Guard, Admin dan Public Monitoring masih load tanpa visible regression/overflow; tiada scanner route dalam frontend, `doGet` atau `doPost`.
 - Tiada time-driven trigger, live Telegram smoke send, destination/configuration change, frontend/schema/lifecycle/threshold/version/service-worker change atau deployment. Existing lifecycle Telegram dan return-selfie `sendPhoto` kekal.
-- Focused Phase 5 baseline ialah **14/14 lulus**; full Node baseline semasa ialah **443/443 lulus**.
+- Focused Phase 5 baseline bagi milestone implementation tersebut ialah **14/14 lulus**; full Node baseline milestone ialah **443/443 lulus**.
 
 ## 2026-08-20 — Admin Operational Intelligence + Perlu Tindakan / Fasa 4 (v2.4.0)
 
