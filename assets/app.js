@@ -4058,23 +4058,36 @@ function setConfigFieldStateV200(field, visible, required, options = {}) {
   }
 }
 
+function getStudentDateSectionLabelsV240(typeCode) {
+  const normalizedTypeCode = String(typeCode || "").trim().toUpperCase();
+  if (normalizedTypeCode === REQUEST_TYPE.overnight) {
+    return { section: "Maklumat Pulang Bermalam", leaveDate: "Tarikh Keluar" };
+  }
+  if (normalizedTypeCode === REQUEST_TYPE.semester) {
+    return { section: "Maklumat Cuti Semester", leaveDate: "Tarikh Mula Cuti" };
+  }
+  if (normalizedTypeCode === REQUEST_TYPE.emergency) {
+    return { section: "Maklumat Tarikh Keluar", leaveDate: "Tarikh Keluar" };
+  }
+  return { section: "Maklumat Permohonan", leaveDate: "Tarikh Keluar" };
+}
+
+function applyStudentDateSectionLabelsV240(typeCode) {
+  if (!els.overnightFields) return;
+  const labels = getStudentDateSectionLabelsV240(typeCode);
+  const sectionTitle = els.overnightFields.querySelector("h3");
+  const leaveDateLabel = els.overnightFields.querySelector('label[for="leaveDateInput"]');
+  if (sectionTitle) sectionTitle.textContent = labels.section;
+  if (leaveDateLabel) leaveDateLabel.textContent = labels.leaveDate;
+}
+
 function applyStudentOutingTypeConfigV200(config) {
   if (!config) return;
   const typeChanged = studentPreviousOutingTypeCodeV200 !== config.type_code;
   const sameDayOnly = config.same_day_only === true;
   const fixedReturnTime = String(config.fixed_return_time || "").trim();
   const hasDepartureDayRule = String(config.departure_allowed_days || "").trim() !== "";
-  const standardTypeCodes = new Set(Object.values(REQUEST_TYPE));
-  const dynamicSectionTitle = els.overnightFields
-    ? els.overnightFields.querySelector("h3")
-    : null;
-  if (dynamicSectionTitle) {
-    if (config.type_code === REQUEST_TYPE.overnight) {
-      dynamicSectionTitle.textContent = "Maklumat Pulang Bermalam";
-    } else if (!standardTypeCodes.has(config.type_code)) {
-      dynamicSectionTitle.textContent = "Maklumat Tambahan";
-    }
-  }
+  applyStudentDateSectionLabelsV240(config.type_code);
   const leaveDateRequired = config.require_leave_date === true || hasDepartureDayRule;
   setConfigFieldStateV200(els.leaveDateInput, leaveDateRequired, leaveDateRequired, { reset: typeChanged, clearOnTypeChange: true });
   setConfigFieldStateV200(
@@ -9617,7 +9630,7 @@ function ensureSemesterLeaveDateFieldV160() {
   const label = document.createElement("label");
   label.setAttribute("for", "leaveDateInput");
   label.dataset.semesterOnly = "1";
-  label.textContent = "Tarikh Keluar / Tarikh Mula Cuti";
+  label.textContent = "Tarikh Keluar";
   const input = document.createElement("input");
   input.id = "leaveDateInput";
   input.type = "date";
@@ -9636,6 +9649,7 @@ function updateLegacyRequestTypeFieldsV164() {
   const isSemester = requestType === REQUEST_TYPE.semester;
   const purposeLabel = els.purposeInput ? document.querySelector(`label[for="${els.purposeInput.id}"]`) : null;
   const locationLabel = els.locationInput ? document.querySelector(`label[for="${els.locationInput.id}"]`) : null;
+  applyStudentDateSectionLabelsV240(requestType);
 
   setSectionVisibleV164(
   els.overnightFields,
@@ -9666,10 +9680,6 @@ setFieldAndLabelHiddenV160(
   setFieldAndLabelHiddenV160(els.guardianRelationSelect, !(isEmergency || isOvernight || isSemester));
   setFieldAndLabelHiddenV160(els.emergencyNoteInput, !(isEmergency || isSemester));
 
-const overnightTitle = els.overnightFields
-  ? els.overnightFields.querySelector("h3")
-  : null;
-
 const emergencyTitle = els.emergencyFields
   ? els.emergencyFields.querySelector("h3")
   : null;
@@ -9684,10 +9694,6 @@ if (els.expectedReturnTimeInput) {
 }
 
 if (isWeekend) {
-  if (overnightTitle) {
-    overnightTitle.textContent = "Maklumat Outing Sabtu / Ahad";
-  }
-
   if (purposeLabel) {
     purposeLabel.textContent = "Tujuan Outing";
   }
@@ -9695,11 +9701,6 @@ if (isWeekend) {
   if (locationLabel) {
     locationLabel.textContent = "Lokasi Outing";
   }
-
-  setLabelTextV163(
-    els.leaveDateInput,
-    "Tarikh Outing Sabtu / Ahad"
-  );
 
   setLabelTextV163(
     els.expectedReturnTimeInput,
@@ -9731,11 +9732,9 @@ if (isWeekend) {
 }
 
 if (isSemester) {
-    if (overnightTitle) overnightTitle.textContent = "Maklumat Cuti Semester";
     if (emergencyTitle) emergencyTitle.textContent = "Maklumat Waris / Cuti Semester";
     if (purposeLabel) purposeLabel.textContent = "Tujuan Cuti Semester";
     if (locationLabel) locationLabel.textContent = "Alamat / Destinasi Semasa Cuti";
-    setLabelTextV163(els.leaveDateInput, "Tarikh Keluar / Tarikh Mula Cuti");
     setLabelTextV163(els.returnDateInput, "Tarikh Pulang Ke Asrama");
     setLabelTextV163(els.expectedReturnTimeInput, "Masa Dijangka Pulang Ke Asrama");
     setLabelTextV163(els.guardianPhoneInput, "Telefon Waris");
@@ -9757,7 +9756,6 @@ if (isSemester) {
   }
 
   if (isOvernight) {
-    if (overnightTitle) overnightTitle.textContent = "Maklumat Pulang Bermalam";
     if (emergencyTitle) emergencyTitle.textContent = "Maklumat Waris";
     if (purposeLabel) purposeLabel.textContent = "Tujuan Pulang Bermalam";
     if (locationLabel) locationLabel.textContent = "Alamat / Destinasi Bermalam";
@@ -9785,7 +9783,6 @@ if (isSemester) {
   }
 
   if (isNormal || !requestType) {
-    if (overnightTitle) overnightTitle.textContent = "Maklumat Pulang Bermalam";
     if (emergencyTitle) emergencyTitle.textContent = "Maklumat Kecemasan";
   }
   if (purposeLabel) purposeLabel.textContent = "Tujuan Outing";

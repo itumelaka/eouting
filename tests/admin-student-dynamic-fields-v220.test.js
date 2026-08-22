@@ -50,6 +50,7 @@ function createAdminTimeFixture(initialValue = "07:37") {
 
 function createStudentFieldFixture(typeCode) {
   const title = { textContent: "Maklumat Pulang Bermalam" };
+  const leaveDateLabel = { textContent: "Tarikh Keluar / Tarikh Mula Cuti" };
   const makeField = () => ({ value: "", disabled: false, required: false, readOnly: false, hidden: false });
   const elements = {
     leaveDateInput: makeField(),
@@ -63,10 +64,12 @@ function createStudentFieldFixture(typeCode) {
     vehicleTypeSelect: makeField(),
     vehicleDetailInput: makeField(),
     emergencyNoteInput: { ...makeField(), hidden: true },
-    overnightFields: { querySelector: () => title },
+    overnightFields: {
+      querySelector: (selector) => selector === "h3" ? title : leaveDateLabel
+    },
     emergencyFields: {}
   };
-  const context = vm.createContext({ elements, title, selectedTypeCode: typeCode });
+  const context = vm.createContext({ elements, title, leaveDateLabel, selectedTypeCode: typeCode });
   vm.runInContext(`
     const els = elements;
     const REQUEST_TYPE = {
@@ -142,7 +145,7 @@ test("Admin editor assigns backend blanks directly with no time fallback", () =>
   assert.doesNotMatch(editorSource, /new Date|currentTime|00:00|12:00/);
 });
 
-test("custom KLINIK uses a neutral section and shows only its configured return-time field", () => {
+test("custom KLINIK uses safe fallback date wording and shows only its configured return-time field", () => {
   const context = createStudentFieldFixture("KLINIK");
   context.applyConfig({
     type_code: "KLINIK",
@@ -160,7 +163,8 @@ test("custom KLINIK uses a neutral section and shows only its configured return-
     require_vehicle: true
   });
 
-  assert.equal(context.title.textContent, "Maklumat Tambahan");
+  assert.equal(context.title.textContent, "Maklumat Permohonan");
+  assert.equal(context.leaveDateLabel.textContent, "Tarikh Keluar");
   assert.equal(context.elements.leaveDateInput.hidden, true);
   assert.equal(context.elements.returnDateInput.hidden, true);
   assert.equal(context.elements.expectedReturnTimeInput.hidden, false);
@@ -187,6 +191,7 @@ test("Pulang Bermalam retains its title and configured dynamic fields", () => {
   });
 
   assert.equal(context.title.textContent, "Maklumat Pulang Bermalam");
+  assert.equal(context.leaveDateLabel.textContent, "Tarikh Keluar");
   assert.equal(context.elements.leaveDateInput.hidden, false);
   assert.equal(context.elements.returnDateInput.hidden, false);
   assert.equal(context.elements.expectedReturnTimeInput.hidden, false);
@@ -194,11 +199,57 @@ test("Pulang Bermalam retains its title and configured dynamic fields", () => {
   assert.equal(context.elements.guardianRelationSelect.hidden, false);
 });
 
-test("legacy renderer keeps dedicated titles for Weekend, Cuti Semester, Outing Biasa and Kecemasan", () => {
+test("Kecemasan uses its date wording without any Pulang Bermalam heading", () => {
+  const context = createStudentFieldFixture("KECEMASAN");
+  context.applyConfig({
+    type_code: "KECEMASAN",
+    same_day_only: false,
+    require_leave_date: true,
+    require_return_date: false,
+    require_return_time: false,
+    fixed_return_time: "",
+    departure_allowed_days: "",
+    require_guardian_phone: true,
+    require_guardian_relation: true,
+    require_emergency_reason: true,
+    require_purpose: true,
+    require_location: true,
+    require_vehicle: true
+  });
+
+  assert.equal(context.title.textContent, "Maklumat Tarikh Keluar");
+  assert.equal(context.leaveDateLabel.textContent, "Tarikh Keluar");
+  assert.doesNotMatch(context.title.textContent, /Pulang Bermalam/);
+  assert.equal(context.elements.leaveDateInput.hidden, false);
+});
+
+test("Cuti Semester uses its dedicated section and start-date wording", () => {
+  const context = createStudentFieldFixture("CUTI_SEMESTER");
+  context.applyConfig({
+    type_code: "CUTI_SEMESTER",
+    same_day_only: false,
+    require_leave_date: true,
+    require_return_date: true,
+    require_return_time: true,
+    fixed_return_time: "",
+    departure_allowed_days: "",
+    require_guardian_phone: true,
+    require_guardian_relation: true,
+    require_emergency_reason: false,
+    require_purpose: true,
+    require_location: true,
+    require_vehicle: true
+  });
+
+  assert.equal(context.title.textContent, "Maklumat Cuti Semester");
+  assert.equal(context.leaveDateLabel.textContent, "Tarikh Mula Cuti");
+});
+
+test("legacy renderer delegates shared date wording to the presentation-only label helper", () => {
   const legacySource = sourceBetween("function updateLegacyRequestTypeFieldsV164", "function updateRequestTypeFields");
-  assert.match(legacySource, /Maklumat Outing Sabtu \/ Ahad/);
-  assert.match(legacySource, /Maklumat Cuti Semester/);
-  assert.match(legacySource, /Maklumat Pulang Bermalam/);
+  assert.match(legacySource, /applyStudentDateSectionLabelsV240\(requestType\)/);
+  assert.doesNotMatch(legacySource, /Maklumat Pulang Bermalam/);
+  assert.doesNotMatch(legacySource, /Tarikh Keluar \/ Tarikh Mula Cuti/);
   assert.match(legacySource, /Maklumat Kecemasan/);
   assert.match(legacySource, /if \(isNormal \|\| !requestType\)/);
 });
