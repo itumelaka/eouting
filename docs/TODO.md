@@ -1,8 +1,17 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 51 / cache `2.4.0-r6`** pada 22 Ogos 2026. Fasa 1–6 lengkap dan production verified. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented/deployed dan currently enabled melalui Admin. Baseline kanonik semasa ialah **490/490**; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 52 / cache `2.4.0-r7`** pada 22 Ogos 2026. Fasa 1–6 dan Generic Application Date Window lengkap serta production verified. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented/deployed dan currently enabled melalui Admin. Baseline kanonik semasa ialah **501/501**; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Generic Application Date Window
+
+- [x] Commit `76c6898` menambah `application_open_date`/`application_close_date` optional dan generik untuk semua `OUTING_TYPES`, dengan canonical `YYYY-MM-DD`, inclusive boundaries dan strict date/range validation.
+- [x] `setupAdminOutingConfigV200()` production menambah AC/AD secara idempotent; row lama kekal blank, tiada auto-population dan tiada schema `OUTING_REQUESTS` change.
+- [x] Admin date inputs save/reload, summary, `Kosongkan`, persistent blank, no-current-date fallback dan config-version increment disahkan production.
+- [x] Student future-open smoke mencapai backend, ditolak sebelum persistence dengan mesej BM tepat dan tidak menambah row request.
+- [x] Backend Malaysia-time kekal authoritative; date/day/time rules additive dan safe projection hanya membawa dua tarikh untuk guidance.
+- [x] **COMPLETE / PRODUCTION VERIFIED** pada 22 Ogos 2026; current release v2.4.0 / r7 / GAS Version 52 / **501/501**.
 
 ### Phase 6 — Guardian Contact Shortcut
 
@@ -13,7 +22,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 51 / cache `2.4.0-r6`** pa
 - [x] Commit `3e21c26` memberi label date section Student yang tepat untuk Pulang Bermalam, Cuti Semester, Kecemasan dan fallback.
 - [x] Commit `4c16b0a` memastikan auto-approved `AUTO_CONFIG_V2` emergency berada di approved/risk section berdasarkan `DILULUSKAN_WARDEN`, bukan actor, tanpa pending/approval kedua.
 - [x] Student dan Warden/HEP production smoke berjaya; Guard/No-Guard, lifecycle, schema, trigger, Telegram cadence dan config semantics kekal.
-- [x] Phase 6 **COMPLETE / PRODUCTION VERIFIED** pada 22 Ogos 2026; current release v2.4.0 / r6 / GAS Version 51 / **490/490**.
+- [x] Phase 6 **COMPLETE / PRODUCTION VERIFIED** pada 22 Ogos 2026; milestone release ketika close-out itu ialah v2.4.0 / r6 / GAS Version 51 / **490/490**.
 
 ### No-Guard Departure — sambungan operasi selepas Fasa 5
 

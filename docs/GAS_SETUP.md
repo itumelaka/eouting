@@ -1,6 +1,6 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 51**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. Manifest kanonik ialah `Asia/Kuala_Lumpur`, runtime `V8`, `ANYONE_ANONYMOUS` dan `USER_DEPLOYING`. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready. `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false dan kini enabled melalui Admin. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy. Phase 5 scanner production kekal tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit. Phase 6 Guardian Contact Shortcut telah production verified; `getGuardianContact` kekal POST authenticated dan tidak menambah trigger, schema atau Script Properties.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 52**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. Manifest kanonik ialah `Asia/Kuala_Lumpur`, runtime `V8`, `ANYONE_ANONYMOUS` dan `USER_DEPLOYING`. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready. `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false dan kini enabled melalui Admin. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy. Phase 5 scanner production kekal tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit. Phase 6 Guardian Contact Shortcut dan Generic Application Date Window telah production verified; date window tidak menambah trigger, Script Properties atau schema `OUTING_REQUESTS`.
 
 ## Tanggungjawab Backend
 
@@ -113,6 +113,21 @@ Script Properties Notis Banner dicipta secara automatik apabila Admin menyimpan 
 Action `getAnnouncementBannerAdmin` dan `updateAnnouncementBanner` memerlukan credential Admin aktif; update direkod sebagai `UPDATE_ANNOUNCEMENT_BANNER`. `getAnnouncementBanner` mengesahkan Student, Warden/HEP, Guard atau Admin dan memulangkan projection viewer-safe sahaja. Public GET tidak menyediakan banner, nama/nilai Script Property tidak didedahkan dan `updated_by` tidak dihantar kepada ordinary viewer. Teks dibatasi kepada 500 aksara dan dirawat sebagai plain text.
 
 Jangan dokumentasi atau commit nilai sebenar token, chat ID atau folder ID. Notifikasi Telegram lifecycle biasa kekal non-blocking. Setiap pembatalan Pelajar yang berjaya daripada `MENUNGGU_KELULUSAN` atau `DILULUSKAN_WARDEN` mencuba tepat satu mesej Telegram selepas transaksi: nama, nombor matrik jika tersedia, jenis outing mesra pengguna, status sebelumnya yang mesra pengguna, sebab dan masa pembatalan. Kegagalan Telegram dicatat mengikut convention backend tetapi tidak menggagalkan atau rollback pembatalan. Percubaan pembatalan yang ditolak tidak menghantar mesej. Untuk `submitReturnSelfie`, `sendPhoto` ialah langkah transaksi yang diperlukan dan kegagalan dikendalikan dengan cleanup.
+
+## Migration Generic Application Date Window
+
+Commit `76c6898` menambah dua header optional di hujung `OUTING_TYPES`:
+
+```text
+AC: application_open_date
+AD: application_close_date
+```
+
+Jalankan `setupAdminOutingConfigV200()` menggunakan source baharu selepas authorization yang sah. Helper `ensureHeaders_()` menjadikan migration idempotent: header hilang ditambah tanpa reorder/destructive rewrite, row sedia ada menerima blank, dan rerun tidak menduplikasi kolum. Fungsi tidak mengisi tarikh production, tidak mengubah `OUTING_REQUESTS` dan tidak menetapkan Script Properties baharu.
+
+Production migration telah berjaya pada 22 Ogos 2026. AC/AD disahkan tepat dan semua row production termasuk `CUTI_SEMESTER` disahkan blank selepas migration serta selepas smoke clear. Konfigurasi tarikh mesti dibuat secara manual melalui Admin hanya apabila polisi operasi memerlukannya.
+
+Validation backend menerima blank atau canonical `YYYY-MM-DD`, menolak tarikh tidak sah dan close-before-open, serta membenarkan same-day range. Enforcement submission menggunakan tarikh `Asia/Kuala_Lumpur`, sempadan inklusif dan berlaku sebelum append. `allowed_days` dan application time window terus diperiksa secara additive.
 
 ## Setup Bukti Selfie v1.7.0
 

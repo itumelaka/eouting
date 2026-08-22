@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r6`, GAS Version 51 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Fasa 1–6 complete dan production verified. No-Guard Departure ialah sambungan operasi selepas Fasa 5, currently enabled melalui Admin; full Node baseline kanonik semasa ialah **490/490**.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r7`, GAS Version 52 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Fasa 1–6 serta Generic Application Date Window complete dan production verified. No-Guard Departure ialah sambungan operasi selepas Fasa 5, currently enabled melalui Admin; full Node baseline kanonik semasa ialah **501/501**.
 
 ## Flow keluar normal dan No-Guard
 
@@ -87,6 +87,7 @@ submitRequest
   -> flag false: jalankan whitelist dan validator legacy tanpa OUTING_TYPES
   -> flag true: resolve row OUTING_TYPES daripada type_code
        -> type mesti active dan schema lengkap/sah
+       -> application_open_date/application_close_date berdasarkan tarikh Malaysia semasa
        -> allowed_days + application window berdasarkan masa permohonan
        -> departure_allowed_days berdasarkan tarikh keluar yang diminta
        -> tarikh/masa server-side + fixed_return_time + same_day_only
@@ -98,7 +99,9 @@ submitRequest
 
 `fixed_return_time` mengatasi masa yang dihantar client. `same_day_only` menolak tarikh berbeza dan mengisi tarikh balik efektif jika field itu optional. Jika `require_warden_approval = true`, submission bermula `MENUNGGU_KELULUSAN`; jika `false`, backend menandainya `DILULUSKAN_WARDEN`, mengisi masa approval dan identiti sistem `AUTO_CONFIG_V2`, serta menulis audit `AUTO_APPROVE_REQUEST`. Guard hanya menerima state approved yang sah. Peraturan ini hanya boleh beroperasi apabila feature flag aktif.
 
-Peraturan permohonan dan keluar adalah berasingan. `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar. Kedua-dua masa permohonan ialah optional: blank open time bermaksud tiada opening threshold, blank close time bermaksud tiada closing threshold, dan jika kedua-duanya blank tiada sekatan masa dikenakan. `allowed_days` tetap diperiksa secara berasingan dan authoritative. Admin boleh menggunakan `Kosongkan`; explicit blank membersihkan cell Sheet melalui `clearContent()` supaya nilai lama tidak dikekalkan. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` production membenarkan permohonan pada mana-mana hari, departure Jumaat dan masa paling awal semasa `17:00`; Admin boleh mengubah masa itu mengikut arahan HEP.
+Peraturan permohonan dan keluar adalah berasingan. `application_open_date`/`application_close_date`, `allowed_days` serta `application_open_time`/`application_close_time` menentukan bila borang boleh dihantar dan semuanya additive. Kedua-dua tarikh optional: blank/blank tiada restriction, open sahaja membenarkan mulai tarikh itu, close sahaja membenarkan sehingga dan termasuk tarikh itu, dan kedua-duanya ialah julat inklusif. GAS menggunakan current date `Asia/Kuala_Lumpur`; close-before-open dan tarikh tidak sah ditolak. Kedua-dua masa permohonan juga optional: blank open time bermaksud tiada opening threshold, blank close time bermaksud tiada closing threshold, dan jika kedua-duanya blank tiada sekatan masa dikenakan. `allowed_days` tetap diperiksa secara berasingan dan authoritative. Admin boleh menggunakan `Kosongkan`; explicit blank membersihkan cell Sheet supaya nilai lama tidak dikekalkan dan tiada fallback hari/masa semasa. `departure_allowed_days` menentukan hari pada `tarikh` keluar, dan `earliest_departure_time` dikuatkuasakan semasa Guard menjalankan `confirmOut`. Row `PULANG_BERMALAM` production membenarkan permohonan pada mana-mana hari, departure Jumaat dan masa paling awal semasa `17:00`; Admin boleh mengubah masa itu mengikut arahan HEP.
+
+Safe Student outing-type projection memasukkan dua tarikh untuk guidance sahaja. Sebelum open atau selepas close, `ruleNotice` memaparkan mesej BM yang berguna, tetapi button/request tidak dianggap enforcement authority; submission tetap mencapai GAS dan backend boleh menolak sebelum append. Production smoke future-open mengesahkan state `Menghantar`, backend rejection `Permohonan dibuka mulai 1 Oktober 2026.` dan zero row `CUTI_SEMESTER` baharu dalam `OUTING_REQUESTS`.
 
 Status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` dan `KELUAR` dianggap active dan menghalang request baharu; `SELESAI`, `DITOLAK_WARDEN` serta `DIBATALKAN_PELAJAR` membenarkannya. Frontend mempunyai submission in-flight guard dan loading sendiri, tetapi atomic backend lock kekal protection authoritative.
 

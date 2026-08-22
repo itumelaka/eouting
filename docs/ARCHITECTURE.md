@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r6`. Production menggunakan GAS Version 51, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Manifest kanonik ialah `Asia/Kuala_Lumpur` / `V8` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING`. Config-driven mode kekal aktif dan ready; No-Guard Departure pula currently enabled melalui Admin tetapi mempunyai safe default `false`. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Fasa 1–6 lengkap dan production verified; No-Guard kekal sambungan operasi selepas Fasa 5. Full Node baseline kanonik semasa ialah **490/490**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r7`. Production menggunakan GAS Version 52, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Manifest kanonik ialah `Asia/Kuala_Lumpur` / `V8` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING`. Config-driven mode kekal aktif dan ready; No-Guard Departure pula currently enabled melalui Admin tetapi mempunyai safe default `false`. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Fasa 1–6 serta Generic Application Date Window lengkap dan production verified; No-Guard kekal sambungan operasi selepas Fasa 5. Full Node baseline kanonik semasa ialah **501/501**.
 
 ## Komponen
 
@@ -30,6 +30,14 @@ Frontend mengurus grid landing kompak 2×2, borang Pelajar, Dashboard Warden/HEP
 `gas/Code.gs` menyediakan `doGet(e)` dan `doPost(e)`. Backend membaca dan menulis Google Sheets, mengesahkan credential, menguatkuasakan transition status, menyimpan selfie ke Google Drive, menulis audit log dan menghantar Telegram.
 
 Telegram ialah side effect non-blocking bagi notifikasi lifecycle biasa. Untuk `submitReturnSelfie`, penghantaran imej melalui `sendPhoto` ialah sebahagian daripada hasil bukti yang diperlukan; kegagalan sebelum transaksi lengkap mencetuskan cleanup Drive/Telegram. Kegagalan audit selepas transaksi utama berjaya hanya diberi amaran dan tidak membatalkan submission.
+
+### Generic Application Date Window
+
+`OUTING_TYPES.application_open_date` dan `application_close_date` ialah policy fields optional, canonical `YYYY-MM-DD`, bagi setiap jenis outing. Backend GAS menormalkan config dengan ketat, menerima blank, menolak tarikh malformed/mustahil dan memerlukan close tidak lebih awal daripada open; same-day range sah. Semasa submission, tarikh Malaysia semasa dibanding secara inklusif sebelum allowed-day/time checks dan sebelum append. Oleh itu date, `allowed_days`, `application_open_time` dan `application_close_time` membentuk conjunction; kegagalan mana-mana syarat menghentikan persistence.
+
+Frontend menerima kedua-dua tarikh melalui safe Student projection untuk notis UX sebelum buka atau selepas tutup, tetapi tidak menjadi authority. Jam/browser device boleh mempengaruhi panduan yang terlihat tetapi tidak boleh memintas GAS. Admin-only config metadata kekal di luar projection public/Student. Existing rows dengan blank dates melalui laluan legacy yang sama seperti sebelum feature.
+
+Migration menggunakan `setupAdminOutingConfigV200()`/`ensureHeaders_()` dan menambah header di hujung tanpa reorder data. Production migration 22 Ogos 2026 menghasilkan kolum AC/AD, mengekalkan semua row blank dan tidak menyentuh `OUTING_REQUESTS`. Tiada row menerima tarikh automatik. Commit implementation ialah `76c6898`; production menggunakan GAS Version 52 dan frontend r7.
 
 ### No-Guard Departure — fallback terkawal
 
@@ -219,7 +227,7 @@ Fasa 4.6 menetapkan satu sahaja canonical `apiPost` frontend. Router ini meminta
 
 Fasa 5A memuatkan public `GET getOutingTypes` hanya selepas sesi Pelajar dibuka. Dropdown, visibility, required/disabled state, `same_day_only` dan `fixed_return_time` dirender daripada safe config. Kegagalan atau response kosong menggunakan lima legacy config dalam memory; `submitRequest` GAS dan feature flag default tidak berubah.
 
-Foundation departure-rule menambah `departure_allowed_days` dan `earliest_departure_time` pada `OUTING_TYPES` sedia ada. Ia tidak mencipta modul polisi kedua. `allowed_days` serta application window mengawal masa permohonan; blank `application_open_time`/`application_close_time` bermaksud tiada threshold bagi medan itu, tanpa melemahkan validation `allowed_days`. Explicit empty-string update menggunakan `clearContent()` pada cell Sheet supaya blank ialah state tersimpan sebenar. Medan departure mengawal tarikh keluar yang diminta dan masa paling awal Guard boleh mengesahkan keluar. Enforcement production kini membaca row aktif kerana `OUTING_CONFIG_V2_ENABLED=true`.
+Foundation departure-rule menambah `departure_allowed_days` dan `earliest_departure_time` pada `OUTING_TYPES` sedia ada. Ia tidak mencipta modul polisi kedua. Generic date window, `allowed_days` serta application time window mengawal masa permohonan; blank date/time fields bermaksud tiada threshold bagi medan itu tanpa melemahkan restriction lain. Explicit empty-string update membersihkan cell Sheet supaya blank ialah state tersimpan sebenar. Medan departure mengawal tarikh keluar yang diminta dan masa paling awal Guard boleh mengesahkan keluar. Enforcement production kini membaca row aktif kerana `OUTING_CONFIG_V2_ENABLED=true`.
 
 Readiness hardening menambah POST Admin-only `getOutingConfigReadiness`. Ia membaca `OUTING_TYPES` tanpa mencipta atau mengubah sheet dan tidak mendedahkan property atau credential. Tetapan Outing memaparkan chip `Config Active`, `Legacy` atau `Config Issue` dengan sebab not-ready yang accessible; tiada control activation. Label config digunakan oleh Student, Telegram, statistik, Rekod Master, filter Admin, Checklist/filter Warden, label kontekstual dan return-selfie eligibility. `require_warden_approval=false` menghasilkan state `DILULUSKAN_WARDEN`, approver `AUTO_CONFIG_V2`, masa approval dan audit `AUTO_APPROVE_REQUEST` yang eksplisit.
 
@@ -398,7 +406,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r6` dan query `2.4.0-r6`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency sentiasa diterbitkan selepas cache read menggunakan masa semasa.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r7` dan query `2.4.0-r7`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency sentiasa diterbitkan selepas cache read menggunakan masa semasa.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

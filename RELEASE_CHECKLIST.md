@@ -2,7 +2,19 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r6`; backend production ialah GAS Version 51 pada deployment/URL sedia ada. Phase 6 Guardian Contact Shortcut berstatus COMPLETE / PRODUCTION VERIFIED. No-Guard Departure kekal sambungan operasi selepas Fasa 5 dan kini enabled melalui Admin. Baseline penuh ialah **490/490**. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r7`; backend production ialah GAS Version 52 pada deployment/URL sedia ada. Phase 6 Guardian Contact Shortcut dan Generic Application Date Window berstatus COMPLETE / PRODUCTION VERIFIED. No-Guard Departure kekal sambungan operasi selepas Fasa 5 dan kini enabled melalui Admin. Baseline penuh ialah **501/501**. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+
+## Close-out Generic Application Date Window — 22 Ogos 2026
+
+- [x] Commit `76c6898` (`feat: add outing application date window`) pushed ke `main` dan OneDrive reference clone diselaraskan.
+- [x] `application_open_date` dan `application_close_date` ditambah generik kepada `OUTING_TYPES`, bukan khusus `CUTI_SEMESTER`.
+- [x] `setupAdminOutingConfigV200()` dijalankan; migration idempotent menghasilkan `AC`/`AD`, row sedia ada kekal blank dan `OUTING_REQUESTS` tidak berubah.
+- [x] Admin save/reload mengesahkan tarikh sementara, summary `Buka`/`Tutup`, kenaikan config version, kemudian clear/reload kembali kepada `Tiada had tarikh` tanpa current-date fallback.
+- [x] Student smoke sebelum future open date sampai ke backend, memasuki state menghantar, ditolak dengan mesej tarikh yang tepat dan tidak menambah row `OUTING_REQUESTS`.
+- [x] Date bounds inklusif menggunakan `Asia/Kuala_Lumpur`; `allowed_days` dan application time window kekal additive dan backend authoritative.
+- [x] Release sequence mengesahkan clasp user/tracked files/manifest, `clasp push`, migration, schema, GAS Version 52, existing deployment in-place, `@HEAD` untouched dan frontend r7 live.
+- [x] Display version v2.4.0, asset/cache `2.4.0-r7` / `eouting-cache-v2.4.0-r7`, GAS Version 52 dan full regression **501/501**.
+- [x] Tiada auto-population date window, lifecycle/approval/Guard/No-Guard/Guardian Contact/Telegram/trigger/Script Properties atau schema selain additive `OUTING_TYPES` change.
 
 ## Close-out Phase 6 — 22 Ogos 2026
 
@@ -20,7 +32,7 @@ Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan 
 Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
 
 - [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
-- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **490/490**, bersama syntax checks dan `git diff --check`.
+- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **501/501**, bersama syntax checks dan `git diff --check`.
 - [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
 - [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
 - [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.

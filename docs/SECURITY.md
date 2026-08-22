@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 51** selepas Fasa 6 production verification. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, fallback config, expected-return, guardian atau internal diagnostic exposure.
+Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 52** selepas Fasa 6 dan Generic Application Date Window production verification. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, fallback config, expected-return, guardian atau internal diagnostic exposure.
 
 ## Public Data Boundary
 
@@ -81,10 +81,18 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.4.0-r6`; displayed app version ialah v2.4.0.
+- Cache source semasa ialah `eouting-cache-v2.4.0-r7`; displayed app version ialah v2.4.0.
 - Cache operasi backend 20 saat menyimpan source row, bukan derived urgency; `operational_urgency` dihitung selepas cache read menggunakan masa semasa.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
+
+## Application Date Window Authority
+
+`application_open_date` dan `application_close_date` berada dalam safe Student outing-type projection hanya untuk operational guidance. Projection ini tidak membawa config version internals, creator/updater atau timestamps Admin. Ia juga tidak mengubah Public Monitoring projection.
+
+Frontend boleh memaparkan notice berdasarkan tarikh peranti yang diformat sebagai Malaysia time, tetapi notice atau button state bukan security/business authority. `submitRequest` menyelesaikan config aktif dan membandingkan current date `Asia/Kuala_Lumpur` di GAS. Boundary open/close inklusif; invalid/reversed config ditolak dan kegagalan eligibility berlaku sebelum append `OUTING_REQUESTS`. Manipulasi browser clock, DOM atau payload tidak boleh memintas semakan backend.
+
+Blank dates mengekalkan behavior sedia ada. Date window tidak memberi role baharu, tidak meluaskan approval/Guard/No-Guard/Guardian Contact authority dan tidak mengubah Telegram, trigger, Script Properties atau lifecycle.
 
 ## Backend Validation
 

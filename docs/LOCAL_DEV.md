@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r6` dan production GAS Version 51. Fasa 1–6 lengkap dan production verified; No-Guard Departure kekal sambungan operasi selepas Fasa 5. Production No-Guard kini enabled melalui Admin; Phase 5 scheduling kekal satu trigger private scanner setiap lima minit.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r7` dan production GAS Version 52. Fasa 1–6 serta Generic Application Date Window lengkap dan production verified; No-Guard Departure kekal sambungan operasi selepas Fasa 5. Production No-Guard kini enabled melalui Admin; Phase 5 scheduling kekal satu trigger private scanner setiap lima minit.
 
 ## Keperluan
 
@@ -100,7 +100,9 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline kanonik semasa selepas Phase 6 production close-out ialah **490/490 lulus**. Temporary installer verification Phase 5 pernah menghasilkan **446/446**, tetapi itu ialah milestone sejarah dan bukan baseline semasa.
+Baseline kanonik semasa selepas Generic Application Date Window production close-out ialah **501/501 lulus**. Temporary installer verification Phase 5 pernah menghasilkan **446/446**, tetapi itu ialah milestone sejarah dan bukan baseline semasa.
+
+Focused date-window coverage berada dalam suite schema/Admin/Student/submission sedia ada. Ia meliputi idempotent header migration, blank compatibility, save/clear/reload, invalid/reversed/same-day ranges, safe projection, inclusive Malaysia midnight boundaries, additive day/time rules dan backend rejection tanpa append.
 
 Focused regression yang paling relevan:
 
@@ -265,7 +267,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 ## PWA dan Cache
 
 - Semak footer v2.4.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.4.0-r6` dan asset query `2.4.0-r6`; displayed app version ialah v2.4.0.
+- Semak Cache Storage menggunakan `eouting-cache-v2.4.0-r7` dan asset query `2.4.0-r7`; displayed app version ialah v2.4.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

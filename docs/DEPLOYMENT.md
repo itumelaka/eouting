@@ -1,6 +1,16 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r6` dan service-worker cache `eouting-cache-v2.4.0-r6`. Backend production ialah GAS **Version 51**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready; No-Guard Departure kini enabled melalui Admin. Fasa 1–6 lengkap dan production verified pada 22 Ogos 2026. Full Node baseline kanonik semasa ialah **490/490**.
+Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r7` dan service-worker cache `eouting-cache-v2.4.0-r7`. Backend production ialah GAS **Version 52**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready; No-Guard Departure kini enabled melalui Admin. Fasa 1–6 serta Generic Application Date Window lengkap dan production verified pada 22 Ogos 2026. Full Node baseline kanonik semasa ialah **501/501**.
+
+## Generic Application Date Window production close-out — 22 Ogos 2026
+
+Release commit `76c6898` (`feat: add outing application date window`) menggunakan sequence terkawal berikut: clasp authorized user dan tracked files disahkan; canonical `gas/appsscript.json` disemak; `clasp push` selesai; `setupAdminOutingConfigV200()` dijalankan; schema AC/AD disahkan; GAS Version 52 dicipta; existing production deployment dikemas kini in-place; deployment `@HEAD` tidak disentuh; commit dipush ke `main`; OneDrive reference clone diselaraskan; frontend r7 disahkan live; kemudian Admin dan Student smoke diluluskan. Deployment ID/URL kekal.
+
+Migration menambah `application_open_date` dan `application_close_date` secara idempotent di hujung `OUTING_TYPES`, tanpa reorder destructive, tanpa perubahan `OUTING_REQUESTS` dan tanpa auto-population. Semua row production disahkan blank selepas migration.
+
+Admin persistence smoke menggunakan `CUTI_SEMESTER` secara sementara sahaja: `2026-10-09`/`2026-10-10` persisted selepas save/reload, summary menunjukkan `Buka 09 Oktober 2026` dan `Tutup 10 Oktober 2026`, serta config version meningkat. Kedua-dua tarikh kemudian dikosongkan; save/reload mengembalikan `Tiada had tarikh`, blank kekal dan tiada current-date fallback. Tarikh ujian tersebut bukan konfigurasi production aktif.
+
+Student enforcement smoke menggunakan future open date sementara. UI memaparkan `Permohonan dibuka mulai 1 Oktober 2026.`; percubaan submission memasuki state `Menghantar`, sampai ke GAS, ditolak backend dengan mesej sama dan tidak menambah row Cuti Semester dalam `OUTING_REQUESTS`. Tarikh sementara kemudian dibersihkan. Ini mengesahkan frontend notice ialah guidance dan backend `Asia/Kuala_Lumpur` ialah authority sebelum persistence.
 
 ## Phase 6 production verification — 22 Ogos 2026
 
@@ -91,7 +101,7 @@ Jika duplicate runaway bagi request/stage yang sama disahkan, emergency containm
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah `2.4.0-r6`.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah `2.4.0-r7`.
 
 Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
@@ -146,7 +156,7 @@ Urutan backup, migration idempotent, legacy check, readiness hijau dan controlle
 
 ## Release Beta v2.0
 
-Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.4.0` / `2.4.0-r6`.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Display version/`version.json` kekal `v2.4.0`, manakala query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation semasa diselaraskan kepada `2.4.0-r7`.
 
 Beta pertama hendaklah menguji lima seed dan sekurang-kurangnya satu jenis custom. Gate mesti meliputi `require_selfie=true/false`, `require_warden_approval=true/false`, audit `AUTO_APPROVE_REQUEST`, Guard transition, Telegram, statistik dan filter. `require_warden_approval=false` kekal high-impact walaupun auto-approval kini eksplisit dan diaudit.
 
@@ -285,7 +295,7 @@ Frontend:
 
 - buka `https://itumelaka.github.io/eouting/`;
 - semak footer dan update popup;
-- semak asset query `2.4.0-r6` dan Cache Storage `eouting-cache-v2.4.0-r6`, khususnya selepas refresh/reopen PWA mobile;
+- semak asset query `2.4.0-r7` dan Cache Storage `eouting-cache-v2.4.0-r7`, khususnya selepas refresh/reopen PWA mobile;
 - login Admin, refresh berulang dan sahkan restore hanya selepas backend validation serta tab bukan default kekal lazy;
 - login Pelajar pada telefon, buka foto profil dan sahkan `Ambil Foto`, `Pilih dari Galeri` serta `Batal`; return-selfie mesti kekal sama;
 - buka Public Monitoring sekali dan pastikan loading, scroll, data serta timestamp betul;

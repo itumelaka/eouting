@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-22 — Generic Application Date Window production close-out (v2.4.0)
+
+- Commit `76c6898` menambah `OUTING_TYPES.application_open_date` dan `application_close_date` sebagai medan optional generik `YYYY-MM-DD`; blank mengekalkan behavior lama, open/close ialah inklusif dan close-before-open/tarikh tidak sah ditolak.
+- GAS `Asia/Kuala_Lumpur` kekal authoritative sebelum persistence. Date window, `allowed_days` dan application time window adalah additive; frontend hanya memberi panduan dan rejection tidak menambah `OUTING_REQUESTS`.
+- Admin date inputs menyokong save/reload, `Kosongkan`, persistent blank tanpa current-date fallback dan range validation. Production smoke mengesahkan set/reload/summary/config-version, kemudian clear/reload kembali kepada `Tiada had tarikh`.
+- Migration `setupAdminOutingConfigV200()` berjaya menambah AC/AD secara idempotent; row sedia ada kekal blank, tiada auto-population dan tiada perubahan schema/lifecycle `OUTING_REQUESTS`.
+- Student future-open smoke mencapai backend, ditolak dengan mesej tarikh BM yang tepat dan menghasilkan zero request row. Safe Student projection membawa dua tarikh sahaja untuk operational guidance tanpa Admin metadata.
+- Production kekal v2.4.0, frontend/cache `2.4.0-r7` / `eouting-cache-v2.4.0-r7`, GAS Version 52 pada deployment sedia ada, dan full regression **501/501**.
+
 ## 2026-08-22 — Phase 6 production close-out (v2.4.0)
 
 - Guardian Contact Shortcut untuk Warden/HEP authenticated disahkan production bagi pending/approved `KECEMASAN` dan `KELUAR + CRITICAL/ACTION_REQUIRED`.

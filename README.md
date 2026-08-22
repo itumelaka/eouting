@@ -14,11 +14,11 @@ Versi repo semasa: **v2.4.0 — Production Verified**.
 
 Frontend production v2.4.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Revision aset frontend semasa ialah `2.4.0-r6` dan service worker menggunakan `eouting-cache-v2.4.0-r6`.
+Revision aset frontend semasa ialah `2.4.0-r7` dan service worker menggunakan `eouting-cache-v2.4.0-r7`.
 
-Backend production semasa menggunakan GAS **Version 51**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Frontend kanonik kekal `https://itumelaka.github.io/eouting/`. Manifest Web App kanonik ialah timezone `Asia/Kuala_Lumpur`, runtime `V8`, `executeAs=USER_DEPLOYING` dan `access=ANYONE_ANONYMOUS`; access anonymous ini ialah akses transport API, bukan kuasa aplikasi tanpa authentication. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
+Backend production semasa menggunakan GAS **Version 52**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Frontend kanonik kekal `https://itumelaka.github.io/eouting/`. Manifest Web App kanonik ialah timezone `Asia/Kuala_Lumpur`, runtime `V8`, `executeAs=USER_DEPLOYING` dan `access=ANYONE_ANONYMOUS`; access anonymous ini ialah akses transport API, bukan kuasa aplikasi tanpa authentication. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
 
-Production yang disahkan sehingga 22 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`; dan Guardian Contact Shortcut Fasa 6 melalui `9c16f47` bersama hardening `0caa4fc`, `67d493c`, `3e21c26` dan `4c16b0a`. Fasa 1–6 kini lengkap dan production verified. No-Guard Departure kekal sambungan operasi selepas Fasa 5. Full Node baseline kanonik semasa ialah **490/490 lulus**.
+Production yang disahkan sehingga 22 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`; dan Guardian Contact Shortcut Fasa 6 melalui `9c16f47` bersama hardening `0caa4fc`, `67d493c`, `3e21c26` dan `4c16b0a`. Generic Application Date Window dilengkapkan melalui `76c6898`. Fasa 1–6 dan date-window generik kini lengkap serta production verified. No-Guard Departure kekal sambungan operasi selepas Fasa 5. Full Node baseline kanonik semasa ialah **501/501 lulus**.
 
 ## No-Guard Departure — sambungan operasi selepas Fasa 5
 
@@ -187,6 +187,16 @@ UI memaparkan butiran hanya selepas fetch, kemudian menyediakan `📞 Telefon Se
 
 Fix sokongan production ialah `0caa4fc` untuk menerima hanya boolean `true` atau transport string `"true"` bagi availability flag tanpa membina eligibility local; `67d493c` untuk mengosongkan `fixed_return_time` melalui Admin dengan blank round-trip; dan `3e21c26` untuk label Student: `PULANG_BERMALAM` → `Maklumat Pulang Bermalam`/`Tarikh Keluar`, `CUTI_SEMESTER` → `Maklumat Cuti Semester`/`Tarikh Mula Cuti`, `KECEMASAN` → `Maklumat Tarikh Keluar`/`Tarikh Keluar`, fallback → `Maklumat Permohonan`/`Tarikh Keluar`. Perubahan label dan clear UI tidak mengubah backend, config atau business rules.
 
+## Generic Application Date Window
+
+Commit `76c6898` (`feat: add outing application date window`) berstatus **COMPLETE / PRODUCTION VERIFIED** pada 22 Ogos 2026. Dua medan optional generik ditambah kepada `OUTING_TYPES`: `application_open_date` dan `application_close_date`. Kedua-duanya menggunakan `YYYY-MM-DD`, bukan khusus kepada `CUTI_SEMESTER`: blank/blank tidak mengenakan sekatan tarikh, open sahaja membenarkan submission mulai tarikh itu, close sahaja membenarkan submission sehingga dan termasuk tarikh itu, dan kedua-duanya membentuk julat inklusif. Close tidak boleh lebih awal daripada open; julat satu hari dibenarkan dan tarikh tidak sah ditolak.
+
+Tarikh, `allowed_days`, `application_open_time` dan `application_close_time` adalah additive—semua syarat yang dikonfigurasi mesti lulus. GAS menilai tarikh semasa menggunakan `Asia/Kuala_Lumpur` sebelum append; penolakan tidak menulis row `OUTING_REQUESTS`. Notis Student sebelum buka/selepas tutup ialah panduan UX sahaja dan jam peranti tidak boleh mengatasi enforcement backend.
+
+Admin mengedit kedua-dua tarikh di `Peraturan Permohonan`. Urutan akhir ialah: Hari permohonan dibenarkan; Tarikh Permohonan Dibuka; Tarikh Permohonan Ditutup; Masa Permohonan Dibuka; Masa Permohonan Ditutup. Kedua-dua date input menyokong `Kosongkan`, blank persistent tanpa fallback hari semasa, save/reload dan range validation. Safe Student projection membawa dua medan tarikh ini untuk panduan operasi sahaja; metadata Admin seperti config version internals, creator/updater dan timestamp kekal di luar projection tersebut.
+
+Migration production melalui `setupAdminOutingConfigV200()` berjaya pada 22 Ogos 2026 dan menambah `AC: application_open_date` serta `AD: application_close_date` secara idempotent tanpa reorder destructive atau perubahan schema `OUTING_REQUESTS`. Semua row sedia ada kekal blank; tiada date window dipopulasi automatik. Smoke `CUTI_SEMESTER` mengesahkan save/reload, ringkasan Admin, clear/reload dan kenaikan `config_version`; tarikh sementara kemudian dikosongkan. Smoke Student dengan future open date mengesahkan request sampai ke backend, ditolak sebelum persistence dengan `Permohonan dibuka mulai 1 Oktober 2026.`, dan tiada row test ditambah.
+
 ## Architecture Ringkas
 
 ```text
@@ -240,7 +250,7 @@ Pelajar boleh membatalkan rekod sendiri yang masih `MENUNGGU_KELULUSAN` atau `DI
 
 Konfigurasi production membezakan dua konsep:
 
-- **Peraturan permohonan:** `allowed_days`, `application_open_time` dan `application_close_time` menentukan bila pelajar boleh menghantar permohonan.
+- **Peraturan permohonan:** `application_open_date`, `application_close_date`, `allowed_days`, `application_open_time` dan `application_close_time` menentukan bila pelajar boleh menghantar permohonan; semua restriction yang dikonfigurasi mesti lulus.
 - **Peraturan keluar:** `departure_allowed_days` dan `earliest_departure_time` menentukan hari serta masa paling awal pelajar yang diluluskan boleh keluar secara fizikal.
 
 Admin boleh menggunakan butang `Kosongkan` untuk membuang masa permohonan dibuka atau ditutup. Nilai kosong kekal kosong dan bermaksud tiada threshold masa bagi medan tersebut; jika kedua-duanya kosong, permohonan tidak dihadkan oleh masa tetapi `allowed_days` tetap dikuatkuasakan. Nilai kosong tidak ditukar kepada `00:00`, `12:00` atau masa semasa.
@@ -353,7 +363,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo kanonik semasa selepas Phase 6 close-out ialah **490/490 lulus**. Focused Phase 5 suite `tests/telegram-return-notifications-phase5.test.js` ialah milestone **15/15 lulus**. Temporary installer verification pernah mencapai **17/17 focused** dan **446/446 full**, tetapi test sementara telah dibuang dan angka itu bukan baseline semasa. Focused Phase 4 suite `tests/admin-operational-intelligence-phase4.test.js` kekal milestone **9/9 lulus**. Regression Guardian Contact/visibility dilindungi oleh `tests/guardian-contact-shortcut-phase6.test.js` dan `tests/guardian-contact-smoke-patch-phase6.test.js`; No-Guard kekal dilindungi oleh suite khususnya. Syntax checks:
+Baseline repo kanonik semasa selepas Generic Application Date Window close-out ialah **501/501 lulus**. Focused Phase 5 suite `tests/telegram-return-notifications-phase5.test.js` ialah milestone **15/15 lulus**. Temporary installer verification pernah mencapai **17/17 focused** dan **446/446 full**, tetapi test sementara telah dibuang dan angka itu bukan baseline semasa. Focused Phase 4 suite `tests/admin-operational-intelligence-phase4.test.js` kekal milestone **9/9 lulus**. Regression date-window meliputi schema/migration, Admin persistence/clear, safe projection, Malaysia boundary, additive day/time rules dan rejection tanpa append; Guardian Contact/visibility serta No-Guard kekal dilindungi oleh suite khusus masing-masing. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -394,6 +404,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.4.0 semasa ialah GAS **Version 51**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.4.0-r6`. Version 44–50 kekal milestone sejarah sebelum Phase 6 Version 51. Rollback config-driven segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.4.0 semasa ialah GAS **Version 52**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.4.0-r7`. Version 44–51 kekal milestone sejarah sebelum Generic Application Date Window Version 52. Rollback config-driven segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).
