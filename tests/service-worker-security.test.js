@@ -10,9 +10,9 @@ const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const versionInfo = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
 const EXPECTED_VERSION = "2.4.0";
-const EXPECTED_ASSET_REVISION = "2.4.0-r1";
-const EXPECTED_RELEASE_DATE = "2026-08-20";
-const EXPECTED_RELEASE_NOTE = "Performance caching for operational reads and ultra-compact Guard cards.";
+const EXPECTED_ASSET_REVISION = "2.4.0-r2";
+const EXPECTED_RELEASE_DATE = "2026-08-22";
+const EXPECTED_RELEASE_NOTE = "Phase 6 Guardian Contact Shortcut for eligible Warden and HEP operational-risk cases.";
 
 function createWorker(cacheNames = []) {
   const listeners = {};

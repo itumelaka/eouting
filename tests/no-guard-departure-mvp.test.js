@@ -286,13 +286,14 @@ test("Student and Warden UI expose only the scoped fallback controls", () => {
   assert.match(studentCard, /Menunggu Pengesahan Keluar oleh Warden/);
   assert.doesNotMatch(studentCard, /guard_keluar_by\s*=/);
   assert.match(indexSource, /Menunggu Pengesahan Keluar[\s\S]*wardenDepartureConfirmationList/);
-  const warden = between(appSource, "function renderWarden", "function isReturnSelfieSubmitted");
-  assert.match(warden, /departure_confirmation_pending === true/);
-  assert.match(warden, /data-warden-remote-checkout/);
-  assert.match(warden, /Sahkan Keluar/);
-  assert.doesNotMatch(warden, /telefon_waris|hubungan_waris|guardian|Waris/);
+  const wardenRender = between(appSource, "function renderWarden", "function guardianContactShortcutHtml");
+  const wardenCheckout = between(appSource, "function wardenDepartureConfirmationCard", "function isReturnSelfieSubmitted");
+  assert.match(wardenRender, /departure_confirmation_pending === true/);
+  assert.match(wardenCheckout, /data-warden-remote-checkout/);
+  assert.match(wardenCheckout, /Sahkan Keluar/);
+  assert.doesNotMatch(wardenCheckout, /telefon_waris|hubungan_waris|GUARDIAN_CONTACT_ACCESSED/);
   assert.match(studentCard, /isNoGuardDepartureEnabledForRecord/);
-  assert.match(warden, /isNoGuardDepartureEnabledForRecord/);
+  assert.match(wardenRender, /isNoGuardDepartureEnabledForRecord/);
 });
 
 test("Admin toggle UI uses authenticated read/write endpoints and grants no checkout authority", () => {

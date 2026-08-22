@@ -550,17 +550,17 @@ test("normal Guard cards contain only identity, badges, the action cue and exist
   assert.doesNotMatch(masuk, /Lihat Butiran|Pulang:|Keluar:|Dalam tempoh dibenarkan/);
 });
 
-test("Guard emergency exception keeps only safety-relevant emergency details", () => {
+test("Guard emergency exception keeps non-contact safety details and excludes guardian data", () => {
   const html = renderGuardCard({
     request_id: "R1", student_id: "S1", studentName: "Ali", className: "A3",
     jenis_permohonan: "KECEMASAN", status: "Diluluskan HEP", sebab_kecemasan: "Hospital",
     telefon_waris: "0123456789", hubungan_waris: "Ibu", catatan_kecemasan: "Alergi ubat",
     purpose: "verbose purpose", location: "verbose location", jenis_kenderaan: "verbose vehicle"
   }, "guard-out");
-  for (const criticalDetail of [/Hospital/, /0123456789/, /Hubungi Waris/, /Ibu/, /Alergi ubat/]) {
+  for (const criticalDetail of [/Hospital/, /Alergi ubat/]) {
     assert.match(html, criticalDetail);
   }
-  assert.doesNotMatch(html, /verbose purpose|verbose location|verbose vehicle|Lihat Butiran/);
+  assert.doesNotMatch(html, /0123456789|Hubungi Waris|Ibu|verbose purpose|verbose location|verbose vehicle|Lihat Butiran/);
 
   const blankEmergency = renderGuardCard({
     request_id: "R2", student_id: "S2", studentName: "Abu", className: "A2",

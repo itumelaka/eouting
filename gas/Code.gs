@@ -408,6 +408,7 @@ function doPost(e) {
     if (action === "loginGuard") return jsonResponse(loginGuard(payload));
     if (action === "loginAdmin") return jsonResponse(loginAdmin(payload));
     if (action === "getTodayRecords") return jsonResponse(getOperationalTodayRecords(payload));
+    if (action === "getGuardianContact") return jsonResponse(getGuardianContact(payload));
     if (action === "getStudentAnnualSummary") return jsonResponse(getStudentAnnualSummary(payload));
     if (action === "getAdminIndividualStats") return jsonResponse(getAdminIndividualStats(payload));
     if (action === "getAdminMonitoring") return jsonResponse(getAdminMonitoring(payload));
@@ -3609,9 +3610,92 @@ function getOperationalTodayRecords(payload) {
   const roleProjectedRows = role === "warden" || role === "student"
     ? addDepartureConfirmationProjection_(projectedRows)
     : projectedRows;
-  return authenticatedStudent
+  const visibleRows = authenticatedStudent
     ? roleProjectedRows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
     : roleProjectedRows;
+  return projectGuardianContactBoundary_(visibleRows, role);
+}
+
+function projectGuardianContactBoundary_(rows, role) {
+  return (rows || []).map(function (row) {
+    const projected = Object.assign({}, row);
+    delete projected.telefon_waris;
+    delete projected.hubungan_waris;
+    delete projected.nama_waris;
+    if (role === "warden") {
+      projected.guardian_contact_available = isGuardianContactEligible_(row, row.operational_urgency) &&
+        Boolean(normalizeGuardianPhoneForTel_(row.telefon_waris));
+    }
+    return projected;
+  });
+}
+
+function isGuardianContactEligible_(record, urgency) {
+  const status = String(record && record.status || "").trim();
+  const requestType = String(record && record.jenis_permohonan || "").trim().toUpperCase();
+  if (requestType === REQUEST_TYPE.emergency &&
+      (status === STATUS.pending || status === STATUS.approved)) {
+    return true;
+  }
+  const urgencyState = String(urgency && urgency.state || "").trim().toUpperCase();
+  return status === STATUS.out && (urgencyState === "CRITICAL" || urgencyState === "ACTION_REQUIRED");
+}
+
+function getGuardianContactAuditContext_(record, urgency) {
+  if (String(record && record.jenis_permohonan || "").trim().toUpperCase() === REQUEST_TYPE.emergency &&
+      (String(record && record.status || "").trim() === STATUS.pending ||
+       String(record && record.status || "").trim() === STATUS.approved)) {
+    return "EMERGENCY_REQUEST";
+  }
+  return String(urgency && urgency.state || "").trim().toUpperCase() === "ACTION_REQUIRED"
+    ? "ACTION_REQUIRED_RETURN"
+    : "CRITICAL_RETURN";
+}
+
+function normalizeGuardianPhoneForTel_(value) {
+  const source = String(value === undefined || value === null ? "" : value).trim();
+  if (!source || !/^[+\d\s().-]+$/.test(source)) return "";
+  const plusMatches = source.match(/\+/g) || [];
+  if (plusMatches.length > 1 || (plusMatches.length === 1 && source.charAt(0) !== "+")) return "";
+  const normalized = source.replace(/[\s().-]/g, "");
+  if (!/^\+?\d{7,15}$/.test(normalized)) return "";
+  return normalized;
+}
+
+function getGuardianContact(payload) {
+  const data = payload || {};
+  const warden = findActiveWarden_(data.nama_warden || data.warden_name || data.name, data.pin);
+  if (!warden) throw new Error("Akses sesi warden tidak sah.");
+
+  const requestId = String(data.request_id || "").trim();
+  if (!requestId) throw new Error("ID permohonan diperlukan.");
+  const found = findRowByRequestId_(requestId);
+  if (!found) throw new Error("Permohonan tidak ditemui.");
+
+  const record = found.record;
+  const urgency = getOperationalUrgency_(record, new Date());
+  if (!isGuardianContactEligible_(record, urgency)) {
+    throw new Error("Akses maklumat penjaga tidak lagi tersedia untuk permohonan ini.");
+  }
+
+  const dialablePhone = normalizeGuardianPhoneForTel_(record.telefon_waris);
+  if (!dialablePhone) return { available: false };
+
+  const actorRole = deriveWardenStaffRole(warden) === "HEP" ? "HEP" : "Warden";
+  const context = getGuardianContactAuditContext_(record, urgency);
+  const auditRecord = appendAuditLog(
+    "GUARDIAN_CONTACT_ACCESSED", requestId, actorRole, warden.nama_warden,
+    JSON.stringify({ context: context })
+  );
+  if (!auditRecord) throw new Error("Akses maklumat penjaga gagal diaudit. Sila cuba lagi.");
+
+  return {
+    available: true,
+    guardian_name: "",
+    guardian_relation: String(record.hubungan_waris || "").trim(),
+    guardian_phone: String(record.telefon_waris || "").trim(),
+    call_uri: "tel:" + dialablePhone
+  };
 }
 
 function addOperationalUrgency_(rows, now) {

@@ -1,5 +1,5 @@
 {
   "version": "2.4.0",
-  "releasedAt": "2026-08-20",
-  "notes": "Performance caching for operational reads and ultra-compact Guard cards."
+  "releasedAt": "2026-08-22",
+  "notes": "Phase 6 Guardian Contact Shortcut for eligible Warden and HEP operational-risk cases."
 }

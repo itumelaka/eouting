@@ -3125,6 +3125,47 @@ textarea:focus {
   width: 100%;
 }
 
+.guardian-contact-shortcut {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.guardian-contact-button {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0.55rem 0.8rem;
+}
+
+.guardian-contact-panel {
+  padding: 0.8rem;
+  border: 1px solid rgba(15, 76, 92, 0.2);
+  border-radius: 12px;
+  background: rgba(240, 249, 250, 0.85);
+}
+
+.guardian-contact-details {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 0.75rem;
+}
+
+.guardian-contact-details div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.7fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.guardian-contact-details dt {
+  font-weight: 700;
+}
+
+.guardian-contact-details dd,
+.guardian-contact-unavailable {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 @media (min-width: 820px) {
   #guardApprovedList,
   #guardOutList,

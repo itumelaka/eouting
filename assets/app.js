@@ -290,6 +290,7 @@ let mockNoGuardDepartureEnabled = false;
 const guardActionLocks = {};
 const wardenActionLocks = {};
 const departureConfirmationActionLocks = {};
+const guardianContactRequestLocks = {};
 const DEBUG_STUDENT_RECORDS = false;
 const RETURN_SELFIE_STATUS = {
   pending: "BELUM_HANTAR",
@@ -3530,9 +3531,8 @@ function mapLiveRecord(record) {
     jenis_kenderaan: record.jenis_kenderaan || "",
     butiran_kenderaan: record.butiran_kenderaan || "",
     sebab_kecemasan: record.sebab_kecemasan || "",
-    telefon_waris: record.telefon_waris || "",
-    hubungan_waris: record.hubungan_waris || "",
     catatan_kecemasan: record.catatan_kecemasan || "",
+    guardian_contact_available: record.guardian_contact_available === true,
     rawStatus: record.status || "",
     status: mapLiveStatus(record.status),
     lewat: record.lewat === "Ya",
@@ -7050,6 +7050,10 @@ function renderWarden() {
     now
   );
   const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
+  const urgentReturnRecords = outingRecords.filter((record) => (
+    record.status === STATUS.out && record.guardian_contact_available === true
+  ));
+  const approvedAndUrgentRecords = approvedRecords.concat(urgentReturnRecords);
   const departureConfirmationRecords = approvedRecords.filter((record) => (
     isNoGuardDepartureEnabledForRecord(record) && record.departure_confirmation_pending === true
   ));
@@ -7060,9 +7064,9 @@ function renderWarden() {
     ? pendingRecords.map((record) => recordCard(record, "warden")).join("")
     : emptyState("Tiada permohonan menunggu kelulusan.");
 
-  els.wardenApprovedList.innerHTML = approvedRecords.length
-    ? approvedRecords.map((record) => recordCard(record, "dashboard")).join("")
-    : emptyState("Tiada permohonan diluluskan yang menunggu pengesahan guard.");
+  els.wardenApprovedList.innerHTML = approvedAndUrgentRecords.length
+    ? approvedAndUrgentRecords.map((record) => recordCard(record, "warden-readonly")).join("")
+    : emptyState("Tiada permohonan diluluskan atau kes pulang berisiko tinggi.");
 
   els.wardenDepartureConfirmationList.innerHTML = departureConfirmationRecords.length
     ? departureConfirmationRecords.map(wardenDepartureConfirmationCard).join("")
@@ -7078,6 +7082,65 @@ function renderWarden() {
   els.wardenDepartureConfirmationList.querySelectorAll("[data-warden-remote-checkout]").forEach((button) => {
     button.addEventListener("click", () => confirmWardenRemoteCheckout(button.dataset.wardenRemoteCheckout, button));
   });
+  [els.wardenList, els.wardenApprovedList].forEach((list) => {
+    list.querySelectorAll("[data-guardian-contact]").forEach((button) => {
+      button.addEventListener("click", () => fetchGuardianContact(button.dataset.guardianContact, button));
+    });
+  });
+}
+
+function guardianContactShortcutHtml(record, mode) {
+  const wardenView = mode === "warden" || mode === "warden-readonly";
+  if (!wardenView || record.guardian_contact_available !== true) return "";
+  return `
+    <div class="guardian-contact-shortcut">
+      <button class="secondary-action guardian-contact-button" type="button" data-guardian-contact="${escapeHtml(getRecordId(record))}">📞 Hubungi Penjaga</button>
+      <div class="guardian-contact-panel" data-guardian-contact-panel="${escapeHtml(getRecordId(record))}" hidden></div>
+    </div>
+  `;
+}
+
+function guardianContactPanelHtml(contact) {
+  if (!contact || contact.available !== true || !contact.call_uri) {
+    return `<p class="guardian-contact-unavailable">Maklumat penjaga tidak tersedia.</p>`;
+  }
+  return `
+    <dl class="guardian-contact-details">
+      <div><dt>Nama Penjaga</dt><dd>${escapeHtml(contact.guardian_name || "Tidak direkodkan")}</dd></div>
+      <div><dt>Hubungan</dt><dd>${escapeHtml(contact.guardian_relation || "Tidak direkodkan")}</dd></div>
+      <div><dt>No. Telefon</dt><dd>${escapeHtml(contact.guardian_phone || "-")}</dd></div>
+    </dl>
+    <a class="action-button guardian-call-link" href="${escapeHtml(contact.call_uri)}">📞 Telefon Sekarang</a>
+  `;
+}
+
+async function fetchGuardianContact(requestId, button) {
+  if (!currentSession || currentSession.role !== "warden" || guardianContactRequestLocks[requestId]) return;
+  const panel = button && button.parentElement
+    ? button.parentElement.querySelector("[data-guardian-contact-panel]")
+    : null;
+  guardianContactRequestLocks[requestId] = true;
+  const loadingState = setOperationalActionLoading(button, "Mendapatkan...");
+  try {
+    const contact = await apiPost("getGuardianContact", {
+      request_id: requestId,
+      nama_warden: currentSession.user.nama_warden || currentSession.user.name || "",
+      pin: currentSession.user.pin || ""
+    });
+    if (panel) {
+      panel.innerHTML = guardianContactPanelHtml(contact);
+      panel.hidden = false;
+    }
+  } catch (error) {
+    if (panel) {
+      panel.innerHTML = `<p class="guardian-contact-unavailable">${escapeHtml(error.message || "Maklumat penjaga tidak tersedia.")}</p>`;
+      panel.hidden = false;
+    }
+    showWarning(error.message || "Maklumat penjaga tidak tersedia.");
+  } finally {
+    clearOperationalActionLoading(loadingState);
+    delete guardianContactRequestLocks[requestId];
+  }
 }
 
 function wardenDepartureConfirmationCard(record) {
@@ -7959,6 +8022,7 @@ function recordCard(record, mode) {
       </div>
       ${guardActionCue}
       ${actions}
+      ${guardianContactShortcutHtml(record, mode)}
     </article>
   `;
 }
@@ -7974,17 +8038,9 @@ function guardOperationalCard(record, mode, actions) {
   const requestType = requestTypeLabel(record.jenis_permohonan);
   const statusDisplay = getContextualStatusDisplay(record);
   const emergencyReason = String(record.sebab_kecemasan || "").trim();
-  const emergencyPhone = String(record.telefon_waris || "").trim();
   const emergencyNote = String(record.catatan_kecemasan || "").trim();
-  const emergencyRelation = String(record.hubungan_waris || "").trim();
   const emergencyLines = [];
   if (emergencyReason) emergencyLines.push(`<strong>Sebab Kecemasan:</strong> ${escapeHtml(emergencyReason)}`);
-  if (emergencyPhone) {
-    emergencyLines.push(
-      `<strong>Waris:</strong> ${escapeDisplayPhone(emergencyPhone)}${emergencyRelation ? ` · ${escapeHtml(emergencyRelation)}` : ""}` +
-      guardianContactHtml(emergencyPhone)
-    );
-  }
   if (emergencyNote) emergencyLines.push(`<strong>Catatan:</strong> ${escapeHtml(emergencyNote)}`);
   const emergencySafety = record.jenis_permohonan === REQUEST_TYPE.emergency && emergencyLines.length
     ? `<div class="guard-emergency-safety">${emergencyLines.join("<br>")}</div>`
@@ -8119,9 +8175,6 @@ function emergencyDetailHtml(record) {
 
   return `<br>
         <strong>Sebab Kecemasan:</strong> ${escapeHtml(record.sebab_kecemasan || "-")}<br>
-        <strong>No. Telefon Waris / Penjaga:</strong> ${escapeDisplayPhone(record.telefon_waris)}<br>
-        <strong>Hubungan Waris:</strong> ${escapeHtml(record.hubungan_waris || "-")}
-        ${guardianContactHtml(record.telefon_waris)}<br>
         <strong>Catatan Kecemasan:</strong> ${escapeHtml(record.catatan_kecemasan || "-")}`;
 }
 
@@ -8143,9 +8196,7 @@ function overnightDetailHtml(record, mode) {
         <strong>Tarikh Pulang Ke Asrama:</strong> ${escapeHtml(formatDisplayDate(record.tarikh_balik || record.returnDate))}<br>
         <strong>Masa Dijangka Pulang Ke Asrama:</strong> ${escapeHtml(formatExpectedReturnTime(record.masa_balik_dijangka || record.expectedReturnTime))}<br>
         <strong>Destinasi Bermalam:</strong> ${escapeHtml(record.location || record.lokasi || "-")}<br>
-        <strong>Tujuan Pulang Bermalam:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}<br>
-        <strong>No. Telefon Waris / Penjaga:</strong> ${escapeDisplayPhone(record.telefon_waris)}
-        ${guardianContactHtml(record.telefon_waris)}
+        <strong>Tujuan Pulang Bermalam:</strong> ${escapeHtml(record.purpose || record.tujuan || "-")}
         ${lateReturnLine}
         ${guardLine}`;
 }
