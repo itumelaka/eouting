@@ -454,6 +454,7 @@ function doGet(e) {
     if (action === "getWardens") return jsonResponse(getWardens());
     if (action === "getGuards") return jsonResponse(getGuards());
     if (action === "getTodayRecords") return jsonResponse(getTodayRecords());
+    if (action === "getCurrentHostelSummary") return jsonResponse(getCurrentHostelSummary());
     if (action === "getOutingStats") return jsonResponse(getOutingStats(e.parameter || {}));
     if (action === "getOutingTypes") return jsonResponse(getOutingTypes());
 
@@ -474,6 +475,7 @@ function doPost(e) {
     if (action === "loginGuard") return jsonResponse(loginGuard(payload));
     if (action === "loginAdmin") return jsonResponse(loginAdmin(payload));
     if (action === "getTodayRecords") return jsonResponse(getOperationalTodayRecords(payload));
+    if (action === "getCurrentHostelRoster") return jsonResponse(getCurrentHostelRoster(payload));
     if (action === "getGuardianContact") return jsonResponse(getGuardianContact(payload));
     if (action === "getStudentAnnualSummary") return jsonResponse(getStudentAnnualSummary(payload));
     if (action === "getAdminIndividualStats") return jsonResponse(getAdminIndividualStats(payload));
@@ -3742,6 +3744,152 @@ function isNoGuardDepartureEnabled_() {
   if (typeof PropertiesService === "undefined") return false;
   const value = PropertiesService.getScriptProperties().getProperty(NO_GUARD_DEPARTURE_PROPERTY);
   return normalizeText_(value) === "true";
+}
+
+function getCurrentHostelSummary() {
+  return toPublicCurrentHostelSummary_(loadCurrentHostelPresence_());
+}
+
+function getCurrentHostelRoster(payload) {
+  validateCurrentHostelRosterViewer_(payload);
+  return toAuthenticatedCurrentHostelRoster_(loadCurrentHostelPresence_());
+}
+
+function validateCurrentHostelRosterViewer_(payload) {
+  const data = payload || {};
+  const role = normalizeText_(data.role);
+  if (role === "admin") {
+    validateAdminCredentials_(data);
+    return "admin";
+  }
+  if (role === "warden" && findActiveWarden_(data.nama_warden || data.warden_name || data.name, data.pin)) {
+    return "warden";
+  }
+  if (role === "guard" && findActiveGuard_(data.nama_guard || data.guard_name || data.name, data.pin)) {
+    return "guard";
+  }
+  throw new Error("Akses staff diperlukan.");
+}
+
+function loadCurrentHostelPresence_() {
+  return buildCurrentHostelPresenceFromRows_(
+    getRowsAsObjects_(getSheet_(SHEETS.students)),
+    getRowsAsObjects_(getSheet_(SHEETS.requests)),
+    getStudentLoginDirectory(),
+    now_()
+  );
+}
+
+function currentHostelRequestTimestamp_(row) {
+  const parsed = parseDateForSort_(row && (row.masa_mohon || row.tarikh));
+  return parsed ? parsed.getTime() : 0;
+}
+
+function selectAuthoritativeCurrentRequestForStudent_(student, requestRows) {
+  let selected = null;
+  let selectedTimestamp = -1;
+  (requestRows || []).forEach(function (row) {
+    if (!isRecordForStudent_(row, student)) return;
+    const timestamp = currentHostelRequestTimestamp_(row);
+    if (!selected || timestamp >= selectedTimestamp) {
+      selected = row;
+      selectedTimestamp = timestamp;
+    }
+  });
+  return selected;
+}
+
+function buildCurrentHostelPresenceFromRows_(studentRows, requestRows, loginDirectory, generatedAt) {
+  const activeStudents = (studentRows || []).filter(function (student) {
+    return isActive_(student.status);
+  });
+  const configuredGroups = Array.isArray(loginDirectory && loginDirectory.groups)
+    ? loginDirectory.groups
+    : [];
+  const groupByStudentId = {};
+  const groups = configuredGroups.map(function (group, index) {
+    const projectedGroup = {
+      key: "resident-group-" + String(index + 1),
+      label: String(group.label || "Kumpulan Pelajar").trim() || "Kumpulan Pelajar",
+      count: 0,
+      students: []
+    };
+    (group.students || []).forEach(function (student) {
+      const studentId = normalizeText_(student && student.student_id);
+      if (studentId) groupByStudentId[studentId] = projectedGroup;
+    });
+    return projectedGroup;
+  });
+  let fallbackGroup = null;
+  let totalOutNow = 0;
+
+  activeStudents.forEach(function (student) {
+    const currentRequest = selectAuthoritativeCurrentRequestForStudent_(student, requestRows);
+    const currentlyOut = String(currentRequest && currentRequest.status || "").trim().toUpperCase() === STATUS.out;
+    if (currentlyOut) {
+      totalOutNow += 1;
+      return;
+    }
+
+    let group = groupByStudentId[normalizeText_(student.student_id)];
+    if (!group) {
+      if (!fallbackGroup) {
+        fallbackGroup = {
+          key: "resident-group-unconfigured",
+          label: "Belum Dikonfigurasi",
+          count: 0,
+          students: []
+        };
+        groups.push(fallbackGroup);
+      }
+      group = fallbackGroup;
+    }
+    group.count += 1;
+    group.students.push({ nama: String(student.nama || "Pelajar").trim() || "Pelajar" });
+  });
+
+  groups.forEach(function (group) {
+    group.students.sort(function (left, right) {
+      return left.nama.localeCompare(right.nama, "ms", { sensitivity: "base" });
+    });
+  });
+
+  return {
+    generated_at: generatedAt || now_(),
+    total_active_students: activeStudents.length,
+    total_out_now: totalOutNow,
+    total_in_hostel: activeStudents.length - totalOutNow,
+    groups: groups
+  };
+}
+
+function toPublicCurrentHostelSummary_(presence) {
+  return {
+    generated_at: presence.generated_at,
+    total_active_students: presence.total_active_students,
+    total_out_now: presence.total_out_now,
+    total_in_hostel: presence.total_in_hostel,
+    hostel_groups: (presence.groups || []).map(function (group) {
+      return { key: group.key, label: group.label, count: group.count };
+    })
+  };
+}
+
+function toAuthenticatedCurrentHostelRoster_(presence) {
+  return {
+    generated_at: presence.generated_at,
+    total: presence.total_in_hostel,
+    total_active_students: presence.total_active_students,
+    total_out_now: presence.total_out_now,
+    groups: (presence.groups || []).map(function (group) {
+      return {
+        key: group.key,
+        label: group.label,
+        count: group.count,
+        students: group.students.map(function (student) { return { nama: student.nama }; })
+      };
+    })
+  };
 }
 
 function readNoGuardDepartureConfig_() {

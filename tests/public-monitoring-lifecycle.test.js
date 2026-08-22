@@ -130,6 +130,7 @@ function createLifecycleContext(options = {}) {
     let monitorLastUpdatedAt = null;
     let monitorIsLoading = false;
     let monitorHasLoadedOnce = ${hadCachedData};
+    let publicCurrentHostelSummaryV240 = null;
     let outingRecords = ${JSON.stringify(oldRecords)};
   `, context);
   vm.runInContext(extractFinalFunction("stopMonitoringAutoRefresh", "updateMonitoringLastUpdated"), context);
@@ -166,12 +167,12 @@ test("first monitoring click activates before scrolling and performs one public 
   assert.equal(els.appWorkspace.classList.contains("active"), false);
   assert.equal(calls.scrollAfterActivation, true);
   assert.deepEqual(JSON.parse(JSON.stringify(calls.scroll)), [{ behavior: "smooth", block: "start" }]);
-  assert.deepEqual(calls.apiGet, ["getTodayRecords"]);
+  assert.deepEqual(calls.apiGet, ["getTodayRecords", "getCurrentHostelSummary"]);
   assert.equal(els.monitorLoading.hidden, false);
 
   const repeatedOpen = context.openMonitoringPage({ type: "click" });
   const autoRefresh = context.refreshMonitoringRecords("auto");
-  assert.equal(calls.apiGet.length, 1, "repeated click and auto refresh must share the active request");
+  assert.equal(calls.apiGet.length, 2, "repeated click and auto refresh must share the active request pair");
 
   const rawRecords = [{ nama: "NAMA PELAJAR", kelas: "A2", status: "KELUAR" }];
   request.resolve(rawRecords);
@@ -193,7 +194,7 @@ test("failed first load does not mark monitoring successful or set a new timesta
   const refresh = context.openMonitoringPage({ type: "click" });
   assert.equal(els.publicMonitoringPanel.hidden, false);
   assert.equal(els.monitorLoading.hidden, false);
-  assert.equal(calls.apiGet.length, 1);
+  assert.equal(calls.apiGet.length, 2);
   request.reject(new Error("network unavailable"));
   await refresh;
 
@@ -211,7 +212,7 @@ test("successful empty first load renders once and timestamps only after success
   const firstOpen = context.openMonitoringPage({ type: "click" });
   assert.equal(els.publicMonitoringPanel.hidden, false);
   assert.equal(els.monitorLoading.hidden, false);
-  assert.equal(calls.apiGet.length, 1);
+  assert.equal(calls.apiGet.length, 2);
 
   request.resolve([]);
   await firstOpen;

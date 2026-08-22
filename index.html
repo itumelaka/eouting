@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r11">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r12">
   </head>
   <body>
     <header class="app-header">
@@ -73,6 +73,16 @@
           </div>
           <div class="monitor-loading" id="monitorLoading" hidden>Memuatkan rekod pemantauan...</div>
           <div class="summary-grid monitor-summary" id="monitorSummary"></div>
+          <section class="current-hostel-summary" aria-labelledby="publicCurrentHostelTitle">
+            <div class="current-hostel-heading">
+              <div>
+                <h3 id="publicCurrentHostelTitle">🏠 Penghuni Semasa Asrama</h3>
+                <p>Anggaran semasa berdasarkan rekod keluar/masuk eOuting.</p>
+              </div>
+            </div>
+            <div class="current-hostel-kpis" id="publicCurrentHostelKpis" aria-live="polite"></div>
+            <div class="current-hostel-groups" id="publicCurrentHostelGroups" aria-live="polite"></div>
+          </section>
           <section class="monitor-name-panel" id="monitorNamePanel">
             <h3>Senarai Status Semasa</h3>
             <div class="monitor-name-list" id="monitorNameList"></div>
@@ -302,6 +312,10 @@
           <h2>Semakan Warden</h2>
           <p>Luluskan atau tolak permohonan sebelum guard boleh sahkan pelajar keluar.</p>
         </div>
+        <section class="current-hostel-roster" aria-labelledby="wardenCurrentHostelTitle">
+          <div class="current-hostel-heading"><div><h3 id="wardenCurrentHostelTitle">🏠 Penghuni Semasa Asrama</h3><p>Senarai minimum untuk kegunaan operasi staff.</p></div></div>
+          <div id="wardenCurrentHostelRoster" aria-live="polite"></div>
+        </section>
         <h3 class="list-title">Menunggu Kelulusan</h3>
         <div class="record-list" id="wardenList"></div>
         <h3 class="list-title">Menunggu Pengesahan Keluar</h3>
@@ -315,6 +329,11 @@
           <h2>Pengesahan Guard</h2>
           <p>Semak arah pergerakan pelajar sebelum membuat pengesahan keluar atau masuk.</p>
         </div>
+
+        <section class="current-hostel-roster" aria-labelledby="guardCurrentHostelTitle">
+          <div class="current-hostel-heading"><div><h3 id="guardCurrentHostelTitle">🏠 Penghuni Semasa Asrama</h3><p>Senarai minimum untuk kegunaan operasi staff.</p></div></div>
+          <div id="guardCurrentHostelRoster" aria-live="polite"></div>
+        </section>
 
         <h3 class="list-title guard-list-title guard-list-title-out">Keluar · Menunggu Pengesahan</h3>
         <p class="guard-list-hint">Pelajar masih di kampus. Gunakan <strong>Sahkan Keluar</strong> hanya apabila pelajar meninggalkan pos guard.</p>
@@ -395,6 +414,10 @@
             <p class="form-message" id="adminMonitoringMessage" aria-live="polite"></p>
             <p class="admin-last-updated" id="adminMonitoringUpdated">Belum dikemas kini</p>
             <div class="admin-kpi-grid" id="adminMonitoringKpis"></div>
+            <section class="current-hostel-roster admin-current-hostel-roster" aria-labelledby="adminCurrentHostelTitle">
+              <div class="current-hostel-heading"><div><h4 id="adminCurrentHostelTitle">🏠 Penghuni Semasa Asrama</h4><p>Senarai minimum untuk kegunaan operasi staff.</p></div></div>
+              <div id="adminCurrentHostelRoster" aria-live="polite"></div>
+            </section>
             <section class="admin-action-queue" aria-labelledby="adminActionQueueTitle">
               <div class="admin-action-queue-heading">
                 <div><h4 id="adminActionQueueTitle">Perlu Tindakan</h4><p>Keutamaan operasi daripada status backend semasa.</p></div>
@@ -937,6 +960,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r11"></script>
+    <script src="assets/app.js?v=2.4.0-r12"></script>
   </body>
 </html>

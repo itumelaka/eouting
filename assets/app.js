@@ -237,6 +237,8 @@ let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
 let monitorIsLoading = false;
 let monitorHasLoadedOnce = false;
+let publicCurrentHostelSummaryV240 = null;
+let staffCurrentHostelRosterV240 = null;
 let toastTimerId = null;
 let activeRefreshPage = "access";
 let selectedStudentLoginClass = "A2";
@@ -600,8 +602,11 @@ const els = {
   adminMonitoringMessage: document.querySelector("#adminMonitoringMessage"),
   adminMonitoringUpdated: document.querySelector("#adminMonitoringUpdated"),
   adminMonitoringKpis: document.querySelector("#adminMonitoringKpis"),
+  adminCurrentHostelRoster: document.querySelector("#adminCurrentHostelRoster"),
   adminActionQueue: document.querySelector("#adminActionQueue"),
   adminMonitoringList: document.querySelector("#adminMonitoringList"),
+  wardenCurrentHostelRoster: document.querySelector("#wardenCurrentHostelRoster"),
+  guardCurrentHostelRoster: document.querySelector("#guardCurrentHostelRoster"),
   adminMasterRefreshButton: document.querySelector("#adminMasterRefreshButton"),
   adminMasterSearch: document.querySelector("#adminMasterSearch"),
   adminMasterMonth: document.querySelector("#adminMasterMonth"),
@@ -992,6 +997,7 @@ function setAdminLoginMessageV200(message, isError) {
 }
 
 function startAdminSessionV200(admin) {
+  staffCurrentHostelRosterV240 = null;
   currentSession = {
     role: "admin",
     user: {
@@ -1139,6 +1145,7 @@ function exitAdminSessionV200() {
   closeProfilePhotoPreview();
   clearSavedAdminSessionV220();
   clearAdminRuntimeCredentialV200();
+  staffCurrentHostelRosterV240 = null;
   currentSession = null;
   els.appWorkspace.classList.remove("active");
   els.accessScreen.classList.remove("hidden");
@@ -1378,7 +1385,14 @@ async function loadAdminMonitoringV210() {
   els.adminMonitoringList.innerHTML = '<div class="empty-state">Memuatkan rekod...</div>';
   if (els.adminActionQueue) els.adminActionQueue.innerHTML = '<div class="empty-state">Menyusun keutamaan operasi...</div>';
   try {
-    adminMonitoringV210 = await apiPost("getAdminMonitoring", buildAdminCredentialPayloadV200());
+    const [monitoring, roster] = await Promise.all([
+      apiPost("getAdminMonitoring", buildAdminCredentialPayloadV200()),
+      isLiveMode
+        ? apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
+        : Promise.resolve(null)
+    ]);
+    adminMonitoringV210 = monitoring;
+    staffCurrentHostelRosterV240 = roster;
     els.adminMonitoringMessage.textContent = "";
     els.adminMonitoringUpdated.textContent = `Terakhir dikemas kini: ${formatDisplayDateTime(adminMonitoringV210.generated_at)}`;
     renderAdminMonitoringV210();
@@ -1638,6 +1652,7 @@ function renderAdminMonitoringV210(options) {
     els.adminMonitoringKpis.innerHTML = cards.map(([key, label, count]) => `<button type="button" class="admin-kpi-card admin-ops-kpi admin-ops-kpi-${key.replace(/_/g, "-")} ${(key === "late" || key === "critical" || key === "action_required") ? "is-late" : ""} ${adminMonitoringFilterV210 === key ? "active" : ""}" data-monitor-filter="${key}"><strong data-rolling-number="${Number(count || 0)}" data-rolling-key="${key}">${Number(count || 0)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
     animateRollingNumbers(els.adminMonitoringKpis, "admin-monitoring");
   }
+  globalThis.renderStaffCurrentHostelRosterV240?.();
   renderAdminActionQueueV240(intelligence.queue);
   const rows = (adminMonitoringV210.records || []).filter((row) => matchesAdminMonitoringFilterV240(row, adminMonitoringFilterV210));
   els.adminMonitoringList.innerHTML = rows.length ? rows.map((row) => {
@@ -3163,6 +3178,8 @@ function setupMonitoringPanel() {
   els.monitorLastUpdated = panel.querySelector("#monitorLastUpdated");
   els.monitorLoading = panel.querySelector("#monitorLoading");
   els.monitorSummary = panel.querySelector("#monitorSummary");
+  els.publicCurrentHostelKpis = panel.querySelector("#publicCurrentHostelKpis");
+  els.publicCurrentHostelGroups = panel.querySelector("#publicCurrentHostelGroups");
   els.monitorNamePanel = panel.querySelector("#monitorNamePanel");
   els.monitorNameList = panel.querySelector("#monitorNameList");
   els.monitorRefreshButton.addEventListener("click", refreshMonitoringRecords);
@@ -3443,6 +3460,7 @@ els.logoutButton.addEventListener("click", () => {
   stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
   currentSession = null;
+  staffCurrentHostelRosterV240 = null;
   clearAnnouncementBannerV1();
   clearProfilePhotoSessionCaches();
   els.appWorkspace.classList.remove("active");
@@ -4062,9 +4080,15 @@ async function loadTodayRecords() {
   try {
     const isAuthenticated = Boolean(currentSession);
     const accessPayload = isAuthenticated ? buildTodayRecordsAccessPayload() : null;
-    const records = isAuthenticated
-      ? await apiPost("getTodayRecords", accessPayload)
-      : await apiGet("getTodayRecords");
+    const recordsPromise = isAuthenticated
+      ? apiPost("getTodayRecords", accessPayload)
+      : apiGet("getTodayRecords");
+    const staffRole = currentSession && ["warden", "guard"].includes(currentSession.role);
+    const rosterPromise = staffRole
+      ? apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
+      : Promise.resolve(null);
+    const [records, roster] = await Promise.all([Promise.resolve(recordsPromise), rosterPromise]);
+    if (staffRole) staffCurrentHostelRosterV240 = roster;
     outingRecords = records.map(isAuthenticated ? mapLiveRecord : mapPublicMonitoringRecord);
     if (currentSession && currentSession.role === "student") {
       studentLastUpdatedAt = new Date();
@@ -5863,7 +5887,11 @@ async function refreshGuardRecords(source) {
 
   try {
     if (isLiveMode) {
-      const records = await apiPost("getTodayRecords", buildTodayRecordsAccessPayload());
+      const [records, roster] = await Promise.all([
+        apiPost("getTodayRecords", buildTodayRecordsAccessPayload()),
+        apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
+      ]);
+      staffCurrentHostelRosterV240 = roster;
       outingRecords = records.map(mapLiveRecord);
       render();
       loadProfilePhotoThumbnailsForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
@@ -6155,6 +6183,7 @@ function startSession(role, user) {
   stopStudentAutoRefresh();
   stopGuardAutoRefresh();
   deactivatePublicMonitoringPanelV200();
+  staffCurrentHostelRosterV240 = null;
   currentSession = { role, user };
   if (isLiveMode) {
     outingRecords = [];
@@ -7038,6 +7067,64 @@ function isActiveStudentRecord(record) {
   return status === "MENUNGGU_KELULUSAN" || status === "DILULUSKAN_WARDEN" || status === "KELUAR";
 }
 
+function buildCurrentHostelRosterAccessPayloadV240() {
+  if (!currentSession) throw new Error("Akses staff diperlukan.");
+  if (currentSession.role === "admin") {
+    return Object.assign({ role: "admin" }, buildAdminCredentialPayloadV200());
+  }
+  if (currentSession.role === "warden" || currentSession.role === "guard") {
+    return buildTodayRecordsAccessPayload();
+  }
+  throw new Error("Akses staff diperlukan.");
+}
+
+function renderPublicCurrentHostelSummaryV240(summary) {
+  if (!els.publicCurrentHostelKpis || !els.publicCurrentHostelGroups) return;
+  const data = summary || {};
+  const cards = [
+    ["Jumlah Pelajar Aktif", data.total_active_students],
+    ["Sedang Keluar", data.total_out_now],
+    ["Masih Di Asrama", data.total_in_hostel]
+  ];
+  els.publicCurrentHostelKpis.innerHTML = cards.map(([label, count]) => `
+    <article class="current-hostel-kpi"><span>${escapeHtml(label)}</span><strong>${Number(count || 0)}</strong></article>
+  `).join("");
+  const groups = Array.isArray(data.hostel_groups) ? data.hostel_groups : [];
+  els.publicCurrentHostelGroups.innerHTML = groups.length
+    ? groups.map((group) => `<article class="current-hostel-group-count"><span>${escapeHtml(group.label || "Kumpulan Pelajar")}</span><strong>${Number(group.count || 0)}</strong></article>`).join("")
+    : emptyState("Tiada data kumpulan penghuni semasa.");
+}
+
+function currentHostelRosterHtmlV240(roster) {
+  const data = roster || {};
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+  const groupHtml = groups.map((group) => {
+    const students = Array.isArray(group.students) ? group.students : [];
+    const names = students.length
+      ? `<ul>${students.map((student) => `<li>${escapeHtml(student.nama || "Pelajar")}</li>`).join("")}</ul>`
+      : '<p class="current-hostel-empty-group">Tiada penghuni dalam kumpulan ini.</p>';
+    return `<details class="current-hostel-group-roster">
+      <summary><span>${escapeHtml(group.label || "Kumpulan Pelajar")}</span><strong>${Number(group.count || 0)} orang</strong></summary>
+      ${names}
+    </details>`;
+  }).join("");
+  return `<p class="current-hostel-total">Jumlah: <strong>${Number(data.total || 0)} orang</strong></p>
+    <div class="current-hostel-roster-groups">${groupHtml || emptyState("Tiada penghuni semasa.")}</div>`;
+}
+
+function renderStaffCurrentHostelRosterV240() {
+  if (!currentSession || !["admin", "warden", "guard"].includes(currentSession.role)) return;
+  const target = {
+    admin: els.adminCurrentHostelRoster,
+    warden: els.wardenCurrentHostelRoster,
+    guard: els.guardCurrentHostelRoster
+  }[currentSession.role];
+  if (!target) return;
+  target.innerHTML = staffCurrentHostelRosterV240
+    ? currentHostelRosterHtmlV240(staffCurrentHostelRosterV240)
+    : emptyState("Senarai penghuni semasa belum dimuatkan.");
+}
+
 function updateStudentRequestSectionVisibility(currentRecord) {
   const hasActiveRequest = Boolean(currentRecord && isActiveStudentRecord(currentRecord));
   if (els.studentRequestSection) {
@@ -7802,6 +7889,7 @@ function renderWarden() {
   ));
 
   renderWardenSemesterChecklist(outingRecords);
+  globalThis.renderStaffCurrentHostelRosterV240?.();
 
   els.wardenList.innerHTML = pendingRecords.length
     ? pendingRecords.map((record) => recordCard(record, "warden")).join("")
@@ -8329,6 +8417,7 @@ function uniqueRecordsByRequestId(records) {
 
 function renderGuard() {
   ensureGuardRefreshControls();
+  globalThis.renderStaffCurrentHostelRosterV240?.();
   const approvedRecords = uniqueRecordsByRequestId(
     outingRecords.filter((record) => record.status === STATUS.approved)
   );
@@ -11205,6 +11294,10 @@ async function loadPublicMonitoringRecords() {
   return (Array.isArray(records) ? records : []).map(mapPublicMonitoringRecord);
 }
 
+async function loadPublicCurrentHostelSummaryV240() {
+  return apiGet("getCurrentHostelSummary");
+}
+
 async function refreshMonitoringRecords(source) {
   if (monitorIsLoading) {
     return false;
@@ -11222,8 +11315,12 @@ async function refreshMonitoringRecords(source) {
   }
 
   try {
-    const records = await loadPublicMonitoringRecords();
+    const [records, hostelSummary] = await Promise.all([
+      loadPublicMonitoringRecords(),
+      loadPublicCurrentHostelSummaryV240()
+    ]);
     outingRecords = records;
+    publicCurrentHostelSummaryV240 = hostelSummary;
     renderMonitoringPageV1612();
     monitorHasLoadedOnce = true;
     updateMonitorLastUpdatedV1612();
@@ -11263,6 +11360,14 @@ function setMonitorLoadingState(isLoading, clearCurrentView) {
       els.monitorNameList.innerHTML = "";
     }
   }
+  if (els.publicCurrentHostelKpis) {
+    els.publicCurrentHostelKpis.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) els.publicCurrentHostelKpis.innerHTML = "";
+  }
+  if (els.publicCurrentHostelGroups) {
+    els.publicCurrentHostelGroups.classList.toggle("is-loading", isLoading);
+    if (clearCurrentView) els.publicCurrentHostelGroups.innerHTML = "";
+  }
 }
 
 function renderMonitoringPageV1612() {
@@ -11281,6 +11386,7 @@ function renderMonitoringPageV1612() {
     ].join("");
     animateRollingNumbers(els.monitorSummary, "public-monitoring");
   }
+  renderPublicCurrentHostelSummaryV240(publicCurrentHostelSummaryV240);
   renderMonitorNameListV1613(records);
 }
 
@@ -11562,11 +11668,15 @@ async function loadWardenRecordsOnly() {
     return;
   }
 
-  const records = await apiPost("getTodayRecords", buildTodayRecordsAccessPayload());
+  const [records, roster] = await Promise.all([
+    apiPost("getTodayRecords", buildTodayRecordsAccessPayload()),
+    apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
+  ]);
   if (!Array.isArray(records)) {
     throw new Error("Format rekod warden tidak sah.");
   }
   outingRecords = records.map(mapLiveRecord);
+  staffCurrentHostelRosterV240 = roster;
   if (typeof loadProfilePhotoThumbnailsForStudents === "function") {
     loadProfilePhotoThumbnailsForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
   }

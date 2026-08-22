@@ -1925,6 +1925,125 @@ textarea {
   gap: 7px;
 }
 
+.current-hostel-summary,
+.current-hostel-roster {
+  background: linear-gradient(145deg, #f8fcff, #edf8f2);
+  border: 1px solid rgba(22, 114, 71, 0.2);
+  border-left: 6px solid #167247;
+  border-radius: 16px;
+  box-shadow: var(--clay-shadow-soft, 0 8px 20px rgba(3, 18, 47, 0.08));
+  margin: 16px 0;
+  padding: 14px;
+}
+
+.current-hostel-heading h3,
+.current-hostel-heading h4,
+.current-hostel-heading p {
+  margin: 0;
+}
+
+.current-hostel-heading h3,
+.current-hostel-heading h4 {
+  color: var(--deep-navy);
+}
+
+.current-hostel-heading p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin-top: 3px;
+}
+
+.current-hostel-kpis,
+.current-hostel-groups {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.current-hostel-groups {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.current-hostel-kpi,
+.current-hostel-group-count {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(8, 36, 92, 0.1);
+  border-radius: 12px;
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+}
+
+.current-hostel-kpi span,
+.current-hostel-group-count span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.current-hostel-kpi strong,
+.current-hostel-group-count strong {
+  color: var(--deep-navy);
+  font-size: 1.35rem;
+}
+
+.current-hostel-total {
+  color: var(--deep-navy);
+  margin: 12px 0 8px;
+}
+
+.current-hostel-roster-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.current-hostel-group-roster {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(8, 36, 92, 0.1);
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.current-hostel-group-roster summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 12px;
+}
+
+.current-hostel-group-roster ul {
+  border-top: 1px solid rgba(8, 36, 92, 0.08);
+  columns: 2;
+  margin: 0;
+  padding: 10px 12px 12px 32px;
+}
+
+.current-hostel-group-roster li {
+  break-inside: avoid;
+  margin: 4px 0;
+}
+
+.current-hostel-empty-group {
+  border-top: 1px solid rgba(8, 36, 92, 0.08);
+  color: var(--muted);
+  margin: 0;
+  padding: 10px 12px;
+}
+
+@media (max-width: 520px) {
+  .current-hostel-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .current-hostel-group-roster ul {
+    columns: 1;
+  }
+}
+
 .guard-refresh-panel {
   align-items: center;
   background: #ffffff;

@@ -186,6 +186,6 @@ test("Phase D keeps version.json stable and advances only runtime cache referenc
   const version = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
   const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
   assert.equal(version.version, "2.4.0");
-  assert.match(html, /2\.4\.0-r11/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r11/);
+  assert.match(html, /2\.4\.0-r12/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r12/);
 });

@@ -115,9 +115,12 @@ function createFrontendRecordContext(currentSession, overrides = {}) {
       calls.get += 1;
       return [{ kelas: "A2", status: "KELUAR" }];
     },
-    apiPost: async (_action, payload) => {
+    apiPost: async (action, payload) => {
       calls.post += 1;
       calls.payload = plain(payload);
+      if (action === "getCurrentHostelRoster") {
+        return { generated_at: "2026-08-22 12:00:00", total: 1, groups: [] };
+      }
       return [{ request_id: "OUT-001", nama: "PELAJAR SULIT" }];
     },
     mapLiveRecord: (record) => ({ ...record, mappedAs: "operational" }),
@@ -134,6 +137,7 @@ function createFrontendRecordContext(currentSession, overrides = {}) {
   assert.notEqual(loadEnd, -1, "loadTodayRecords boundary must exist");
   vm.runInContext([
     appSource.slice(loadStart, loadEnd),
+    extractFunction(appSource, "buildCurrentHostelRosterAccessPayloadV240", "renderPublicCurrentHostelSummaryV240"),
     extractFunction(appSource, "buildTodayRecordsAccessPayload", "refreshSystemCaches")
   ].join("\n"), context);
   return { calls, context };
@@ -299,7 +303,7 @@ test("authenticated records use POST and retain operational names without undefi
   ]) {
     const { calls, context } = createFrontendRecordContext(session);
     await context.loadTodayRecords();
-    assert.equal(calls.post, 1);
+    assert.equal(calls.post, session.role === "student" ? 1 : 2);
     assert.equal(calls.get, 0);
     assert.equal(context.outingRecords[0].nama, "PELAJAR SULIT");
     assert.equal(Object.values(context.outingRecords[0]).includes(undefined), false);
