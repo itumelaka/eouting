@@ -3532,7 +3532,8 @@ function mapLiveRecord(record) {
     butiran_kenderaan: record.butiran_kenderaan || "",
     sebab_kecemasan: record.sebab_kecemasan || "",
     catatan_kecemasan: record.catatan_kecemasan || "",
-    guardian_contact_available: record.guardian_contact_available === true,
+    guardian_contact_available: record.guardian_contact_available === true ||
+      String(record.guardian_contact_available || "").trim().toLowerCase() === "true",
     rawStatus: record.status || "",
     status: mapLiveStatus(record.status),
     lewat: record.lewat === "Ya",
@@ -7509,7 +7510,8 @@ function ensureWardenSemesterChecklist() {
     <div class="semester-checklist-list" id="wardenSemesterList"></div>
   `;
 
-  els.wardenList.parentNode.insertBefore(panel, els.wardenList);
+  const sectionAnchor = els.wardenApprovedList || els.wardenList;
+  sectionAnchor.parentNode.insertBefore(panel, sectionAnchor.nextSibling);
   els.wardenSemesterChecklist = panel;
   els.wardenSemesterCount = panel.querySelector("#wardenSemesterCount");
   els.wardenSemesterList = panel.querySelector("#wardenSemesterList");
@@ -10849,7 +10851,8 @@ function ensureWardenSemesterChecklist() {
     <div class="semester-checklist-summary" id="wardenSemesterSummary"></div>
     <div class="semester-checklist-list" id="wardenSemesterList"></div>
   `;
-  els.wardenList.parentNode.insertBefore(panel, els.wardenList);
+  const sectionAnchor = els.wardenApprovedList || els.wardenList;
+  sectionAnchor.parentNode.insertBefore(panel, sectionAnchor.nextSibling);
   els.wardenSemesterChecklist = panel;
   els.wardenSemesterCount = panel.querySelector("#wardenSemesterCount");
   els.wardenSemesterSummary = panel.querySelector("#wardenSemesterSummary");
