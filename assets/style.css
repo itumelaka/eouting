@@ -8554,3 +8554,123 @@ body:has(#admin.admin-dashboard.active) #admin :where(button, input, select, tex
     transition: none;
   }
 }
+
+/* Production UI regression patch — authenticated header, student notice, admin form contrast */
+body:has(#appWorkspace.active) .app-header {
+  display: block !important;
+}
+
+body:has(#appWorkspace.active) .app-header-inner {
+  align-items: center;
+  flex-direction: row;
+  gap: clamp(14px, 2vw, 24px);
+}
+
+body:has(#appWorkspace.active) .header-logo {
+  width: clamp(320px, 42vw, 560px);
+}
+
+body:has(#appWorkspace.active) .time-card {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: #ffffff;
+  flex-direction: row;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  white-space: nowrap;
+  width: auto;
+}
+
+body:has(#appWorkspace.active) .time-card strong {
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+body:has(#appWorkspace.active) .time-card span {
+  color: #c8d8ea;
+  font-size: 0.84rem;
+}
+
+body:has(#appWorkspace.active) .time-card .time-metadata-separator {
+  color: rgba(139, 212, 255, 0.72);
+  font-size: 0.7rem;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #ruleNotice {
+  display: none;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid label,
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-config-fieldset > legend {
+  color: #12344a;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid .admin-field-helper {
+  color: #52677d;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid :where(input, select, textarea)::placeholder {
+  color: #9fb2c1;
+  opacity: 1;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid :where(input, select, textarea):disabled {
+  opacity: 0.72;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-subnav {
+  gap: 10px 12px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-subtab {
+  padding-inline: 14px;
+}
+
+@media (max-width: 780px) {
+  body:has(#appWorkspace.active) .app-header-inner {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  body:has(#appWorkspace.active) .header-logo {
+    width: min(100%, 480px);
+  }
+
+  body:has(#appWorkspace.active) .time-card {
+    flex-wrap: wrap;
+    justify-content: center;
+    white-space: normal;
+    width: 100%;
+  }
+}
+
+@media (max-width: 430px) {
+  body:has(#appWorkspace.active) .time-card {
+    gap: 6px;
+  }
+
+  body:has(#appWorkspace.active) .time-card strong,
+  body:has(#appWorkspace.active) .time-card span {
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 760px) {
+  body:has(#admin.admin-dashboard.active) #admin .admin-subnav {
+    column-gap: 14px;
+    grid-auto-columns: max-content;
+    padding-inline: 12px;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-subtab {
+    min-width: max-content;
+    padding-inline: 16px;
+    white-space: nowrap;
+  }
+}
