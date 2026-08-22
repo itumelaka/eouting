@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const appSource = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
@@ -154,6 +155,42 @@ test("fixed return time fills and locks the active return-time input", () => {
   assert.match(source, /fixedReturnTime/);
   assert.match(source, /readOnly: Boolean\(fixedReturnTime\)/);
   assert.match(source, /value: fixedReturnTime/);
+});
+
+test("Student safe config keeps only the two operational date-window fields needed for guidance", () => {
+  const normalize = extractFunction("normalizeStudentOutingTypesV200");
+  assert.match(normalize, /application_open_date: normalizeStudentConfigDateV240/);
+  assert.match(normalize, /application_close_date: normalizeStudentConfigDateV240/);
+  const publicFields = gasSource.slice(
+    gasSource.indexOf("const PUBLIC_OUTING_TYPE_FIELDS"),
+    gasSource.indexOf("const SCRIPT_CACHE")
+  );
+  assert.match(publicFields, /application_open_date/);
+  assert.match(publicFields, /application_close_date/);
+  assert.doesNotMatch(publicFields, /created_by|updated_by|config_version/);
+});
+
+test("Student rule notice guides before and after a date window without frontend-only enforcement", () => {
+  const notice = { textContent: "Sedia ada", classList: { remove() {} } };
+  const context = vm.createContext({
+    els: { ruleNotice: notice },
+    notice,
+    getMalaysiaDateKeyV240: (date) => date,
+    formatDisplayDate: (date) => ({
+      "2026-09-01": "1 September 2026",
+      "2026-09-10": "10 September 2026"
+    }[date])
+  });
+  vm.runInContext(extractFunction("updateStudentApplicationDateWindowNoticeV240"), context);
+  const config = { application_open_date: "2026-09-01", application_close_date: "2026-09-10" };
+  context.updateStudentApplicationDateWindowNoticeV240(config, "2026-08-31");
+  assert.equal(notice.textContent, "Permohonan dibuka mulai 1 September 2026.");
+  notice.textContent = "Sedia ada";
+  context.updateStudentApplicationDateWindowNoticeV240(config, "2026-09-05");
+  assert.equal(notice.textContent, "Sedia ada");
+  context.updateStudentApplicationDateWindowNoticeV240(config, "2026-09-11");
+  assert.equal(notice.textContent, "Tempoh permohonan telah ditutup pada 10 September 2026.");
+  assert.match(gasSource, /validateConfigDrivenSubmissionV200_[\s\S]*application_open_date/);
 });
 
 test("configured departure days expose and require a requested leave date", () => {

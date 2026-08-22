@@ -15,10 +15,12 @@ const OUTING_HEADERS = [
   "require_leave_date", "require_return_date", "require_return_time", "require_guardian_phone",
   "require_guardian_relation", "require_emergency_reason", "require_purpose", "require_location",
   "require_vehicle", "require_warden_approval", "require_selfie", "config_version", "created_at",
-  "created_by", "updated_at", "updated_by", "departure_allowed_days", "earliest_departure_time"
+  "created_by", "updated_at", "updated_by", "departure_allowed_days", "earliest_departure_time",
+  "application_open_date", "application_close_date"
 ];
 const PUBLIC_FIELDS = [
   "type_code", "display_name", "description", "sort_order", "allowed_days",
+  "application_open_date", "application_close_date",
   "application_open_time", "application_close_time", "departure_allowed_days", "earliest_departure_time", "fixed_return_time", "same_day_only",
   "require_leave_date", "require_return_date", "require_return_time", "require_guardian_phone",
   "require_guardian_relation", "require_emergency_reason", "require_purpose", "require_location",
@@ -125,6 +127,8 @@ function completeConfig(typeCode = "LAWATAN_KELUARGA") {
     active: true,
     sort_order: 10,
     allowed_days: "SABTU,AHAD",
+    application_open_date: "",
+    application_close_date: "",
     application_open_time: "08:00",
     application_close_time: "18:00",
     departure_allowed_days: "JUMAAT",
@@ -278,6 +282,60 @@ test("update increments version, preserves creation metadata and audits safe cha
   assert.match(String(audit.details), /departure_allowed_days/);
   assert.match(String(audit.details), /earliest_departure_time/);
   assert.doesNotMatch(String(audit.details), /2468/);
+});
+
+test("Admin date-window validation accepts blanks and same-day ranges but rejects malformed or reversed dates", () => {
+  const { context } = createContext();
+  seed(context);
+  const created = context.createOutingType(adminPayload({
+    outing_type: {
+      ...completeConfig("LAWATAN_TARIKH"),
+      application_open_date: "2026-09-10",
+      application_close_date: "2026-09-10"
+    }
+  }));
+  assert.equal(created.application_open_date, "2026-09-10");
+  assert.equal(created.application_close_date, "2026-09-10");
+  assert.throws(() => context.createOutingType(adminPayload({
+    outing_type: { ...completeConfig("TARIKH_FORMAT"), application_open_date: "10/09/2026" }
+  })), /YYYY-MM-DD/);
+  assert.throws(() => context.createOutingType(adminPayload({
+    outing_type: { ...completeConfig("TARIKH_MUSTAHIL"), application_open_date: "2026-02-30" }
+  })), /tidak sah/);
+  assert.throws(() => context.createOutingType(adminPayload({
+    outing_type: {
+      ...completeConfig("TARIKH_TERBALIK"),
+      application_open_date: "2026-09-10",
+      application_close_date: "2026-09-09"
+    }
+  })), /tidak boleh lebih awal/);
+});
+
+test("Admin can persist and explicitly clear both application dates", () => {
+  const { context, sheets } = createContext();
+  seed(context);
+  const before = context.getAdminOutingTypes(adminPayload())
+    .find((type) => type.type_code === "OUTING_BIASA");
+  const dated = context.updateOutingType(adminPayload({
+    type_code: before.type_code,
+    expected_config_version: before.config_version,
+    outing_type: {
+      application_open_date: "2026-09-01",
+      application_close_date: "2026-09-10"
+    }
+  }));
+  assert.equal(dated.application_open_date, "2026-09-01");
+  assert.equal(dated.application_close_date, "2026-09-10");
+  const cleared = context.updateOutingType(adminPayload({
+    type_code: before.type_code,
+    expected_config_version: dated.config_version,
+    outing_type: { application_open_date: "", application_close_date: "" }
+  }));
+  assert.equal(cleared.application_open_date, "");
+  assert.equal(cleared.application_close_date, "");
+  const row = sheetObjects(sheets.get("OUTING_TYPES")).find((type) => type.type_code === before.type_code);
+  assert.equal(row.application_open_date, "");
+  assert.equal(row.application_close_date, "");
 });
 
 test("update explicitly clears existing application window times and blank survives reread", () => {

@@ -129,7 +129,8 @@ test("public outing projections cache config-driven and legacy behavior separate
   context.sortOutingTypes_ = (rows) => rows;
   const publicProjection = (typeCode, displayName, sortOrder = 1) => ({
     type_code: typeCode, display_name: displayName, description: "", sort_order: sortOrder,
-    allowed_days: "", application_open_time: "", application_close_time: "",
+    allowed_days: "", application_open_date: "", application_close_date: "",
+    application_open_time: "", application_close_time: "",
     departure_allowed_days: "", earliest_departure_time: "", fixed_return_time: "",
     same_day_only: false, require_leave_date: false, require_return_date: false,
     require_return_time: false, require_guardian_phone: false, require_guardian_relation: false,

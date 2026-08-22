@@ -97,7 +97,9 @@ const HEADERS = {
     "updated_at",
     "updated_by",
     "departure_allowed_days",
-    "earliest_departure_time"
+    "earliest_departure_time",
+    "application_open_date",
+    "application_close_date"
   ],
   ADMIN_USERS: [
     "admin_id",
@@ -180,6 +182,11 @@ const OUTING_TYPE_TIME_FIELDS = [
   "fixed_return_time"
 ];
 
+const OUTING_TYPE_DATE_FIELDS = [
+  "application_open_date",
+  "application_close_date"
+];
+
 const SHEET_TIME_ONLY_FIELDS = OUTING_TYPE_TIME_FIELDS.concat(["masa_balik_dijangka"]);
 
 const PUBLIC_OUTING_TYPE_FIELDS = [
@@ -188,6 +195,8 @@ const PUBLIC_OUTING_TYPE_FIELDS = [
   "description",
   "sort_order",
   "allowed_days",
+  "application_open_date",
+  "application_close_date",
   "application_open_time",
   "application_close_time",
   "departure_allowed_days",
@@ -531,6 +540,8 @@ function getDefaultOutingTypeSeedsV200_(timestamp, createdBy) {
   const allDays = "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU";
   const common = {
     active: true,
+    application_open_date: "",
+    application_close_date: "",
     application_close_time: "",
     departure_allowed_days: "",
     earliest_departure_time: "",
@@ -686,6 +697,8 @@ function getEditableOutingTypeFields_() {
     "active",
     "sort_order",
     "allowed_days",
+    "application_open_date",
+    "application_close_date",
     "application_open_time",
     "application_close_time",
     "departure_allowed_days",
@@ -743,6 +756,13 @@ function validateOutingTypeConfig_(input, options) {
   OUTING_TYPE_TIME_FIELDS.forEach((field) => {
     result[field] = normalizeOptionalTime_(data[field], field);
   });
+  OUTING_TYPE_DATE_FIELDS.forEach((field) => {
+    result[field] = normalizeOptionalDate_(data[field], field);
+  });
+  if (result.application_open_date && result.application_close_date &&
+      result.application_close_date < result.application_open_date) {
+    throw new Error("Tarikh Permohonan Ditutup tidak boleh lebih awal daripada Tarikh Permohonan Dibuka.");
+  }
   OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
     result[field] = requireBoolean_(data[field], field);
   });
@@ -807,6 +827,35 @@ function normalizeOptionalTime_(value, fieldName) {
   return text;
 }
 
+function normalizeOptionalDate_(value, fieldName) {
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    if (isNaN(value.getTime())) {
+      throw new Error(fieldName + " mesti menggunakan format YYYY-MM-DD atau dikosongkan.");
+    }
+    return Utilities.formatDate(value, "Asia/Kuala_Lumpur", "yyyy-MM-dd");
+  }
+
+  const text = String(value).trim();
+  if (!text) {
+    return "";
+  }
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    throw new Error(fieldName + " mesti menggunakan format YYYY-MM-DD atau dikosongkan.");
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() + 1 !== month || parsed.getUTCDate() !== day) {
+    throw new Error(fieldName + " tidak sah.");
+  }
+  return text;
+}
+
 function requireBoolean_(value, fieldName) {
   if (value !== true && value !== false) {
     throw new Error(fieldName + " mesti boolean true atau false.");
@@ -856,6 +905,14 @@ function normalizeSheetTimeValue_(value) {
   return match ? match[1] + ":" + match[2] : "";
 }
 
+function normalizeSheetDateValue_(value) {
+  try {
+    return normalizeOptionalDate_(value, "Tarikh konfigurasi");
+  } catch (error) {
+    return "";
+  }
+}
+
 function normalizeOutingTypeRecord_(row) {
   const source = row || {};
   const result = {};
@@ -870,6 +927,9 @@ function normalizeOutingTypeRecord_(row) {
   result.departure_allowed_days = String(result.departure_allowed_days || "").trim().toUpperCase();
   OUTING_TYPE_TIME_FIELDS.forEach((field) => {
     result[field] = normalizeSheetTimeValue_(result[field]);
+  });
+  OUTING_TYPE_DATE_FIELDS.forEach((field) => {
+    result[field] = normalizeSheetDateValue_(result[field]);
   });
   OUTING_TYPE_BOOLEAN_FIELDS.forEach((field) => {
     result[field] = normalizeStoredBoolean_(result[field]);
@@ -888,6 +948,9 @@ function toAdminOutingType_(row) {
   const result = pickDefined_(row, HEADERS.OUTING_TYPES);
   OUTING_TYPE_TIME_FIELDS.forEach((field) => {
     result[field] = normalizeSheetTimeValue_(result[field]);
+  });
+  OUTING_TYPE_DATE_FIELDS.forEach((field) => {
+    result[field] = normalizeSheetDateValue_(result[field]);
   });
   return result;
 }
@@ -1304,6 +1367,9 @@ function assessOutingConfigReadinessV220_() {
           throw new Error(field + " mesti menggunakan format HH:mm.");
         }
         stored[field] = normalizedTime;
+      });
+      OUTING_TYPE_DATE_FIELDS.forEach((field) => {
+        stored[field] = normalizeOptionalDate_(stored[field], field);
       });
       const configVersion = Number(stored.config_version);
       if (!Number.isInteger(configVersion) || configVersion < 1) {
@@ -1966,11 +2032,14 @@ function resolveSubmissionOutingTypeConfigV200_(requestType) {
       stored[field] = normalizeStoredBooleanStrictV220_(stored[field], field);
     });
     OUTING_TYPE_TIME_FIELDS.forEach((field) => {
-        const normalizedTime = normalizeSheetTimeValue_(stored[field]);
+      const normalizedTime = normalizeSheetTimeValue_(stored[field]);
       if (hasCellValue_(stored[field]) && !normalizedTime) {
         throw new Error("INVALID_TIME_CONFIG");
       }
       stored[field] = normalizedTime;
+    });
+    OUTING_TYPE_DATE_FIELDS.forEach((field) => {
+      stored[field] = normalizeOptionalDate_(stored[field], field);
     });
     const validated = validateOutingTypeConfig_(stored, {
       requireTypeCode: true,
@@ -2066,6 +2135,17 @@ function validateConfigDrivenSubmissionV200_(payload, config, now) {
     config.require_return_date
   );
   const effectiveLeaveDateKey = leaveDateKey || todayKey;
+
+  if (config.application_open_date && todayKey < config.application_open_date) {
+    throw new Error(
+      "Permohonan dibuka mulai " + formatOperationalDateMalayV220_(config.application_open_date) + "."
+    );
+  }
+  if (config.application_close_date && todayKey > config.application_close_date) {
+    throw new Error(
+      "Tempoh permohonan telah ditutup pada " + formatOperationalDateMalayV220_(config.application_close_date) + "."
+    );
+  }
 
   if (returnDateKey && returnDateKey < effectiveLeaveDateKey) {
     throw new Error("Tarikh pulang ke asrama tidak boleh lebih awal daripada tarikh keluar.");

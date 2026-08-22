@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r6">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r7">
   </head>
   <body>
     <header class="app-header">
@@ -534,6 +534,22 @@
                 </div>
                 <div class="admin-form-grid">
                   <div class="admin-field-group">
+                    <label for="adminOpenDateInput">Tarikh Permohonan Dibuka</label>
+                    <div class="admin-time-clear-control">
+                      <input id="adminOpenDateInput" type="date">
+                      <button class="secondary-action compact-action" id="adminClearOpenDateButton" type="button">Kosongkan</button>
+                    </div>
+                    <small class="admin-field-helper">Kosong bermaksud tiada tarikh mula permohonan.</small>
+                  </div>
+                  <div class="admin-field-group">
+                    <label for="adminCloseDateInput">Tarikh Permohonan Ditutup</label>
+                    <div class="admin-time-clear-control">
+                      <input id="adminCloseDateInput" type="date">
+                      <button class="secondary-action compact-action" id="adminClearCloseDateButton" type="button">Kosongkan</button>
+                    </div>
+                    <small class="admin-field-helper">Kosong bermaksud tiada tarikh tamat permohonan.</small>
+                  </div>
+                  <div class="admin-field-group">
                     <label for="adminOpenTimeInput">Masa Permohonan Dibuka</label>
                     <div class="admin-time-clear-control">
                       <input id="adminOpenTimeInput" type="time">
@@ -809,6 +825,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r6"></script>
+    <script src="assets/app.js?v=2.4.0-r7"></script>
   </body>
 </html>

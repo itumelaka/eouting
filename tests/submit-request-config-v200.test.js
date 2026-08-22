@@ -13,7 +13,8 @@ const OUTING_HEADERS = [
   "require_leave_date", "require_return_date", "require_return_time", "require_guardian_phone",
   "require_guardian_relation", "require_emergency_reason", "require_purpose", "require_location",
   "require_vehicle", "require_warden_approval", "require_selfie", "config_version", "created_at",
-  "created_by", "updated_at", "updated_by", "departure_allowed_days", "earliest_departure_time"
+  "created_by", "updated_at", "updated_by", "departure_allowed_days", "earliest_departure_time",
+  "application_open_date", "application_close_date"
 ];
 
 class FakeSheet {
@@ -131,6 +132,8 @@ function completeConfig(overrides = {}) {
     active: true,
     sort_order: 10,
     allowed_days: "ISNIN",
+    application_open_date: "",
+    application_close_date: "",
     application_open_time: "",
     application_close_time: "",
     departure_allowed_days: "",
@@ -432,6 +435,79 @@ test("blank application times impose no threshold while configured boundaries re
     () => validate(context, wrongDayWithoutTimes, {}, "2026-08-03T02:00:00Z"),
     /tidak dibenarkan pada hari/
   );
+});
+
+test("application date windows are inclusive and use the Malaysia calendar boundary", () => {
+  const context = createContext();
+  const allDays = "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU";
+  const base = Object.fromEntries(OUTING_HEADERS.map((header, index) => [header, completeConfig({
+    allowed_days: allDays,
+    application_open_date: "2026-09-01",
+    application_close_date: "2026-09-10"
+  })[index]]));
+  const config = context.validateOutingTypeConfig_(base, { requireTypeCode: true });
+
+  assert.throws(
+    () => validate(context, config, {}, "2026-08-31T15:59:00Z"),
+    /dibuka mulai 1 September 2026/
+  );
+  assert.doesNotThrow(() => validate(context, config, {}, "2026-08-31T16:00:00Z"));
+  assert.doesNotThrow(() => validate(context, config, {}, "2026-09-05T04:00:00Z"));
+  assert.doesNotThrow(() => validate(context, config, {}, "2026-09-10T15:59:00Z"));
+  assert.throws(
+    () => validate(context, config, {}, "2026-09-10T16:00:00Z"),
+    /ditutup pada 10 September 2026/
+  );
+});
+
+test("open-only and close-only application dates preserve the unconfigured side", () => {
+  const context = createContext();
+  const allDays = "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU";
+  const makeValidated = (overrides) => {
+    const row = completeConfig({ allowed_days: allDays, ...overrides });
+    return context.validateOutingTypeConfig_(
+      Object.fromEntries(OUTING_HEADERS.map((header, index) => [header, row[index]])),
+      { requireTypeCode: true }
+    );
+  };
+  const openOnly = makeValidated({ application_open_date: "2026-09-01" });
+  assert.throws(() => validate(context, openOnly, {}, "2026-08-31T15:59:00Z"), /dibuka mulai/);
+  assert.doesNotThrow(() => validate(context, openOnly, {}, "2027-01-01T00:00:00Z"));
+
+  const closeOnly = makeValidated({ application_close_date: "2026-09-10" });
+  assert.doesNotThrow(() => validate(context, closeOnly, {}, "2026-01-01T00:00:00Z"));
+  assert.throws(() => validate(context, closeOnly, {}, "2026-09-10T16:00:00Z"), /telah ditutup/);
+});
+
+test("date, allowed-day and application-time policies remain additive", () => {
+  const context = createContext();
+  const base = Object.fromEntries(OUTING_HEADERS.map((header, index) => [header, completeConfig()[index]]));
+  const config = context.validateOutingTypeConfig_({
+    ...base,
+    application_open_date: "2026-08-01",
+    application_close_date: "2026-08-31",
+    allowed_days: "ISNIN",
+    application_open_time: "08:00",
+    application_close_time: "17:00"
+  }, { requireTypeCode: true });
+  assert.doesNotThrow(() => validate(context, config, {}, "2026-08-03T02:00:00Z"));
+  assert.throws(() => validate(context, config, {}, "2026-08-04T02:00:00Z"), /tidak dibenarkan pada hari/);
+  assert.throws(() => validate(context, config, {}, "2026-08-03T10:00:00Z"), /belum dibuka atau telah ditutup/);
+});
+
+test("a backend date-window rejection appends no OUTING_REQUESTS row", () => {
+  const row = completeConfig({
+    allowed_days: "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU",
+    application_open_date: "2026-09-01"
+  });
+  const context = createContext({ featureEnabled: true, rows: [row] });
+  context.now_ = () => testNow(context, "2026-08-31T15:59:00Z");
+  assert.throws(() => context.submitRequest({
+    student_id: "A3-001",
+    no_matrik: "A3001",
+    jenis_permohonan: "LAWATAN_KELUARGA"
+  }), /dibuka mulai/);
+  assert.equal(context.__testSheets.get("OUTING_REQUESTS").rows.length, 0);
 });
 
 test("fixed_return_time overrides client input and required return time is strict", () => {

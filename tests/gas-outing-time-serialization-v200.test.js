@@ -158,6 +158,7 @@ test("actual Admin list action returns canonical Sheet times at its response bou
       "application_close_time",
       "fixed_return_time"
     ],
+    OUTING_TYPE_DATE_FIELDS: [],
     OUTING_TYPE_BOOLEAN_FIELDS: ["active"],
     SHEETS: { outingTypes: "OUTING_TYPES" },
     SpreadsheetApp: {

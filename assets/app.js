@@ -452,6 +452,10 @@ const els = {
   adminSortOrderInput: document.querySelector("#adminSortOrderInput"),
   adminActiveField: document.querySelector("#adminActiveField"),
   adminActiveInput: document.querySelector("#adminActiveInput"),
+  adminOpenDateInput: document.querySelector("#adminOpenDateInput"),
+  adminCloseDateInput: document.querySelector("#adminCloseDateInput"),
+  adminClearOpenDateButton: document.querySelector("#adminClearOpenDateButton"),
+  adminClearCloseDateButton: document.querySelector("#adminClearCloseDateButton"),
   adminOpenTimeInput: document.querySelector("#adminOpenTimeInput"),
   adminCloseTimeInput: document.querySelector("#adminCloseTimeInput"),
   adminClearOpenTimeButton: document.querySelector("#adminClearOpenTimeButton"),
@@ -742,6 +746,12 @@ function setupAdminDashboardV200() {
   els.adminAddTypeButton.addEventListener("click", openAdminCreateEditorV200);
   els.adminEditorCancelButton.addEventListener("click", closeAdminEditorV200);
   els.adminOutingTypeForm.addEventListener("submit", handleAdminTypeSubmitV200);
+  if (els.adminClearOpenDateButton) {
+    els.adminClearOpenDateButton.addEventListener("click", () => clearAdminOptionalInputV240(els.adminOpenDateInput));
+  }
+  if (els.adminClearCloseDateButton) {
+    els.adminClearCloseDateButton.addEventListener("click", () => clearAdminOptionalInputV240(els.adminCloseDateInput));
+  }
   if (els.adminClearOpenTimeButton) {
     els.adminClearOpenTimeButton.addEventListener("click", () => clearAdminTimeInputV200(els.adminOpenTimeInput));
   }
@@ -1945,6 +1955,10 @@ function renderAdminOutingTypesV200() {
   }
   els.adminTypeList.innerHTML = adminOutingTypes.map((type) => {
     const active = type.active === true;
+    const dateSummaryItems = [
+      type.application_open_date ? `Buka ${formatDisplayDate(type.application_open_date)}` : "",
+      type.application_close_date ? `Tutup ${formatDisplayDate(type.application_close_date)}` : ""
+    ].filter(Boolean);
     const timeSummaryItems = [
       type.application_open_time ? `Buka ${formatAdminTimeOnlyV200(type.application_open_time)}` : "",
       type.application_close_time ? `Tutup ${formatAdminTimeOnlyV200(type.application_close_time)}` : "",
@@ -1970,6 +1984,7 @@ function renderAdminOutingTypesV200() {
         <dl class="admin-type-meta">
           <div><dt>Turutan</dt><dd>${escapeHtml(type.sort_order)}</dd></div>
           <div><dt>Hari</dt><dd>${escapeHtml(formatAdminDaysV200(type.allowed_days))}</dd></div>
+          <div><dt>Tarikh</dt><dd>${escapeHtml(dateSummaryItems.join(" · ") || "Tiada had tarikh")}</dd></div>
           <div><dt>Masa</dt><dd class="admin-time-stack">${timeSummary}</dd></div>
           <div><dt>Keluar</dt><dd>${escapeHtml(departureSummary)}</dd></div>
           <div><dt>Versi</dt><dd>v${escapeHtml(type.config_version)}</dd></div>
@@ -2046,6 +2061,8 @@ function openAdminEditEditorV200(typeCode) {
   els.adminDescriptionInput.value = type.description || "";
   els.adminSortOrderInput.value = String(type.sort_order || 1);
   els.adminActiveField.hidden = true;
+  els.adminOpenDateInput.value = type.application_open_date || "";
+  els.adminCloseDateInput.value = type.application_close_date || "";
   els.adminOpenTimeInput.value = type.application_open_time || "";
   els.adminCloseTimeInput.value = type.application_close_time || "";
   els.adminEarliestDepartureTimeInput.value = type.earliest_departure_time || "";
@@ -2108,6 +2125,10 @@ function getAdminRuleInputMapV200() {
 
 function setAdminAllowedDaysV200(allowedDays) {
   setAdminDaySelectionV220(els.adminAllowedDays, allowedDays);
+}
+
+function clearAdminOptionalInputV240(input) {
+  clearAdminTimeInputV200(input);
 }
 
 function clearAdminTimeInputV200(input) {
@@ -2212,12 +2233,19 @@ function collectAdminOutingTypeConfigV200() {
   if (!allowedDays.length) {
     throw new Error("Pilih sekurang-kurangnya satu hari dibenarkan.");
   }
+  const applicationOpenDate = String(els.adminOpenDateInput.value || "").trim();
+  const applicationCloseDate = String(els.adminCloseDateInput.value || "").trim();
+  if (applicationOpenDate && applicationCloseDate && applicationCloseDate < applicationOpenDate) {
+    throw new Error("Tarikh Permohonan Ditutup tidak boleh lebih awal daripada Tarikh Permohonan Dibuka.");
+  }
   const config = {
     type_code: els.adminTypeCodeInput.value.trim().toUpperCase(),
     display_name: els.adminDisplayNameInput.value.trim(),
     description: els.adminDescriptionInput.value.trim(),
     sort_order: Number(els.adminSortOrderInput.value),
     allowed_days: allowedDays.join(","),
+    application_open_date: applicationOpenDate,
+    application_close_date: applicationCloseDate,
     application_open_time: String(els.adminOpenTimeInput.value || "").trim(),
     application_close_time: String(els.adminCloseTimeInput.value || "").trim(),
     departure_allowed_days: departureAllowedDays.join(","),
@@ -2902,6 +2930,8 @@ function buildMockAdminOutingTypesV200() {
   const allDays = "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU";
   const common = {
     active: true,
+    application_open_date: "",
+    application_close_date: "",
     application_open_time: "",
     application_close_time: "",
     departure_allowed_days: "",
@@ -3992,6 +4022,8 @@ function normalizeStudentOutingTypesV200(rows) {
       type_code: String(row.type_code || "").trim().toUpperCase(),
       display_name: String(row.display_name || "").trim(),
       sort_order: Number(row.sort_order) || 0,
+      application_open_date: normalizeStudentConfigDateV240(row.application_open_date),
+      application_close_date: normalizeStudentConfigDateV240(row.application_close_date),
       application_open_time: normalizeTimeOnlyValue(row.application_open_time),
       application_close_time: normalizeTimeOnlyValue(row.application_close_time),
       earliest_departure_time: normalizeTimeOnlyValue(row.earliest_departure_time),
@@ -4006,6 +4038,34 @@ function normalizeStudentOutingTypesV200(rows) {
       left.sort_order - right.sort_order
       || left.display_name.localeCompare(right.display_name)
     ));
+}
+
+function normalizeStudentConfigDateV240(value) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";
+  const parsed = parseFlexibleDate(text);
+  if (!parsed) return "";
+  const parts = getKualaLumpurParts(parsed);
+  return `${parts.year}-${parts.month}-${parts.day}` === text ? text : "";
+}
+
+function getMalaysiaDateKeyV240(value = new Date()) {
+  const parts = getKualaLumpurParts(value);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function updateStudentApplicationDateWindowNoticeV240(config, now = new Date()) {
+  if (!els.ruleNotice || !config) return;
+  const todayKey = getMalaysiaDateKeyV240(now);
+  if (config.application_open_date && todayKey < config.application_open_date) {
+    els.ruleNotice.classList.remove("ok");
+    els.ruleNotice.textContent = `Permohonan dibuka mulai ${formatDisplayDate(config.application_open_date)}.`;
+    return;
+  }
+  if (config.application_close_date && todayKey > config.application_close_date) {
+    els.ruleNotice.classList.remove("ok");
+    els.ruleNotice.textContent = `Tempoh permohonan telah ditutup pada ${formatDisplayDate(config.application_close_date)}.`;
+  }
 }
 
 function useLegacyStudentOutingTypesV200(message, showRetry) {
@@ -9803,7 +9863,9 @@ if (isSemester) {
 
 function updateRequestTypeFields() {
   updateLegacyRequestTypeFieldsV164();
-  applyStudentOutingTypeConfigV200(getSelectedStudentOutingTypeConfigV200());
+  const config = getSelectedStudentOutingTypeConfigV200();
+  applyStudentOutingTypeConfigV200(config);
+  updateStudentApplicationDateWindowNoticeV240(config);
 }
 
 function updateSemesterFieldsV160() {

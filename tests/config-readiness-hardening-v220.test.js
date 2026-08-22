@@ -16,7 +16,8 @@ const outingHeaders = [
   "require_leave_date", "require_return_date", "require_return_time", "require_guardian_phone",
   "require_guardian_relation", "require_emergency_reason", "require_purpose", "require_location",
   "require_vehicle", "require_warden_approval", "require_selfie", "config_version", "created_at",
-  "created_by", "updated_at", "updated_by", "departure_allowed_days", "earliest_departure_time"
+  "created_by", "updated_at", "updated_by", "departure_allowed_days", "earliest_departure_time",
+  "application_open_date", "application_close_date"
 ];
 
 function completeConfig(overrides = {}) {

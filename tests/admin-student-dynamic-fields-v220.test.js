@@ -25,6 +25,8 @@ function createAdminTimeFixture(initialValue = "07:37") {
     adminDisplayNameInput: { value: "Keluar ke Klinik" },
     adminDescriptionInput: { value: "Rawatan" },
     adminSortOrderInput: { value: "6" },
+    adminOpenDateInput: makeTimeInput("2026-09-01"),
+    adminCloseDateInput: makeTimeInput("2026-09-10"),
     adminOpenTimeInput: makeTimeInput("12:00"),
     adminCloseTimeInput: makeTimeInput("18:00"),
     adminFixedReturnTimeInput: makeTimeInput("22:00"),
@@ -40,9 +42,10 @@ function createAdminTimeFixture(initialValue = "07:37") {
       return container === els.adminAllowedDays ? ["ISNIN"] : [];
     }
     function getAdminRuleInputMapV200() { return []; }
-    ${sourceBetween("function clearAdminTimeInputV200", "async function loadAdminOutingConfigReadinessV220")}
+    ${sourceBetween("function clearAdminOptionalInputV240", "async function loadAdminOutingConfigReadinessV220")}
     ${sourceBetween("function collectAdminOutingTypeConfigV200", "async function handleAdminTypeSubmitV200")}
     globalThis.clearTime = clearAdminTimeInputV200;
+    globalThis.clearOptional = clearAdminOptionalInputV240;
     globalThis.collect = collectAdminOutingTypeConfigV200;
   `, context);
   return context;
@@ -124,6 +127,30 @@ test("Admin can explicitly clear application open and close times into the updat
   assert.match(htmlSource, /id="adminClearCloseTimeButton"[^>]*>Kosongkan</);
 });
 
+test("Admin application dates load, save and clear without a current-date fallback", () => {
+  const context = createAdminTimeFixture();
+  assert.equal(context.collect().application_open_date, "2026-09-01");
+  assert.equal(context.collect().application_close_date, "2026-09-10");
+  context.clearOptional(context.elements.adminOpenDateInput);
+  context.clearOptional(context.elements.adminCloseDateInput);
+  assert.equal(context.collect().application_open_date, "");
+  assert.equal(context.collect().application_close_date, "");
+  assert.equal(context.elements.adminOpenDateInput.focused, true);
+  assert.equal(context.elements.adminCloseDateInput.focused, true);
+  assert.match(htmlSource, /id="adminOpenDateInput" type="date"/);
+  assert.match(htmlSource, /id="adminCloseDateInput" type="date"/);
+  assert.doesNotMatch(sourceBetween("function openAdminCreateEditorV200", "function openAdminEditEditorV200"), /new Date|currentDate/);
+});
+
+test("Admin blocks an application close date earlier than its open date", () => {
+  const context = createAdminTimeFixture();
+  context.elements.adminOpenDateInput.value = "2026-09-10";
+  context.elements.adminCloseDateInput.value = "2026-09-09";
+  assert.throws(() => context.collect(), /tidak boleh lebih awal/);
+  context.elements.adminCloseDateInput.value = "2026-09-10";
+  assert.doesNotThrow(() => context.collect());
+});
+
 test("Admin can explicitly clear fixed return time into the generic save payload", () => {
   const context = createAdminTimeFixture();
   context.clearTime(context.elements.adminFixedReturnTimeInput);
@@ -143,6 +170,8 @@ test("Admin editor assigns backend blanks directly with no time fallback", () =>
   assert.match(editorSource, /adminCloseTimeInput\.value = type\.application_close_time \|\| ""/);
   assert.match(editorSource, /adminFixedReturnTimeInput\.value = type\.fixed_return_time \|\| ""/);
   assert.doesNotMatch(editorSource, /new Date|currentTime|00:00|12:00/);
+  assert.match(editorSource, /adminOpenDateInput\.value = type\.application_open_date \|\| ""/);
+  assert.match(editorSource, /adminCloseDateInput\.value = type\.application_close_date \|\| ""/);
 });
 
 test("custom KLINIK uses safe fallback date wording and shows only its configured return-time field", () => {

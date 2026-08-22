@@ -35,7 +35,9 @@ const OUTING_TYPE_HEADERS = [
   "updated_at",
   "updated_by",
   "departure_allowed_days",
-  "earliest_departure_time"
+  "earliest_departure_time",
+  "application_open_date",
+  "application_close_date"
 ];
 
 const ADMIN_USER_HEADERS = [
@@ -237,6 +239,40 @@ test("rerunning migration preserves existing type rows and immutable type_code",
   assert.equal(sheet.rows[1][0], "OUTING_BIASA");
   assert.equal(sheet.rows[1][displayNameIndex], "Nama Sedia Ada");
   assert.equal(sheet.rows.length, 6);
+});
+
+test("date-window headers are appended idempotently and existing rows keep blank dates", () => {
+  const legacyHeaders = OUTING_TYPE_HEADERS.filter((header) => (
+    header !== "application_open_date" && header !== "application_close_date"
+  ));
+  const legacyRow = legacyHeaders.map((header) => ({
+    type_code: "JENIS_LAMA",
+    display_name: "Jenis Lama",
+    description: "Tidak berubah",
+    active: true,
+    sort_order: 9,
+    allowed_days: "ISNIN",
+    application_open_time: "08:00",
+    application_close_time: "17:00",
+    config_version: 4,
+    created_at: "lama",
+    created_by: "ADM",
+    updated_at: "lama",
+    updated_by: "ADM"
+  }[header] ?? false));
+  const sheet = new FakeSheet("OUTING_TYPES", [legacyHeaders, legacyRow]);
+  const { context } = createMigrationContext({ sheets: { OUTING_TYPES: sheet } });
+
+  context.setupAdminOutingConfigV200();
+  context.setupAdminOutingConfigV200();
+  const existing = rowsAsObjects(sheet).find((row) => row.type_code === "JENIS_LAMA");
+  assert.deepEqual(sheet.rows[0], OUTING_TYPE_HEADERS);
+  assert.equal(existing.display_name, "Jenis Lama");
+  assert.equal(existing.config_version, 4);
+  assert.equal(existing.application_open_date || "", "");
+  assert.equal(existing.application_close_date || "", "");
+  assert.equal(sheet.rows[0].filter((header) => header === "application_open_date").length, 1);
+  assert.equal(sheet.rows[0].filter((header) => header === "application_close_date").length, 1);
 });
 
 test("migration backfills Friday departure once without changing versions or later Admin edits", () => {
