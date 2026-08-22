@@ -7061,13 +7061,19 @@ function classSummaryCard(item, index) {
   `;
 }
 
+function isWardenApprovedOperationalRecord(record) {
+  if (!record) return false;
+  const lifecycle = String(record.rawStatus || record.status || "").trim().toUpperCase();
+  return record.status === STATUS.approved || lifecycle === "DILULUSKAN_WARDEN";
+}
+
 function renderWarden() {
   const now = new Date();
   const pendingRecords = sortWardenPendingRequests(
     outingRecords.filter((record) => record.status === STATUS.pending),
     now
   );
-  const approvedRecords = outingRecords.filter((record) => record.status === STATUS.approved);
+  const approvedRecords = outingRecords.filter(isWardenApprovedOperationalRecord);
   const urgentReturnRecords = outingRecords.filter((record) => (
     record.status === STATUS.out && record.guardian_contact_available === true
   ));

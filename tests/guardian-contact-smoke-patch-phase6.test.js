@@ -36,6 +36,43 @@ function shortcut(record, mode) {
   return context.guardianContactShortcutHtml(record, mode);
 }
 
+function renderWardenFixture(records) {
+  const makeList = () => ({
+    innerHTML: "",
+    querySelectorAll: () => []
+  });
+  const elements = {
+    wardenList: makeList(),
+    wardenApprovedList: makeList(),
+    wardenDepartureConfirmationList: makeList()
+  };
+  const context = vm.createContext({
+    STATUS: {
+      pending: "Menunggu Kelulusan",
+      approved: "Diluluskan Warden",
+      out: "Sedang Keluar"
+    },
+    outingRecords: records,
+    els: elements,
+    sortWardenPendingRequests: (rows) => rows,
+    isNoGuardDepartureEnabledForRecord: () => false,
+    renderWardenSemesterChecklist() {},
+    emptyState: (message) => `EMPTY:${message}`,
+    recordCard: (record, mode) => `${mode}:${record.request_id}`,
+    wardenDepartureConfirmationCard: (record) => `departure:${record.request_id}`,
+    updateStatus() {},
+    confirmWardenRemoteCheckout() {},
+    fetchGuardianContact() {}
+  });
+  vm.runInContext(
+    functionSource("isWardenApprovedOperationalRecord", "renderWarden") +
+      functionSource("renderWarden", "guardianContactShortcutHtml"),
+    context
+  );
+  context.renderWarden();
+  return { context, elements };
+}
+
 test("pending emergency renders the shortcut after safe projection-flag normalization", () => {
   const mapped = mapRecord({
     request_id: "PENDING-E",
@@ -56,6 +93,69 @@ test("approved emergency with a literal backend boolean renders the shortcut", (
   });
   assert.equal(mapped.guardian_contact_available, true);
   assert.match(shortcut(mapped, "warden-readonly"), /Hubungi Penjaga/);
+});
+
+test("auto-approved and human-approved emergencies share the approved-risk section without entering pending", () => {
+  const records = [
+    {
+      request_id: "AUTO-E",
+      rawStatus: "DILULUSKAN_WARDEN",
+      status: "Diluluskan Warden",
+      jenis_permohonan: "KECEMASAN",
+      warden_approve_by: "AUTO_CONFIG_V2",
+      guardian_contact_available: true
+    },
+    {
+      request_id: "HUMAN-E",
+      rawStatus: "DILULUSKAN_WARDEN",
+      status: "Diluluskan Warden",
+      jenis_permohonan: "KECEMASAN",
+      warden_approve_by: "Warden A",
+      guardian_contact_available: true
+    },
+    {
+      request_id: "NORMAL-A",
+      rawStatus: "DILULUSKAN_WARDEN",
+      status: "Diluluskan Warden",
+      jenis_permohonan: "OUTING_BIASA",
+      warden_approve_by: "Warden A",
+      guardian_contact_available: false
+    },
+    {
+      request_id: "PENDING-E",
+      rawStatus: "MENUNGGU_KELULUSAN",
+      status: "Menunggu Kelulusan",
+      jenis_permohonan: "KECEMASAN",
+      warden_approve_by: ""
+    }
+  ];
+  const before = JSON.stringify(records);
+  const { elements } = renderWardenFixture(records);
+
+  assert.match(elements.wardenApprovedList.innerHTML, /warden-readonly:AUTO-E/);
+  assert.match(elements.wardenApprovedList.innerHTML, /warden-readonly:HUMAN-E/);
+  assert.match(elements.wardenApprovedList.innerHTML, /warden-readonly:NORMAL-A/);
+  assert.doesNotMatch(elements.wardenApprovedList.innerHTML, /PENDING-E/);
+  assert.match(elements.wardenList.innerHTML, /warden:PENDING-E/);
+  assert.doesNotMatch(elements.wardenList.innerHTML, /AUTO-E|HUMAN-E|NORMAL-A/);
+  assert.equal(JSON.stringify(records), before);
+});
+
+test("approved-risk membership uses lifecycle and never approval actor identity", () => {
+  const helper = functionSource("isWardenApprovedOperationalRecord", "renderWarden");
+  assert.match(helper, /DILULUSKAN_WARDEN/);
+  assert.doesNotMatch(helper, /warden_approve_by|AUTO_CONFIG_V2|jenis_permohonan/);
+
+  const rawLifecycleRecord = {
+    request_id: "RAW-E",
+    rawStatus: "DILULUSKAN_WARDEN",
+    status: "unmapped-display-value",
+    jenis_permohonan: "KECEMASAN",
+    warden_approve_by: "AUTO_CONFIG_V2"
+  };
+  const { elements } = renderWardenFixture([rawLifecycleRecord]);
+  assert.match(elements.wardenApprovedList.innerHTML, /warden-readonly:RAW-E/);
+  assert.doesNotMatch(elements.wardenList.innerHTML, /warden:/);
 });
 
 test("false, missing, and arbitrary projection values do not render a shortcut", () => {

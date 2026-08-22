@@ -152,8 +152,12 @@ test("backend rejects another student's request and every non-cancellable state"
 
 test("cancelled requests are terminal across duplicate, Warden, Guard, history and statistics logic", () => {
   const activeHelper = sourceBetween(gasSource, "function isActiveRequestStatus_", "function hasActiveRequestForStudent_");
+  const wardenApprovedHelper = sourceBetween(appSource, "function isWardenApprovedOperationalRecord", "function renderWarden");
+  const wardenRenderer = sourceBetween(appSource, "function renderWarden", "function isReturnSelfieSubmitted");
   assert.doesNotMatch(activeHelper, /studentCancelled|DIBATALKAN_PELAJAR/);
-  assert.match(sourceBetween(appSource, "function renderWarden", "function isReturnSelfieSubmitted"), /record\.status === STATUS\.pending[\s\S]*record\.status === STATUS\.approved/);
+  assert.match(wardenRenderer, /record\.status === STATUS\.pending[\s\S]*filter\(isWardenApprovedOperationalRecord\)/);
+  assert.match(wardenApprovedHelper, /record\.status === STATUS\.approved[\s\S]*DILULUSKAN_WARDEN/);
+  assert.doesNotMatch(wardenApprovedHelper, /studentCancelled|DIBATALKAN_PELAJAR/);
   assert.match(sourceBetween(appSource, "function renderGuard", "function renderDashboard"), /record\.status === STATUS\.approved[\s\S]*record\.status === STATUS\.out/);
   assert.match(sourceBetween(appSource, "function isStudentHistoryRecord", "function studentHistoryCard"), /DIBATALKAN_PELAJAR/);
   assert.match(gasSource, /const completed = status === STATUS\.done/);
