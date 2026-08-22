@@ -393,6 +393,8 @@ const els = {
   studentOutingTypesRetryButton: document.querySelector("#studentOutingTypesRetryButton"),
   emergencyFields: document.querySelector("#emergencyFields"),
   overnightFields: document.querySelector("#overnightFields"),
+  studentRequestSection: document.querySelector("#studentRequestSection"),
+  studentActiveRequestNotice: document.querySelector("#studentActiveRequestNotice"),
   requestForm: document.querySelector("#requestForm"),
   purposeInput: document.querySelector("#purposeInput"),
   locationInput: document.querySelector("#locationInput"),
@@ -6993,6 +6995,7 @@ function renderStudent() {
   debugStudentRecords(studentRecords);
   const currentRecord = selectStudentCurrentRecord(studentRecords);
   els.studentCurrentStatus.innerHTML = renderStudentCurrentStatus(currentRecord);
+  updateStudentRequestSectionVisibility(currentRecord);
   renderStudentAnnualHistory();
   bindStudentCancellationControls();
   bindStudentDepartureConfirmationControls();
@@ -7033,6 +7036,16 @@ function renderStudentHistoryRecords(studentRecords) {
 function isActiveStudentRecord(record) {
   const status = record.rawStatus || reverseDisplayStatus(record.status);
   return status === "MENUNGGU_KELULUSAN" || status === "DILULUSKAN_WARDEN" || status === "KELUAR";
+}
+
+function updateStudentRequestSectionVisibility(currentRecord) {
+  const hasActiveRequest = Boolean(currentRecord && isActiveStudentRecord(currentRecord));
+  if (els.studentRequestSection) {
+    els.studentRequestSection.hidden = hasActiveRequest;
+  }
+  if (els.studentActiveRequestNotice) {
+    els.studentActiveRequestNotice.hidden = !hasActiveRequest;
+  }
 }
 
 function isStudentHistoryRecord(record) {

@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r10">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r11">
   </head>
   <body>
     <header class="app-header">
@@ -201,11 +201,12 @@
           <div id="studentCurrentStatus" aria-live="polite"></div>
         </section>
 
-        <div class="section-heading student-request-heading">
-          <h2>Permohonan Pelajar</h2>
-        </div>
+        <section class="student-request-section" id="studentRequestSection" aria-label="Permohonan Pelajar">
+          <div class="section-heading student-request-heading">
+            <h2>Permohonan Pelajar</h2>
+          </div>
 
-        <form class="form-card" id="requestForm">
+          <form class="form-card" id="requestForm">
 
           <label for="requestTypeSelect">Jenis Permohonan</label>
           <select id="requestTypeSelect" required>
@@ -279,8 +280,13 @@
           </div>
 
           <button class="primary-action" type="submit">Hantar Permohonan</button>
-          <p class="form-message" id="studentMessage"></p>
-        </form>
+            <p class="form-message" id="studentMessage"></p>
+          </form>
+        </section>
+        <aside class="student-active-request-notice" id="studentActiveRequestNotice" role="status" aria-live="polite" hidden>
+          <strong>Permohonan baharu belum tersedia</strong>
+          <p>Anda masih mempunyai permohonan aktif. Permohonan baharu boleh dibuat selepas urusan semasa selesai.</p>
+        </aside>
         <section class="student-outing-history" aria-labelledby="studentOutingHistoryTitle">
           <div class="student-history-refresh" id="studentHistoryRefreshControls"></div>
           <p class="student-annual-summary" id="studentAnnualSummary" aria-live="polite">Jumlah Outing —: —</p>
@@ -931,6 +937,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r10"></script>
+    <script src="assets/app.js?v=2.4.0-r11"></script>
   </body>
 </html>

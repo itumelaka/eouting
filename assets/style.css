@@ -3898,6 +3898,35 @@ button:disabled,
   margin-top: 20px;
 }
 
+.student-request-section[hidden],
+.student-active-request-notice[hidden] {
+  display: none !important;
+}
+
+.student-active-request-notice {
+  background: #f5f8fd;
+  border: 1px solid rgba(22, 111, 199, 0.2);
+  border-left: 5px solid var(--info);
+  border-radius: 14px;
+  box-shadow: var(--clay-shadow-soft, 0 8px 20px rgba(3, 18, 47, 0.08));
+  display: grid;
+  gap: 4px;
+  margin: 20px 0 18px;
+  padding: 13px 14px;
+}
+
+.student-active-request-notice strong {
+  color: var(--deep-navy);
+  font-size: 0.94rem;
+}
+
+.student-active-request-notice p {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
 @media (max-width: 520px) {
   .announcement-banner-main {
     align-items: flex-start !important;
