@@ -8,7 +8,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "assets", "style.css"), "utf8");
 const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const roleGridStart = html.indexOf('<div class="role-grid" id="roleGrid">');
-const roleGridEnd = html.indexOf('<form class="access-panel" id="studentLoginPanel">', roleGridStart);
+const roleGridEnd = html.indexOf('<form class="access-panel" id="studentLoginPanel"', roleGridStart);
 assert.notEqual(roleGridStart, -1, "roleGrid must exist");
 assert.notEqual(roleGridEnd, -1, "student login panel must follow roleGrid");
 const roleGridMarkup = html.slice(roleGridStart, roleGridEnd);
@@ -35,7 +35,7 @@ test("landing terminology keeps LI students within the existing Pelajar role", (
   assert.match(roleGridMarkup, /data-role-choice="student"/);
   assert.doesNotMatch(roleGridMarkup, /Pelajar Latihan Industri \(LI\)|data-role-choice="li"/i);
   assert.doesNotMatch(html, /data-role-choice="li"/i);
-  assert.match(app, /student:\s*"Pelajar"/);
+  assert.match(app, /button\.classList\.add\("clay-role-button"\)/);
   assert.match(html, /Pelajar Latihan Industri \(LI\)/);
   assert.match(html, /data-student-class="LI"[^>]*hidden/);
   assert.doesNotMatch(`${html}\n${app}`, /pelajar praktikal/i);

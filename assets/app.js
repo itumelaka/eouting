@@ -812,7 +812,9 @@ function renderLiStudentLoginOptionsV200() {
 function showAdminLoginPanelV200() {
   document.querySelectorAll(".access-panel").forEach((panel) => panel.classList.remove("active"));
   document.querySelectorAll("[data-role-choice]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.roleChoice === "admin");
+    const active = button.dataset.roleChoice === "admin";
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
   });
   if (els.adminLoginPanel) {
     els.adminLoginPanel.classList.add("active");
@@ -3061,17 +3063,9 @@ function setupClayRoleNav() {
   }
 
   els.roleGrid.classList.add("clay-role-nav");
-  const roleLabels = {
-    student: "Pelajar",
-    warden: "Warden & HEP",
-    guard: "Guard",
-    admin: "Admin"
-  };
-
   els.roleGrid.querySelectorAll("[data-role-choice]").forEach((button) => {
-    const role = button.dataset.roleChoice;
     button.classList.add("clay-role-button");
-    button.innerHTML = `<strong>${roleLabels[role] || button.textContent}</strong>`;
+    if (!button.hasAttribute("aria-pressed")) button.setAttribute("aria-pressed", "false");
   });
 
   let monitorButton = els.roleGrid.querySelector('[data-role-choice="monitor"]');
@@ -3080,7 +3074,7 @@ function setupClayRoleNav() {
     monitorButton.className = "role-card clay-role-button";
     monitorButton.type = "button";
     monitorButton.dataset.roleChoice = "monitor";
-    monitorButton.innerHTML = "<strong>Pemantauan Semasa</strong>";
+    monitorButton.innerHTML = '<span class="role-card-icon" aria-hidden="true">◉</span><strong>Pemantauan Semasa</strong><span>Paparan status dan ringkasan semasa.</span>';
     els.roleGrid.appendChild(monitorButton);
   }
   els.monitorNavButton = monitorButton;
@@ -4405,19 +4399,15 @@ async function retryLiveConnection() {
 function updateDataModeIndicator() {
   if (!els.dataModeIndicator) {
     els.dataModeIndicator = document.createElement("p");
+    els.dataModeIndicator.className = "data-mode-indicator";
     els.dataModeIndicator.setAttribute("aria-live", "polite");
-    els.dataModeIndicator.style.margin = "0 0 12px";
-    els.dataModeIndicator.style.fontWeight = "700";
-    els.dataModeIndicator.style.color = isLiveMode ? "#15573b" : (ALLOW_MOCK_MODE ? "#8a2600" : "#9b111e");
     els.appShell.insertBefore(els.dataModeIndicator, els.appShell.firstElementChild);
   }
 
   const isLiveUnavailable = !isLiveMode && !ALLOW_MOCK_MODE && Boolean(dataModeMessage);
-  els.dataModeIndicator.style.color = isLiveMode || (!ALLOW_MOCK_MODE && !dataModeMessage) ? "#15573b" : (ALLOW_MOCK_MODE ? "#8a2600" : "#9b111e");
-  els.dataModeIndicator.style.background = !isLiveMode && ALLOW_MOCK_MODE ? "#fff0d9" : "";
-  els.dataModeIndicator.style.border = !isLiveMode && ALLOW_MOCK_MODE ? "1px solid #ffb65c" : "";
-  els.dataModeIndicator.style.borderRadius = !isLiveMode && ALLOW_MOCK_MODE ? "8px" : "";
-  els.dataModeIndicator.style.padding = !isLiveMode && ALLOW_MOCK_MODE ? "8px 10px" : "";
+  els.dataModeIndicator.dataset.modeState = isLiveMode
+    ? "live"
+    : (ALLOW_MOCK_MODE ? "mock" : (isLiveUnavailable ? "unstable" : "live"));
   els.dataModeIndicator.textContent = isLiveMode
     ? "Live Mode: Google Sheets"
     : ALLOW_MOCK_MODE
@@ -6148,6 +6138,13 @@ function showLoginPanel(role) {
   deactivatePublicMonitoringPanelV200();
   hideLoginPanels();
   els.studentLoginMessage.textContent = "";
+  if (els.roleGrid && typeof els.roleGrid.querySelectorAll === "function") {
+    els.roleGrid.querySelectorAll("[data-role-choice]").forEach((button) => {
+      const active = button.dataset.roleChoice === role;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
 
   if (role === "student") {
     els.studentLoginPanel.classList.add("active");
@@ -11243,6 +11240,13 @@ updatePulangBermalamFields = function updatePulangBermalamFieldsRequestTypeBridg
 };
 
 function setPublicMonitoringPanelActiveV200(isActive) {
+  if (isActive && els.roleGrid && typeof els.roleGrid.querySelectorAll === "function") {
+    els.roleGrid.querySelectorAll("[data-role-choice]").forEach((button) => {
+      const active = button.dataset.roleChoice === "monitor";
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
   if (els.publicMonitoringPanel) {
     els.publicMonitoringPanel.hidden = !isActive;
     els.publicMonitoringPanel.classList.toggle("active", isActive);

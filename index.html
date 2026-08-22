@@ -10,15 +10,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r12">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r13">
   </head>
   <body>
     <header class="app-header">
       <div class="app-header-inner">
         <img src="assets/eouting-header-logo.png" alt="eOuting ITU SKM OLP" class="header-logo">
-        <div class="time-card" aria-live="polite">
+        <div class="time-card time-metadata" aria-live="polite">
           <span id="todayDate">-</span>
+          <span class="time-metadata-separator" aria-hidden="true">•</span>
           <strong id="todayDay">-</strong>
+          <span class="time-metadata-separator" aria-hidden="true">•</span>
           <span id="currentTime">-</span>
         </div>
       </div>
@@ -38,6 +40,7 @@
         <div class="section-heading access-heading">
           <img class="access-logo" src="assets/pwa-logo.png" alt="" aria-hidden="true">
           <div class="access-heading-copy">
+            <span class="access-eyebrow">Portal Akses Institusi</span>
             <h2>Masuk Sistem</h2>
             <p>Sila pilih peranan anda.</p>
           </div>
@@ -49,14 +52,17 @@
 
         <div class="role-grid" id="roleGrid">
           <button class="role-card" type="button" data-role-choice="student">
+            <span class="role-card-icon" aria-hidden="true">🎓</span>
             <strong>Pelajar</strong>
             <span>Mohon outing dan semak status permohonan.</span>
           </button>
           <button class="role-card" type="button" data-role-choice="warden">
+            <span class="role-card-icon" aria-hidden="true">◆</span>
             <strong>Warden &amp; HEP</strong>
             <span>Lulus / tolak permohonan dan pantau pelajar.</span>
           </button>
           <button class="role-card" type="button" data-role-choice="guard">
+            <span class="role-card-icon" aria-hidden="true">⬟</span>
             <strong>Guard</strong>
             <span>Sahkan keluar dan masuk pelajar di pos guard.</span>
           </button>
@@ -89,8 +95,14 @@
           </section>
         </section>
 
-        <form class="access-panel" id="studentLoginPanel">
-          <h3>Masuk sebagai Pelajar</h3>
+        <form class="access-panel" id="studentLoginPanel" aria-labelledby="studentLoginTitle">
+          <div class="access-panel-heading">
+            <span class="access-panel-icon" aria-hidden="true">🎓</span>
+            <div>
+              <h3 id="studentLoginTitle">Masuk sebagai Pelajar</h3>
+              <p>Sila lengkapkan maklumat di bawah untuk log masuk.</p>
+            </div>
+          </div>
           <div class="student-class-filter">
             <span id="studentLoginGroupLabel">Pilih Kelas</span>
             <div class="student-class-pills" id="studentClassFilter" role="group" aria-label="Pilih kelas pelajar">
@@ -112,7 +124,7 @@
             <span>Ingat peranti ini</span>
           </label>
 
-          <button class="primary-action" type="submit">Masuk sebagai Pelajar</button>
+          <button class="primary-action access-submit" type="submit">Masuk sebagai Pelajar <span aria-hidden="true">→</span></button>
           <p class="form-message" id="studentLoginMessage"></p>
         </form>
 
@@ -960,6 +972,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r12"></script>
+    <script src="assets/app.js?v=2.4.0-r13"></script>
   </body>
 </html>
