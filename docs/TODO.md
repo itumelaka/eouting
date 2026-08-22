@@ -4,6 +4,14 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 55 / cache `2.4.0-r17`** p
 
 ## Done / Completed
 
+### Authenticated UI regression fix — 22 Ogos 2026
+
+- [x] Pulihkan header/logo dan metadata tarikh, hari serta masa yang kompak selepas login untuk Student, Warden/HEP, Guard dan Admin.
+- [x] Sembunyikan banner kuning `#ruleNotice` pada Student authenticated tanpa mengubah eligibility, validation atau submission behavior.
+- [x] Baiki kontras label/helper text pada editor Admin yang cerah.
+- [x] Jadikan sub-navigation Admin mobile content-sized, berjarak jelas, tidak membalut dan kekal horizontally scrollable.
+- [x] Verifikasi visual browser/mobile berjaya; production source commit `996d9c0` telah dipush ke `main`.
+
 ### Premium Institutional UI r13–r17
 
 - [x] Premium Institutional Access/Login UI lengkap; header akhir ialah `Masuk Sistem` dan `Sila pilih peranan anda.` tanpa label `PORTAL AKSES INSTITUSI`.

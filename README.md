@@ -22,6 +22,8 @@ Production yang disahkan sehingga 22 Ogos 2026 merangkumi Fasa 1–6, Generic Ap
 
 Frontend production kini menggunakan satu tema Premium Institutional yang responsif untuk desktop/PWA merentas Access/Login, Student, Warden/HEP, Guard dan Admin. Setiap role mengekalkan hierarki operasi tersendiri, dynamic Student login kekal data-driven, dan refresh visual ini tidak mengubah backend, authorization atau business behavior.
 
+Pembaikan regression UI production pada 22 Ogos 2026 (`996d9c0`) memulihkan header/logo serta paparan tarikh, hari dan masa yang kompak selepas login untuk semua role. Kontras editor Admin dan sub-navigation Admin mobile turut diperbaiki serta disahkan melalui verifikasi browser/mobile.
+
 ### Kumpulan Pelajar, login dan penghuni semasa
 
 - Admin mengurus `STUDENT_GROUPS`, `LI_INSTITUTIONS` dan penugasan `institution_code` melalui `Tetapan Pelajar`; kumpulan login production ialah A2, A3, LI UMK dan LI UPM.
@@ -58,7 +60,7 @@ Mod Normal berlabel `MAKLUMAN`, manakala mod Important berlabel `PENTING`. Kedua
 
 Banner ialah komunikasi sahaja. Contohnya, teks “Pulang Bermalam dibenarkan keluar mulai jam 2.00 petang.” tidak mengubah `earliest_departure_time`. Admin mesti mengemas kini `Admin > Tetapan Outing > Pulang Bermalam > Masa Keluar Paling Awal` secara berasingan jika enforcement sebenar hendak berubah.
 
-Dalam workspace Pelajar, Announcement Banner menyampaikan notis operasi semasa, manakala `ruleNotice` kuning kekal authoritative untuk panduan peraturan kontekstual. Ayat panduan pendua di bawah “Permohonan Pelajar” telah dibuang; banner, `ruleNotice` dan borang outing kekal.
+Dalam workspace Pelajar, Announcement Banner menyampaikan notis operasi semasa. Elemen `ruleNotice` dan logic eligibility/validation yang mendasarinya dikekalkan, tetapi banner kuning besarnya kini disembunyikan secara visual pada dashboard Pelajar authenticated. Ayat panduan pendua di bawah “Permohonan Pelajar” telah dibuang dan borang outing kekal.
 
 ## Operational Urgency Foundation — Fasa 1
 

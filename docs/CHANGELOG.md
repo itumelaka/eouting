@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-22 — Authenticated UI regression fix (v2.4.0)
+
+- Commit production `996d9c0` memulihkan header/logo utama selepas login untuk Student, Warden/HEP, Guard dan Admin, bersama paparan tarikh, hari dan masa authenticated yang kompak serta responsif.
+- Banner kuning `#ruleNotice` disembunyikan secara visual hanya pada dashboard Student authenticated; eligibility outing, validation frontend/GAS dan submission behavior tidak berubah.
+- Kontras label/helper text pada permukaan editor Admin yang cerah diperbaiki tanpa mengubah tema panel gelap, input atau struktur form.
+- Sub-navigation Admin mobile kini menggunakan tab bersaiz kandungan, jarak yang jelas dan label tidak membalut, sambil mengekalkan horizontal scrolling.
+- Verifikasi visual browser/mobile berjaya. Behavior ticker Announcement Banner desktop sengaja dikekalkan kerana ticker mobile berfungsi dan perkara desktop itu bukan production blocker.
+
 ## 2026-08-22 — Premium Institutional UI Refresh r13–r17 production close-out (v2.4.0)
 
 - UI-1/r13 menyatukan Access/Login kepada tema institusi dark navy yang responsif, mengekalkan dynamic Student group chips dan Admin access, serta membuang label `PORTAL AKSES INSTITUSI` tanpa menggantikannya.

@@ -10,7 +10,9 @@ Verdict semasa pada **22 Ogos 2026** ialah **production verified** pada display 
 
 `Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX dan Current Hostel Residents semuanya **COMPLETE / PRODUCTION VERIFIED**. Premium Institutional Access UI serta refresh dashboard Student, Warden/HEP, Guard dan Admin juga **COMPLETE / PRODUCTION VERIFIED**, membentuk satu sistem visual institusi dark navy yang bersatu. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **656/656**.
 
-Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
+Batch regression UI production commit `996d9c0` (`fix: restore authenticated header and admin mobile ui`) telah lengkap dan berada pada `main`. Header/logo serta metadata tarikh/hari/masa authenticated kini kelihatan dan responsif untuk Student, Warden/HEP, Guard dan Admin; kontras editor Admin serta sub-navigation Admin mobile juga telah diperbaiki dan disahkan melalui verifikasi browser/mobile.
+
+Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa; elemen `ruleNotice` serta eligibility/validation yang mendasarinya dikekalkan tetapi banner kuning itu disembunyikan secara visual pada Student authenticated. Behavior ticker desktop sengaja tidak diubah kerana mobile berfungsi dan isu desktop bukan production blocker.
 
 Production boundary semasa:
 
@@ -220,6 +222,7 @@ Nilai backend `KELUAR` tidak berubah.
 - **Version 50:** Warden remote checkout completion Telegram deployed dengan single-send/failure-safe behavior; automated baseline **465/465**, tetapi live visual confirmation completion message masih outstanding.
 - **Version 51 / 22 Ogos 2026:** Phase 6 Guardian Contact Shortcut, smoke normalization dan auto-approved emergency visibility disahkan production pada deployment ID/URL sedia ada; frontend/cache final milestone `2.4.0-r6`, commit latest ketika itu `4c16b0a` dan regression **490/490**.
 - **Version 52 / 22 Ogos 2026:** Generic Application Date Window commit `76c6898`, migration AC/AD, Admin persistence/clear dan Student backend rejection-before-append disahkan production; frontend/cache `2.4.0-r7` dan regression **501/501**.
+- **22 Ogos 2026:** commit production `996d9c0` menutup regression header authenticated, metadata masa kompak, Student `ruleNotice`, kontras editor Admin dan sub-navigation Admin mobile; visual browser/mobile disahkan dan perubahan telah dipush ke `main`.
 
 ## Production Validation v1.7.0
 
