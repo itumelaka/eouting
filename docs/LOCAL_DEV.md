@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r1` dan production GAS Version 50. Fasa 1–5 lengkap dan No-Guard Departure ialah sambungan operasi selepas Fasa 5. Production No-Guard kini enabled melalui Admin; Phase 5 scheduling kekal satu trigger private scanner setiap lima minit.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r6` dan production GAS Version 51. Fasa 1–6 lengkap dan production verified; No-Guard Departure kekal sambungan operasi selepas Fasa 5. Production No-Guard kini enabled melalui Admin; Phase 5 scheduling kekal satu trigger private scanner setiap lima minit.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline kanonik semasa selepas No-Guard Departure dan Warden checkout Telegram ialah **465/465 lulus**. Temporary installer verification Phase 5 pernah menghasilkan **446/446**, tetapi itu ialah milestone sejarah dan bukan baseline semasa.
+Baseline kanonik semasa selepas Phase 6 production close-out ialah **490/490 lulus**. Temporary installer verification Phase 5 pernah menghasilkan **446/446**, tetapi itu ialah milestone sejarah dan bukan baseline semasa.
 
 Focused regression yang paling relevan:
 
@@ -225,6 +225,9 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 6. Pastikan credential hilang menghasilkan error, bukan data Public Monitoring.
 7. Klik foto sebenar pada kad Warden/HEP dan sahkan list menggunakan satu batch thumbnail, preview membuat hanya satu request full jika belum dicache, dan approve/reject tidak terganggu.
 8. Sahkan permohonan yang telah dibatalkan Pelajar tidak muncul dalam queue dan race approve/reject tidak menimpa status authoritative.
+9. Untuk `KECEMASAN` pending/approved atau `KELUAR + CRITICAL/ACTION_REQUIRED`, sahkan `📞 Hubungi Penjaga` muncul hanya dalam view Warden/HEP; klik dan pastikan contact dimuat melalui POST authenticated, kemudian `📞 Telefon Sekarang` menggunakan URI `tel:` selamat.
+10. Uji `AUTO_CONFIG_V2` emergency: ia mesti berada di `Telah Diluluskan / Risiko Pulang`, tidak berada di `Menunggu Kelulusan`, tidak mempunyai approve/reject kedua dan Guard kekal checkout authority.
+11. Sahkan row tanpa `guardian_contact_available=true` tidak mempunyai shortcut, dan list payload/DOM awal tidak mengandungi raw telefon/hubungan.
 
 ## Smoke Test Guard
 
@@ -262,7 +265,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 ## PWA dan Cache
 
 - Semak footer v2.4.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.4.0-r1` dan asset query `2.4.0-r1`; displayed app version ialah v2.4.0.
+- Semak Cache Storage menggunakan `eouting-cache-v2.4.0-r6` dan asset query `2.4.0-r6`; displayed app version ialah v2.4.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

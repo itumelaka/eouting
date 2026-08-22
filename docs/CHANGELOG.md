@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-22 — Phase 6 production close-out (v2.4.0)
+
+- Guardian Contact Shortcut untuk Warden/HEP authenticated disahkan production bagi pending/approved `KECEMASAN` dan `KELUAR + CRITICAL/ACTION_REQUIRED`.
+- Broad list projection hanya membawa `guardian_contact_available`; telefon/hubungan sebenar kekal di belakang authenticated `getGuardianContact`, authoritative re-read/re-evaluation dan audit `GUARDIAN_CONTACT_ACCESSED` tanpa sensitive values.
+- Commit `4c16b0a` memastikan auto-approved `AUTO_CONFIG_V2` emergency dengan lifecycle `DILULUSKAN_WARDEN` muncul di `Telah Diluluskan / Risiko Pulang`, bukan pending queue, tanpa approval kedua atau perubahan Guard/No-Guard.
+- Supporting fixes: `0caa4fc` menormalkan availability flag secara ketat, `67d493c` membolehkan Admin mengosongkan `fixed_return_time`, dan `3e21c26` memberi label tarikh Student yang context-aware.
+- Production smoke Student dan Warden/HEP berjaya. Display version kekal v2.4.0, frontend/cache ialah `2.4.0-r6` / `eouting-cache-v2.4.0-r6`, backend ialah GAS Version 51 dan regression akhir **490/490**.
+
 ## 2026-08-21 — Warden remote checkout Telegram / Version 50 (v2.4.0)
 
 - Commit `1d750ab` (`feat: notify warden remote checkout`) adds one `✅ PENGESAHAN KELUAR OLEH WARDEN` message after `DILULUSKAN_WARDEN -> KELUAR`, successful `WARDEN_REMOTE_CHECKOUT` audit and Spreadsheet flush.
@@ -38,7 +46,7 @@ Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.
 - First natural scheduled execution ran `21 Aug 2026, 08:10:59`, completed in `21.761` seconds and showed `0%` trigger error rate. `AUDIT_LOG` remained 1037, no new notification was observed and the controlled test request retained one matching SENT audit, providing production evidence of audit-backed dedup.
 - Post-Version-46 browser verification passed at desktop `1280x720` and mobile `390x844`: Student urgency/expected return, Warden approval controls, Guard movement controls, Admin KPIs/`Perlu Tindakan` and Public Monitoring privacy boundary were preserved; no horizontal overflow or browser console error was observed.
 - Practical limitation remains: Telegram delivery and Sheets audit write are not atomic, so Phase 5 offers audit-backed practical idempotency rather than guaranteed transactional exactly-once delivery.
-- This Phase 5 close-out used canonical regression baseline **444/444**, with focused Phase 5 **15/15**. Temporary installer verification totals **446/446** full and **17/17** focused were not that committed baseline. Current post–Phase 5 baseline is **465/465**; Phase 6 has not started.
+- This Phase 5 close-out used canonical regression baseline **444/444**, with focused Phase 5 **15/15**. Temporary installer verification totals **446/446** full and **17/17** focused were not that committed baseline. Pada checkpoint sejarah 21 Ogos 2026, baseline post–Phase 5 ialah **465/465** dan Phase 6 belum bermula.
 
 ## 2026-08-20 — Telegram Return Reminder + Late Escalation / Fasa 5 (v2.4.0)
 

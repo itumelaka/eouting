@@ -1,8 +1,19 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 50 / cache `2.4.0-r1`** pada 21 Ogos 2026. Fasa 1–5 lengkap/deployed/activated. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented/deployed dan currently enabled melalui Admin. Baseline kanonik semasa ialah **465/465**. Fasa 6 belum bermula; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 51 / cache `2.4.0-r6`** pada 22 Ogos 2026. Fasa 1–6 lengkap dan production verified. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented/deployed dan currently enabled melalui Admin. Baseline kanonik semasa ialah **490/490**; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Phase 6 — Guardian Contact Shortcut
+
+- [x] Commit `9c16f47` menambah shortcut Warden/HEP bagi pending/approved `KECEMASAN` serta `KELUAR + CRITICAL/ACTION_REQUIRED`.
+- [x] Broad Warden projection membawa `guardian_contact_available` sahaja; raw telefon/hubungan kekal di belakang authenticated `getGuardianContact`, authoritative recheck dan audit fail-closed `GUARDIAN_CONTACT_ACCESSED`.
+- [x] Commit `0caa4fc` menerima hanya boolean/string `true` bagi transport availability tanpa local eligibility reconstruction.
+- [x] Commit `67d493c` membolehkan Admin mengosongkan `fixed_return_time` dan mengekalkan blank selepas reload.
+- [x] Commit `3e21c26` memberi label date section Student yang tepat untuk Pulang Bermalam, Cuti Semester, Kecemasan dan fallback.
+- [x] Commit `4c16b0a` memastikan auto-approved `AUTO_CONFIG_V2` emergency berada di approved/risk section berdasarkan `DILULUSKAN_WARDEN`, bukan actor, tanpa pending/approval kedua.
+- [x] Student dan Warden/HEP production smoke berjaya; Guard/No-Guard, lifecycle, schema, trigger, Telegram cadence dan config semantics kekal.
+- [x] Phase 6 **COMPLETE / PRODUCTION VERIFIED** pada 22 Ogos 2026; current release v2.4.0 / r6 / GAS Version 51 / **490/490**.
 
 ### No-Guard Departure — sambungan operasi selepas Fasa 5
 
@@ -262,7 +273,8 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 50 / cache `2.4.0-r1`** pa
 - [ ] Optional `request_id` deep link/highlight later.
 - [ ] Daily WhatsApp summary/report.
 - [ ] Review keputusan konservatif `lewat=Ya` apabila timing benar-benar indeterminate semasa `confirmIn`; active malformed record kini memberi `needs_review=true`.
-- [ ] Fasa 6+: guardian/waris shortcut atau phone-call button, notification observability/long-term trigger monitoring dan notification channel masa hadapan.
+- [x] Fasa 6 Guardian Contact Shortcut dan safe phone-call link untuk Warden/HEP telah production verified.
+- [ ] Notification observability/long-term trigger monitoring dan notification channel masa hadapan.
 - [ ] Pertimbang snapshot request-level `earliest_departure_time` dalam schema/version masa hadapan; sementara itu perubahan config boleh mentafsir semula priority fallback-only Warden, manakala snapshot request-level sah kekal stabil.
 
 ## Security / Access Improvements
@@ -296,8 +308,8 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 50 / cache `2.4.0-r1`** pa
 - [x] Selaraskan existing production Web App deployment kepada Version 46 tanpa menukar deployment ID/URL.
 - [x] Jalankan satu controlled real Telegram send dan sahkan audit/dedup production.
 - [x] Aktifkan tepat satu time-driven trigger/lima-minit dan sahkan first natural execution.
-- [ ] Guardian/waris shortcut.
-- [ ] Phone-call button untuk flow operasi yang diluluskan.
+- [x] Guardian/waris shortcut untuk eligibility operasi Warden/HEP yang diluluskan.
+- [x] Safe `tel:` phone-call button selepas authenticated contact fetch.
 - [ ] Long-term trigger monitoring dan notification observability improvements.
 - [ ] Additional notification channels selepas acceptance berasingan.
 - [ ] Optional WhatsApp notification later if required.

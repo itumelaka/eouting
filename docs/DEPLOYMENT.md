@@ -1,6 +1,15 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r1` dan service-worker cache `eouting-cache-v2.4.0-r1`. Backend production ialah GAS **Version 50**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready; No-Guard Departure kini enabled melalui Admin. Fasa 1–5 lengkap/deployed/activated dan No-Guard ialah sambungan selepas Fasa 5, bukan Fasa 6. Full Node baseline kanonik semasa ialah **465/465**.
+Versi aplikasi semasa: **v2.4.0**, cache/asset source revision `2.4.0-r6` dan service-worker cache `eouting-cache-v2.4.0-r6`. Backend production ialah GAS **Version 51**, menggunakan source kanonik `gas/Code.gs`, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint production yang tidak berubah. Config-driven production kekal aktif dan ready; No-Guard Departure kini enabled melalui Admin. Fasa 1–6 lengkap dan production verified pada 22 Ogos 2026. Full Node baseline kanonik semasa ialah **490/490**.
+
+## Phase 6 production verification — 22 Ogos 2026
+
+- Existing production deployment ID/URL kekal dan GAS **Version 51** menyajikan Guardian Contact Shortcut.
+- Student smoke mengesahkan label `KECEMASAN` ialah `Maklumat Tarikh Keluar` / `Tarikh Keluar`, guardian fields hadir mengikut config, submission berjaya dan `require_warden_approval=false` menghasilkan `AUTO_CONFIG_V2` + `DILULUSKAN_WARDEN` tanpa mengubah Guard checkout.
+- Warden/HEP smoke mengesahkan auto-approved emergency muncul di `Telah Diluluskan / Risiko Pulang`, bukan `Menunggu Kelulusan`; kad menunjukkan `Kecemasan`, `Diluluskan Warden`, actor `AUTO_CONFIG_V2` dan `📞 Hubungi Penjaga`.
+- Fetch contact authenticated berjaya mendedahkan contact secara on-demand dan menghasilkan link `📞 Telefon Sekarang`. Broad list payload kekal tanpa `telefon_waris`/`hubungan_waris`.
+- Release chain: `9c16f47` feature, `0caa4fc` smoke normalization, `67d493c` fixed-time clear, `3e21c26` dynamic date labels dan `4c16b0a` auto-approved emergency visibility. Frontend/cache akhir ialah `2.4.0-r6` / `eouting-cache-v2.4.0-r6`.
+- Tiada lifecycle, global approval rule, Guard authority, No-Guard semantics, Telegram cadence, Phase 5 threshold, trigger, schema atau Script Properties change dalam close-out ini.
 
 ## No-Guard deployment chronology — Versions 47–50
 
@@ -82,7 +91,7 @@ Jika duplicate runaway bagi request/stage yang sama disahkan, emergency containm
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah `2.4.0-r1`.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah `2.4.0-r6`.
 
 Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
@@ -137,7 +146,7 @@ Urutan backup, migration idempotent, legacy check, readiness hijau dan controlle
 
 ## Release Beta v2.0
 
-Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.4.0` / `2.4.0-r1`.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Metadata runtime, `version.json`, footer, query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation kini diselaraskan secara atomik kepada `v2.4.0` / `2.4.0-r6`.
 
 Beta pertama hendaklah menguji lima seed dan sekurang-kurangnya satu jenis custom. Gate mesti meliputi `require_selfie=true/false`, `require_warden_approval=true/false`, audit `AUTO_APPROVE_REQUEST`, Guard transition, Telegram, statistik dan filter. `require_warden_approval=false` kekal high-impact walaupun auto-approval kini eksplisit dan diaudit.
 
@@ -276,7 +285,7 @@ Frontend:
 
 - buka `https://itumelaka.github.io/eouting/`;
 - semak footer dan update popup;
-- semak asset query `2.4.0-r1` dan Cache Storage `eouting-cache-v2.4.0-r1`, khususnya selepas refresh/reopen PWA mobile;
+- semak asset query `2.4.0-r6` dan Cache Storage `eouting-cache-v2.4.0-r6`, khususnya selepas refresh/reopen PWA mobile;
 - login Admin, refresh berulang dan sahkan restore hanya selepas backend validation serta tab bukan default kekal lazy;
 - login Pelajar pada telefon, buka foto profil dan sahkan `Ambil Foto`, `Pilih dari Galeri` serta `Batal`; return-selfie mesti kekal sama;
 - buka Public Monitoring sekali dan pastikan loading, scroll, data serta timestamp betul;

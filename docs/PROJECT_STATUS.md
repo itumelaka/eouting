@@ -6,15 +6,15 @@ Status repo semasa: **v2.4.0 — production verified**.
 
 Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **21 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 50. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r1` dan service-worker cache ialah `eouting-cache-v2.4.0-r1`. Production beroperasi normal.
+Verdict semasa pada **22 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 51. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r6` dan service-worker cache ialah `eouting-cache-v2.4.0-r6`. Production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1, 2, 3, 4 dan 5 semuanya complete; Fasa 5 berstatus **IMPLEMENTED + DEPLOYED + ACTIVATED**. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented dan deployed melalui Versions 47–50, serta currently enabled melalui Admin. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **465/465**. Fasa 6 belum dimulakan.
+`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6 semuanya complete; Fasa 6 berstatus **COMPLETE / PRODUCTION VERIFIED** pada 22 Ogos 2026. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented dan deployed melalui Versions 47–50, serta currently enabled melalui Admin. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **490/490**.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 50**;
+- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 51**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
@@ -26,7 +26,7 @@ Production boundary semasa:
 - application rules dan departure rules dipisahkan melalui `allowed_days`/application window serta `departure_allowed_days`/`earliest_departure_time`;
 - blank `application_open_time` atau `application_close_time` bermaksud tiada threshold bagi medan tersebut; Admin boleh menggunakan `Kosongkan`, blank kekal blank, dan `allowed_days` tetap authoritative;
 - `PULANG_BERMALAM` boleh dipohon pada mana-mana hari, departure semasa ialah Jumaat dan earliest time `17:00`, boleh diubah Admin mengikut arahan HEP.
-- custom `KLINIK` (`Keluar ke Klinik`) beroperasi sebagai same-day tanpa tarikh manual, memerlukan masa balik, lokasi, kenderaan, kelulusan Warden dan selfie; dynamic section menggunakan `Maklumat Tambahan`;
+- custom `KLINIK` (`Keluar ke Klinik`) beroperasi sebagai same-day tanpa tarikh manual, memerlukan masa balik, lokasi, kenderaan, kelulusan Warden dan selfie; shared date-section fallback menggunakan `Maklumat Permohonan` / `Tarikh Keluar` apabila section itu visible;
 - blank `earliest_departure_time` bermaksud tiada sekatan masa paling awal dan Admin boleh mengosongkannya tanpa current-time fallback;
 - operational urgency backend memisahkan `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED` daripada lifecycle;
 - expected-return mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` bagi standard dan custom type, dengan legacy daily fallback sahaja apabila wajar;
@@ -43,8 +43,8 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r1`.
-- Backend GAS production ialah **Version 50** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
+- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r6`.
+- Backend GAS production ialah **Version 51** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -87,7 +87,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Telegram Return Reminder + Late Escalation Scanner Fasa 5 telah lengkap dan aktif dalam production: `KELUAR + DUE_SOON/CRITICAL/ACTION_REQUIRED`, batching 40/3,500, audit-backed dedup, ScriptLock dan safe manual dry-run wrapper. Scanner menggunakan urgency Fasa 1 dan tidak mempunyai frontend route.
 - Tepat satu trigger time-driven setiap lima minit menyasarkan `scanReturnOperationalNotifications_` (ID `9156626915782557696`), bukan wrapper dry-run. First natural execution pada `21 Aug 2026, 08:10:59` completed dalam `21.761` saat dengan displayed error rate `0%`.
 - Controlled dry-run, controlled real `ACTION_REQUIRED` Telegram send, `RETURN_ACTION_REQUIRED_SENT` dan same-stage `ALREADY_SENT` telah disahkan. Test request kekal mempunyai tepat satu audit selepas trigger activation dan tiada duplicate notification diperhatikan.
-- Guardian shortcut/access scope, phone-call button, long-term trigger monitoring, additional channels dan kerja Fasa 6 lain kekal future; destination/config Telegram tidak diubah semasa aktivasi.
+- Guardian Contact Shortcut Fasa 6 telah production verified. Eligibility ialah pending/approved `KECEMASAN` dan `KELUAR + CRITICAL/ACTION_REQUIRED`; direct notification, long-term trigger monitoring dan additional channels kekal future.
 - Public Monitoring membuka inline dalam shell landing, membuat GET awam khusus, mengelakkan overlap dan merender sekali.
 - Public Monitoring mengekalkan data lama apabila refresh gagal.
 - Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
@@ -97,7 +97,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r1`.
+- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r6`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -112,6 +112,18 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Guard kini memaparkan business-rule tarikh/hari/masa secara selamat; request 14 Ogos 2026 ditolak ketika confirm-out dicuba pada 10 Ogos 2026.
 - Public Monitoring berfungsi pada klik pertama dan Statistik Admin inline berjaya dimuatkan tanpa meninggalkan sesi Admin.
 - Production smoke test mengesahkan upload Pelajar, thumbnail Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar, secure full preview, Public Pemantauan photo-free, keyboard Enter, rolling KPI serta two-tier performance optimisation.
+
+## Phase 6 — COMPLETE / PRODUCTION VERIFIED
+
+Phase 6 selesai dan disahkan production pada **22 Ogos 2026**. Commit utama ialah `9c16f47` (`feat: add guardian contact safety shortcut`), diikuti `0caa4fc`, `67d493c`, `3e21c26` dan final visibility hardening `4c16b0a`.
+
+- Warden/HEP melihat `📞 Hubungi Penjaga` hanya untuk pending/approved `KECEMASAN` atau `KELUAR` dengan urgency authoritative `CRITICAL`/`ACTION_REQUIRED`.
+- Broad Warden projection membawa boolean `guardian_contact_available` sahaja; `telefon_waris`, `hubungan_waris` dan raw contact tidak berada dalam list payload.
+- POST `getGuardianContact` mengesahkan Warden aktif, memperoleh role Warden/HEP melalui logic sedia ada, membaca semula request, menilai semula urgency dan menulis `GUARDIAN_CONTACT_ACCESSED`. Context audit ialah `EMERGENCY_REQUEST`, `CRITICAL_RETURN` atau `ACTION_REQUIRED_RETURN`; raw phone/relation tidak diaudit dan audit failure menghalang disclosure.
+- Contact dipaparkan on-demand bersama `📞 Telefon Sekarang` melalui URI `tel:` ternormalisasi. Source ialah `OUTING_REQUESTS.telefon_waris`/`hubungan_waris`; tiada guardian-name source, maka UI memaparkan `Tidak direkodkan`. Tiada WhatsApp/SMS atau outbound automation.
+- `require_warden_approval=false` kekal menghasilkan `AUTO_CONFIG_V2` + `DILULUSKAN_WARDEN`. Fix `4c16b0a` memastikan lifecycle authoritative itu masuk `Telah Diluluskan / Risiko Pulang` tanpa bergantung pada actor, tidak masuk pending queue dan tidak memerlukan approval kedua.
+- Guard kekal normal checkout authority; No-Guard kekal fallback sahaja. Lifecycle, global approval rules, Telegram cadence, threshold/trigger Fasa 5, schema dan Script Properties tidak berubah.
+- Student production smoke mengesahkan label `KECEMASAN` (`Maklumat Tarikh Keluar` / `Tarikh Keluar`), submission auto-approved dan Guard requirement. Warden/HEP smoke mengesahkan card/actor/shortcut dan contact retrieval berjaya.
 
 ## Privacy Boundary
 
@@ -175,6 +187,7 @@ Nilai backend `KELUAR` tidak berubah.
 - **Version 48:** canonical manifest `Asia/Kuala_Lumpur` / `V8` / `USER_DEPLOYING` / `ANYONE_ANONYMOUS` memulihkan login, class dinamik, Admin toggle dan Web App authority.
 - **Version 49:** No-Guard request Telegram + operational eOuting URL deployed; waiting UI dan request alert disahkan live.
 - **Version 50:** Warden remote checkout completion Telegram deployed dengan single-send/failure-safe behavior; automated baseline **465/465**, tetapi live visual confirmation completion message masih outstanding.
+- **Version 51 / 22 Ogos 2026:** Phase 6 Guardian Contact Shortcut, smoke normalization dan auto-approved emergency visibility disahkan production pada deployment ID/URL sedia ada; frontend/cache final `2.4.0-r6`, commit latest `4c16b0a` dan regression **490/490**.
 
 ## Production Validation v1.7.0
 
@@ -199,6 +212,6 @@ Ujian production berjaya menggunakan request `OUT-20260726-121316-1479`:
 - Consent/privacy notice refinement.
 - QR code.
 - Review polisi bagi timing yang benar-benar indeterminate ketika `confirmIn`; sementara ini historical `lewat` disimpan secara konservatif sebagai `Ya`, manakala active malformed record menggunakan `needs_review=true`.
-- Bina Fasa 6+ di atas Fasa 1–5: guardian/waris shortcut atau phone-call button, direct Student/WhatsApp/email notification, Admin acknowledgement, notification observability/long-term trigger monitoring, access scope baharu serta sebarang notification-state schema/lifecycle/threshold hardening masih belum dilaksanakan.
+- Selepas Fasa 6, direct Student/WhatsApp/email notification, Admin acknowledgement, notification observability/long-term trigger monitoring, access scope tambahan serta sebarang notification-state schema/lifecycle/threshold hardening kekal belum dilaksanakan.
 - Pertimbang snapshot `earliest_departure_time` per request dalam schema/version masa hadapan supaya perubahan config tidak mentafsir semula fallback-only Warden priority.
 - Automated reports dan version injection.

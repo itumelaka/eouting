@@ -2,14 +2,25 @@
 
 Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (21 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r1`; backend production ialah GAS Version 50 pada deployment/URL sedia ada. No-Guard Departure ialah sambungan operasi selepas Fasa 5 dan kini enabled melalui Admin. Baseline penuh ialah **465/465**. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r6`; backend production ialah GAS Version 51 pada deployment/URL sedia ada. Phase 6 Guardian Contact Shortcut berstatus COMPLETE / PRODUCTION VERIFIED. No-Guard Departure kekal sambungan operasi selepas Fasa 5 dan kini enabled melalui Admin. Baseline penuh ialah **490/490**. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+
+## Close-out Phase 6 — 22 Ogos 2026
+
+- [x] Guardian Contact Shortcut Warden/HEP production verified bagi pending/approved `KECEMASAN` dan `KELUAR + CRITICAL/ACTION_REQUIRED`.
+- [x] Broad projection hanya membawa `guardian_contact_available`; contact sebenar memerlukan authenticated `getGuardianContact`, authoritative recheck dan successful privacy-safe audit.
+- [x] `AUTO_CONFIG_V2` emergency kekal `DILULUSKAN_WARDEN`, muncul di `Telah Diluluskan / Risiko Pulang`, tidak masuk pending queue dan tidak memerlukan approval kedua.
+- [x] Guard kekal normal checkout authority; No-Guard kekal fallback sahaja.
+- [x] Student smoke mengesahkan label Kecemasan, submission/auto-approval dan lifecycle; Warden/HEP smoke mengesahkan card, shortcut, contact reveal dan safe phone link.
+- [x] Commit chain: `9c16f47`, `0caa4fc`, `67d493c`, `3e21c26`, `4c16b0a`.
+- [x] Display version v2.4.0, asset/cache `2.4.0-r6` / `eouting-cache-v2.4.0-r6`, GAS Version 51 dan full regression **490/490**.
+- [x] Tiada schema, lifecycle, trigger, Telegram cadence, Phase 5 threshold, Script Properties atau deployment ID/URL change.
 
 ## Guardrail release GAS semasa
 
 Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
 
 - [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
-- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **465/465**, bersama syntax checks dan `git diff --check`.
+- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **490/490**, bersama syntax checks dan `git diff --check`.
 - [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
 - [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
 - [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.

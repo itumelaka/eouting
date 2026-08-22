@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r1`. Production menggunakan GAS Version 50, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Manifest kanonik ialah `Asia/Kuala_Lumpur` / `V8` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING`. Config-driven mode kekal aktif dan ready; No-Guard Departure pula currently enabled melalui Admin tetapi mempunyai safe default `false`. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Fasa 1–5 lengkap, deployed dan activated; No-Guard ialah sambungan operasi selepas Fasa 5, bukan Fasa 6. Full Node baseline kanonik semasa ialah **465/465**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r6`. Production menggunakan GAS Version 51, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Manifest kanonik ialah `Asia/Kuala_Lumpur` / `V8` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING`. Config-driven mode kekal aktif dan ready; No-Guard Departure pula currently enabled melalui Admin tetapi mempunyai safe default `false`. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Fasa 1–6 lengkap dan production verified; No-Guard kekal sambungan operasi selepas Fasa 5. Full Node baseline kanonik semasa ialah **490/490**.
 
 ## Komponen
 
@@ -168,6 +168,16 @@ lifecycle:          MENUNGGU_KELULUSAN -> DILULUSKAN_WARDEN -> KELUAR -> SELESAI
 return urgency:     NORMAL -> DUE_SOON -> LATE -> CRITICAL -> ACTION_REQUIRED
 notification audit: RETURN_REMINDER_SENT | RETURN_CRITICAL_SENT | RETURN_ACTION_REQUIRED_SENT
 ```
+
+### Guardian Contact Shortcut — Fasa 6
+
+Phase 6 menambah boundary akses contact yang sempit untuk Warden/HEP authenticated. Eligibility authoritative kekal pending/approved `KECEMASAN`, atau `KELUAR + CRITICAL/ACTION_REQUIRED`. `getOperationalTodayRecords` menghapuskan `telefon_waris`, `hubungan_waris` dan `nama_waris` daripada broad projection; hanya Warden menerima `guardian_contact_available` yang dihitung backend.
+
+`getGuardianContact` ialah POST authenticated dan tidak berada pada public GET. Endpoint membaca semula request, mengira semula urgency dan mengesahkan eligibility sebelum disclosure. Telefon dinormalisasi kepada URI `tel:` yang selamat. Successful retrieval memerlukan audit `GUARDIAN_CONTACT_ACCESSED` dengan context `EMERGENCY_REQUEST`, `CRITICAL_RETURN` atau `ACTION_REQUIRED_RETURN`; audit tidak mengandungi phone/relation, dan kegagalan audit fail-closed. Source nama penjaga tidak wujud, jadi projection detail menggunakan nama kosong dan UI memaparkan `Tidak direkodkan`.
+
+Frontend hanya merender shortcut apabila boolean availability yang selamat diterima; transport string `"true"` dinormalisasi tetapi nilai lain ditolak. Approved/risk membership menerima display status approved atau raw lifecycle `DILULUSKAN_WARDEN`, tanpa membaca `warden_approve_by`. Oleh itu `AUTO_CONFIG_V2` dan human-approved emergency berkongsi section read-only, sementara pending sorting Fasa 3, Guard checkout dan No-Guard fallback kekal berasingan.
+
+Fasa 6 tidak menambah schema, lifecycle, global approval rule, trigger, Telegram cadence, threshold, Script Property atau automatic outbound contact. Emergency priority kekal operational ordering; auto-approval hanya berlaku apabila `OUTING_TYPES.require_warden_approval=false`.
 
 ### Google Sheets
 
@@ -388,7 +398,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r1` dan query `2.4.0-r1`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency sentiasa diterbitkan selepas cache read menggunakan masa semasa.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r6` dan query `2.4.0-r6`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency sentiasa diterbitkan selepas cache read menggunakan masa semasa.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

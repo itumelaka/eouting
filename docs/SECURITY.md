@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 50** selepas aktivasi Fasa 5 dan sambungan No-Guard Departure. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, fallback config, expected-return, guardian atau internal diagnostic exposure.
+Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 51** selepas Fasa 6 production verification. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, fallback config, expected-return, guardian atau internal diagnostic exposure.
 
 ## Public Data Boundary
 
@@ -46,6 +46,16 @@ Jika credential hilang atau salah, frontend menunjukkan error terkawal. Authenti
 
 Authenticated `getStudentAnnualSummary` mengesahkan Pelajar aktif menggunakan gabungan `student_id` + `no_matrik`. Row `OUTING_REQUESTS` yang mempunyai kedua-dua identifier mesti sepadan pada kedua-duanya; fallback identifier tunggal hanya menyokong row legacy yang memang kehilangan salah satu nilai. Response sejarah tahunan dihadkan kepada `tarikh`, `jenis_permohonan` dan `status`, dan hanya row `SELESAI` tahun semasa yang turut menyumbang kepada `total_outings` dipulangkan. Rekod Pelajar lain serta tujuan, lokasi, kenderaan, approval, Guard, waris dan data selfie tidak dibawa ke frontend.
 
+### Guardian Contact authenticated boundary — Fasa 6
+
+- Eligibility ialah pending/approved `KECEMASAN` serta `KELUAR + CRITICAL/ACTION_REQUIRED`; client tidak mengira eligibility sendiri.
+- Broad Warden projection hanya menerima `guardian_contact_available`. `telefon_waris`, `hubungan_waris` dan `nama_waris` dibuang; Student, Guard dan Public tidak menerima availability flag atau raw contact.
+- Detail hanya melalui POST `getGuardianContact` selepas active Warden authentication. Role Warden/HEP diperoleh daripada derivation `WARDENS` sedia ada, bukan input client.
+- Endpoint membaca semula request dan menilai semula urgency pada access time. Stale card tidak boleh membuka contact selepas eligibility tamat.
+- Disclosure berjaya memerlukan audit `GUARDIAN_CONTACT_ACCESSED` dengan context `EMERGENCY_REQUEST`, `CRITICAL_RETURN` atau `ACTION_REQUIRED_RETURN`. Telefon/hubungan tidak ditulis dalam audit dan audit failure menghalang response detail.
+- Normalisasi telefon hanya membenarkan URI `tel:` yang selamat. Tiada WhatsApp/SMS automation, outbound contact automatik atau guardian-name source; UI menggunakan `Tidak direkodkan` untuk nama.
+- Approved emergency visibility menggunakan lifecycle `DILULUSKAN_WARDEN`, bukan actor identity. `AUTO_CONFIG_V2` tidak memberi Warden approval kedua dan tidak mengubah Guard/No-Guard authority.
+
 ## PIN dan Session
 
 PIN ialah basic internal access control, bukan authentication production-grade.
@@ -71,7 +81,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.4.0-r1`; displayed app version ialah v2.4.0.
+- Cache source semasa ialah `eouting-cache-v2.4.0-r6`; displayed app version ialah v2.4.0.
 - Cache operasi backend 20 saat menyimpan source row, bukan derived urgency; `operational_urgency` dihitung selepas cache read menggunakan masa semasa.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.

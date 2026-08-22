@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r1`, GAS Version 50 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Fasa 1–5 implemented, deployed dan activated. No-Guard Departure ialah sambungan operasi selepas Fasa 5, currently enabled melalui Admin; full Node baseline kanonik semasa ialah **465/465**.
+Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r6`, GAS Version 51 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Fasa 1–6 complete dan production verified. No-Guard Departure ialah sambungan operasi selepas Fasa 5, currently enabled melalui Admin; full Node baseline kanonik semasa ialah **490/490**.
 
 ## Flow keluar normal dan No-Guard
 
@@ -355,6 +355,35 @@ Stage mapping ialah `DUE_SOON -> RETURN_REMINDER_SENT`, `CRITICAL -> RETURN_CRIT
 
 Practical exactly-once limitation kekal: Telegram send dan Sheet audit bukan atomic. Send berjaya diikuti audit failure boleh dilaporkan sebagai `SENT_AUDIT_PARTIAL`; retry kemudian secara teori boleh duplicate. Trigger production kini aktif, tetapi tiada browser/frontend route kepada scanner.
 
+## Flow Guardian Contact Shortcut — Fasa 6
+
+```text
+authenticated Warden/HEP operational list
+        ↓
+backend broad projection removes telefon_waris / hubungan_waris
+        ↓
+eligible row receives guardian_contact_available=true
+        ↓
+frontend renders 📞 Hubungi Penjaga
+        ↓
+POST getGuardianContact with Warden credentials + request_id
+        ↓
+re-read authoritative request + re-evaluate urgency
+        ↓
+validate pending/approved KECEMASAN
+  OR KELUAR + CRITICAL/ACTION_REQUIRED
+        ↓
+normalize safe tel: phone
+        ↓
+write GUARDIAN_CONTACT_ACCESSED without raw contact
+        ↓
+return details and render 📞 Telefon Sekarang
+```
+
+Audit context ialah `EMERGENCY_REQUEST`, `CRITICAL_RETURN` atau `ACTION_REQUIRED_RETURN`; audit failure menghalang disclosure. Tiada WhatsApp/SMS atau automatic outbound contact. Source ialah `OUTING_REQUESTS.telefon_waris` dan `hubungan_waris`; nama penjaga tiada dalam schema dan dipaparkan sebagai `Tidak direkodkan`.
+
+Jika `OUTING_TYPES.require_warden_approval=false`, submission kekal auto-approved oleh `AUTO_CONFIG_V2` kepada `DILULUSKAN_WARDEN`. Frontend mengenali lifecycle authoritative itu dan meletakkan emergency di `Telah Diluluskan / Risiko Pulang`, bukan `Menunggu Kelulusan`, tanpa actor-based filter atau approval kedua. Guard terus melakukan checkout normal; No-Guard hanya fallback yang dikawal berasingan.
+
 ## Flow Pembatalan Pelajar
 
 ```text
@@ -439,6 +468,7 @@ Warden boleh:
 - melihat Dashboard dan Checklist Permohonan;
 - approve/reject dengan in-flight lock/loading yang menolak duplicate click;
 - salin senarai nama dengan emoji status.
+- melihat `📞 Hubungi Penjaga` secara on-demand bagi record Phase 6 yang backend tandakan eligible; broad list tidak membawa raw contact.
 
 Rekod `DIBATALKAN_PELAJAR` tidak berada dalam pending approval atau approved/actionable queue Warden. Jika muncul dalam sejarah authenticated, label dan sebab pembatalan boleh dipaparkan.
 
