@@ -309,6 +309,39 @@ test("update explicitly clears existing application window times and blank survi
   assert.equal(reloaded.application_close_time, "");
 });
 
+test("update explicitly clears fixed return time as a true blank and preserves non-blank updates", () => {
+  const { context, sheets } = createContext();
+  seed(context);
+  const sheet = sheets.get("OUTING_TYPES");
+  const before = context.getAdminOutingTypes(adminPayload())
+    .find((type) => type.type_code === "OUTING_BIASA");
+  const rowIndex = sheet.rows.findIndex((row) => row[0] === before.type_code);
+  const fixedTimeIndex = OUTING_HEADERS.indexOf("fixed_return_time");
+  assert.equal(sheet.rows[rowIndex][fixedTimeIndex], "22:00");
+
+  const cleared = context.updateOutingType(adminPayload({
+    type_code: before.type_code,
+    expected_config_version: before.config_version,
+    outing_type: { fixed_return_time: "" }
+  }));
+  assert.equal(cleared.fixed_return_time, "");
+  assert.equal(sheet.rows[rowIndex][fixedTimeIndex], "");
+  assert.notEqual(sheet.rows[rowIndex][fixedTimeIndex], "00:00");
+  assert.notEqual(sheet.rows[rowIndex][fixedTimeIndex], "12:00");
+
+  const reloadedBlank = context.getAdminOutingTypes(adminPayload())
+    .find((type) => type.type_code === before.type_code);
+  assert.equal(reloadedBlank.fixed_return_time, "");
+
+  const restored = context.updateOutingType(adminPayload({
+    type_code: before.type_code,
+    expected_config_version: cleared.config_version,
+    outing_type: { fixed_return_time: "21:15" }
+  }));
+  assert.equal(restored.fixed_return_time, "21:15");
+  assert.equal(sheet.rows[rowIndex][fixedTimeIndex], "21:15");
+});
+
 test("toggle changes only active, increments version and emits activate/deactivate audit", () => {
   const { context, sheets } = createContext();
   seed(context);

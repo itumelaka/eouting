@@ -27,7 +27,7 @@ function createAdminTimeFixture(initialValue = "07:37") {
     adminSortOrderInput: { value: "6" },
     adminOpenTimeInput: makeTimeInput("12:00"),
     adminCloseTimeInput: makeTimeInput("18:00"),
-    adminFixedReturnTimeInput: { value: "" },
+    adminFixedReturnTimeInput: makeTimeInput("22:00"),
     adminAllowedDays: {},
     adminDepartureAllowedDays: {},
     adminActiveInput: { value: "true" }
@@ -121,10 +121,24 @@ test("Admin can explicitly clear application open and close times into the updat
   assert.match(htmlSource, /id="adminClearCloseTimeButton"[^>]*>Kosongkan</);
 });
 
+test("Admin can explicitly clear fixed return time into the generic save payload", () => {
+  const context = createAdminTimeFixture();
+  context.clearTime(context.elements.adminFixedReturnTimeInput);
+
+  assert.equal(context.elements.adminFixedReturnTimeInput.value, "");
+  assert.equal(context.elements.adminFixedReturnTimeInput.focused, true);
+  assert.equal(context.collect().fixed_return_time, "");
+  assert.match(htmlSource, /id="adminClearFixedReturnTimeButton"[^>]*>Kosongkan</);
+  assert.match(htmlSource, /Kosong bermaksud tiada masa pulang tetap/);
+  const setupSource = sourceBetween("function setupAdminDashboardV200", "async function handleAdminLoginV200");
+  assert.match(setupSource, /adminClearFixedReturnTimeButton[\s\S]*clearAdminTimeInputV200\(els\.adminFixedReturnTimeInput\)/);
+});
+
 test("Admin editor assigns backend blanks directly with no time fallback", () => {
   const editorSource = sourceBetween("function openAdminEditEditorV200", "function closeAdminEditorV200");
   assert.match(editorSource, /adminOpenTimeInput\.value = type\.application_open_time \|\| ""/);
   assert.match(editorSource, /adminCloseTimeInput\.value = type\.application_close_time \|\| ""/);
+  assert.match(editorSource, /adminFixedReturnTimeInput\.value = type\.fixed_return_time \|\| ""/);
   assert.doesNotMatch(editorSource, /new Date|currentTime|00:00|12:00/);
 });
 

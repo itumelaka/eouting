@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r3">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r4">
   </head>
   <body>
     <header class="app-header">
@@ -579,9 +579,14 @@
               <fieldset class="admin-config-fieldset">
                 <legend>Peraturan dan Medan Wajib</legend>
                 <div class="admin-form-grid">
-                  <label>Masa Pulang Tetap
-                    <input id="adminFixedReturnTimeInput" type="time">
-                  </label>
+                  <div class="admin-field-group">
+                    <label for="adminFixedReturnTimeInput">Masa Pulang Tetap</label>
+                    <div class="admin-time-clear-control">
+                      <input id="adminFixedReturnTimeInput" type="time">
+                      <button class="secondary-action compact-action" id="adminClearFixedReturnTimeButton" type="button">Kosongkan</button>
+                    </div>
+                    <small class="admin-field-helper">Kosong bermaksud tiada masa pulang tetap.</small>
+                  </div>
                 </div>
                 <div class="admin-checkbox-grid admin-rule-grid">
                   <label><input id="adminSameDayInput" type="checkbox"> Pulang hari sama</label>
@@ -804,6 +809,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r3"></script>
+    <script src="assets/app.js?v=2.4.0-r4"></script>
   </body>
 </html>

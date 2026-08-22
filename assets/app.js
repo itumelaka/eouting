@@ -460,6 +460,7 @@ const els = {
   adminEarliestDepartureTimeInput: document.querySelector("#adminEarliestDepartureTimeInput"),
   adminClearEarliestDepartureTimeButton: document.querySelector("#adminClearEarliestDepartureTimeButton"),
   adminFixedReturnTimeInput: document.querySelector("#adminFixedReturnTimeInput"),
+  adminClearFixedReturnTimeButton: document.querySelector("#adminClearFixedReturnTimeButton"),
   adminAllowedDays: document.querySelector("#adminAllowedDays"),
   adminSameDayInput: document.querySelector("#adminSameDayInput"),
   adminRequireLeaveDateInput: document.querySelector("#adminRequireLeaveDateInput"),
@@ -749,6 +750,9 @@ function setupAdminDashboardV200() {
   }
   if (els.adminClearEarliestDepartureTimeButton) {
     els.adminClearEarliestDepartureTimeButton.addEventListener("click", () => clearAdminTimeInputV200(els.adminEarliestDepartureTimeInput));
+  }
+  if (els.adminClearFixedReturnTimeButton) {
+    els.adminClearFixedReturnTimeButton.addEventListener("click", () => clearAdminTimeInputV200(els.adminFixedReturnTimeInput));
   }
   els.adminTypeList.addEventListener("click", handleAdminTypeListActionV200);
   if (els.adminOutingTab) {
@@ -2218,7 +2222,7 @@ function collectAdminOutingTypeConfigV200() {
     application_close_time: String(els.adminCloseTimeInput.value || "").trim(),
     departure_allowed_days: departureAllowedDays.join(","),
     earliest_departure_time: String(els.adminEarliestDepartureTimeInput.value || "").trim(),
-    fixed_return_time: els.adminFixedReturnTimeInput.value || ""
+    fixed_return_time: String(els.adminFixedReturnTimeInput.value || "").trim()
   };
   getAdminRuleInputMapV200().forEach(([field, input]) => {
     config[field] = Boolean(input.checked);
