@@ -6,18 +6,19 @@ Status repo semasa: **v2.4.0 — production verified**.
 
 Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **22 Ogos 2026** ialah **config-driven production ACTIVE dan Ready** pada release v2.4.0 dengan GAS Version 52. Displayed version ialah v2.4.0, cache/asset source revision ialah `2.4.0-r7` dan service-worker cache ialah `eouting-cache-v2.4.0-r7`. Production beroperasi normal.
+Verdict semasa pada **22 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 55, cache/asset `2.4.0-r12` dan service worker `eouting-cache-v2.4.0-r12`. Config-driven outing serta Dynamic Student Login aktif dan ready. Production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6 serta Generic Application Date Window semuanya complete/production verified pada 22 Ogos 2026. No-Guard Departure ialah sambungan operasi selepas Fasa 5, implemented dan deployed melalui Versions 47–50, serta currently enabled melalui Admin. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **501/501**.
+`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX dan Current Hostel Residents semuanya **COMPLETE / PRODUCTION VERIFIED**. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **587/587**.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
 Production boundary semasa:
 
-- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 52**;
+- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 55**;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
+- `STUDENT_GROUP_CONFIG_ENABLED=true`; migration complete dan Dynamic Student Login production aktif untuk A2, A3, LI UMK dan LI UPM;
 - `TELEGRAM_ENABLED=true` kekal aktif;
 - `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false tetapi current production state ialah enabled; Admin hanya mengawal config dan Warden kekal fallback confirmer;
 - canonical Web App contract ialah `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING`, `ANYONE_ANONYMOUS`;
@@ -44,8 +45,8 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r7`.
-- Backend GAS production ialah **Version 52** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
+- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r12`.
+- Backend GAS production ialah **Version 55** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -98,7 +99,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r7`.
+- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r12`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -114,6 +115,25 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Public Monitoring berfungsi pada klik pertama dan Statistik Admin inline berjaya dimuatkan tanpa meninggalkan sesi Admin.
 - Production smoke test mengesahkan upload Pelajar, thumbnail Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar, secure full preview, Public Pemantauan photo-free, keyboard Enter, rolling KPI serta two-tier performance optimisation.
 
+## Student Groups dan Dynamic Student Login — COMPLETE / PRODUCTION VERIFIED
+
+- Foundation `STUDENT_GROUPS`, `LI_INSTITUTIONS` dan `STUDENTS.institution_code`, Admin management, readiness, migration, activation dan rollback telah production verified.
+- Migration menulis 19 rekod LI dengan **0 unmatched** dan **0 conflict**. `institution_code` authoritative; prefix ID ialah migration-only.
+- Login directory dibina backend dengan projection minimum `student_id` + `nama`. Login authentication kekal `student_id` + `no_matrik`, kelas kanonik LI kekal `LI`.
+- Kumpulan production tersusun A2, A3, LI UMK dan LI UPM. Kumpulan/institusi masa hadapan diurus melalui Admin tanpa ordinary source-code change.
+- Rollback terkawal: `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
+
+## Active-request Application-form UX — COMPLETE / PRODUCTION VERIFIED
+
+Apabila canonical current record berada dalam `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` atau `KELUAR`, borang permohonan baharu disembunyikan dan notis kompak dipaparkan. Borang kembali bagi status terminal atau tiada current request. Ini presentation UX sahaja; backend duplicate protection kekal authoritative.
+
+## Current Hostel Residents — COMPLETE / PRODUCTION VERIFIED
+
+- Rule authoritative ialah Pelajar aktif tolak Pelajar yang current lifecycle-nya ialah `KELUAR`; inactive Student dikecualikan.
+- Presence diturunkan daripada data lifecycle, tidak dipersist, dan tiada `IN_HOSTEL` source of truth kedua.
+- Public menerima aggregate counts/group breakdown sahaja. Admin, Warden/HEP dan Guard authenticated menerima roster minimum nama, dikelompokkan mengikut konfigurasi dynamic.
+- Production endpoint mengesahkan 49 Pelajar aktif = 48 di luar + 1 di asrama; roster authenticated mengenal pasti baki Pelajar ujian aktif tanpa mendedahkan namanya dalam dokumentasi.
+
 ## Generic Application Date Window — COMPLETE / PRODUCTION VERIFIED
 
 Commit `76c6898` menambah capability generik bagi semua `OUTING_TYPES`, bukan rule khas `CUTI_SEMESTER`. `application_open_date` dan `application_close_date` optional menggunakan canonical `YYYY-MM-DD`; blank mengekalkan behavior lama, open/close adalah inklusif, same-day sah dan invalid/reversed range ditolak. Tarikh, hari dan masa permohonan semuanya mesti lulus.
@@ -122,7 +142,7 @@ Migration production melalui `setupAdminOutingConfigV200()` pada 22 Ogos 2026 me
 
 Student smoke dengan future open date memaparkan `Permohonan dibuka mulai 1 Oktober 2026.`, membenarkan attempt mencapai GAS dan menerima backend rejection sebelum persistence. Inspection `OUTING_REQUESTS` mengesahkan zero row test. Safe Student projection membawa dua tarikh bagi guidance sahaja; config version internals, creator/updater dan timestamp tidak diluaskan.
 
-Release menggunakan frontend/cache r7, GAS Version 52 dan existing production deployment in-place; `@HEAD` tidak disentuh. Lifecycle, approval semantics, Guard authority, No-Guard, Guardian Contact, Phase 5 scanner/Telegram cadence/trigger, Script Properties dan existing blank config behavior tidak berubah.
+Milestone ini menggunakan frontend/cache r7 dan GAS Version 52; ia kekal rekod sejarah sebelum current production r12 / GAS Version 55.
 
 ## Phase 6 — COMPLETE / PRODUCTION VERIFIED
 

@@ -14,11 +14,19 @@ Versi repo semasa: **v2.4.0 — Production Verified**.
 
 Frontend production v2.4.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Revision aset frontend semasa ialah `2.4.0-r7` dan service worker menggunakan `eouting-cache-v2.4.0-r7`.
+Revision aset frontend semasa ialah `2.4.0-r12` dan service worker menggunakan `eouting-cache-v2.4.0-r12`.
 
-Backend production semasa menggunakan GAS **Version 52**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`. Frontend kanonik kekal `https://itumelaka.github.io/eouting/`. Manifest Web App kanonik ialah timezone `Asia/Kuala_Lumpur`, runtime `V8`, `executeAs=USER_DEPLOYING` dan `access=ANYONE_ANONYMOUS`; access anonymous ini ialah akses transport API, bukan kuasa aplikasi tanpa authentication. `OUTING_CONFIG_V2_ENABLED=true` telah aktif sejak 10 Ogos 2026 dan `OUTING_TYPES` ialah source authoritative bagi peraturan outing yang disokong. `gas/Code.gs` ialah source GAS executable kanonik dan `.claspignore` mengehadkan push kepada `gas/Code.gs` serta `gas/appsscript.json`. Snapshot lama `gas/Code.production-v171.gs` bukan source kanonik dan tidak boleh dideploy.
+Backend production semasa menggunakan GAS **Version 55** pada deployment sedia ada. Manifest Web App kanonik kekal `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING` dan `ANYONE_ANONYMOUS`; akses anonymous ialah transport API, bukan kuasa aplikasi tanpa authentication. `OUTING_CONFIG_V2_ENABLED=true` dan `STUDENT_GROUP_CONFIG_ENABLED=true`; `OUTING_TYPES` kekal authoritative bagi peraturan outing, manakala konfigurasi kumpulan Pelajar production aktif. `gas/Code.gs` ialah source GAS executable kanonik.
 
-Production yang disahkan sehingga 22 Ogos 2026 meletakkan `Status Semasa` Pelajar di atas borang sebagai kawasan authoritative bagi rekod aktif serta tindakan batal/selfie yang layak. Bahagian bawah mengandungi `Refresh Status`, jumlah outing tahunan dan `Rekod Outing Saya` dalam baris kompak. Jumlah dan sejarah menggunakan skop authenticated yang sama: hanya rekod `SELESAI` bagi tahun semasa, disusun paling baharu dahulu. Foundation Operational Urgency Fasa 1 telah dilengkapkan melalui commit `dde1fc4`; Student Live Status Clarity Fasa 2 melalui `89d6b46`; Warden Approval Prioritisation + Emergency Mode Fasa 3 melalui `5443375`; Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 melalui `d0be685`; Telegram Return Reminder + Late Escalation Scanner Fasa 5 melalui `54d526b`; dan Guardian Contact Shortcut Fasa 6 melalui `9c16f47` bersama hardening `0caa4fc`, `67d493c`, `3e21c26` dan `4c16b0a`. Generic Application Date Window dilengkapkan melalui `76c6898`. Fasa 1–6 dan date-window generik kini lengkap serta production verified. No-Guard Departure kekal sambungan operasi selepas Fasa 5. Full Node baseline kanonik semasa ialah **501/501 lulus**.
+Production yang disahkan sehingga 22 Ogos 2026 merangkumi Fasa 1–6, Generic Application Date Window, Dynamic Student Login, active-request application-form suppression dan Current Hostel Residents. Full Node baseline kanonik semasa ialah **587/587 lulus**.
+
+### Kumpulan Pelajar, login dan penghuni semasa
+
+- Admin mengurus `STUDENT_GROUPS`, `LI_INSTITUTIONS` dan penugasan `institution_code` melalui `Tetapan Pelajar`; kumpulan login production ialah A2, A3, LI UMK dan LI UPM.
+- `institution_code` ialah kuasa runtime bagi institusi LI; prefix ID hanya digunakan ketika migration. Login kekal menggunakan `student_id` + `no_matrik`, dan kelas kanonik LI kekal `LI`.
+- Kumpulan atau institusi masa hadapan boleh diwujudkan melalui Admin tanpa perubahan source code biasa. Control `Kembali ke Login Legacy` menyediakan rollback terkawal.
+- Apabila permohonan aktif authoritative wujud, borang permohonan baharu disembunyikan sebagai UX; perlindungan duplicate backend kekal authoritative.
+- `Penghuni Semasa Asrama` dikira daripada Pelajar aktif tolak lifecycle semasa `KELUAR`. Public menerima kiraan agregat sahaja; Admin, Warden/HEP dan Guard authenticated menerima roster minimum nama yang dikumpulkan secara dinamik.
 
 ## No-Guard Departure — sambungan operasi selepas Fasa 5
 
@@ -363,7 +371,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo kanonik semasa selepas Generic Application Date Window close-out ialah **501/501 lulus**. Focused Phase 5 suite `tests/telegram-return-notifications-phase5.test.js` ialah milestone **15/15 lulus**. Temporary installer verification pernah mencapai **17/17 focused** dan **446/446 full**, tetapi test sementara telah dibuang dan angka itu bukan baseline semasa. Focused Phase 4 suite `tests/admin-operational-intelligence-phase4.test.js` kekal milestone **9/9 lulus**. Regression date-window meliputi schema/migration, Admin persistence/clear, safe projection, Malaysia boundary, additive day/time rules dan rejection tanpa append; Guardian Contact/visibility serta No-Guard kekal dilindungi oleh suite khusus masing-masing. Syntax checks:
+Baseline repo kanonik semasa selepas Current Hostel Residents production close-out ialah **587/587 lulus**. Angka focused dan full yang lebih lama dalam changelog ialah milestone sejarah. Regression semasa turut melindungi Student Group configuration/migration, Dynamic Student Login, active-request form suppression, privacy aggregate public dan roster penghuni authenticated. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -404,6 +412,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.4.0 semasa ialah GAS **Version 52**, `OUTING_CONFIG_V2_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.4.0-r7`. Version 44–51 kekal milestone sejarah sebelum Generic Application Date Window Version 52. Rollback config-driven segera boleh dibuat dengan menetapkan property kepada `false`; ia mengembalikan laluan legacy tanpa code push atau GAS deployment.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.4.0 semasa ialah GAS **Version 55**, `OUTING_CONFIG_V2_ENABLED=true`, `STUDENT_GROUP_CONFIG_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.4.0-r12`. Version 44–54 kekal milestone sejarah. Rollback dynamic login boleh dilakukan melalui `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`; rollback config-driven outing kekal melalui property sedia ada.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

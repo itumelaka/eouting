@@ -5,7 +5,7 @@ Google Sheets ialah database dan source of truth eOuting ITU v2.4.0. Production 
 ## `STUDENTS`
 
 ```text
-student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan | photo_file_id | photo_updated_at
+student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan | photo_file_id | photo_updated_at | institution_code
 ```
 
 - `student_id` ialah identifier dalaman yang digunakan oleh frontend login.
@@ -17,6 +17,7 @@ student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | cata
 - `photo_updated_at` ialah masa kemas kini berjaya dalam zon Asia/Kuala_Lumpur. Base64 tidak disimpan dalam Sheet.
 - Admin list menerima hanya `has_profile_photo` dan `photo_updated_at`; `photo_file_id` tidak dihantar. Thumbnail dibaca melalui POST batch authenticated `photo_variant = "thumbnail"` dan dipetakan menggunakan `student_id` yang dinormalisasi. Drive metadata/URL/token kekal server-side.
 - Preview besar tidak menambah schema atau menyimpan data baharu. POST authenticated `photo_variant = "full"` membaca satu imej stored-compressed untuk satu pelajar apabila diperlukan dan frontend mencachenya sepanjang sesi.
+- `institution_code` ialah assignment authoritative bagi Pelajar dalam kelas/group yang memerlukan institusi, kini LI. Ia kosong bagi A2/A3 dan tidak mengubah nilai kelas kanonik `LI`.
 
 Public `getStudents` hanya mengeluarkan:
 
@@ -25,6 +26,22 @@ student_id | nama | kelas
 ```
 
 Field lain dalam sheet tidak menjadi sebahagian daripada direktori awam.
+
+## `STUDENT_GROUPS`
+
+```text
+group_code | display_name | institution_required | active | sort_order | config_version | created_at | created_by | updated_at | updated_by
+```
+
+Konfigurasi ini menentukan kumpulan Pelajar dan sama ada sub-kumpulan institusi diperlukan. Code immutable, versioning optimistic dan deactivation guards dikawal melalui Admin; tiada destructive delete workflow.
+
+## `LI_INSTITUTIONS`
+
+```text
+institution_code | display_name | active | sort_order | config_version | created_at | created_by | updated_at | updated_by
+```
+
+`institution_code` dipadankan dengan `STUDENTS.institution_code`. Prefix Student ID hanya input migration legacy dan bukan runtime source of truth.
 
 ## `WARDENS`
 
@@ -105,6 +122,14 @@ Kolum bukti selfie v1.7.0:
 Field `selfie_*`, folder `SELFIE_FOLDER_ID`, submission `submitReturnSelfie` dan Telegram `sendPhoto` tidak digunakan oleh foto profil. Foto profil hanya menggunakan `STUDENTS.photo_file_id`, `photo_updated_at` dan `PROFILE_PHOTO_FOLDER_ID`; kedua-dua bukti kekal private dan berasingan.
 
 ## Public Monitoring Projection
+
+Current Hostel Residents tidak menambah kolum atau sheet presence. Nilainya diturunkan sebagai:
+
+```text
+ACTIVE STUDENTS - current lifecycle KELUAR = CURRENT HOSTEL RESIDENTS
+```
+
+Public summary membawa aggregate/group counts sahaja. Roster authenticated untuk Admin/Warden/Guard memproyeksikan `nama` sahaja. Tiada `IN_HOSTEL` field atau source of truth kedua.
 
 Public GET `getTodayRecords` membaca `OUTING_REQUESTS` tetapi memproyeksikan hanya:
 

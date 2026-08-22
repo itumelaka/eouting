@@ -1,10 +1,10 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Repo eOuting v2.4.0 menggunakan backend production GAS Web App **Version 52**, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint sedia ada yang tidak berubah. Manifest kanonik ialah `Asia/Kuala_Lumpur`, runtime `V8`, `ANYONE_ANONYMOUS` dan `USER_DEPLOYING`. `OUTING_CONFIG_V2_ENABLED=true`; config-driven kekal Active + Ready. `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false dan kini enabled melalui Admin. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy. Phase 5 scanner production kekal tepat satu trigger `scanReturnOperationalNotifications_` setiap lima minit. Phase 6 Guardian Contact Shortcut dan Generic Application Date Window telah production verified; date window tidak menambah trigger, Script Properties atau schema `OUTING_REQUESTS`.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production v2.4.0 menggunakan GAS **Version 55**, `OUTING_CONFIG_V2_ENABLED=true` dan `STUDENT_GROUP_CONFIG_ENABLED=true`. Dynamic Student Login dan Current Hostel Residents telah production verified; manifest, Spreadsheet, endpoint dan source backend kanonik kekal sedia ada.
 
 ## Tanggungjawab Backend
 
-- membaca `STUDENTS`, `WARDENS`, `GUARDS` dan `OUTING_REQUESTS`;
+- membaca `STUDENTS`, `STUDENT_GROUPS`, `LI_INSTITUTIONS`, `WARDENS`, `GUARDS` dan `OUTING_REQUESTS`;
 - mengesahkan login Pelajar, Warden dan Guard;
 - menghalang duplicate active request;
 - membatalkan permohonan milik Pelajar secara atomic daripada status menunggu atau diluluskan, tanpa memadam rekod;
@@ -13,6 +13,7 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - menyelesaikan expected-return authoritative dan menerbitkan urgency `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` atau `ACTION_REQUIRED` bagi rekod aktif `KELUAR`;
 - menyediakan projection public minimum dan rekod operasi authenticated;
 - menyediakan jumlah serta sejarah minimum authenticated bagi rekod `SELESAI` Pelajar dalam tahun semasa;
+- membina direktori login dynamic dan derived Current Hostel Residents tanpa mempersist presence;
 - mengira statistik agregat;
 - menulis `AUDIT_LOG`;
 - menyimpan dan menyediakan satu Notis Banner authenticated melalui Script Properties;
@@ -30,6 +31,8 @@ Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets
 - `getGuards`
 - `getTodayRecords`
 - `getOutingStats`
+- `getStudentLoginDirectory`
+- `getCurrentHostelSummary`
 
 Boundary penting:
 
@@ -37,6 +40,8 @@ Boundary penting:
 - `getTodayRecords` hanya mengembalikan `nama`, `kelas`, `jenis_permohonan`, `status`, `lewat`, `belum_masuk`.
 - `getTodayRecords` awam tidak mengembalikan nested `operational_urgency` atau timing diagnostic tepat.
 - `getOutingStats` hanya mengembalikan aggregate structures/counts.
+- `getStudentLoginDirectory` hanya membawa grouping serta `student_id` + `nama`; `no_matrik` dan raw `institution_code` tidak didedahkan.
+- `getCurrentHostelSummary` aggregate-only dan tidak membawa nama atau identifier Pelajar.
 
 Jangan tambah PII atau metadata operasi kepada response public tanpa security review dan regression test.
 
@@ -55,6 +60,7 @@ Jangan tambah PII atau metadata operasi kepada response public tanpa security re
 - `confirmOut`
 - `confirmIn`
 - `submitReturnSelfie`
+- `getCurrentHostelRoster`
 
 Authenticated `getTodayRecords` mengesahkan:
 
@@ -63,6 +69,8 @@ Authenticated `getTodayRecords` mengesahkan:
 - Guard: nama Guard + PIN.
 
 Pelajar hanya menerima rekod sendiri. Warden dan Guard menerima rekod operasi yang diperlukan. Projection authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`; ia diterbitkan selepas cache source operasi 20 saat dibaca dan tidak dicache sebagai state. Credential tidak lengkap atau salah mesti menghasilkan error; jangan fallback kepada public GET.
+
+`getCurrentHostelRoster` menerima Admin, Warden/HEP atau Guard authenticated sahaja dan memulangkan nama minimum. Dynamic-login rollback dibuat melalui `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`; jangan mengubah Script Properties secara manual untuk operasi biasa.
 
 ## Credential dan Secret
 

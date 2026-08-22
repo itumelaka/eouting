@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow semasa **v2.4.0**, cache revision `2.4.0-r7`, GAS Version 52 dan `OUTING_CONFIG_V2_ENABLED=true` (Active + Ready). Fasa 1–6 serta Generic Application Date Window complete dan production verified. No-Guard Departure ialah sambungan operasi selepas Fasa 5, currently enabled melalui Admin; full Node baseline kanonik semasa ialah **501/501**.
+Dokumen ini menerangkan flow production **v2.4.0**, cache `2.4.0-r12`, GAS Version 55, config outing active + ready dan Dynamic Student Login ON. Full Node baseline kanonik ialah **587/587**.
 
 ## Flow keluar normal dan No-Guard
 
@@ -34,6 +34,32 @@ Student tidak pernah self-checkout dan request sahaja tidak menghasilkan `KELUAR
 `NO_GUARD_DEPARTURE_ENABLED` hanya aktif bagi nilai tepat `"true"`; safe default ialah false tetapi production close-out kini ON. Apabila OFF, Student request baharu dan Warden fallback confirmation ditolak, sejarah audit kekal, dan unresolved request boleh actionable semula apabila ON. Admin hanya mengawal toggle, bukan authority checkout.
 
 Jika request Telegram gagal, request/waiting UI/queue kekal dan tiada retry automatik. Jika completion Telegram gagal selepas transition, audit dan flush, `KELUAR`, `masa_keluar` dan audit kekal committed, `guard_keluar_by` kekal blank, serta tiada rollback atau automatic retry.
+
+## Dynamic Student Login
+
+```text
+GET getStudentLoginDirectory
+  -> backend baca STUDENT_GROUPS + LI_INSTITUTIONS + active STUDENTS
+  -> institution_code menentukan institusi LI
+  -> projection Pelajar minimum student_id + nama
+  -> Pelajar pilih kumpulan dan identiti
+  -> loginStudent sahkan student_id + no_matrik pada STUDENTS authoritative
+```
+
+Kumpulan production ialah A2, A3, LI UMK dan LI UPM. Prefix ID tidak digunakan ketika runtime. Jika config tidak valid atau rollback dipilih, backend kembali kepada kumpulan legacy dengan authentication yang sama.
+
+## Current Hostel Residents
+
+```text
+active STUDENTS
+  -> pilih authoritative current request setiap Pelajar
+  -> current status KELUAR = outside
+  -> status lain / tiada request = in hostel
+  -> public GET: aggregate sahaja
+  -> authenticated POST Admin/Warden/Guard: nama sahaja, grouped
+```
+
+Interpretasi operasi ialah **anggaran semasa berdasarkan rekod keluar/masuk eOuting**. Approved tetapi belum checkout masih di asrama; `SELESAI` bermaksud kembali; inactive Student dikecualikan. Tiada tuntutan biometric atau kepastian fizikal.
 
 ## Backend Config API v2.0
 
@@ -449,7 +475,7 @@ Field masa sahaja dinormalkan di boundary GAS kepada `HH:mm` dalam `Asia/Kuala_L
 
 Direktori public hanya membekalkan `student_id`, `nama` dan `kelas`. Dropdown menggunakan `student_id` sebagai value dalaman dan memaparkan nama. Nombor matrik ditaip berasingan dan backend memadankan kedua-dua credential dengan row Google Sheets.
 
-Pelajar hanya menerima rekod sendiri melalui authenticated POST. `getTodayRecords` membekalkan rekod operasi live/current dan nested `operational_urgency` untuk `Status Semasa`; active request menghalang permohonan baharu sehingga selesai, ditolak atau dibatalkan. Student presentation menggunakan state, `expected_return_at` dan `next_transition_at` authoritative daripada backend dan tidak memiliki threshold classification. Butang `Batal Permohonan` hanya hadir untuk rekod sendiri yang pending/approved.
+Pelajar hanya menerima rekod sendiri melalui authenticated POST. `getTodayRecords` membekalkan rekod operasi live/current dan nested `operational_urgency` untuk `Status Semasa`; active request menghalang permohonan baharu sehingga selesai, ditolak atau dibatalkan. Ketika status `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` atau `KELUAR`, UI menyembunyikan borang baharu dan memaparkan notis kompak. Ini UX sahaja; backend duplicate protection kekal authoritative. Student presentation menggunakan state, `expected_return_at` dan `next_transition_at` authoritative daripada backend dan tidak memiliki threshold classification. Butang `Batal Permohonan` hanya hadir untuk rekod sendiri yang pending/approved.
 
 Hierarki workspace Pelajar ialah Announcement Banner, navigasi, `ruleNotice`, identiti, `Status Semasa`, borang outing, kemudian bahagian bawah Refresh Status, jumlah tahunan dan `Rekod Outing Saya`. `Status Semasa` di atas borang ialah kawasan authoritative untuk rekod aktif/actionable serta tindakan pembatalan atau return-selfie apabila layak. Borang dan logic pemilihan current record tidak berubah.
 

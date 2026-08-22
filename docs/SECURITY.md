@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan repo **v2.4.0 / GAS Version 52** selepas Fasa 6 dan Generic Application Date Window production verification. Frontend ialah laman statik yang boleh diperiksa oleh pengguna; authorization sebenar mesti berlaku di GAS dan Google Sheets. Trigger private scanner setiap lima minit tidak menambah route frontend/public, dan Public Monitoring kekal tanpa urgency private, fallback config, expected-return, guardian atau internal diagnostic exposure.
+Dokumen ini menerangkan boundary keselamatan production **v2.4.0 / GAS Version 55 / frontend r12** pada 22 Ogos 2026. Frontend ialah laman statik yang boleh diperiksa; authorization sebenar berlaku di GAS dan Google Sheets.
 
 ## Public Data Boundary
 
@@ -9,6 +9,8 @@ Public `getStudents` hanya mengembalikan:
 ```text
 student_id | nama | kelas
 ```
+
+Dynamic login menggunakan `getStudentLoginDirectory` yang dibina backend. Setiap entry Pelajar hanya membawa `student_id` + `nama`; `no_matrik` tidak diekspos dan authentication tetap menyemak `student_id` + `no_matrik` terhadap `STUDENTS`. Visual group bukan authority authentication, `institution_code` authoritative untuk grouping LI, dan prefix ID ialah migration-only.
 
 Public GET `getTodayRecords` hanya mengembalikan:
 
@@ -32,7 +34,11 @@ Nama dibenarkan pada Public Monitoring read-only v1.6.25. PII dan metadata berik
 
 Endpoint compatibility `getOutingStats` hanya menyediakan aggregated counts, bukan row mentah atau leaderboard individu. Landing awam tidak menyediakan kad atau navigasi Statistik; UI Statistik dan data individu hanya tersedia dalam sesi Admin authenticated.
 
+Public `getCurrentHostelSummary` hanya memulangkan `generated_at`, tiga total dan breakdown kumpulan safe key/label/count. Ia tidak membawa nama, `student_id`, `no_matrik`, contact atau raw `institution_code`; public UI tidak menerima hidden roster names.
+
 ## Authenticated Operational Records
+
+`getCurrentHostelRoster` mengesahkan Admin, Warden/HEP atau Guard pada backend sebelum memulangkan projection Pelajar minimum `nama`. Grouping menggunakan konfigurasi active, nama disusun alfabet, dan Student/Public tidak mempunyai route roster detail. Presence sendiri diturunkan daripada lifecycle; hanya `KELUAR` bermaksud outside dan tiada `IN_HOSTEL` source of truth.
 
 Rekod operasi menggunakan POST `getTodayRecords` yang berasingan:
 
@@ -81,7 +87,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.4.0-r7`; displayed app version ialah v2.4.0.
+- Cache source semasa ialah `eouting-cache-v2.4.0-r12`; displayed app version ialah v2.4.0.
 - Cache operasi backend 20 saat menyimpan source row, bukan derived urgency; `operational_urgency` dihitung selepas cache read menggunakan masa semasa.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
@@ -95,6 +101,8 @@ Frontend boleh memaparkan notice berdasarkan tarikh peranti yang diformat sebaga
 Blank dates mengekalkan behavior sedia ada. Date window tidak memberi role baharu, tidak meluaskan approval/Guard/No-Guard/Guardian Contact authority dan tidak mengubah Telegram, trigger, Script Properties atau lifecycle.
 
 ## Backend Validation
+
+Active-request application-form suppression ialah UX sahaja. Backend duplicate detection dan lifecycle validation kekal authoritative walaupun client state stale atau form dimanipulasi.
 
 GAS mesti mengesahkan:
 

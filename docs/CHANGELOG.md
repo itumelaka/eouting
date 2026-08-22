@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-22 — Student Groups, Dynamic Login dan Current Hostel Residents production close-out (v2.4.0)
+
+- Student Group Fasa A–D menambah foundation `STUDENT_GROUPS`, `LI_INSTITUTIONS` dan `STUDENTS.institution_code`, Admin management dengan optimistic versioning/deactivation guards, readiness + dry-run/apply migration, serta activation dan rollback Dynamic Student Login yang terkawal.
+- Production migration memproses 19 Pelajar LI: **19 `institution_code` ditulis, 0 unmatched dan 0 conflicts**. `institution_code` kini authoritative; prefix `LIUMK-`/`LIUPM-` kekal migration-only.
+- Dynamic Student Login diaktifkan dengan urutan A2, A3, LI UMK dan LI UPM. Login authentication kekal `student_id` + `no_matrik`, kelas kanonik LI kekal `LI`, dan smoke keempat-empat kumpulan berjaya. Rollback tersedia melalui `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
+- Commit `f0fe872` menyembunyikan borang permohonan baharu apabila canonical current request berada dalam `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` atau `KELUAR`; ini ialah UX sahaja dan backend duplicate protection kekal authoritative.
+- Commit `25fefa6` menambah Current Hostel Residents: Pelajar aktif tolak Pelajar yang current lifecycle authoritative ialah `KELUAR`. Presence tidak dipersist dan tiada field/sheet `IN_HOSTEL` diwujudkan.
+- Public `getCurrentHostelSummary` membawa aggregate sahaja. Roster nama minimum hanya tersedia melalui authenticated `getCurrentHostelRoster` untuk Admin, Warden/HEP dan Guard, dikelompokkan mengikut konfigurasi dynamic tanpa `student_id`, nombor matrik, contact atau raw `institution_code`.
+- Production smoke mengesahkan kiraan public, equation total, kumpulan dynamic, tiada kebocoran nama awam, serta roster authenticated yang mengenal pasti baki Pelajar ujian aktif tanpa merekodkan nama sensitif dalam dokumentasi.
+- Production akhir menggunakan GAS **Version 55**, frontend/cache `2.4.0-r12` / `eouting-cache-v2.4.0-r12`, display v2.4.0 dan full regression **587/587**.
+
 ## 2026-08-22 — Generic Application Date Window production close-out (v2.4.0)
 
 - Commit `76c6898` menambah `OUTING_TYPES.application_open_date` dan `application_close_date` sebagai medan optional generik `YYYY-MM-DD`; blank mengekalkan behavior lama, open/close ialah inklusif dan close-before-open/tarikh tidak sah ditolak.

@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r7`. Production menggunakan GAS Version 52, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint Web App production sedia ada. Manifest kanonik ialah `Asia/Kuala_Lumpur` / `V8` / `ANYONE_ANONYMOUS` / `USER_DEPLOYING`. Config-driven mode kekal aktif dan ready; No-Guard Departure pula currently enabled melalui Admin tetapi mempunyai safe default `false`. Backend kanonik ialah `gas/Code.gs`; snapshot `gas/Code.production-v171.gs` bukan source deploy. Fasa 1–6 serta Generic Application Date Window lengkap dan production verified; No-Guard kekal sambungan operasi selepas Fasa 5. Full Node baseline kanonik semasa ialah **501/501**.
+Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r12`. Production menggunakan GAS Version 55, Dynamic Student Login aktif, dan full Node baseline **587/587**. Manifest, endpoint dan backend kanonik kekal seperti sedia ada.
 
 ## Komponen
 
@@ -187,6 +187,18 @@ Frontend hanya merender shortcut apabila boolean availability yang selamat diter
 
 Fasa 6 tidak menambah schema, lifecycle, global approval rule, trigger, Telegram cadence, threshold, Script Property atau automatic outbound contact. Emergency priority kekal operational ordering; auto-approval hanya berlaku apabila `OUTING_TYPES.require_warden_approval=false`.
 
+### Dynamic Student Login dan Student Group Configuration
+
+Backend membina direktori login melalui `getStudentLoginDirectory`. Public projection setiap Pelajar hanya `student_id` + `nama`; `no_matrik` tidak dihantar dan kekal input authentication bersama `student_id` terhadap row `STUDENTS` authoritative. Visual group ialah presentation/login grouping sahaja: kelas kanonik A2/A3/LI tidak berubah.
+
+`STUDENT_GROUPS` dan `LI_INSTITUTIONS` menentukan kumpulan aktif serta susunan. Bagi LI, `STUDENTS.institution_code` authoritative; prefix `LIUMK-`/`LIUPM-` hanya digunakan semasa migration dan tidak dirujuk untuk grouping runtime. Config invalid atau feature disabled fallback selamat kepada direktori legacy. Activation dan rollback dikawal Admin dengan readiness guard.
+
+### Current Hostel Residents
+
+Presence diturunkan setiap refresh daripada Pelajar aktif dan authoritative current lifecycle: hanya `KELUAR` bermaksud di luar. Tiada presence flag, cache jangka panjang atau `IN_HOSTEL` source of truth. `getCurrentHostelSummary` ialah GET aggregate-only; `getCurrentHostelRoster` ialah POST authenticated bagi Admin, Warden/HEP dan Guard, dengan projection nama minimum.
+
+Grouping roster menggunakan login directory/config yang sama, tetapi core presence calculation tidak bergantung pada `institution_code`, prefix ID atau label group. Public UI tidak pernah menerima hidden resident names.
+
 ### Google Sheets
 
 Google Sheets ialah database dan source of truth. Tab utama:
@@ -198,6 +210,8 @@ Google Sheets ialah database dan source of truth. Tab utama:
 - `AUDIT_LOG`
 - `OUTING_TYPES` — source authoritative konfigurasi outing production
 - `ADMIN_USERS` — identiti Admin private
+- `STUDENT_GROUPS` — konfigurasi kumpulan login/presentation
+- `LI_INSTITUTIONS` — konfigurasi institusi LI
 
 Semua field masa sahaja yang keluar daripada Sheet (`masa_balik_dijangka`, `fixed_return_time`, `application_open_time`, `application_close_time`, `earliest_departure_time`) melalui normalisasi backend kanonik kepada `HH:mm` menggunakan `Asia/Kuala_Lumpur`. Frontend mempunyai pertahanan kecil untuk payload legacy 1899, tanpa menambah atau menolak offset masa secara manual.
 
@@ -271,6 +285,10 @@ nama | kelas | jenis_permohonan | status | lewat | belum_masuk
 
 `GET getOutingTypes` memulangkan projection konfigurasi yang selamat. Selagi feature flag bukan `true`, ia memulangkan lima konfigurasi legacy daripada code. Apabila flag `true`, hanya row aktif dipulangkan mengikut `sort_order`; metadata version/audit/Admin tidak didedahkan.
 
+`GET getStudentLoginDirectory` memulangkan kumpulan login dengan Pelajar minimum `student_id` + `nama`; `no_matrik`, contact dan raw `institution_code` tidak dipulangkan.
+
+`GET getCurrentHostelSummary` memulangkan aggregate total dan breakdown kumpulan selamat sahaja, tanpa nama atau identifier Pelajar.
+
 ### Authenticated POST
 
 `POST getTodayRecords` mengesahkan credential sebenar dan boleh menyertakan nested `operational_urgency` yang role-safe:
@@ -303,6 +321,7 @@ Action write lain kekal melalui POST:
 - `createOutingType`
 - `updateOutingType`
 - `toggleOutingType`
+- `getCurrentHostelRoster` — read authenticated untuk Admin, Warden/HEP dan Guard; projection Pelajar hanya `nama`
 
 Admin action mengesahkan `admin_id` atau `nama_admin` bersama PIN aktif pada setiap request. Create/update/toggle menggunakan `LockService`. Update dan toggle memerlukan `expected_config_version`; mismatch menghasilkan `CONFIG_VERSION_CONFLICT`.
 
@@ -406,7 +425,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r7` dan query `2.4.0-r7`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency sentiasa diterbitkan selepas cache read menggunakan masa semasa.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r12` dan query `2.4.0-r12`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency dan penghuni semasa sentiasa diturunkan daripada source authoritative.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

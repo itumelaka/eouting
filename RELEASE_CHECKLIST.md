@@ -1,8 +1,17 @@
-# eOuting v2.0.0 Release Checklist
+# eOuting Release Checklist
 
-Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan kesinambungan ujian beta. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
+Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah rollout. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r7`; backend production ialah GAS Version 52 pada deployment/URL sedia ada. Phase 6 Guardian Contact Shortcut dan Generic Application Date Window berstatus COMPLETE / PRODUCTION VERIFIED. No-Guard Departure kekal sambungan operasi selepas Fasa 5 dan kini enabled melalui Admin. Baseline penuh ialah **501/501**. Source backend kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` tidak boleh dideploy.
+> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r12`; backend production ialah GAS Version 55. Dynamic Student Login dan Current Hostel Residents berstatus COMPLETE / PRODUCTION VERIFIED. Baseline penuh ialah **587/587**.
+
+## Close-out Student Groups / Dynamic Login / Current Hostel Residents — 22 Ogos 2026
+
+- [x] Migration LI: 19 written, 0 unmatched, 0 conflicts; readiness Ready.
+- [x] `STUDENT_GROUP_CONFIG_ENABLED=true`; login A2, A3, LI UMK dan LI UPM disahkan production.
+- [x] Rollback tersedia melalui `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
+- [x] Active-request application form suppression disahkan tanpa perubahan backend duplicate authority.
+- [x] Public Current Hostel Residents aggregate-only dan authenticated roster minimum disahkan.
+- [x] Display v2.4.0, frontend/cache r12, GAS Version 55 dan regression 587/587.
 
 ## Close-out Generic Application Date Window — 22 Ogos 2026
 
@@ -32,7 +41,7 @@ Dokumen ini ialah runbook terkawal untuk release frontend production v2.0.0 dan 
 Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
 
 - [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
-- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **501/501**, bersama syntax checks dan `git diff --check`.
+- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **587/587**, bersama syntax checks dan `git diff --check`.
 - [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
 - [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
 - [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.
