@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-22 — Premium Institutional UI Refresh r13–r17 production close-out (v2.4.0)
+
+- UI-1/r13 menyatukan Access/Login kepada tema institusi dark navy yang responsif, mengekalkan dynamic Student group chips dan Admin access, serta membuang label `PORTAL AKSES INSTITUSI` tanpa menggantikannya.
+- Student r14 memperbaharui dashboard, status/form/history dan menyatukan profile card kepada tepat satu thumbnail di sebelah identiti dengan timestamp serta tindakan `Kemaskini Foto` sedia ada.
+- Warden/HEP r15, Guard r16 dan Admin r17 menerima visual operasi khusus role sambil mengekalkan queue, urgency, Current Hostel Residents, action handlers, Tetapan Pelajar, migration/readiness, Dynamic Login rollback dan No-Guard.
+- Production smoke mengesahkan Access/Login, Student, Warden/HEP, Guard dan Admin sepadan dengan implementasi localhost yang diluluskan tanpa visual regression.
+- Close-out production ialah display v2.4.0, frontend/cache `2.4.0-r17`, service worker `eouting-cache-v2.4.0-r17`, GAS Version 55 dan full regression **656/656**.
+- Release r13–r17 ialah frontend-only: tiada perubahan auth, API, lifecycle, privacy boundary, schema atau business behavior, serta tiada `clasp push`, GAS version baharu atau deployment GAS.
+
 ## 2026-08-22 — Student Groups, Dynamic Login dan Current Hostel Residents production close-out (v2.4.0)
 
 - Student Group Fasa A–D menambah foundation `STUDENT_GROUPS`, `LI_INSTITUTIONS` dan `STUDENTS.institution_code`, Admin management dengan optimistic versioning/deactivation guards, readiness + dry-run/apply migration, serta activation dan rollback Dynamic Student Login yang terkawal.

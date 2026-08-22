@@ -14,11 +14,13 @@ Versi repo semasa: **v2.4.0 — Production Verified**.
 
 Frontend production v2.4.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
-Revision aset frontend semasa ialah `2.4.0-r12` dan service worker menggunakan `eouting-cache-v2.4.0-r12`.
+Revision aset frontend semasa ialah `2.4.0-r17` dan service worker menggunakan `eouting-cache-v2.4.0-r17`.
 
 Backend production semasa menggunakan GAS **Version 55** pada deployment sedia ada. Manifest Web App kanonik kekal `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING` dan `ANYONE_ANONYMOUS`; akses anonymous ialah transport API, bukan kuasa aplikasi tanpa authentication. `OUTING_CONFIG_V2_ENABLED=true` dan `STUDENT_GROUP_CONFIG_ENABLED=true`; `OUTING_TYPES` kekal authoritative bagi peraturan outing, manakala konfigurasi kumpulan Pelajar production aktif. `gas/Code.gs` ialah source GAS executable kanonik.
 
-Production yang disahkan sehingga 22 Ogos 2026 merangkumi Fasa 1–6, Generic Application Date Window, Dynamic Student Login, active-request application-form suppression dan Current Hostel Residents. Full Node baseline kanonik semasa ialah **587/587 lulus**.
+Production yang disahkan sehingga 22 Ogos 2026 merangkumi Fasa 1–6, Generic Application Date Window, Dynamic Student Login, active-request application-form suppression, Current Hostel Residents dan Premium Institutional UI r13–r17. Full Node baseline kanonik semasa ialah **656/656 lulus**.
+
+Frontend production kini menggunakan satu tema Premium Institutional yang responsif untuk desktop/PWA merentas Access/Login, Student, Warden/HEP, Guard dan Admin. Setiap role mengekalkan hierarki operasi tersendiri, dynamic Student login kekal data-driven, dan refresh visual ini tidak mengubah backend, authorization atau business behavior.
 
 ### Kumpulan Pelajar, login dan penghuni semasa
 
@@ -371,7 +373,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline repo kanonik semasa selepas Current Hostel Residents production close-out ialah **587/587 lulus**. Angka focused dan full yang lebih lama dalam changelog ialah milestone sejarah. Regression semasa turut melindungi Student Group configuration/migration, Dynamic Student Login, active-request form suppression, privacy aggregate public dan roster penghuni authenticated. Syntax checks:
+Baseline repo kanonik semasa selepas Premium Institutional UI r13–r17 production close-out ialah **656/656 lulus**. Angka focused dan full yang lebih lama dalam changelog ialah milestone sejarah. Regression semasa turut melindungi Student Group configuration/migration, Dynamic Student Login, active-request form suppression, privacy aggregate public dan roster penghuni authenticated. Syntax checks:
 
 ```powershell
 node --check assets/app.js
@@ -412,6 +414,6 @@ Backend GAS:
 6. dalam Manage deployments pilih `New version` sambil mengekalkan URL production;
 7. jalankan smoke test endpoint dan flow hujung-ke-hujung.
 
-Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.4.0 semasa ialah GAS **Version 55**, `OUTING_CONFIG_V2_ENABLED=true`, `STUDENT_GROUP_CONFIG_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.4.0-r12`. Version 44–54 kekal milestone sejarah. Rollback dynamic login boleh dilakukan melalui `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`; rollback config-driven outing kekal melalui property sedia ada.
+Rollout awal production v2.0.0 menggunakan GAS **Version 24**. Production v2.4.0 semasa ialah GAS **Version 55**, `OUTING_CONFIG_V2_ENABLED=true`, `STUDENT_GROUP_CONFIG_ENABLED=true`, readiness hijau dan source frontend menggunakan cache `2.4.0-r17`. Version 44–54 kekal milestone sejarah. Rollback dynamic login boleh dilakukan melalui `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`; rollback config-driven outing kekal melalui property sedia ada.
 
 Lihat dokumentasi lanjut dalam [`docs/`](docs/), khususnya [Architecture](docs/ARCHITECTURE.md), [Deployment](docs/DEPLOYMENT.md), [Security](docs/SECURITY.md) dan [Local Development](docs/LOCAL_DEV.md).

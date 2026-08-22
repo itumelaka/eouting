@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production **v2.4.0**, cache `2.4.0-r12`, GAS Version 55, config outing active + ready dan Dynamic Student Login ON. Full Node baseline kanonik ialah **587/587**.
+Dokumen ini menerangkan flow production **v2.4.0**, cache `2.4.0-r17`, GAS Version 55, config outing active + ready dan Dynamic Student Login ON. Full Node baseline kanonik ialah **656/656**. Premium Institutional UI r13–r17 mengubah presentation sahaja; flow dan authority di bawah kekal sama.
 
 ## Flow keluar normal dan No-Guard
 

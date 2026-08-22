@@ -6,9 +6,9 @@ Status repo semasa: **v2.4.0 — production verified**.
 
 Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **22 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 55, cache/asset `2.4.0-r12` dan service worker `eouting-cache-v2.4.0-r12`. Config-driven outing serta Dynamic Student Login aktif dan ready. Production beroperasi normal.
+Verdict semasa pada **22 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 55, cache/asset `2.4.0-r17` dan service worker `eouting-cache-v2.4.0-r17`. Config-driven outing serta Dynamic Student Login aktif dan ready. Production UI smoke ialah **VERIFIED** dan production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX dan Current Hostel Residents semuanya **COMPLETE / PRODUCTION VERIFIED**. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **587/587**.
+`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX dan Current Hostel Residents semuanya **COMPLETE / PRODUCTION VERIFIED**. Premium Institutional Access UI serta refresh dashboard Student, Warden/HEP, Guard dan Admin juga **COMPLETE / PRODUCTION VERIFIED**, membentuk satu sistem visual institusi dark navy yang bersatu. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **656/656**.
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa, `ruleNotice` kuning kekal authoritative untuk panduan kontekstual, dan borang outing tidak berubah.
 
@@ -45,7 +45,7 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r12`.
+- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r17` dan service worker ialah `eouting-cache-v2.4.0-r17`.
 - Backend GAS production ialah **Version 55** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
@@ -99,7 +99,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r12`.
+- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r17` / `eouting-cache-v2.4.0-r17`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -142,7 +142,7 @@ Migration production melalui `setupAdminOutingConfigV200()` pada 22 Ogos 2026 me
 
 Student smoke dengan future open date memaparkan `Permohonan dibuka mulai 1 Oktober 2026.`, membenarkan attempt mencapai GAS dan menerima backend rejection sebelum persistence. Inspection `OUTING_REQUESTS` mengesahkan zero row test. Safe Student projection membawa dua tarikh bagi guidance sahaja; config version internals, creator/updater dan timestamp tidak diluaskan.
 
-Milestone ini menggunakan frontend/cache r7 dan GAS Version 52; ia kekal rekod sejarah sebelum current production r12 / GAS Version 55.
+Milestone ini menggunakan frontend/cache r7 dan GAS Version 52; ia kekal rekod sejarah sebelum current production r17 / GAS Version 55.
 
 ## Phase 6 — COMPLETE / PRODUCTION VERIFIED
 

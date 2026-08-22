@@ -2,7 +2,15 @@
 
 Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah rollout. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan cache `2.4.0-r12`; backend production ialah GAS Version 55. Dynamic Student Login dan Current Hostel Residents berstatus COMPLETE / PRODUCTION VERIFIED. Baseline penuh ialah **587/587**.
+> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan frontend/cache `2.4.0-r17` dan service worker `eouting-cache-v2.4.0-r17`; backend production kekal GAS Version 55. Premium Institutional UI r13–r17, Dynamic Student Login dan Current Hostel Residents berstatus COMPLETE / PRODUCTION VERIFIED. Baseline penuh ialah **656/656**.
+
+## Close-out Premium Institutional UI r13–r17 — 22 Ogos 2026
+
+- [x] Access/Login, Student r14, Warden/HEP r15, Guard r16 dan Admin r17 menggunakan visual Premium Institutional yang konsisten dan responsif.
+- [x] Student profile card disatukan kepada satu thumbnail/identity card; label `PORTAL AKSES INSTITUSI` dibuang tanpa pengganti.
+- [x] Production smoke berjaya untuk Access/Login, Student, Warden/HEP, Guard dan Admin tanpa visual regression.
+- [x] Display kekal v2.4.0; frontend/cache ialah `2.4.0-r17` / `eouting-cache-v2.4.0-r17`; full regression **656/656**.
+- [x] Release ini frontend-only. GAS kekal Version 55; tiada `clasp push`, GAS version baharu atau deployment backend diperlukan.
 
 ## Close-out Student Groups / Dynamic Login / Current Hostel Residents — 22 Ogos 2026
 
@@ -41,7 +49,7 @@ Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah ro
 Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
 
 - [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
-- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **587/587**, bersama syntax checks dan `git diff --check`.
+- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **656/656**, bersama syntax checks dan `git diff --check`.
 - [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
 - [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
 - [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.

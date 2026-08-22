@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r12`, production GAS Version 55 dan baseline **587/587**. Dynamic Student Login serta Current Hostel Residents telah production verified.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision `2.4.0-r17`, production GAS Version 55 dan baseline **656/656**. Dynamic Student Login, Current Hostel Residents serta Premium Institutional UI r13–r17 telah production verified.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline kanonik semasa selepas Current Hostel Residents production close-out ialah **587/587 lulus**. Angka suite lebih lama ialah milestone sejarah dan bukan baseline semasa.
+Baseline kanonik semasa selepas Premium Institutional UI r13–r17 production close-out ialah **656/656 lulus**. Angka suite lebih lama ialah milestone sejarah dan bukan baseline semasa.
 
 Focused date-window coverage berada dalam suite schema/Admin/Student/submission sedia ada. Ia meliputi idempotent header migration, blank compatibility, save/clear/reload, invalid/reversed/same-day ranges, safe projection, inclusive Malaysia midnight boundaries, additive day/time rules dan backend rejection tanpa append.
 
@@ -267,7 +267,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 ## PWA dan Cache
 
 - Semak footer v2.4.0 dan popup update.
-- Semak Cache Storage menggunakan `eouting-cache-v2.4.0-r12` dan asset query `2.4.0-r12`; displayed app version ialah v2.4.0.
+- Semak Cache Storage menggunakan `eouting-cache-v2.4.0-r17` dan asset query `2.4.0-r17`; displayed app version ialah v2.4.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.

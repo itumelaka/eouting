@@ -1,6 +1,6 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan production **v2.4.0 / GAS Version 55 / frontend r12** pada 22 Ogos 2026. Frontend ialah laman statik yang boleh diperiksa; authorization sebenar berlaku di GAS dan Google Sheets.
+Dokumen ini menerangkan boundary keselamatan production **v2.4.0 / GAS Version 55 / frontend r17** pada 22 Ogos 2026. Frontend ialah laman statik yang boleh diperiksa; authorization sebenar berlaku di GAS dan Google Sheets. Gaya khusus role dalam Premium Institutional UI r13–r17 tidak mengubah authentication, permission, API atau privacy boundary.
 
 ## Public Data Boundary
 
@@ -87,7 +87,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.4.0-r12`; displayed app version ialah v2.4.0.
+- Cache source semasa ialah `eouting-cache-v2.4.0-r17`; displayed app version ialah v2.4.0.
 - Cache operasi backend 20 saat menyimpan source row, bukan derived urgency; `operational_urgency` dihitung selepas cache read menggunakan masa semasa.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.

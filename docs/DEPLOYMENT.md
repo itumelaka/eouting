@@ -1,6 +1,6 @@
 # Deployment eOuting ITU
 
-Versi aplikasi semasa: **v2.4.0**, cache/asset `2.4.0-r12`, service worker `eouting-cache-v2.4.0-r12` dan GAS **Version 55**. Dynamic Student Login serta Current Hostel Residents telah production verified pada 22 Ogos 2026; full Node baseline ialah **587/587**.
+Versi aplikasi semasa: **v2.4.0**, cache/asset `2.4.0-r17`, service worker `eouting-cache-v2.4.0-r17` dan GAS **Version 55**. Dynamic Student Login, Current Hostel Residents serta Premium Institutional UI r13–r17 telah production verified pada 22 Ogos 2026; full Node baseline ialah **656/656**.
 
 ## Student Groups / Dynamic Login / Current Hostel Residents close-out — 22 Ogos 2026
 
@@ -8,7 +8,7 @@ Versi aplikasi semasa: **v2.4.0**, cache/asset `2.4.0-r12`, service worker `eout
 - Smoke login berjaya untuk A2, A3, LI UMK dan LI UPM. Rollback operasi ialah `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
 - Active-request form suppression disahkan bagi Pelajar dengan request aktif dan tiada request.
 - Public aggregate Current Hostel Residents serta authenticated Guard roster disahkan; privacy split dan dynamic grouping tepat.
-- Production deployment akhir ialah GAS Version 55 dengan description `eOuting v2.4.0 current hostel resident monitoring`, frontend r12 dan regression 587/587.
+- Production deployment GAS kekal Version 55 dengan description `eOuting v2.4.0 current hostel resident monitoring`; frontend semasa ialah r17 dan regression **656/656**. UI r13–r17 tidak memerlukan `clasp push`, GAS version atau deployment baharu.
 - Operasi penghuni semasa hendaklah ditafsir sebagai “Anggaran semasa berdasarkan rekod keluar/masuk eOuting.” Hanya `KELUAR` bermaksud outside; approved-but-not-checked-out kekal in hostel, `SELESAI` kembali in hostel dan inactive Student dikecualikan.
 
 ## Generic Application Date Window production close-out — 22 Ogos 2026
@@ -110,7 +110,7 @@ Jika duplicate runaway bagi request/stage yang sama disahkan, emergency containm
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah `2.4.0-r12`.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache semasa ialah `2.4.0-r17`.
 
 Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
@@ -165,7 +165,7 @@ Urutan backup, migration idempotent, legacy check, readiness hijau dan controlle
 
 ## Release Beta v2.0
 
-Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Display version/`version.json` kekal `v2.4.0`, manakala query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation semasa diselaraskan kepada `2.4.0-r12`.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Display version/`version.json` kekal `v2.4.0`, manakala query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation semasa diselaraskan kepada `2.4.0-r17`.
 
 Beta pertama hendaklah menguji lima seed dan sekurang-kurangnya satu jenis custom. Gate mesti meliputi `require_selfie=true/false`, `require_warden_approval=true/false`, audit `AUTO_APPROVE_REQUEST`, Guard transition, Telegram, statistik dan filter. `require_warden_approval=false` kekal high-impact walaupun auto-approval kini eksplisit dan diaudit.
 
@@ -304,7 +304,7 @@ Frontend:
 
 - buka `https://itumelaka.github.io/eouting/`;
 - semak footer dan update popup;
-- semak asset query `2.4.0-r12` dan Cache Storage `eouting-cache-v2.4.0-r12`, khususnya selepas refresh/reopen PWA mobile;
+- semak asset query `2.4.0-r17` dan Cache Storage `eouting-cache-v2.4.0-r17`, khususnya selepas refresh/reopen PWA mobile;
 - login Admin, refresh berulang dan sahkan restore hanya selepas backend validation serta tab bukan default kekal lazy;
 - login Pelajar pada telefon, buka foto profil dan sahkan `Ambil Foto`, `Pilih dari Galeri` serta `Batal`; return-selfie mesti kekal sama;
 - buka Public Monitoring sekali dan pastikan loading, scroll, data serta timestamp betul;

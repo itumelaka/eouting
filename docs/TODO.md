@@ -1,8 +1,16 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 55 / cache `2.4.0-r12`** pada 22 Ogos 2026. Fasa 1–6, Generic Application Date Window, Student Groups, Dynamic Student Login, active-request form suppression dan Current Hostel Residents lengkap serta production verified. Baseline kanonik semasa ialah **587/587**; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 55 / cache `2.4.0-r17`** pada 22 Ogos 2026. Fasa 1–6, Generic Application Date Window, Student Groups, Dynamic Student Login, active-request form suppression, Current Hostel Residents dan Premium Institutional UI r13–r17 lengkap serta production verified. Baseline kanonik semasa ialah **656/656**; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
 
 ## Done / Completed
+
+### Premium Institutional UI r13–r17
+
+- [x] Premium Institutional Access/Login UI lengkap; header akhir ialah `Masuk Sistem` dan `Sila pilih peranan anda.` tanpa label `PORTAL AKSES INSTITUSI`.
+- [x] Student r14, Warden/HEP r15, Guard r16 dan Admin r17 dashboard refresh lengkap tanpa perubahan business behavior.
+- [x] Student profile card disatukan kepada tepat satu thumbnail/identity card tanpa mengubah upload/update authorization.
+- [x] Production smoke Access/Login, Student, Warden/HEP, Guard dan Admin berjaya; display v2.4.0, cache `2.4.0-r17`, service worker `eouting-cache-v2.4.0-r17`, GAS Version 55 dan **656/656**.
+- [x] Broad UI Phase 2 ditutup sebagai frontend-only; tiada GAS deployment diperlukan.
 
 ### Student Groups, Dynamic Login dan Current Hostel Residents
 
@@ -12,7 +20,7 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 55 / cache `2.4.0-r12`** p
 - [x] Sediakan guarded activation dan rollback `Kembali ke Login Legacy`; ordinary kumpulan/institusi baharu kini kerja operasi Admin, bukan development TODO.
 - [x] Sembunyikan borang permohonan apabila canonical active request wujud tanpa mengubah duplicate protection backend.
 - [x] Tambah Current Hostel Residents sebagai derived presence; public aggregate-only dan roster nama minimum untuk Admin/Warden/Guard authenticated.
-- [x] Production verified pada v2.4.0 / r12 / GAS Version 55 dengan **587/587**.
+- [x] Production verified pada milestone v2.4.0 / r12 / GAS Version 55 dengan **587/587**; nilai ini dikekalkan sebagai rekod sejarah sebelum UI r13–r17.
 
 ### Generic Application Date Window
 

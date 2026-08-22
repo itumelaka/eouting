@@ -1,6 +1,8 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan cache frontend `2.4.0-r12`. Production menggunakan GAS Version 55, Dynamic Student Login aktif, dan full Node baseline **587/587**. Manifest, endpoint dan backend kanonik kekal seperti sedia ada.
+Versi repo semasa: **v2.4.0** dengan frontend/cache `2.4.0-r17` dan service worker `eouting-cache-v2.4.0-r17`. Production menggunakan GAS Version 55, Dynamic Student Login aktif, dan full Node baseline **656/656**. Manifest, endpoint dan backend kanonik kekal seperti sedia ada.
+
+Premium Institutional UI r13–r17 memberi Access/Login, Student, Warden/HEP, Guard dan Admin gaya responsif khusus role di atas boundary sedia ada. Refresh visual tidak menukar auth authority, API contract, lifecycle, Current Hostel Residents privacy model atau profile-photo authorization.
 
 ## Komponen
 
@@ -425,7 +427,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r12` dan query `2.4.0-r12`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency dan penghuni semasa sentiasa diturunkan daripada source authoritative.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r17` dan query `2.4.0-r17`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency dan penghuni semasa sentiasa diturunkan daripada source authoritative.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 
