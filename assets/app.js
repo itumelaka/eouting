@@ -370,9 +370,6 @@ const els = {
   loggedStudentName: document.querySelector("#loggedStudentName"),
   loggedStudentMeta: document.querySelector("#loggedStudentMeta"),
   studentIdentityProfilePhoto: document.querySelector("#studentIdentityProfilePhoto"),
-  studentProfilePhotoPanel: document.querySelector("#studentProfilePhotoPanel"),
-  studentProfilePhotoPreview: document.querySelector("#studentProfilePhotoPreview"),
-  studentProfilePhotoTitle: document.querySelector("#studentProfilePhotoTitle"),
   studentProfilePhotoUpdated: document.querySelector("#studentProfilePhotoUpdated"),
   studentProfilePhotoPicker: document.querySelector("#studentProfilePhotoPicker"),
   studentProfilePhotoCameraInput: document.querySelector("#studentProfilePhotoCameraInput"),
@@ -5194,7 +5191,7 @@ function renderProfilePhotoConsumers() {
 }
 
 function renderStudentProfilePhotoArea() {
-  if (!els.studentProfilePhotoPreview || !currentSession || currentSession.role !== "student") return;
+  if (!els.studentIdentityProfilePhoto || !currentSession || currentSession.role !== "student") return;
   const student = currentSession.user || {};
   const studentId = student.student_id || student.studentId || student.id || "";
   const key = profilePhotoCacheKey(studentId);
@@ -5202,23 +5199,13 @@ function renderStudentProfilePhotoArea() {
   const fullPhoto = profilePhotoFullImages.get(key);
   const photo = fullPhoto || thumbnail;
   const hasPhoto = Boolean(photo || student.has_profile_photo);
-  if (els.studentIdentityProfilePhoto) {
-    els.studentIdentityProfilePhoto.innerHTML = profilePhotoMarkup(
-      studentId,
-      student.name || student.nama || "Pelajar",
-      "profile-photo-identity",
-      [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · "),
-      true
-    );
-  }
-  els.studentProfilePhotoPreview.innerHTML = profilePhotoMarkup(
+  els.studentIdentityProfilePhoto.innerHTML = profilePhotoMarkup(
     studentId,
     student.name || student.nama || "Pelajar",
-    "profile-photo-frame-large",
+    "profile-photo-identity",
     [student.className || student.kelas, student.no_matrik || studentId].filter(Boolean).join(" · "),
     true
   );
-  els.studentProfilePhotoTitle.textContent = hasPhoto ? "Foto Profil" : "Tiada Foto Profil";
   const updatedAt = photo && photo.photo_updated_at || student.photo_updated_at || "";
   els.studentProfilePhotoUpdated.textContent = updatedAt ? `Dikemas kini: ${formatDisplayDateTime(updatedAt)}` : "";
   els.studentProfilePhotoPicker.textContent = hasPhoto ? "Kemaskini Foto" : "Tambah Foto";
@@ -7942,6 +7929,22 @@ function guardianContactPanelHtml(contact) {
   `;
 }
 
+function wardenOperationalUrgencyHtml(record, mode) {
+  if (mode !== "warden" && mode !== "warden-readonly") return "";
+  const urgency = record && record.operational_urgency;
+  if (!urgency || typeof urgency !== "object" || Array.isArray(urgency)) return "";
+  const state = String(urgency.state || "").trim().toUpperCase();
+  const labels = {
+    NORMAL: "Normal",
+    DUE_SOON: "Hampir Waktu Pulang",
+    LATE: "Lewat",
+    CRITICAL: "Kritikal",
+    ACTION_REQUIRED: "Tindakan Segera"
+  };
+  if (urgency.applicable === false || urgency.timing_valid === false || !labels[state]) return "";
+  return `<div class="warden-urgency warden-urgency-${state.toLowerCase().replace(/_/g, "-")}" role="status"><span>Keutamaan Pulang</span><strong>${escapeHtml(labels[state])}</strong></div>`;
+}
+
 async function fetchGuardianContact(requestId, button) {
   if (!currentSession || currentSession.role !== "warden" || guardianContactRequestLocks[requestId]) return;
   const panel = button && button.parentElement
@@ -7988,6 +7991,7 @@ function wardenDepartureConfirmationCard(record) {
         <strong>Dimohon:</strong> ${escapeHtml(formatDisplayDateTime(record.departure_confirmation_requested_at))}<br>
         <strong>Dijangka Pulang:</strong> ${escapeHtml(expectedReturnDisplay(record))}
       </div>
+      <div class="warden-remote-cue"><strong>Operasi No-Guard</strong><span>Pengesahan keluar jarak jauh oleh Warden.</span></div>
       <div class="record-actions"><button class="action-button out-button" type="button" data-warden-remote-checkout="${escapeHtml(getRecordId(record))}">Sahkan Keluar</button></div>
     </article>
   `;
@@ -8803,6 +8807,7 @@ function recordCard(record, mode) {
   const wardenNow = mode === "warden" ? new Date() : null;
   const wardenPriority = mode === "warden" ? getWardenPendingPriority(record, wardenNow) : null;
   const wardenPriorityHtml = mode === "warden" ? wardenPriorityPresentation(record, wardenNow) : "";
+  const wardenUrgencyHtml = wardenOperationalUrgencyHtml(record, mode);
   const cardClasses = ["record-card"];
   if (record.jenis_permohonan === REQUEST_TYPE.overnight) cardClasses.push("overnight-card");
   if (mode === "warden") {
@@ -8833,6 +8838,7 @@ function recordCard(record, mode) {
           <span class="badge badge-${statusDisplay.key}">${statusDisplay.icon} ${escapeHtml(statusDisplay.label)}</span>
         </div>
       </div>
+      ${wardenUrgencyHtml}
       ${wardenPriorityHtml}
       <div class="record-detail">
         <strong>Jenis Permohonan:</strong> ${escapeHtml(requestTypeLabel(record.jenis_permohonan))}<br>
@@ -8875,7 +8881,12 @@ function guardOperationalCard(record, mode, actions) {
   const emergencySafety = record.jenis_permohonan === REQUEST_TYPE.emergency && emergencyLines.length
     ? `<div class="guard-emergency-safety">${emergencyLines.join("<br>")}</div>`
     : "";
+  const emergencyBadge = record.jenis_permohonan === REQUEST_TYPE.emergency
+    ? `<span class="badge badge-emergency">Kecemasan</span>`
+    : "";
+  const urgencyHtml = guardOperationalUrgencyHtml(record);
   const actionHeading = isCheckout ? "TINDAKAN KELUAR" : "TINDAKAN MASUK";
+  const directionLabel = isCheckout ? "PELAJAR AKAN KELUAR" : "PELAJAR PULANG";
   const actionInstruction = isCheckout
     ? "Pastikan pelajar berada di pos sebelum disahkan meninggalkan kampus."
     : "Pastikan pelajar telah kembali ke kampus.";
@@ -8891,18 +8902,37 @@ function guardOperationalCard(record, mode, actions) {
           </div>
         </div>
         <div class="badge-stack">
+          ${emergencyBadge}
           <span class="badge badge-request-type">${escapeHtml(requestType)}</span>
           <span class="badge badge-${statusDisplay.key}">${statusDisplay.icon} ${escapeHtml(statusDisplay.label)}</span>
         </div>
       </div>
       ${emergencySafety}
+      ${urgencyHtml}
       <div class="guard-action-cue ${isCheckout ? "guard-action-cue-out" : "guard-action-cue-in"}">
+        <span class="guard-direction-label">${directionLabel}</span>
         <strong>${actionHeading}</strong>
         <span>${actionInstruction}</span>
       </div>
       ${actions}
     </article>
   `;
+}
+
+function guardOperationalUrgencyHtml(record) {
+  const urgency = record && record.operational_urgency;
+  if (!urgency || typeof urgency !== "object" || Array.isArray(urgency)) return "";
+  const state = String(urgency.state || "").trim().toUpperCase();
+  const labels = {
+    NORMAL: "Normal",
+    DUE_SOON: "Hampir Waktu Pulang",
+    LATE: "Lewat",
+    CRITICAL: "Kritikal",
+    ACTION_REQUIRED: "Tindakan Segera"
+  };
+  if (urgency.applicable === false || urgency.timing_valid === false || !labels[state]) return "";
+  const stateClass = state.toLowerCase().replace(/_/g, "-");
+  return `<div class="guard-urgency guard-urgency-${stateClass}" role="status"><span>Keutamaan Pulang</span><strong>${escapeHtml(labels[state])}</strong></div>`;
 }
 
 function getGuardReturnTiming(record, now) {

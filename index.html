@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r13">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r17">
   </head>
   <body>
     <header class="app-header">
@@ -40,7 +40,6 @@
         <div class="section-heading access-heading">
           <img class="access-logo" src="assets/pwa-logo.png" alt="" aria-hidden="true">
           <div class="access-heading-copy">
-            <span class="access-eyebrow">Portal Akses Institusi</span>
             <h2>Masuk Sistem</h2>
             <p>Sila pilih peranan anda.</p>
           </div>
@@ -192,24 +191,20 @@
         <div class="identity-panel">
           <div class="student-identity-copy">
             <div id="studentIdentityProfilePhoto" aria-label="Foto profil pelajar pada identiti"></div>
-            <div>
+            <div class="student-identity-details">
               <span>Pelajar</span>
               <strong id="loggedStudentName">-</strong>
               <small id="loggedStudentMeta">-</small>
-            </div>
-          </div>
-          <div class="student-profile-photo-panel" id="studentProfilePhotoPanel">
-            <div id="studentProfilePhotoPreview" aria-label="Foto profil pelajar"></div>
-            <div class="student-profile-photo-copy">
-              <strong id="studentProfilePhotoTitle">Tiada Foto Profil</strong>
-              <small id="studentProfilePhotoUpdated"></small>
-              <button class="secondary-action student-profile-photo-picker" id="studentProfilePhotoPicker" type="button">Tambah Foto</button>
-              <input id="studentProfilePhotoCameraInput" class="profile-photo-input" type="file"
-                accept="image/*" capture="user" aria-label="Ambil foto profil">
-              <input id="studentProfilePhotoGalleryInput" class="profile-photo-input" type="file"
-                accept="image/*" aria-label="Pilih foto profil dari galeri">
-              <small class="profile-photo-guidance">Gunakan gambar muka yang jelas seperti gambar ukuran pasport.</small>
-              <p class="form-message student-profile-photo-message" id="studentProfilePhotoMessage" aria-live="polite"></p>
+              <div class="student-profile-photo-controls">
+                <small id="studentProfilePhotoUpdated"></small>
+                <button class="secondary-action student-profile-photo-picker" id="studentProfilePhotoPicker" type="button">Tambah Foto</button>
+                <input id="studentProfilePhotoCameraInput" class="profile-photo-input" type="file"
+                  accept="image/*" capture="user" aria-label="Ambil foto profil">
+                <input id="studentProfilePhotoGalleryInput" class="profile-photo-input" type="file"
+                  accept="image/*" aria-label="Pilih foto profil dari galeri">
+                <small class="profile-photo-guidance" hidden>Gunakan gambar muka yang jelas seperti gambar ukuran pasport.</small>
+                <p class="form-message student-profile-photo-message" id="studentProfilePhotoMessage" aria-live="polite"></p>
+              </div>
             </div>
           </div>
         </div>
@@ -319,8 +314,9 @@
         </section>
         </section>
 
-        <section class="tab-panel" id="warden" aria-labelledby="tab-warden">
-        <div class="section-heading">
+        <section class="tab-panel warden-dashboard" id="warden" aria-labelledby="tab-warden">
+        <div class="section-heading warden-dashboard-heading">
+          <span class="warden-dashboard-kicker">Operasi Warden &amp; HEP</span>
           <h2>Semakan Warden</h2>
           <p>Luluskan atau tolak permohonan sebelum guard boleh sahkan pelajar keluar.</p>
         </div>
@@ -328,16 +324,17 @@
           <div class="current-hostel-heading"><div><h3 id="wardenCurrentHostelTitle">🏠 Penghuni Semasa Asrama</h3><p>Senarai minimum untuk kegunaan operasi staff.</p></div></div>
           <div id="wardenCurrentHostelRoster" aria-live="polite"></div>
         </section>
-        <h3 class="list-title">Menunggu Kelulusan</h3>
+        <h3 class="list-title warden-queue-title warden-queue-title-pending">Menunggu Kelulusan</h3>
         <div class="record-list" id="wardenList"></div>
-        <h3 class="list-title">Menunggu Pengesahan Keluar</h3>
+        <h3 class="list-title warden-queue-title warden-queue-title-departure">Menunggu Pengesahan Keluar</h3>
         <div class="record-list" id="wardenDepartureConfirmationList"></div>
-        <h3 class="list-title">Telah Diluluskan / Risiko Pulang</h3>
+        <h3 class="list-title warden-queue-title warden-queue-title-approved">Telah Diluluskan / Risiko Pulang</h3>
         <div class="record-list" id="wardenApprovedList"></div>
         </section>
 
-        <section class="tab-panel" id="guard" aria-labelledby="tab-guard">
-        <div class="section-heading">
+        <section class="tab-panel guard-dashboard" id="guard" aria-labelledby="tab-guard">
+        <div class="section-heading guard-dashboard-heading">
+          <span class="guard-dashboard-kicker">Operasi Keselamatan</span>
           <h2>Pengesahan Guard</h2>
           <p>Semak arah pergerakan pelajar sebelum membuat pengesahan keluar atau masuk.</p>
         </div>
@@ -400,6 +397,7 @@
         <section class="tab-panel admin-dashboard" id="admin" aria-labelledby="adminDashboardTitle">
           <div class="section-heading admin-dashboard-heading">
             <div>
+              <span class="admin-dashboard-kicker">Konsol Pentadbiran</span>
               <h2 id="adminDashboardTitle">Admin eOuting</h2>
               <p>Pemantauan operasi, rekod, pelajar, staff dan tetapan outing dalam satu ruang berautentikasi.</p>
             </div>
@@ -972,6 +970,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r13"></script>
+    <script src="assets/app.js?v=2.4.0-r17"></script>
   </body>
 </html>

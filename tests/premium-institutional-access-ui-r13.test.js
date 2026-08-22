@@ -10,6 +10,17 @@ const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
 const premiumCss = css.slice(css.indexOf("Premium Institutional Access UI — r13"));
 
+test("access header starts with the primary heading and keeps the integrated Admin action", () => {
+  const headingStart = html.indexOf('<div class="section-heading access-heading">');
+  const headingEnd = html.indexOf("</div>", html.indexOf("</button>", headingStart));
+  const headingMarkup = html.slice(headingStart, headingEnd);
+
+  assert.notEqual(headingStart, -1);
+  assert.doesNotMatch(html, /Portal Akses Institusi/i);
+  assert.match(headingMarkup, /<div class="access-heading-copy">\s*<h2>Masuk Sistem<\/h2>\s*<p>Sila pilih peranan anda\.<\/p>/);
+  assert.match(headingMarkup, /<button class="admin-management-button"[^>]*data-role-choice="admin">/);
+});
+
 test("UI-1 keeps one canonical Student login form and every access route", () => {
   assert.equal((html.match(/<form\b[^>]*id="studentLoginPanel"/g) || []).length, 1);
   ["student", "warden", "guard"].forEach((role) => {
@@ -100,10 +111,10 @@ test("accessibility styling covers focus, touch targets, autofill and reduced mo
   assert.match(html, /aria-live="polite"/);
 });
 
-test("r13 cache revision advances without changing displayed application version", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r13/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r13/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r13/);
+test("r13 access UI remains intact under the r17 frontend cache revision", () => {
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r17/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r17/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r17/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
-  assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r12/);
+  assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r13/);
 });

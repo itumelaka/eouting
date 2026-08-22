@@ -182,10 +182,10 @@ test("remember-device schema and restored canonical Student session remain compa
   assert.match(app, /function findStudentForSavedSession/);
 });
 
-test("Phase D keeps version.json stable and advances only runtime cache references", () => {
+test("version.json stays stable while the new UI phase advances runtime cache references", () => {
   const version = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
   const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
   assert.equal(version.version, "2.4.0");
-  assert.match(html, /2\.4\.0-r13/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r13/);
+  assert.match(html, /2\.4\.0-r17/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r17/);
 });

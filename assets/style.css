@@ -6178,3 +6178,2379 @@ body:has(#accessScreen:not(.hidden)) .app-footer {
     transform: none;
   }
 }
+
+/* ==================================================
+   Premium Institutional Student Dashboard — r14
+   ================================================== */
+body:has(#appWorkspace.active #pelajar.tab-panel.active) {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(33, 150, 243, 0.2), transparent 32rem),
+    radial-gradient(circle at 92% 28%, rgba(29, 78, 216, 0.14), transparent 28rem),
+    linear-gradient(150deg, var(--access-navy-950) 0%, var(--access-navy-900) 52%, #092448 100%);
+  color: var(--access-off-white);
+  min-height: 100vh;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active)::before {
+  background-image:
+    linear-gradient(rgba(125, 211, 252, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 211, 252, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  content: "";
+  inset: 0;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .app-header { display: none; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .app-shell {
+  margin-top: 0;
+  max-width: 1180px;
+  padding: 18px clamp(14px, 2.5vw, 30px) 28px;
+  width: 100%;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #appWorkspace,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar {
+  margin-inline: auto;
+  max-width: 1120px;
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar {
+  align-items: center;
+  background:
+    radial-gradient(circle at 0 0, rgba(33, 150, 243, 0.2), transparent 15rem),
+    linear-gradient(135deg, rgba(12, 43, 83, 0.94), rgba(5, 22, 46, 0.96));
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-left: 4px solid var(--access-blue-500);
+  border-radius: 16px;
+  box-shadow: 0 18px 42px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.06);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 12px;
+  padding: 13px 15px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar span {
+  color: #7dd3fc;
+  font-size: 0.68rem;
+  letter-spacing: 0.13em;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar strong {
+  color: #ffffff;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #logoutButton {
+  background: rgba(8, 32, 64, 0.78);
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  border-radius: 11px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+  color: #e8f4ff;
+  min-height: 44px;
+  padding: 9px 14px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .tabs { display: none; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .announcement-banner {
+  background: rgba(8, 30, 60, 0.9);
+  border-color: rgba(125, 211, 252, 0.24);
+  box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
+  color: #e7f3ff;
+  margin-bottom: 10px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .announcement-banner-label { color: #7dd3fc; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .announcement-banner-copy,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .announcement-banner-updated { color: #c3d5e8; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #ruleNotice {
+  background: rgba(62, 42, 9, 0.78);
+  border: 1px solid rgba(251, 191, 36, 0.34);
+  border-left: 4px solid #fbbf24;
+  border-radius: 13px;
+  color: #fff1bd;
+  font-size: 0.86rem;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #ruleNotice.ok {
+  background: rgba(8, 62, 47, 0.66);
+  border-color: rgba(52, 211, 153, 0.32);
+  border-left-color: #34d399;
+  color: #d1fae5;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar { color: var(--access-off-white); }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .identity-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(33, 150, 243, 0.12), transparent 17rem),
+    linear-gradient(145deg, rgba(11, 39, 75, 0.94), rgba(5, 21, 44, 0.96));
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-left: 5px solid var(--access-blue-500);
+  border-radius: 17px;
+  box-shadow: 0 18px 42px rgba(0, 5, 18, 0.26), inset 0 1px rgba(255, 255, 255, 0.05);
+  grid-template-columns: minmax(0, 1fr);
+  padding: 15px 16px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-identity-copy {
+  align-items: center;
+  width: 100%;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-identity-details {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-profile-photo-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 5px;
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #studentProfilePhotoUpdated { font-size: 0.76rem; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .profile-photo-guidance { display: none; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-profile-photo-message {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .identity-panel span,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .identity-panel small { color: var(--access-muted); }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .identity-panel strong { color: #ffffff; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #loggedStudentName {
+  font-size: clamp(1.12rem, 2vw, 1.38rem);
+  line-height: 1.25;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #loggedStudentMeta {
+  color: #a9c2d9;
+  font-size: 0.82rem;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .profile-photo-frame {
+  background: linear-gradient(145deg, #173c68, #0a2446);
+  border-color: rgba(125, 211, 252, 0.28);
+  box-shadow: 0 10px 24px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.08);
+  color: #dbeafe;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-profile-photo-picker {
+  background: rgba(12, 45, 84, 0.9);
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  color: #e5f3ff;
+  margin-top: 0;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-status-section {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(33, 150, 243, 0.15), transparent 19rem),
+    linear-gradient(145deg, rgba(10, 38, 74, 0.96), rgba(4, 18, 39, 0.98));
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-left: 5px solid var(--access-blue-500);
+  border-radius: 19px;
+  box-shadow: 0 22px 52px rgba(0, 5, 18, 0.34), inset 0 1px rgba(255, 255, 255, 0.06);
+  gap: 12px;
+  margin: 14px 0 16px;
+  padding: 17px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-status-heading h2 {
+  color: #ffffff;
+  font-size: clamp(1.3rem, 2vw, 1.6rem);
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-status-heading p { color: var(--access-muted); }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-status-kicker { color: #7dd3fc; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card {
+  --student-state-accent: var(--access-blue-500);
+  background: linear-gradient(150deg, rgba(16, 51, 91, 0.94), rgba(5, 23, 48, 0.98));
+  border: 1px solid color-mix(in srgb, var(--student-state-accent) 42%, transparent);
+  border-left: 5px solid var(--student-state-accent);
+  border-radius: 16px;
+  box-shadow: 0 16px 38px rgba(0, 5, 18, 0.28), inset 0 0 34px color-mix(in srgb, var(--student-state-accent) 5%, transparent);
+  color: #e8f2fc;
+  padding: 17px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card:has(.badge-pending) { --student-state-accent: #fbbf24; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card:has(.badge-approved) { --student-state-accent: #38bdf8; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card:has(.badge-out) { --student-state-accent: #fb923c; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card:has(.badge-returned) { --student-state-accent: #34d399; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card:has(.badge-rejected),
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card:has(.badge-cancelled),
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card:has(.badge-late) { --student-state-accent: #f87171; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card h3,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card .record-detail strong,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-next-action { color: #ffffff; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card .record-meta,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card .record-times,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-lifecycle-label { color: #a9bfd5; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-lifecycle-guidance,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-operational-guidance {
+  background: rgba(5, 22, 45, 0.78);
+  border-color: color-mix(in srgb, var(--student-state-accent) 35%, rgba(125, 211, 252, 0.2));
+  border-left-color: var(--student-state-accent);
+  color: #dbe9f6;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-urgency-title { color: #ffffff; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-guidance-fact {
+  background: rgba(13, 48, 87, 0.78);
+  border-color: rgba(125, 211, 252, 0.18);
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-guidance-fact span,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-urgency-status { color: #aac0d5; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-guidance-fact strong { color: #ffffff; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-empty {
+  background: rgba(7, 29, 57, 0.72);
+  border: 1px dashed rgba(125, 211, 252, 0.3);
+  border-radius: 13px;
+  color: #c5d8ea;
+  padding: 14px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-active-request-notice {
+  background: linear-gradient(145deg, rgba(9, 51, 67, 0.9), rgba(5, 29, 48, 0.96));
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  border-left: 5px solid #2dd4bf;
+  border-radius: 16px;
+  box-shadow: 0 16px 38px rgba(0, 5, 18, 0.26);
+  color: #d8f7f2;
+  gap: 5px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-active-request-notice strong { color: #ffffff; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-active-request-notice p { color: #aedbd5; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-request-heading { margin: 17px 0 9px; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-request-heading h2 {
+  color: #ffffff;
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  margin: 0;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(33, 150, 243, 0.1), transparent 18rem),
+    linear-gradient(145deg, rgba(10, 37, 72, 0.96), rgba(4, 18, 39, 0.98));
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-top: 3px solid var(--access-blue-500);
+  border-radius: 18px;
+  box-shadow: 0 20px 48px rgba(0, 5, 18, 0.3), inset 0 1px rgba(255, 255, 255, 0.05);
+  color: #e5eff9;
+  gap: 12px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm label {
+  color: #e7f2fc;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm :where(input, select, textarea) {
+  background: rgba(247, 250, 253, 0.98);
+  border: 1px solid #8da9c4;
+  border-radius: 10px;
+  color: #0b1e36;
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm :where(input, textarea)::placeholder {
+  color: #60758b;
+  opacity: 1;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm input:-webkit-autofill,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #f7fafd inset;
+  -webkit-text-fill-color: #0b1e36;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm .overnight-fields,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm .emergency-fields {
+  background: rgba(7, 29, 57, 0.78);
+  border-color: rgba(125, 211, 252, 0.22);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm :where(.overnight-fields, .emergency-fields) h3 { color: #ffffff; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(.primary-action, .action-button) {
+  background: linear-gradient(135deg, #0d47a1, #1976d2 58%, #2196f3);
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 75, 169, 0.26), inset 0 1px rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  min-height: 48px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .secondary-action,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .history-toggle {
+  background: rgba(10, 44, 82, 0.84);
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  border-radius: 10px;
+  color: #e4f2ff;
+  min-height: 44px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .danger-action {
+  background: rgba(106, 24, 35, 0.72);
+  border: 1px solid rgba(248, 113, 113, 0.34);
+  border-radius: 10px;
+  color: #fee2e2;
+  min-height: 46px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(button, .return-selfie-picker):disabled,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(button, .return-selfie-picker)[aria-disabled="true"] {
+  background: #33475c;
+  border-color: #53687d;
+  box-shadow: none;
+  color: #aab9c7;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .return-selfie-proof {
+  background: rgba(7, 30, 60, 0.84);
+  border-color: rgba(96, 165, 250, 0.24);
+  color: #dbe9f6;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .return-selfie-preview {
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 12px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-outing-history {
+  background: linear-gradient(145deg, rgba(10, 37, 72, 0.94), rgba(4, 18, 39, 0.98));
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  border-radius: 18px;
+  box-shadow: 0 18px 44px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.05);
+  gap: 11px;
+  margin-top: 0;
+  padding: 16px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-annual-summary {
+  background: linear-gradient(135deg, rgba(21, 101, 192, 0.32), rgba(8, 39, 74, 0.88));
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 13px;
+  color: #cfe8ff;
+  min-width: min(100%, 240px);
+  padding: 11px 13px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-annual-summary strong {
+  color: #ffffff;
+  font-size: 1.3rem;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-record-heading h3 {
+  color: #ffffff;
+  font-size: 1.12rem;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-history-compact-list {
+  background: rgba(5, 23, 47, 0.74);
+  border-color: rgba(125, 211, 252, 0.18);
+  border-radius: 13px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-history-compact-row + .student-history-compact-row { border-top-color: rgba(125, 211, 252, 0.14); }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-history-date,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-history-type { color: #edf7ff; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-history-status,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-history-compact-empty { color: #a9bfd5; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .badge-pending { background: #fbbf24; color: #271900; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .badge-approved { background: #38bdf8; color: #04233a; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .badge-out { background: #fb923c; color: #2c1202; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .badge-returned { background: #34d399; color: #03291d; }
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(.badge-rejected, .badge-cancelled, .badge-late) { background: #7f3542; color: #ffe4e6; }
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(button, input, select, textarea, .return-selfie-picker):focus-visible,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #logoutButton:focus-visible {
+  outline: 3px solid var(--access-focus);
+  outline-offset: 3px;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) .app-footer { color: var(--access-muted); }
+
+@supports (backdrop-filter: blur(14px)) {
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar,
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(.identity-panel, .student-current-status-section, #requestForm, .student-outing-history) {
+    backdrop-filter: blur(14px);
+  }
+}
+
+@media (min-width: 720px) {
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-identity-details {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-profile-photo-controls {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    justify-content: flex-end;
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) .app-shell { padding: 10px 9px 20px; }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar {
+    margin-bottom: 8px;
+    padding: 10px 11px;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar strong { font-size: 1rem; }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #logoutButton {
+    min-height: 42px;
+    padding: 7px 10px;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #ruleNotice {
+    font-size: 0.77rem;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .identity-panel {
+    padding: 12px;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-profile-photo-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .profile-photo-guidance { display: none; }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-status-section {
+    margin: 10px 0 12px;
+    padding: 12px;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-status-heading h2 { font-size: 1.2rem; }
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card { padding: 13px; }
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-request-heading { margin-top: 13px; }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm {
+    gap: 10px;
+    padding: 14px 12px;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-active-request-notice {
+    margin-bottom: 12px;
+    padding: 12px;
+  }
+
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-outing-history { padding: 13px 11px; }
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-annual-summary { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar *,
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar,
+  body:has(#appWorkspace.active #pelajar.tab-panel.active) #logoutButton {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+
+/* ==================================================
+   Premium Institutional Warden Dashboard — r15
+   ================================================== */
+body:has(#appWorkspace.active #warden.tab-panel.active) {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.2), transparent 34rem),
+    radial-gradient(circle at 92% 24%, rgba(124, 58, 237, 0.14), transparent 30rem),
+    linear-gradient(150deg, var(--access-navy-950) 0%, #071a37 52%, #101b45 100%);
+  color: var(--access-off-white);
+  min-height: 100vh;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active)::before {
+  background-image:
+    linear-gradient(rgba(165, 180, 252, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(165, 180, 252, 0.035) 1px, transparent 1px);
+  background-size: 30px 30px;
+  content: "";
+  inset: 0;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .app-header { display: none; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .app-shell {
+  margin-top: 0;
+  max-width: 1240px;
+  padding: 18px clamp(14px, 2.5vw, 30px) 30px;
+  width: 100%;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #appWorkspace,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden {
+  margin-inline: auto;
+  max-width: 1180px;
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar {
+  align-items: center;
+  background:
+    radial-gradient(circle at 0 0, rgba(129, 140, 248, 0.24), transparent 17rem),
+    linear-gradient(135deg, rgba(25, 35, 82, 0.96), rgba(11, 22, 54, 0.97));
+  border: 1px solid rgba(165, 180, 252, 0.34);
+  border-left: 5px solid #818cf8;
+  border-radius: 16px;
+  box-shadow: 0 18px 44px rgba(0, 5, 18, 0.3), inset 0 1px rgba(255, 255, 255, 0.06);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 10px;
+  padding: 13px 15px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar span {
+  color: #c4b5fd;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar strong {
+  color: #ffffff;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #logoutButton {
+  background: rgba(31, 41, 89, 0.86);
+  border: 1px solid rgba(196, 181, 253, 0.32);
+  border-radius: 11px;
+  color: #f2efff;
+  min-height: 44px;
+  padding: 9px 14px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .tabs {
+  background: rgba(9, 22, 50, 0.82);
+  border: 1px solid rgba(129, 140, 248, 0.18);
+  border-radius: 13px;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 5px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .tab-button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #aebed3;
+  min-height: 40px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .tab-button.active {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.84), rgba(109, 40, 217, 0.78));
+  border-color: rgba(196, 181, 253, 0.28);
+  color: #ffffff;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .announcement-banner {
+  background: rgba(12, 27, 60, 0.92);
+  border-color: rgba(165, 180, 252, 0.24);
+  box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
+  color: #edf2ff;
+  margin-bottom: 10px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .announcement-banner-label { color: #c4b5fd; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .announcement-banner-copy,
+body:has(#appWorkspace.active #warden.tab-panel.active) .announcement-banner-updated { color: #b8c7dc; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #ruleNotice {
+  background: rgba(54, 42, 14, 0.78);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  border-left: 4px solid #fbbf24;
+  border-radius: 13px;
+  color: #fff1bd;
+  font-size: 0.84rem;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden { color: #e8eef8; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-dashboard-heading {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(124, 58, 237, 0.17), transparent 19rem),
+    linear-gradient(145deg, rgba(18, 34, 73, 0.96), rgba(8, 20, 48, 0.98));
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  border-left: 5px solid #818cf8;
+  border-radius: 17px;
+  box-shadow: 0 18px 42px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.05);
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 15px 16px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-dashboard-kicker {
+  color: #c4b5fd;
+  display: block;
+  font-size: 0.69rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-dashboard-heading h2 {
+  color: #ffffff;
+  font-size: clamp(1.35rem, 2.3vw, 1.75rem);
+  margin: 0;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-dashboard-heading p {
+  color: #b7c7da;
+  margin: 0;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-panel {
+  background: linear-gradient(145deg, rgba(19, 37, 78, 0.92), rgba(9, 22, 51, 0.96));
+  border: 1px solid rgba(129, 140, 248, 0.24);
+  border-radius: 15px;
+  box-shadow: 0 14px 34px rgba(0, 5, 18, 0.24), inset 0 1px rgba(255, 255, 255, 0.04);
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-top {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-top h3 { color: #ffffff; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-top small { color: #aebed3; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-button,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-utility-actions button,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .app-reload-subtle-button {
+  background: rgba(43, 49, 105, 0.8);
+  border: 1px solid rgba(165, 180, 252, 0.3);
+  border-radius: 10px;
+  color: #f0f1ff;
+  min-height: 42px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-loading {
+  background: rgba(9, 23, 52, 0.8);
+  border-color: rgba(165, 180, 252, 0.3);
+  color: #c8d4e5;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-reload-action {
+  border-top-color: rgba(165, 180, 252, 0.16);
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-roster {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.1), transparent 18rem),
+    linear-gradient(145deg, rgba(12, 48, 68, 0.94), rgba(7, 27, 51, 0.98));
+  border: 1px solid rgba(45, 212, 191, 0.28);
+  border-left: 5px solid #2dd4bf;
+  border-radius: 18px;
+  box-shadow: 0 18px 44px rgba(0, 5, 18, 0.3), inset 0 1px rgba(255, 255, 255, 0.05);
+  margin: 12px 0 16px;
+  padding: 15px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-heading h3 { color: #ffffff; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-heading p { color: #a9c9c8; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-total { color: #dffbf6; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-group-roster {
+  background: rgba(6, 28, 48, 0.78);
+  border-color: rgba(94, 234, 212, 0.18);
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-group-roster summary {
+  color: #e8fffb;
+  font-weight: 800;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-group-roster[open] summary {
+  background: rgba(13, 72, 74, 0.34);
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-group-roster ul,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-empty-group {
+  border-top-color: rgba(94, 234, 212, 0.16);
+  color: #c5dedb;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-queue-title {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  font-size: clamp(1.08rem, 2vw, 1.28rem);
+  gap: 9px;
+  margin: 18px 0 9px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-queue-title::before {
+  background: #818cf8;
+  border-radius: 999px;
+  content: "";
+  height: 9px;
+  width: 9px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-queue-title-pending::before { background: #fbbf24; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-queue-title-departure::before { background: #2dd4bf; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-queue-title-approved::before { background: #60a5fa; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(#wardenList, #wardenDepartureConfirmationList, #wardenApprovedList) {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1), transparent 17rem),
+    linear-gradient(150deg, rgba(16, 37, 77, 0.96), rgba(7, 20, 47, 0.98));
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  border-left: 4px solid #818cf8;
+  border-radius: 16px;
+  box-shadow: 0 16px 38px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.05);
+  color: #dce7f5;
+  min-width: 0;
+  padding: 14px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-card.warden-priority-emergency {
+  border-color: rgba(248, 113, 113, 0.35);
+  border-left-color: #f87171;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-card.warden-priority-departure {
+  border-color: rgba(251, 191, 36, 0.34);
+  border-left-color: #fbbf24;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-card.overnight-card {
+  border-left-color: #60a5fa;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-card h3 {
+  color: #ffffff;
+  font-size: 1.06rem;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-meta { color: #aebed3; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .profile-photo-frame {
+  background: linear-gradient(145deg, #2e3779, #162653);
+  border-color: rgba(196, 181, 253, 0.3);
+  color: #ede9fe;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-detail {
+  background: rgba(5, 19, 44, 0.68);
+  border: 1px solid rgba(129, 140, 248, 0.14);
+  border-radius: 11px;
+  color: #c8d5e5;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  padding: 10px 11px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-detail strong { color: #f4f6ff; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-times {
+  color: #aebed3;
+  gap: 5px 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-times span {
+  background: rgba(17, 37, 72, 0.7);
+  border: 1px solid rgba(129, 140, 248, 0.12);
+  border-radius: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 6px 8px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge {
+  border: 1px solid transparent;
+  font-weight: 850;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge-pending { background: #fbbf24; color: #2d1d00; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge-approved { background: #38bdf8; color: #04233a; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge-out { background: #fb923c; color: #2c1202; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge-returned { background: #34d399; color: #03291d; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge-emergency { background: #b91c1c; border-color: #f87171; color: #ffffff; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge-overnight { background: #2563eb; color: #ffffff; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(.badge-late, .badge-not-returned, .badge-rejected) { background: #7f1d2d; border-color: #fb7185; color: #ffe4e6; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-priority-cue {
+  background: rgba(10, 27, 58, 0.84);
+  border-color: rgba(165, 180, 252, 0.2);
+  color: #e4ebf7;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-priority-cue-emergency {
+  background: rgba(80, 19, 34, 0.72);
+  border-color: rgba(248, 113, 113, 0.36);
+  color: #ffe4e6;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-priority-cue-departure {
+  background: rgba(78, 48, 9, 0.7);
+  border-color: rgba(251, 191, 36, 0.34);
+  color: #fef3c7;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-priority-facts div {
+  background: rgba(4, 18, 42, 0.56);
+  border: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency {
+  align-items: center;
+  background: rgba(23, 46, 83, 0.78);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-left: 4px solid #60a5fa;
+  border-radius: 10px;
+  color: #dbeafe;
+  display: flex;
+  gap: 8px 12px;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency span {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency strong { color: #ffffff; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency-normal { background: rgba(23, 46, 83, 0.78); border-left-color: #60a5fa; color: #dbeafe; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency-due-soon { background: rgba(91, 57, 8, 0.76); border-color: rgba(251, 191, 36, 0.4); border-left-color: #fbbf24; color: #fef3c7; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency-late { background: rgba(105, 43, 10, 0.76); border-color: rgba(251, 146, 60, 0.42); border-left-color: #fb923c; color: #ffedd5; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency-critical { background: rgba(100, 22, 35, 0.8); border-color: rgba(248, 113, 113, 0.44); border-left-color: #f87171; color: #ffe4e6; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency-action-required { background: linear-gradient(135deg, rgba(112, 26, 65, 0.86), rgba(76, 29, 149, 0.78)); border-color: rgba(244, 114, 182, 0.46); border-left-color: #f472b6; color: #fce7f3; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-actions .action-button {
+  border-radius: 10px;
+  min-height: 46px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .approve-button {
+  background: linear-gradient(135deg, #047857, #059669 58%, #10b981);
+  border: 1px solid rgba(110, 231, 183, 0.32);
+  color: #ffffff;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .reject-button {
+  background: rgba(102, 27, 42, 0.78);
+  border: 1px solid rgba(248, 113, 113, 0.38);
+  color: #ffe4e6;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-contact-shortcut {
+  border-top: 1px solid rgba(165, 180, 252, 0.14);
+  margin-top: 11px;
+  padding-top: 10px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-contact-button {
+  background: rgba(51, 46, 113, 0.82);
+  border: 1px solid rgba(196, 181, 253, 0.34);
+  border-radius: 10px;
+  color: #f5f3ff;
+  min-height: 44px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-contact-panel {
+  background: rgba(10, 32, 58, 0.92);
+  border-color: rgba(94, 234, 212, 0.24);
+  color: #d8eceb;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-contact-details dt { color: #99f6e4; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-contact-details dd { color: #ffffff; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-call-link {
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  border: 1px solid rgba(94, 234, 212, 0.3);
+  border-radius: 10px;
+  color: #ffffff;
+  min-height: 44px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-remote-cue {
+  background: rgba(9, 62, 63, 0.62);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  border-left: 4px solid #2dd4bf;
+  border-radius: 10px;
+  display: grid;
+  gap: 2px;
+  margin: 0 0 10px;
+  padding: 9px 10px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-remote-cue strong { color: #ccfbf1; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-remote-cue span { color: #a7dcd7; font-size: 0.82rem; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden #wardenDepartureConfirmationList .record-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden #wardenDepartureConfirmationList .out-button {
+  background: rgba(13, 100, 96, 0.78);
+  border: 1px solid rgba(45, 212, 191, 0.34);
+  color: #ecfdf5;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-panel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1), transparent 18rem),
+    linear-gradient(145deg, rgba(17, 36, 75, 0.94), rgba(8, 21, 48, 0.98));
+  border: 1px solid rgba(129, 140, 248, 0.24);
+  border-left: 4px solid #818cf8;
+  border-radius: 17px;
+  box-shadow: 0 16px 38px rgba(0, 5, 18, 0.28);
+  margin: 14px 0 0;
+  padding: 14px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-heading h3 { color: #ffffff; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-heading span,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-summary { color: #aebed3; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .checklist-filter-pills {
+  background: rgba(5, 18, 43, 0.6);
+  border: 1px solid rgba(129, 140, 248, 0.14);
+  border-radius: 11px;
+  padding: 5px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .checklist-filter-pill {
+  background: transparent;
+  border-color: rgba(165, 180, 252, 0.18);
+  color: #c8d4e5;
+  min-height: 40px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .checklist-filter-pill.active {
+  background: linear-gradient(135deg, #4f46e5, #6d28d9);
+  border-color: rgba(196, 181, 253, 0.32);
+  color: #ffffff;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .checklist-copy-button {
+  background: rgba(43, 49, 105, 0.82);
+  border: 1px solid rgba(165, 180, 252, 0.28);
+  color: #f1f1ff;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-item {
+  background: rgba(7, 24, 53, 0.78);
+  border-color: rgba(129, 140, 248, 0.16);
+  color: #e1e9f5;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-item:hover,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-item:focus-visible {
+  background: rgba(26, 43, 88, 0.9);
+  border-color: rgba(165, 180, 252, 0.42);
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-main strong { color: #ffffff; }
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-main small,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-meta small,
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-meta span { color: #aebed3; }
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden .empty-state {
+  background: rgba(7, 23, 51, 0.68);
+  border-color: rgba(165, 180, 252, 0.28);
+  color: #b9c7d8;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(button, summary, a):focus-visible,
+body:has(#appWorkspace.active #warden.tab-panel.active) #logoutButton:focus-visible,
+body:has(#appWorkspace.active #warden.tab-panel.active) .tab-button:focus-visible {
+  outline: 3px solid var(--access-focus);
+  outline-offset: 3px;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(button, .action-button):disabled {
+  background: #33475c;
+  border-color: #53687d;
+  box-shadow: none;
+  color: #aab9c7;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+body:has(#appWorkspace.active #warden.tab-panel.active) .app-footer { color: #91a4ba; }
+
+@supports (backdrop-filter: blur(14px)) {
+  body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar,
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(.warden-dashboard-heading, .warden-refresh-panel, .current-hostel-roster, .record-card, .semester-checklist-panel) {
+    backdrop-filter: blur(14px);
+  }
+}
+
+@media (min-width: 1000px) {
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(#wardenList, #wardenDepartureConfirmationList, #wardenApprovedList) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  body:has(#appWorkspace.active #warden.tab-panel.active) .app-shell { padding: 10px 9px 22px; }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar {
+    margin-bottom: 8px;
+    padding: 10px 11px;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar strong { font-size: 1rem; }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #logoutButton {
+    min-height: 42px;
+    padding: 7px 10px;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) .tabs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #ruleNotice {
+    font-size: 0.77rem;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-dashboard-heading,
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-roster,
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-panel {
+    padding: 12px;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-dashboard-heading p { font-size: 0.86rem; }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-panel { padding: 11px; }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-top {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-refresh-button { width: fit-content; }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-card { padding: 12px; }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-top {
+    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge-stack {
+    align-items: flex-end;
+    max-width: 136px;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .badge {
+    max-width: 136px;
+    white-space: normal;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-times {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-urgency {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-contact-button { width: fit-content; }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .guardian-contact-details div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .checklist-copy-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .checklist-filter-pills {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-item {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden .semester-checklist-meta {
+    grid-column: 2;
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(#appWorkspace.active #warden.tab-panel.active) #warden *,
+  body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar,
+  body:has(#appWorkspace.active #warden.tab-panel.active) #logoutButton {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+
+/* ==================================================
+   Premium Institutional Guard Dashboard — r16
+   ================================================== */
+body:has(#appWorkspace.active #guard.tab-panel.active) {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(245, 158, 11, 0.16), transparent 32rem),
+    radial-gradient(circle at 94% 24%, rgba(249, 115, 22, 0.1), transparent 28rem),
+    linear-gradient(150deg, var(--access-navy-950) 0%, #071a32 54%, #172038 100%);
+  color: var(--access-off-white);
+  min-height: 100vh;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active)::before {
+  background-image:
+    linear-gradient(rgba(251, 191, 36, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(251, 191, 36, 0.025) 1px, transparent 1px);
+  background-size: 30px 30px;
+  content: "";
+  inset: 0;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .app-header { display: none; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .app-shell {
+  margin-top: 0;
+  max-width: 1240px;
+  padding: 18px clamp(14px, 2.5vw, 30px) 30px;
+  width: 100%;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #appWorkspace,
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard {
+  margin-inline: auto;
+  max-width: 1180px;
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .session-bar {
+  align-items: center;
+  background:
+    radial-gradient(circle at 0 0, rgba(245, 158, 11, 0.2), transparent 17rem),
+    linear-gradient(135deg, rgba(36, 39, 59, 0.97), rgba(10, 24, 49, 0.98));
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-left: 5px solid #f59e0b;
+  border-radius: 16px;
+  box-shadow: 0 18px 44px rgba(0, 5, 18, 0.3), inset 0 1px rgba(255, 255, 255, 0.05);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 10px;
+  padding: 13px 15px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .session-bar span {
+  color: #fbbf24;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .session-bar strong {
+  color: #ffffff;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #logoutButton {
+  background: rgba(61, 45, 25, 0.82);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  border-radius: 11px;
+  color: #fff7df;
+  min-height: 44px;
+  padding: 9px 14px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .tabs {
+  background: rgba(9, 22, 45, 0.84);
+  border: 1px solid rgba(245, 158, 11, 0.16);
+  border-radius: 13px;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 5px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .tab-button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #aebed3;
+  min-height: 40px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .tab-button.active {
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.92), rgba(234, 88, 12, 0.84));
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #ffffff;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .announcement-banner {
+  background: rgba(12, 27, 55, 0.92);
+  border-color: rgba(245, 158, 11, 0.2);
+  box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
+  color: #f8eddc;
+  margin-bottom: 10px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) .announcement-banner-label { color: #fbbf24; }
+body:has(#appWorkspace.active #guard.tab-panel.active) .announcement-banner-copy,
+body:has(#appWorkspace.active #guard.tab-panel.active) .announcement-banner-updated { color: #b8c7da; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #ruleNotice {
+  background: rgba(58, 42, 13, 0.78);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-left: 4px solid #f59e0b;
+  border-radius: 13px;
+  color: #fff1bd;
+  font-size: 0.84rem;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard { color: #e8eef8; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-heading {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(249, 115, 22, 0.15), transparent 19rem),
+    linear-gradient(145deg, rgba(30, 40, 66, 0.97), rgba(8, 22, 47, 0.98));
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-left: 5px solid #f59e0b;
+  border-radius: 17px;
+  box-shadow: 0 18px 42px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.05);
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 15px 16px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-kicker {
+  color: #fbbf24;
+  display: block;
+  font-size: 0.69rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-heading h2 {
+  color: #ffffff;
+  font-size: clamp(1.35rem, 2.3vw, 1.75rem);
+  margin: 0;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-heading p {
+  color: #b7c7da;
+  margin: 0;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-refresh-panel {
+  align-items: center;
+  background: linear-gradient(145deg, rgba(43, 40, 47, 0.92), rgba(10, 24, 49, 0.96));
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-refresh-button {
+  background: rgba(120, 68, 12, 0.72);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 10px;
+  color: #fff7df;
+  min-height: 42px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-last-updated {
+  color: #b7c7da;
+  overflow-wrap: anywhere;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-roster {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.09), transparent 18rem),
+    linear-gradient(145deg, rgba(13, 46, 65, 0.95), rgba(7, 27, 49, 0.98));
+  border: 1px solid rgba(45, 212, 191, 0.26);
+  border-left: 5px solid #2dd4bf;
+  border-radius: 18px;
+  box-shadow: 0 18px 44px rgba(0, 5, 18, 0.3), inset 0 1px rgba(255, 255, 255, 0.05);
+  margin: 12px 0 16px;
+  padding: 15px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-heading h3 { color: #ffffff; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-heading p { color: #a9c9c8; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-total { color: #dffbf6; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-group-roster {
+  background: rgba(6, 28, 47, 0.78);
+  border-color: rgba(94, 234, 212, 0.18);
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-group-roster summary {
+  color: #e8fffb;
+  font-weight: 800;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-group-roster[open] summary {
+  background: rgba(13, 72, 74, 0.34);
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-group-roster ul,
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-empty-group {
+  border-top-color: rgba(94, 234, 212, 0.16);
+  color: #c5dedb;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-list-title {
+  align-items: center;
+  border-left: 0;
+  color: #ffffff;
+  display: flex;
+  font-size: clamp(1.08rem, 2vw, 1.28rem);
+  gap: 9px;
+  margin: 18px 0 8px;
+  padding-left: 0;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-list-title::before {
+  background: #f59e0b;
+  border-radius: 999px;
+  content: "";
+  flex: 0 0 auto;
+  height: 9px;
+  width: 9px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-list-title-in::before { background: #2dd4bf; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-list-hint {
+  color: #aebed3;
+  font-size: 0.84rem;
+  margin: -3px 0 10px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard :where(#guardApprovedList, #guardOutList) {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  width: 100%;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-card.guard-operational-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.09), transparent 17rem),
+    linear-gradient(150deg, rgba(19, 39, 68, 0.97), rgba(7, 21, 45, 0.99));
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  border-left: 4px solid #f59e0b;
+  border-radius: 16px;
+  box-shadow: 0 16px 38px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.05);
+  color: #dce7f5;
+  min-width: 0;
+  padding: 14px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard #guardOutList .record-card.guard-operational-card {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.08), transparent 17rem),
+    linear-gradient(150deg, rgba(13, 42, 64, 0.97), rgba(6, 24, 43, 0.99));
+  border-color: rgba(45, 212, 191, 0.23);
+  border-left-color: #2dd4bf;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-card.overnight-card { border-left-color: #60a5fa; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-card h3 { color: #ffffff; font-size: 1.06rem; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-meta { color: #aebed3; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .profile-photo-frame {
+  background: linear-gradient(145deg, #4c3b25, #1b2b47);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #fff7df;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .badge {
+  border: 1px solid transparent;
+  font-weight: 850;
+  max-width: 160px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .badge-request-type { background: #1d4f7f; color: #dbeafe; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .badge-approved { background: #38bdf8; color: #04233a; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .badge-out { background: #fb923c; color: #2c1202; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .badge-emergency { background: #991b1b; border-color: #f87171; color: #ffffff; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-emergency-safety {
+  background: rgba(91, 24, 31, 0.76);
+  border-color: rgba(248, 113, 113, 0.38);
+  color: #ffe4e6;
+  overflow-wrap: anywhere;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency {
+  align-items: center;
+  background: rgba(24, 47, 73, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-left: 4px solid #94a3b8;
+  border-radius: 10px;
+  color: #e2e8f0;
+  display: flex;
+  gap: 8px 12px;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency span {
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency strong { color: #ffffff; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency-normal { border-left-color: #94a3b8; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency-due-soon { background: rgba(91, 57, 8, 0.78); border-color: rgba(251, 191, 36, 0.4); border-left-color: #fbbf24; color: #fef3c7; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency-late { background: rgba(105, 43, 10, 0.78); border-color: rgba(251, 146, 60, 0.42); border-left-color: #fb923c; color: #ffedd5; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency-critical { background: rgba(100, 22, 35, 0.84); border-color: rgba(248, 113, 113, 0.46); border-left-color: #f87171; color: #ffe4e6; }
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency-action-required { background: linear-gradient(135deg, rgba(127, 29, 29, 0.96), rgba(69, 10, 10, 0.96)); border-color: rgba(254, 202, 202, 0.5); border-left-color: #ffffff; color: #ffffff; }
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-action-cue {
+  background: rgba(66, 45, 13, 0.72);
+  border-color: rgba(251, 191, 36, 0.34);
+  color: #fef3c7;
+  margin-bottom: 10px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-action-cue-in {
+  background: rgba(8, 72, 67, 0.64);
+  border-color: rgba(45, 212, 191, 0.34);
+  color: #ccfbf1;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-direction-label {
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-actions .action-button {
+  border-radius: 11px;
+  box-shadow: none;
+  min-height: 48px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .out-button {
+  background: linear-gradient(135deg, #b45309, #ea580c 62%, #f97316);
+  border: 1px solid rgba(253, 186, 116, 0.38);
+  color: #ffffff;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .in-button {
+  background: linear-gradient(135deg, #047857, #0d9488 62%, #14b8a6);
+  border: 1px solid rgba(94, 234, 212, 0.34);
+  color: #ffffff;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .empty-state {
+  background: rgba(8, 23, 46, 0.78);
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  color: #aebed3;
+  min-width: 0;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard :where(button, summary, [tabindex]):focus-visible,
+body:has(#appWorkspace.active #guard.tab-panel.active) #logoutButton:focus-visible,
+body:has(#appWorkspace.active #guard.tab-panel.active) .tab-button:focus-visible {
+  outline: 3px solid #fde68a;
+  outline-offset: 3px;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard button:disabled,
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard .action-button.is-loading:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+@media (min-width: 1000px) {
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard :where(#guardApprovedList, #guardOutList) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  body:has(#appWorkspace.active #guard.tab-panel.active) .app-shell {
+    padding: 10px 10px 22px;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) .session-bar {
+    gap: 9px;
+    padding: 11px 12px;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) .tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-heading,
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .current-hostel-roster {
+    padding: 12px;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-heading p { font-size: 0.86rem; }
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-refresh-panel { padding: 9px 10px; }
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-card.guard-operational-card { padding: 12px; }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-top {
+    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .badge-stack {
+    align-items: flex-end;
+    max-width: 136px;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .badge { max-width: 136px; }
+}
+
+@media (max-width: 430px) {
+  body:has(#appWorkspace.active #guard.tab-panel.active) .app-shell { padding-inline: 8px; }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) .session-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #logoutButton {
+    min-height: 42px;
+    padding-inline: 10px;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #ruleNotice {
+    font-size: 0.77rem;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-list-title {
+    font-size: 1.02rem;
+    margin-top: 15px;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-list-hint { font-size: 0.79rem; }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-refresh-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-urgency {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(#appWorkspace.active #guard.tab-panel.active) #guard *,
+  body:has(#appWorkspace.active #guard.tab-panel.active) .session-bar,
+  body:has(#appWorkspace.active #guard.tab-panel.active) #logoutButton {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+
+/* ==================================================
+   Premium Institutional Admin Dashboard — r17
+   ================================================== */
+body:has(#admin.admin-dashboard.active) {
+  background:
+    radial-gradient(circle at 7% 0%, rgba(16, 185, 129, 0.17), transparent 34rem),
+    radial-gradient(circle at 94% 18%, rgba(6, 182, 212, 0.1), transparent 30rem),
+    linear-gradient(150deg, var(--access-navy-950) 0%, #071b32 52%, #0d2638 100%);
+  color: var(--access-off-white);
+  min-height: 100vh;
+}
+
+body:has(#admin.admin-dashboard.active)::before {
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.027) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.027) 1px, transparent 1px);
+  background-size: 30px 30px;
+  content: "";
+  inset: 0;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+body:has(#admin.admin-dashboard.active) .app-header { display: none; }
+
+body:has(#admin.admin-dashboard.active) .app-shell {
+  margin-top: 0;
+  max-width: 1320px;
+  padding: 18px clamp(14px, 2.2vw, 30px) 32px;
+  width: 100%;
+}
+
+body:has(#admin.admin-dashboard.active) #appWorkspace,
+body:has(#admin.admin-dashboard.active) #admin {
+  margin-inline: auto;
+  max-width: 1280px;
+  min-width: 0;
+}
+
+body:has(#admin.admin-dashboard.active) .session-bar {
+  align-items: center;
+  background:
+    radial-gradient(circle at 0 0, rgba(16, 185, 129, 0.22), transparent 18rem),
+    linear-gradient(135deg, rgba(12, 51, 55, 0.97), rgba(7, 25, 48, 0.98));
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-left: 5px solid #10b981;
+  border-radius: 16px;
+  box-shadow: 0 18px 44px rgba(0, 5, 18, 0.3), inset 0 1px rgba(255, 255, 255, 0.05);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 10px;
+  padding: 13px 15px;
+}
+
+body:has(#admin.admin-dashboard.active) .session-bar span {
+  color: #6ee7b7;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+body:has(#admin.admin-dashboard.active) .session-bar strong {
+  color: #ffffff;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+}
+
+body:has(#admin.admin-dashboard.active) #logoutButton {
+  background: rgba(6, 78, 69, 0.66);
+  border: 1px solid rgba(110, 231, 183, 0.32);
+  border-radius: 11px;
+  color: #ecfdf5;
+  min-height: 44px;
+  padding: 9px 14px;
+}
+
+body:has(#admin.admin-dashboard.active) .announcement-banner {
+  background: rgba(9, 31, 53, 0.92);
+  border-color: rgba(52, 211, 153, 0.2);
+  box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
+  color: #e7f8f2;
+  margin-bottom: 10px;
+}
+
+body:has(#admin.admin-dashboard.active) .announcement-banner-label { color: #6ee7b7; }
+body:has(#admin.admin-dashboard.active) .announcement-banner-copy,
+body:has(#admin.admin-dashboard.active) .announcement-banner-updated { color: #b8cbd5; }
+
+body:has(#admin.admin-dashboard.active) #ruleNotice {
+  background: rgba(12, 62, 64, 0.72);
+  border: 1px solid rgba(45, 212, 191, 0.28);
+  border-left: 4px solid #2dd4bf;
+  border-radius: 13px;
+  color: #ccfbf1;
+  font-size: 0.84rem;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin { color: #dce8f3; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-heading {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.13), transparent 20rem),
+    linear-gradient(145deg, rgba(14, 50, 61, 0.97), rgba(7, 23, 47, 0.98));
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  border-left: 5px solid #10b981;
+  border-radius: 17px;
+  box-shadow: 0 18px 42px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.05);
+  margin-bottom: 12px;
+  padding: 15px 16px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-kicker {
+  color: #6ee7b7;
+  display: block;
+  font-size: 0.69rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-heading h2 {
+  color: #ffffff;
+  font-size: clamp(1.4rem, 2.4vw, 1.85rem);
+  margin: 0;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-heading p {
+  color: #b7cad5;
+  margin: 3px 0 0;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-subnav {
+  background: rgba(7, 27, 49, 0.9);
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 5, 18, 0.24), inset 0 1px rgba(255, 255, 255, 0.04);
+  gap: 5px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 12px 0 14px;
+  padding: 5px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-subtab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #adc2cf;
+  font-size: 0.78rem;
+  min-height: 43px;
+  padding: 8px 9px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-subtab.active {
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.94), rgba(8, 145, 178, 0.86));
+  border-color: rgba(110, 231, 183, 0.3);
+  box-shadow: none;
+  color: #ffffff;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-subpanel {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.055), transparent 24rem),
+    linear-gradient(150deg, rgba(11, 31, 56, 0.94), rgba(6, 22, 43, 0.97));
+  border: 1px solid rgba(52, 211, 153, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 18px 42px rgba(0, 5, 18, 0.25), inset 0 1px rgba(255, 255, 255, 0.035);
+  min-width: 0;
+  padding: clamp(14px, 2vw, 20px);
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-section-toolbar,
+body:has(#admin.admin-dashboard.active) #admin .admin-student-editor-heading {
+  border-bottom: 1px solid rgba(52, 211, 153, 0.12);
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-section-toolbar, .admin-student-editor-heading) h3,
+body:has(#admin.admin-dashboard.active) #admin .admin-action-queue-heading h4,
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-list-title {
+  color: #ffffff;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-section-toolbar, .admin-student-editor-heading) p,
+body:has(#admin.admin-dashboard.active) #admin .admin-action-queue-heading p,
+body:has(#admin.admin-dashboard.active) #admin .admin-last-updated {
+  color: #9fb5c5;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-heading-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(.primary-action, .secondary-action, .danger-action) {
+  border-radius: 10px;
+  min-height: 42px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .primary-action {
+  background: linear-gradient(135deg, #047857, #059669 58%, #0d9488);
+  border: 1px solid rgba(110, 231, 183, 0.32);
+  color: #ffffff;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .secondary-action {
+  background: rgba(19, 59, 74, 0.82);
+  border: 1px solid rgba(103, 232, 249, 0.24);
+  color: #e0f7fa;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .danger-action {
+  background: rgba(111, 31, 46, 0.88);
+  border: 1px solid rgba(248, 113, 113, 0.38);
+  color: #ffe4e6;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-kpi-grid {
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  margin: 12px 0 16px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-kpi-card {
+  background: linear-gradient(145deg, rgba(17, 47, 71, 0.96), rgba(8, 29, 53, 0.98));
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  border-left: 4px solid #10b981;
+  border-radius: 13px;
+  color: #dff8ef;
+  min-height: 88px;
+  padding: 12px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-kpi-card strong {
+  color: #ffffff;
+  font-size: 1.65rem;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-kpi-card span {
+  color: #b8d4d1;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-kpi-card.active {
+  border-color: #6ee7b7;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.25);
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-kpi-due-soon { background: rgba(82, 57, 10, 0.82); border-left-color: #fbbf24; }
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-ops-kpi-late, .admin-ops-kpi-critical) { background: rgba(91, 31, 38, 0.84); border-color: rgba(248, 113, 113, 0.35); border-left-color: #f87171; color: #ffe4e6; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-kpi-action-required { background: linear-gradient(145deg, rgba(119, 24, 46, 0.95), rgba(69, 10, 30, 0.98)); border-color: rgba(251, 113, 133, 0.42); border-left-color: #ffffff; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-kpi-needs-review { background: rgba(66, 48, 102, 0.8); border-left-color: #c4b5fd; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-kpi-pending-emergency { background: rgba(91, 31, 45, 0.82); border-left-color: #fb7185; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.1), transparent 18rem),
+    linear-gradient(145deg, rgba(10, 54, 67, 0.95), rgba(6, 30, 50, 0.98));
+  border: 1px solid rgba(45, 212, 191, 0.26);
+  border-left: 5px solid #2dd4bf;
+  border-radius: 16px;
+  box-shadow: 0 16px 38px rgba(0, 5, 18, 0.25);
+  margin: 12px 0 16px;
+  padding: 14px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-heading h4 { color: #ffffff; }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-heading p { color: #a9c9c8; }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-total { color: #dffbf6; }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-group-roster { background: rgba(4, 29, 47, 0.78); border-color: rgba(94, 234, 212, 0.18); }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-group-roster summary { color: #e8fffb; }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-group-roster[open] summary { background: rgba(13, 72, 74, 0.34); }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster :where(ul, .current-hostel-empty-group) { border-top-color: rgba(94, 234, 212, 0.16); color: #c5dedb; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-action-queue {
+  background: linear-gradient(145deg, rgba(14, 39, 66, 0.95), rgba(7, 25, 48, 0.98));
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  border-radius: 16px;
+  box-shadow: 0 16px 38px rgba(0, 5, 18, 0.24);
+  padding: 14px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-action-grid {
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-action-card {
+  background: rgba(11, 31, 55, 0.9);
+  border-color: rgba(148, 163, 184, 0.2);
+  border-left-color: #64748b;
+  border-radius: 12px;
+  color: #dce7f2;
+  padding: 12px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-action-card header strong,
+body:has(#admin.admin-dashboard.active) #admin .admin-action-guidance { color: #ffffff; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-identity,
+body:has(#admin.admin-dashboard.active) #admin .admin-action-facts dt { color: #aebed3; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-facts dd { color: #f0f6fb; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-lifecycle { background: rgba(14, 116, 144, 0.65); color: #cffafe; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-action-required { background: rgba(105, 22, 43, 0.84); border-left-color: #fb7185; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-critical { background: rgba(94, 39, 18, 0.84); border-left-color: #fb923c; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-needs-review { background: rgba(60, 45, 91, 0.82); border-left-color: #c4b5fd; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-pending-emergency { background: rgba(91, 26, 41, 0.84); border-left-color: #f87171; }
+body:has(#admin.admin-dashboard.active) #admin .admin-action-review-copy { color: #ddd6fe; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-list {
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-card,
+body:has(#admin.admin-dashboard.active) #admin .admin-staff-card {
+  background: linear-gradient(145deg, rgba(15, 42, 67, 0.94), rgba(7, 27, 50, 0.98));
+  border-color: rgba(52, 211, 153, 0.16);
+  border-radius: 13px;
+  box-shadow: 0 14px 32px rgba(0, 5, 18, 0.22);
+  color: #dce8f3;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-ops-card, .admin-staff-card) h4 { color: #ffffff; }
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-ops-card, .admin-staff-card) p,
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-summary,
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-card dt { color: #9fb5c5; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-card dd { color: #eef5fb; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-card.is-late { background: rgba(91, 27, 41, 0.82); border-color: rgba(248, 113, 113, 0.34); }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-status { background: rgba(5, 150, 105, 0.7); color: #ecfdf5; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-status.is-out { background: rgba(194, 65, 12, 0.8); color: #ffedd5; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-urgency { background: rgba(18, 51, 76, 0.88); border-color: rgba(103, 232, 249, 0.25); color: #cffafe; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-urgency-due-soon { background: rgba(91, 57, 8, 0.82); border-color: rgba(251, 191, 36, 0.4); color: #fef3c7; }
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-ops-urgency-late, .admin-ops-urgency-critical, .admin-ops-urgency-action-required) { background: rgba(100, 22, 35, 0.84); border-color: rgba(248, 113, 113, 0.44); color: #ffe4e6; }
+body:has(#admin.admin-dashboard.active) #admin .admin-ops-urgency-review { background: rgba(66, 48, 102, 0.82); border-color: rgba(196, 181, 253, 0.36); color: #ede9fe; }
+
+body:has(#admin.admin-dashboard.active) #admin .profile-photo-frame {
+  background: linear-gradient(145deg, #164e4a, #18334f);
+  border-color: rgba(110, 231, 183, 0.28);
+  color: #d1fae5;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-module-heading {
+  align-items: flex-start;
+  background: rgba(7, 28, 50, 0.7);
+  border: 1px solid rgba(52, 211, 153, 0.14);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-subtabs {
+  background: rgba(5, 23, 43, 0.82);
+  border: 1px solid rgba(52, 211, 153, 0.16);
+  border-radius: 11px;
+  gap: 4px;
+  padding: 4px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-subtab {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #adc2cf;
+  min-height: 42px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-subtab.active {
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.9), rgba(8, 145, 178, 0.8));
+  border-color: rgba(110, 231, 183, 0.28);
+  box-shadow: none;
+  color: #ffffff;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-inner-panel { min-width: 0; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-config-status summary {
+  background: rgba(17, 53, 66, 0.9);
+  border-color: rgba(103, 232, 249, 0.24);
+  color: #d9f7f5;
+  min-height: 40px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-config-status[data-state="active"] .admin-config-status-dot { background: #34d399; }
+body:has(#admin.admin-dashboard.active) #admin .admin-config-status[data-state="legacy"] .admin-config-status-dot { background: #fbbf24; }
+body:has(#admin.admin-dashboard.active) #admin .admin-config-status[data-state="issue"] .admin-config-status-dot { background: #f87171; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-config-status-popover {
+  background: linear-gradient(145deg, #0d2c42, #081d36);
+  border-color: rgba(52, 211, 153, 0.24);
+  box-shadow: 0 18px 42px rgba(0, 5, 18, 0.4);
+  color: #dce8f3;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-config-status-popover ul:not([hidden]) { color: #fecaca; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-migration-tools,
+body:has(#admin.admin-dashboard.active) #admin .admin-dynamic-login-tools {
+  background: rgba(5, 22, 42, 0.68);
+  border: 1px solid rgba(52, 211, 153, 0.13);
+  border-radius: 10px;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-migration-title { color: #ffffff; }
+body:has(#admin.admin-dashboard.active) #admin .admin-dynamic-login-heading strong {
+  background: rgba(10, 91, 77, 0.72);
+  border: 1px solid rgba(52, 211, 153, 0.26);
+  border-radius: 999px;
+  color: #d1fae5;
+  padding: 5px 9px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-migration-result > div {
+  background: rgba(17, 49, 70, 0.88);
+  border: 1px solid rgba(103, 232, 249, 0.12);
+  color: #eef6fb;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-migration-result dt,
+body:has(#admin.admin-dashboard.active) #admin .admin-migration-confirm { color: #aebfcb; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-filters,
+body:has(#admin.admin-dashboard.active) #admin .stats-filter-card,
+body:has(#admin.admin-dashboard.active) #admin .admin-master-filters {
+  background: linear-gradient(145deg, rgba(15, 48, 66, 0.9), rgba(8, 29, 50, 0.95));
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  border-radius: 13px;
+  box-shadow: none;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(label, legend) { color: #dce8f3; }
+body:has(#admin.admin-dashboard.active) #admin .admin-field-helper { color: #9fb5c5; }
+
+body:has(#admin.admin-dashboard.active) #admin :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  background: rgba(5, 22, 42, 0.88);
+  border-color: rgba(103, 232, 249, 0.2);
+  color: #f2f8fc;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(input, select, textarea)::placeholder { color: #78909f; }
+body:has(#admin.admin-dashboard.active) #admin :where(input[type="checkbox"], input[type="radio"]) { accent-color: #10b981; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-list,
+body:has(#admin.admin-dashboard.active) #admin .admin-student-config-list {
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-card,
+body:has(#admin.admin-dashboard.active) #admin .admin-student-config-card,
+body:has(#admin.admin-dashboard.active) #admin .admin-type-card {
+  background: linear-gradient(145deg, rgba(15, 45, 67, 0.96), rgba(7, 27, 49, 0.98));
+  border: 1px solid rgba(52, 211, 153, 0.17);
+  border-radius: 14px;
+  box-shadow: 0 14px 32px rgba(0, 5, 18, 0.22);
+  color: #dce8f3;
+  padding: 14px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-student-card, .admin-student-config-card, .admin-type-card) h4 { color: #ffffff; }
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-student-card, .admin-student-config-card, .admin-type-card) p,
+body:has(#admin.admin-dashboard.active) #admin .admin-student-contact,
+body:has(#admin.admin-dashboard.active) #admin .admin-student-note { color: #aebfcb; }
+body:has(#admin.admin-dashboard.active) #admin .admin-student-note { background: rgba(4, 21, 41, 0.62); }
+
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-student-card, .admin-student-config-card).is-inactive {
+  background: rgba(26, 39, 53, 0.86);
+  border-color: rgba(148, 163, 184, 0.18);
+  filter: saturate(0.68);
+  opacity: 0.8;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .clay-status-badge.is-active { background: #065f46; color: #d1fae5; }
+body:has(#admin.admin-dashboard.active) #admin .clay-status-badge.is-inactive { background: #334155; color: #e2e8f0; }
+body:has(#admin.admin-dashboard.active) #admin .admin-student-id { background: #164e63; color: #cffafe; }
+body:has(#admin.admin-dashboard.active) #admin .student-li-badge { background: #4c1d95; color: #ede9fe; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-student-editor,
+body:has(#admin.admin-dashboard.active) #admin .admin-editor,
+body:has(#admin.admin-dashboard.active) #admin .admin-announcement-form {
+  background: linear-gradient(145deg, rgba(14, 45, 65, 0.97), rgba(6, 25, 47, 0.99));
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  border-radius: 15px;
+  box-shadow: 0 16px 36px rgba(0, 5, 18, 0.25);
+  color: #dce8f3;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-announcement-form { max-width: none; }
+body:has(#admin.admin-dashboard.active) #admin #adminNoGuardDepartureForm { border-left: 4px solid #2dd4bf; margin-bottom: 14px; }
+body:has(#admin.admin-dashboard.active) #admin .admin-announcement-boundary { background: rgba(91, 57, 8, 0.72); color: #fef3c7; }
+body:has(#admin.admin-dashboard.active) #admin .admin-announcement-state { color: #9fb5c5; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-config-fieldset {
+  background: rgba(5, 22, 42, 0.62);
+  border-color: rgba(103, 232, 249, 0.14);
+  border-radius: 12px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-config-fieldset > p { color: #9fb5c5; }
+
+body:has(#admin.admin-dashboard.active) #admin .admin-checkbox-grid label,
+body:has(#admin.admin-dashboard.active) #admin .admin-announcement-options label {
+  background: rgba(16, 48, 68, 0.78);
+  border-color: rgba(103, 232, 249, 0.14);
+  color: #dce8f3;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .stats-section,
+body:has(#admin.admin-dashboard.active) #admin .admin-table-wrap {
+  background: rgba(7, 26, 47, 0.72);
+  border: 1px solid rgba(52, 211, 153, 0.12);
+  border-radius: 13px;
+  padding: 12px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-table-wrap { overflow-x: auto; }
+body:has(#admin.admin-dashboard.active) #admin .admin-master-table { color: #dce8f3; }
+body:has(#admin.admin-dashboard.active) #admin .admin-master-table th { background: rgba(10, 61, 67, 0.84); color: #d1fae5; }
+body:has(#admin.admin-dashboard.active) #admin .admin-master-table :where(th, td) { border-bottom-color: rgba(148, 163, 184, 0.16); }
+body:has(#admin.admin-dashboard.active) #admin .admin-master-table small { color: #9fb5c5; }
+body:has(#admin.admin-dashboard.active) #admin .admin-master-details td { background: rgba(13, 49, 61, 0.78); }
+
+body:has(#admin.admin-dashboard.active) #admin .empty-state {
+  background: rgba(6, 24, 44, 0.76);
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  color: #9fb5c5;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(button, input, select, textarea, summary, [tabindex]):focus-visible,
+body:has(#admin.admin-dashboard.active) #logoutButton:focus-visible {
+  outline: 3px solid #6ee7b7;
+  outline-offset: 3px;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+@media (max-width: 1080px) {
+  body:has(#admin.admin-dashboard.active) #admin .admin-subnav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  body:has(#admin.admin-dashboard.active) .app-shell { padding: 10px 10px 24px; }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-subnav {
+    display: grid;
+    grid-auto-columns: minmax(138px, 0.8fr);
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-subtab { white-space: nowrap; }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-action-grid,
+  body:has(#admin.admin-dashboard.active) #admin .admin-ops-list,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-list,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-config-list,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-form-grid,
+  body:has(#admin.admin-dashboard.active) #admin .admin-action-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-module-heading,
+  body:has(#admin.admin-dashboard.active) #admin .admin-section-toolbar,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-editor-heading,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-card-heading,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-config-card,
+  body:has(#admin.admin-dashboard.active) #admin .admin-staff-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-subtabs {
+    width: 100%;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-heading-actions { justify-content: flex-start; }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-config-status-popover {
+    margin-top: 8px;
+    min-width: 0;
+    position: static;
+    width: 100%;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-config-status,
+  body:has(#admin.admin-dashboard.active) #admin .admin-config-status[open] {
+    min-width: 0;
+    width: 100%;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-config-status summary {
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    width: 100%;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-config-status summary > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 430px) {
+  body:has(#admin.admin-dashboard.active) .app-shell { padding-inline: 8px; }
+
+  body:has(#admin.admin-dashboard.active) .session-bar {
+    gap: 9px;
+    padding: 11px 12px;
+  }
+
+  body:has(#admin.admin-dashboard.active) #logoutButton {
+    min-height: 42px;
+    padding-inline: 10px;
+  }
+
+  body:has(#admin.admin-dashboard.active) #ruleNotice {
+    font-size: 0.77rem;
+    padding: 8px 10px;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-heading,
+  body:has(#admin.admin-dashboard.active) #admin .admin-subpanel {
+    padding: 12px;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-heading p { font-size: 0.84rem; }
+  body:has(#admin.admin-dashboard.active) #admin .admin-kpi-card { min-height: 82px; padding: 10px; }
+  body:has(#admin.admin-dashboard.active) #admin .admin-kpi-card strong { font-size: 1.45rem; }
+  body:has(#admin.admin-dashboard.active) #admin .admin-action-queue,
+  body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster { padding: 11px; }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-subtabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-subtab {
+    font-size: 0.75rem;
+    padding-inline: 6px;
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-filters,
+  body:has(#admin.admin-dashboard.active) #admin .admin-form-grid,
+  body:has(#admin.admin-dashboard.active) #admin .admin-master-filters,
+  body:has(#admin.admin-dashboard.active) #admin .stats-filter-grid,
+  body:has(#admin.admin-dashboard.active) #admin .admin-migration-result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-time-clear-control {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body:has(#admin.admin-dashboard.active) #admin .admin-heading-actions > button,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-actions > button,
+  body:has(#admin.admin-dashboard.active) #admin .admin-student-form-actions > button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(#admin.admin-dashboard.active) #admin *,
+  body:has(#admin.admin-dashboard.active) .session-bar,
+  body:has(#admin.admin-dashboard.active) #logoutButton {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
