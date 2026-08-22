@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r8">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r9">
   </head>
   <body>
     <header class="app-header">
@@ -642,6 +642,20 @@
                 <div class="admin-config-status-popover">
                   <p id="adminStudentConfigStatusDetail">Memuatkan status konfigurasi...</p>
                   <ul id="adminStudentConfigIssues" hidden></ul>
+                  <section class="admin-migration-tools" aria-label="Alat penyelenggaraan migrasi institusi pelajar">
+                    <p class="admin-migration-title">Penyelenggaraan institusi LI</p>
+                    <div class="admin-migration-actions">
+                      <button class="secondary-action compact-action" id="adminStudentReadinessRefreshButton" type="button">Refresh readiness</button>
+                      <button class="secondary-action compact-action" id="adminStudentMigrationDryRunButton" type="button">Dry-run</button>
+                    </div>
+                    <dl class="admin-migration-result" id="adminStudentMigrationResult" hidden></dl>
+                    <label class="admin-migration-confirm">
+                      <input id="adminStudentMigrationConfirmInput" type="checkbox" disabled>
+                      Saya mengesahkan apply selepas dry-run bersih.
+                    </label>
+                    <button class="danger-action compact-action" id="adminStudentMigrationApplyButton" type="button" disabled>Apply migrasi</button>
+                    <p class="form-message" id="adminStudentMigrationMessage" aria-live="polite"></p>
+                  </section>
                 </div>
               </details>
             </div>
@@ -904,6 +918,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r8"></script>
+    <script src="assets/app.js?v=2.4.0-r9"></script>
   </body>
 </html>

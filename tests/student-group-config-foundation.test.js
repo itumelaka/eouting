@@ -118,13 +118,14 @@ test("deactivation guards count only active references and expose no delete muta
   assert.equal(typeof context.deleteStudentGroup, "undefined");
 });
 
-test("Phase A adds no frontend dependency and does not register migration as an HTTP action", () => {
+test("Phase C registers only the authenticated guarded migration action", () => {
   const root = path.join(__dirname, "..");
   const frontend = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
   const gas = fs.readFileSync(path.join(root, "gas", "Code.gs"), "utf8");
   const doPostBody = gas.slice(gas.indexOf("function doPost"), gas.indexOf("function setupDatabase"));
   assert.equal(frontend.includes("STUDENT_GROUP_CONFIG_ENABLED"), false);
   assert.equal(frontend.includes("STUDENT_GROUPS"), false);
-  assert.equal(doPostBody.includes("migrateStudentInstitutionCodesV240"), false);
+  assert.equal(doPostBody.includes('action === "runStudentInstitutionMigration"'), true);
+  assert.equal(doPostBody.includes('action === "migrateStudentInstitutionCodesV240"'), false);
   assert.equal(doPostBody.includes("getStudentGroupConfigReadiness"), true);
 });

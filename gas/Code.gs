@@ -469,6 +469,7 @@ function doPost(e) {
     if (action === "getAnnouncementBanner") return jsonResponse(getAnnouncementBanner(payload));
     if (action === "getOutingConfigReadiness") return jsonResponse(getOutingConfigReadiness(payload));
     if (action === "getStudentGroupConfigReadiness") return jsonResponse(getStudentGroupConfigReadiness(payload));
+    if (action === "runStudentInstitutionMigration") return jsonResponse(runStudentInstitutionMigration(payload));
     if (action === "getAdminStudentGroups") return jsonResponse(getAdminStudentGroups(payload));
     if (action === "createStudentGroup") return jsonResponse(createStudentGroup(payload));
     if (action === "updateStudentGroup") return jsonResponse(updateStudentGroup(payload));
@@ -5439,9 +5440,25 @@ const LI_INSTITUTION_SEEDS_V240 = [
 ];
 
 function setupStudentGroupConfigV240() {
-  const studentGroupsSheet = getSheet_(SHEETS.studentGroups);
-  const liInstitutionsSheet = getSheet_(SHEETS.liInstitutions);
-  const studentsSheet = getSheet_(SHEETS.students);
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const existingStudentGroupsSheet = spreadsheet.getSheetByName(SHEETS.studentGroups);
+  const existingLiInstitutionsSheet = spreadsheet.getSheetByName(SHEETS.liInstitutions);
+  const existingStudentsSheet = spreadsheet.getSheetByName(SHEETS.students);
+  const sheetsCreated = [];
+  if (!existingStudentGroupsSheet) sheetsCreated.push(SHEETS.studentGroups);
+  if (!existingLiInstitutionsSheet) sheetsCreated.push(SHEETS.liInstitutions);
+  if (!existingStudentsSheet) sheetsCreated.push(SHEETS.students);
+
+  const studentGroupsSheet = existingStudentGroupsSheet || spreadsheet.insertSheet(SHEETS.studentGroups);
+  const liInstitutionsSheet = existingLiInstitutionsSheet || spreadsheet.insertSheet(SHEETS.liInstitutions);
+  const studentsSheet = existingStudentsSheet || spreadsheet.insertSheet(SHEETS.students);
+  const headersAdded = {};
+  headersAdded[SHEETS.studentGroups] = getMissingSheetHeadersV240_(studentGroupsSheet, HEADERS.STUDENT_GROUPS);
+  headersAdded[SHEETS.liInstitutions] = getMissingSheetHeadersV240_(liInstitutionsSheet, HEADERS.LI_INSTITUTIONS);
+  headersAdded[SHEETS.students] = getMissingSheetHeadersV240_(studentsSheet, STUDENT_HEADERS_V240);
+  const existingGroupRows = getRowsAsObjects_(studentGroupsSheet).length;
+  const existingInstitutionRows = getRowsAsObjects_(liInstitutionsSheet).length;
+  const existingStudentRows = getRowsAsObjects_(studentsSheet).length;
 
   ensureHeaders_(studentGroupsSheet, HEADERS.STUDENT_GROUPS);
   ensureHeaders_(liInstitutionsSheet, HEADERS.LI_INSTITUTIONS);
@@ -5456,7 +5473,9 @@ function setupStudentGroupConfigV240() {
   });
 
   const properties = PropertiesService.getScriptProperties();
-  if (properties.getProperty(STUDENT_GROUP_CONFIG_PROPERTY) === null) {
+  const existingFlagValue = properties.getProperty(STUDENT_GROUP_CONFIG_PROPERTY);
+  const flagCreatedAsFalse = existingFlagValue === null;
+  if (flagCreatedAsFalse) {
     properties.setProperty(STUDENT_GROUP_CONFIG_PROPERTY, "false");
   }
 
@@ -5482,10 +5501,34 @@ function setupStudentGroupConfigV240() {
   return {
     ok: true,
     sheets: [SHEETS.studentGroups, SHEETS.liInstitutions, SHEETS.students],
+    sheets_created: sheetsCreated,
+    headers_added: headersAdded,
+    seeds_added: {
+      student_groups: createdGroupCodes,
+      li_institutions: createdInstitutionCodes
+    },
+    existing_preserved: {
+      student_group_rows: existingGroupRows,
+      li_institution_rows: existingInstitutionRows,
+      student_rows: existingStudentRows
+    },
+    flag_created_as_false: flagCreatedAsFalse,
+    flag_existing_value: existingFlagValue,
+    flag_effective_value: properties.getProperty(STUDENT_GROUP_CONFIG_PROPERTY),
+    students_rows_untouched: getRowsAsObjects_(studentsSheet).length === existingStudentRows,
+    migration_run: false,
     created_group_codes: createdGroupCodes,
     created_institution_codes: createdInstitutionCodes,
     student_group_config_enabled: isStudentGroupConfigEnabledV240_()
   };
+}
+
+function getMissingSheetHeadersV240_(sheet, requiredHeaders) {
+  const currentHeaders = getSheetHeadersV240_(sheet);
+  if (!currentHeaders.length || currentHeaders.every((header) => header === "")) {
+    return requiredHeaders.slice();
+  }
+  return requiredHeaders.filter((header) => currentHeaders.indexOf(header) === -1);
 }
 
 function seedStudentConfigRowsV240_(sheet, headers, codeField, seeds, timestamp, createdBy) {
@@ -6123,17 +6166,69 @@ function assessStudentGroupConfigReadinessV240_() {
     addStudentConfigDiagnosticV240_(migrationIssues, "ACTIVE_LI_STUDENTS_WITH_INACTIVE_OR_MISSING_INSTITUTION", counts.active_li_students_with_inactive_or_missing_institution);
   }
 
+  const setupIssueCodes = {
+    MISSING_STUDENT_GROUPS_SHEET: true,
+    MISSING_LI_INSTITUTIONS_SHEET: true,
+    MISSING_STUDENTS_SHEET: true,
+    MISSING_STUDENTS_INSTITUTION_CODE_HEADER: true,
+    MISSING_REQUIRED_GROUP_A2: true,
+    MISSING_REQUIRED_GROUP_A3: true,
+    MISSING_REQUIRED_GROUP_LI: true,
+    MISSING_REQUIRED_INSTITUTION_UMK: true,
+    MISSING_REQUIRED_INSTITUTION_UPM: true
+  };
+  const hasSetupIssue = issues.some((issue) => setupIssueCodes[issue.code] === true);
+  const hasFoundationBlocker = issues.some((issue) => setupIssueCodes[issue.code] !== true);
+  let migrationPreview = null;
+  let migrationVerification = null;
+  if (issues.length === 0 && !enabled) {
+    migrationPreview = migrateStudentInstitutionCodesCoreV240_(true);
+    migrationVerification = verifyStudentInstitutionMigrationV240_();
+  }
+  const verificationCounts = migrationVerification && migrationVerification.counts || {};
+  const hasMigrationBlocker = Boolean(
+    (migrationPreview && (migrationPreview.unmatched > 0 || migrationPreview.conflicts > 0)) ||
+    Number(verificationCounts.li_invalid_institution || 0) > 0 ||
+    Number(verificationCounts.non_li_with_institution || 0) > 0 ||
+    Number(verificationCounts.legacy_mapping_conflicts || 0) > 0 ||
+    counts.active_students_with_inactive_or_missing_group > 0
+  );
+  const migrationNeeded = migrationIssues.length > 0 || Boolean(migrationPreview && migrationPreview.matched_blank > 0);
+  let operationalState = "READY_FOR_DYNAMIC_LOGIN";
+  if (hasSetupIssue) operationalState = "SETUP_REQUIRED";
+  else if (hasFoundationBlocker || hasMigrationBlocker) operationalState = "MIGRATION_BLOCKED";
+  else if (migrationNeeded) operationalState = "MIGRATION_REQUIRED";
+  const readyForDynamicLogin = operationalState === "READY_FOR_DYNAMIC_LOGIN";
+
   return {
     ready: issues.length === 0 && (!enabled || migrationIssues.length === 0),
     foundation_ready: issues.length === 0,
-    migration_ready: migrationIssues.length === 0,
-    migration_needed: migrationIssues.length > 0,
+    ready_for_admin_config: issues.length === 0,
+    ready_for_dynamic_login: readyForDynamicLogin,
+    migration_ready: !migrationNeeded && !hasMigrationBlocker,
+    migration_needed: migrationNeeded,
+    migration_blocked: hasFoundationBlocker || hasMigrationBlocker,
     enabled: enabled,
     mode: enabled ? "CONFIG_ENABLED" : "LEGACY_SAFE",
+    admin_config_state: issues.length === 0 ? "READY_FOR_ADMIN_CONFIG" : operationalState,
+    operational_state: operationalState,
     counts: counts,
     issues: issues,
-    migration_issues: migrationIssues
+    migration_issues: migrationIssues,
+    migration_preview: migrationPreview ? {
+      proposed: migrationPreview.rows_proposed,
+      existing: migrationPreview.rows_existing,
+      unmatched: migrationPreview.unmatched,
+      conflicts: migrationPreview.conflicts
+    } : null,
+    migration_verification: migrationVerification
   };
+}
+
+// This is the only rollout gate future flag-enabling code should call. Phase C
+// intentionally provides no flag setter; rollback remains the existing false flag.
+function canEnableStudentGroupConfigV240_() {
+  return assessStudentGroupConfigReadinessV240_().ready_for_dynamic_login === true;
 }
 
 function getSheetHeadersV240_(sheet) {
@@ -6157,7 +6252,7 @@ function migrateStudentInstitutionCodesV240(options) {
   }, "Migrasi institusi pelajar sedang dijalankan. Sila cuba sebentar lagi.");
 }
 
-function migrateStudentInstitutionCodesCoreV240_(dryRun) {
+function migrateStudentInstitutionCodesCoreV240_(dryRun, auditContext) {
   const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = spreadsheet.getSheetByName(SHEETS.students);
   if (!sheet) throw new Error("STUDENTS tidak dijumpai. Jalankan setupStudentGroupConfigV240 dahulu.");
@@ -6183,7 +6278,12 @@ function migrateStudentInstitutionCodesCoreV240_(dryRun) {
     skipped_non_li: 0,
     proposed_by_institution: { UMK: 0, UPM: 0 },
     unmatched_row_numbers: [],
-    conflict_row_numbers: []
+    conflict_row_numbers: [],
+    rows_proposed: 0,
+    rows_written: 0,
+    rows_existing: 0,
+    lock_acquired: dryRun ? false : true,
+    audit_logged: false
   };
   const writes = [];
 
@@ -6199,17 +6299,21 @@ function migrateStudentInstitutionCodesCoreV240_(dryRun) {
 
     result.total_li += 1;
     const studentId = String(row[studentIdIndex] || "").trim().toUpperCase();
+    const existingCode = String(row[institutionIndex] || "").trim().toUpperCase();
     const proposedCode = studentId.indexOf("LIUMK-") === 0
       ? "UMK"
       : (studentId.indexOf("LIUPM-") === 0 ? "UPM" : "");
     if (!proposedCode) {
-      result.unmatched += 1;
-      result.unmatched_row_numbers.push(index + 1);
+      if (existingCode) {
+        result.already_populated += 1;
+      } else {
+        result.unmatched += 1;
+        result.unmatched_row_numbers.push(index + 1);
+      }
       continue;
     }
 
     result.proposed_by_institution[proposedCode] += 1;
-    const existingCode = String(row[institutionIndex] || "").trim().toUpperCase();
     if (existingCode) {
       if (existingCode === proposedCode) {
         result.already_populated += 1;
@@ -6221,20 +6325,26 @@ function migrateStudentInstitutionCodesCoreV240_(dryRun) {
     }
 
     result.matched_blank += 1;
+    result.rows_proposed += 1;
     writes.push({ rowNumber: index + 1, institutionCode: proposedCode });
   }
+
+  result.rows_existing = result.already_populated;
 
   if (!dryRun) {
     writes.forEach((write) => {
       sheet.getRange(write.rowNumber, institutionIndex + 1).setValue(write.institutionCode);
       result.applied += 1;
+      result.rows_written += 1;
     });
     if (result.applied > 0) {
-      appendAuditLog(
+      const actor = auditContext && auditContext.actor ? auditContext.actor : "SYSTEM_MIGRATION_V2.4";
+      const role = auditContext && auditContext.role ? auditContext.role : "SYSTEM";
+      result.audit_logged = Boolean(appendAuditLog(
         "MIGRATE_STUDENT_INSTITUTION_CODES_V240",
         "",
-        "SYSTEM",
-        "SYSTEM_MIGRATION_V2.4",
+        role,
+        actor,
         JSON.stringify({
           total_rows: result.total_rows,
           total_li: result.total_li,
@@ -6247,11 +6357,127 @@ function migrateStudentInstitutionCodesCoreV240_(dryRun) {
         }),
         "STUDENT_CONFIG",
         "V2.4"
-      );
+      ));
     }
   }
 
   return result;
+}
+
+function verifyStudentInstitutionMigrationV240_() {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const studentsSheet = spreadsheet.getSheetByName(SHEETS.students);
+  const institutionsSheet = spreadsheet.getSheetByName(SHEETS.liInstitutions);
+  if (!studentsSheet || !institutionsSheet) {
+    return {
+      verified: false,
+      counts: {
+        total_rows: 0,
+        total_li: 0,
+        li_missing_institution: 0,
+        li_invalid_institution: 0,
+        non_li_with_institution: 0,
+        legacy_mapping_conflicts: 0
+      },
+      issues: [{ code: "SETUP_REQUIRED", count: 1 }]
+    };
+  }
+
+  const validInstitutions = {};
+  getRowsAsObjects_(institutionsSheet).forEach((row) => {
+    try {
+      const institution = validateLiInstitutionConfigRecordV240_(row);
+      validInstitutions[institution.institution_code] = true;
+    } catch (error) {
+      // Foundation readiness reports malformed institution rows separately.
+    }
+  });
+  const counts = {
+    total_rows: 0,
+    total_li: 0,
+    li_missing_institution: 0,
+    li_invalid_institution: 0,
+    non_li_with_institution: 0,
+    legacy_mapping_conflicts: 0
+  };
+  getRowsAsObjects_(studentsSheet).forEach((student) => {
+    counts.total_rows += 1;
+    const groupCode = String(student.kelas || "").trim().toUpperCase();
+    const institutionCode = String(student.institution_code || "").trim().toUpperCase();
+    if (groupCode !== "LI") {
+      if (institutionCode) counts.non_li_with_institution += 1;
+      return;
+    }
+    counts.total_li += 1;
+    if (!institutionCode) counts.li_missing_institution += 1;
+    else if (!validInstitutions[institutionCode]) counts.li_invalid_institution += 1;
+
+    const studentId = String(student.student_id || "").trim().toUpperCase();
+    const legacyCode = studentId.indexOf("LIUMK-") === 0
+      ? "UMK"
+      : (studentId.indexOf("LIUPM-") === 0 ? "UPM" : "");
+    if (legacyCode && institutionCode && institutionCode !== legacyCode) {
+      counts.legacy_mapping_conflicts += 1;
+    }
+  });
+  const issues = [];
+  Object.keys(counts).forEach((key) => {
+    if (key !== "total_rows" && key !== "total_li" && counts[key] > 0) {
+      issues.push({ code: key.toUpperCase(), count: counts[key] });
+    }
+  });
+  return {
+    verified: issues.length === 0,
+    counts: counts,
+    issues: issues
+  };
+}
+
+function runStudentInstitutionMigration(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const mode = String(payload && payload.mode || "dry-run").trim().toLowerCase();
+  if (mode !== "dry-run" && mode !== "apply") {
+    throw new Error("Mode migrasi mesti dry-run atau apply.");
+  }
+  if (mode === "dry-run") {
+    const readiness = assessStudentGroupConfigReadinessV240_();
+    if (!readiness.foundation_ready) {
+      throw new Error("Setup konfigurasi pelajar belum lengkap. Semak status kesiapsiagaan dahulu.");
+    }
+    const result = migrateStudentInstitutionCodesCoreV240_(true);
+    result.verification = verifyStudentInstitutionMigrationV240_();
+    const verificationCounts = result.verification.counts || {};
+    result.can_apply = result.unmatched === 0 && result.conflicts === 0 &&
+      Number(verificationCounts.li_invalid_institution || 0) === 0 &&
+      Number(verificationCounts.non_li_with_institution || 0) === 0 &&
+      Number(verificationCounts.legacy_mapping_conflicts || 0) === 0;
+    return result;
+  }
+  if (!payload || payload.dryRun !== false || payload.confirm_apply !== true) {
+    throw new Error("Apply memerlukan dryRun=false dan pengesahan confirm_apply=true.");
+  }
+  return withScriptLock_(function () {
+    const readiness = assessStudentGroupConfigReadinessV240_();
+    if (!readiness.foundation_ready) {
+      throw new Error("Setup konfigurasi pelajar belum lengkap. Apply dibatalkan.");
+    }
+    const preview = migrateStudentInstitutionCodesCoreV240_(true);
+    const verification = verifyStudentInstitutionMigrationV240_();
+    const verificationCounts = verification.counts || {};
+    if (preview.unmatched > 0 || preview.conflicts > 0 ||
+        Number(verificationCounts.li_invalid_institution || 0) > 0 ||
+        Number(verificationCounts.non_li_with_institution || 0) > 0 ||
+        Number(verificationCounts.legacy_mapping_conflicts || 0) > 0) {
+      throw new Error("Apply dibatalkan kerana terdapat rekod tidak sepadan atau konflik.");
+    }
+    const result = migrateStudentInstitutionCodesCoreV240_(false, {
+      role: "Admin",
+      actor: getSafeAdminIdentity_(admin)
+    });
+    result.can_apply = false;
+    result.verification = verifyStudentInstitutionMigrationV240_();
+    return result;
+  }, "Migrasi institusi pelajar sedang dijalankan. Sila cuba sebentar lagi.");
 }
 
 function countActiveStudentsReferencingGroupV240_(groupCode, studentRows) {

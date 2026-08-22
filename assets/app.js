@@ -135,6 +135,7 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "updateLiInstitution",
   "toggleLiInstitutionStatus",
   "getStudentGroupConfigReadiness",
+  "runStudentInstitutionMigration",
   "createStudent",
   "updateStudent",
   "toggleStudentStatus",
@@ -253,6 +254,7 @@ let adminEditingStudentGroupCodeV240 = "";
 let adminEditingLiInstitutionCodeV240 = "";
 let activeAdminStudentSubtabV240 = "students";
 let adminStudentConfigLoadedV240 = false;
+let adminStudentMigrationDryRunV240 = null;
 let profilePhotoThumbnails = new Map();
 let profilePhotoFullImages = new Map();
 let profilePhotoThumbnailLoadedKeys = new Set();
@@ -529,6 +531,12 @@ const els = {
   adminStudentConfigStatusLabel: document.querySelector("#adminStudentConfigStatusLabel"),
   adminStudentConfigStatusDetail: document.querySelector("#adminStudentConfigStatusDetail"),
   adminStudentConfigIssues: document.querySelector("#adminStudentConfigIssues"),
+  adminStudentReadinessRefreshButton: document.querySelector("#adminStudentReadinessRefreshButton"),
+  adminStudentMigrationDryRunButton: document.querySelector("#adminStudentMigrationDryRunButton"),
+  adminStudentMigrationResult: document.querySelector("#adminStudentMigrationResult"),
+  adminStudentMigrationConfirmInput: document.querySelector("#adminStudentMigrationConfirmInput"),
+  adminStudentMigrationApplyButton: document.querySelector("#adminStudentMigrationApplyButton"),
+  adminStudentMigrationMessage: document.querySelector("#adminStudentMigrationMessage"),
   adminStudentInstitutionField: document.querySelector("#adminStudentInstitutionField"),
   adminStudentInstitutionInput: document.querySelector("#adminStudentInstitutionInput"),
   adminStudentGroupsRefreshButton: document.querySelector("#adminStudentGroupsRefreshButton"),
@@ -888,6 +896,10 @@ function setupAdminDashboardV200() {
   if (els.adminStudentClassInput) els.adminStudentClassInput.addEventListener("change", () => updateAdminStudentInstitutionFieldV240());
   if (els.adminStudentGroupsRefreshButton) els.adminStudentGroupsRefreshButton.addEventListener("click", loadAdminStudentConfigV240);
   if (els.adminLiInstitutionsRefreshButton) els.adminLiInstitutionsRefreshButton.addEventListener("click", loadAdminStudentConfigV240);
+  if (els.adminStudentReadinessRefreshButton) els.adminStudentReadinessRefreshButton.addEventListener("click", refreshAdminStudentReadinessV240);
+  if (els.adminStudentMigrationDryRunButton) els.adminStudentMigrationDryRunButton.addEventListener("click", runAdminStudentMigrationDryRunV240);
+  if (els.adminStudentMigrationConfirmInput) els.adminStudentMigrationConfirmInput.addEventListener("change", updateAdminStudentMigrationApplyStateV240);
+  if (els.adminStudentMigrationApplyButton) els.adminStudentMigrationApplyButton.addEventListener("click", applyAdminStudentMigrationV240);
   if (els.adminAddStudentGroupButton) els.adminAddStudentGroupButton.addEventListener("click", () => openAdminStudentGroupEditorV240());
   if (els.adminAddLiInstitutionButton) els.adminAddLiInstitutionButton.addEventListener("click", () => openAdminLiInstitutionEditorV240());
   if (els.adminStudentGroupCancelButton) els.adminStudentGroupCancelButton.addEventListener("click", closeAdminStudentGroupEditorV240);
@@ -1812,10 +1824,19 @@ function setAdminStudentConfigBusyV240(busy) {
 
 function renderAdminStudentReadinessV240(readiness) {
   if (!els.adminStudentConfigStatus) return;
-  const foundationReady = Boolean(readiness && readiness.foundation_ready);
-  const migrationNeeded = Boolean(readiness && readiness.migration_needed);
-  const state = !foundationReady ? "issue" : (migrationNeeded ? "legacy" : "active");
-  const label = !foundationReady ? "Issue detected" : (migrationNeeded ? "Migration required" : "Ready");
+  const operationalState = String(readiness && readiness.operational_state || "SETUP_REQUIRED");
+  const state = operationalState === "READY_FOR_DYNAMIC_LOGIN"
+    ? "active"
+    : (operationalState === "MIGRATION_REQUIRED" ? "legacy" : "issue");
+  const labels = {
+    LEGACY_SAFE: "Legacy safe",
+    SETUP_REQUIRED: "Setup required",
+    MIGRATION_REQUIRED: "Migration required",
+    MIGRATION_BLOCKED: "Migration blocked",
+    READY_FOR_ADMIN_CONFIG: "Ready for Admin config",
+    READY_FOR_DYNAMIC_LOGIN: "Ready for dynamic login"
+  };
+  const label = labels[operationalState] || operationalState.replace(/_/g, " ");
   els.adminStudentConfigStatus.dataset.state = state;
   els.adminStudentConfigStatusLabel.textContent = `Student Group Config: ${label}`;
   els.adminStudentConfigStatusDetail.textContent = !readiness
@@ -1826,6 +1847,104 @@ function renderAdminStudentReadinessV240(readiness) {
     `<li>${escapeHtml(String(item.code || "ISSUE").replace(/_/g, " "))}: ${Number(item.count || 0)}</li>`
   )).join("");
   els.adminStudentConfigIssues.hidden = diagnostics.length === 0;
+}
+
+async function refreshAdminStudentReadinessV240() {
+  if (!currentSession || currentSession.role !== "admin") return;
+  const button = els.adminStudentReadinessRefreshButton;
+  if (button) button.disabled = true;
+  try {
+    const readiness = await apiPost("getStudentGroupConfigReadiness", buildAdminCredentialPayloadV200());
+    renderAdminStudentReadinessV240(readiness);
+    setAdminStudentMigrationMessageV240("Status kesiapsiagaan dikemas kini.");
+  } catch (error) {
+    setAdminStudentMigrationMessageV240(error.message || "Status kesiapsiagaan gagal dimuatkan.", true);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+function setAdminStudentMigrationMessageV240(message, isError) {
+  if (!els.adminStudentMigrationMessage) return;
+  els.adminStudentMigrationMessage.textContent = message || "";
+  els.adminStudentMigrationMessage.classList.toggle("error", Boolean(isError));
+}
+
+function renderAdminStudentMigrationResultV240(result) {
+  if (!els.adminStudentMigrationResult) return;
+  const counts = [
+    ["Jumlah baris", result && result.total_rows],
+    ["Jumlah LI", result && result.total_li],
+    ["Padanan kosong", result && result.matched_blank],
+    ["Sedia ada", result && result.rows_existing],
+    ["Ditulis", result && result.applied],
+    ["Tidak sepadan", result && result.unmatched],
+    ["Konflik", result && result.conflicts],
+    ["Bukan LI dilangkau", result && result.skipped_non_li]
+  ];
+  els.adminStudentMigrationResult.innerHTML = counts.map(([label, value]) => (
+    `<div><dt>${escapeHtml(label)}</dt><dd>${Number(value || 0)}</dd></div>`
+  )).join("");
+  els.adminStudentMigrationResult.hidden = !result;
+}
+
+function updateAdminStudentMigrationApplyStateV240() {
+  const cleanDryRun = Boolean(adminStudentMigrationDryRunV240 && adminStudentMigrationDryRunV240.can_apply === true);
+  if (els.adminStudentMigrationConfirmInput) {
+    els.adminStudentMigrationConfirmInput.disabled = !cleanDryRun;
+  }
+  if (els.adminStudentMigrationApplyButton) {
+    els.adminStudentMigrationApplyButton.disabled = !cleanDryRun || !els.adminStudentMigrationConfirmInput.checked;
+  }
+}
+
+async function runAdminStudentMigrationDryRunV240() {
+  if (!currentSession || currentSession.role !== "admin") return;
+  adminStudentMigrationDryRunV240 = null;
+  if (els.adminStudentMigrationConfirmInput) els.adminStudentMigrationConfirmInput.checked = false;
+  updateAdminStudentMigrationApplyStateV240();
+  if (els.adminStudentMigrationDryRunButton) els.adminStudentMigrationDryRunButton.disabled = true;
+  setAdminStudentMigrationMessageV240("Dry-run sedang dijalankan...");
+  try {
+    const result = await apiPost("runStudentInstitutionMigration", Object.assign(buildAdminCredentialPayloadV200(), {
+      mode: "dry-run",
+      dryRun: true
+    }));
+    adminStudentMigrationDryRunV240 = result;
+    renderAdminStudentMigrationResultV240(result);
+    updateAdminStudentMigrationApplyStateV240();
+    setAdminStudentMigrationMessageV240(result.can_apply
+      ? "Dry-run bersih. Apply hanya tersedia selepas pengesahan."
+      : "Apply disekat: selesaikan rekod tidak sepadan atau konflik dahulu.", !result.can_apply);
+  } catch (error) {
+    renderAdminStudentMigrationResultV240(null);
+    setAdminStudentMigrationMessageV240(error.message || "Dry-run gagal.", true);
+  } finally {
+    if (els.adminStudentMigrationDryRunButton) els.adminStudentMigrationDryRunButton.disabled = false;
+  }
+}
+
+async function applyAdminStudentMigrationV240() {
+  const confirmed = Boolean(els.adminStudentMigrationConfirmInput && els.adminStudentMigrationConfirmInput.checked);
+  if (!confirmed || !adminStudentMigrationDryRunV240 || adminStudentMigrationDryRunV240.can_apply !== true) return;
+  if (els.adminStudentMigrationApplyButton) els.adminStudentMigrationApplyButton.disabled = true;
+  setAdminStudentMigrationMessageV240("Apply migrasi sedang dijalankan...");
+  try {
+    const result = await apiPost("runStudentInstitutionMigration", Object.assign(buildAdminCredentialPayloadV200(), {
+      mode: "apply",
+      dryRun: false,
+      confirm_apply: true
+    }));
+    renderAdminStudentMigrationResultV240(result);
+    adminStudentMigrationDryRunV240 = null;
+    if (els.adminStudentMigrationConfirmInput) els.adminStudentMigrationConfirmInput.checked = false;
+    updateAdminStudentMigrationApplyStateV240();
+    setAdminStudentMigrationMessageV240(`Apply selesai: ${Number(result.rows_written || 0)} rekod ditulis.`);
+    await refreshAdminStudentReadinessV240();
+  } catch (error) {
+    setAdminStudentMigrationMessageV240(error.message || "Apply migrasi gagal.", true);
+    updateAdminStudentMigrationApplyStateV240();
+  }
 }
 
 function getAdminStudentGroupV240(code) {
@@ -3569,9 +3688,28 @@ async function mockAdminApiPostV200(action, payload) {
       migration_needed: false,
       enabled: false,
       mode: "LEGACY_SAFE",
+      operational_state: "READY_FOR_DYNAMIC_LOGIN",
+      ready_for_dynamic_login: true,
       counts: { student_groups: mockAdminStudentGroupsV240.length, li_institutions: mockAdminLiInstitutionsV240.length },
       issues: [],
       migration_issues: []
+    };
+  }
+  if (action === "runStudentInstitutionMigration") {
+    if (request.mode === "apply" && (request.dryRun !== false || request.confirm_apply !== true)) {
+      throw new Error("Pengesahan apply diperlukan.");
+    }
+    return {
+      dry_run: request.mode !== "apply",
+      rows_proposed: 0,
+      rows_existing: 0,
+      rows_written: 0,
+      unmatched: 0,
+      conflicts: 0,
+      can_apply: request.mode !== "apply",
+      lock_acquired: request.mode === "apply",
+      audit_logged: false,
+      verification: { verified: true, counts: {} }
     };
   }
   if (action === "getAdminStudentGroups") return cloneMockAdminValueV200(mockAdminStudentGroupsV240);

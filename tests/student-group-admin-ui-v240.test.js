@@ -93,10 +93,10 @@ test("Student login remains the legacy A2/A3/LI flow with unchanged payload boun
   assert.equal(gas.includes('setProperty(STUDENT_GROUP_CONFIG_PROPERTY, "true")'), false);
 });
 
-test("frontend runtime revision advances consistently to r8 without changing displayed version", () => {
+test("frontend runtime revision advances consistently to r9 without changing displayed version", () => {
   assert.match(app, /const APP_VERSION = "2\.4\.0"/);
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r8/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r8/);
-  assert.match(serviceWorker, /eouting-cache-v2\.4\.0-r8/);
-  assert.doesNotMatch(`${html}\n${serviceWorker}`, /2\.4\.0-r7/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r9/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r9/);
+  assert.match(serviceWorker, /eouting-cache-v2\.4\.0-r9/);
+  assert.doesNotMatch(`${html}\n${serviceWorker}`, /2\.4\.0-r8/);
 });
