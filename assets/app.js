@@ -135,6 +135,7 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "updateLiInstitution",
   "toggleLiInstitutionStatus",
   "getStudentGroupConfigReadiness",
+  "setStudentGroupConfigEnabled",
   "runStudentInstitutionMigration",
   "createStudent",
   "updateStudent",
@@ -240,6 +241,7 @@ let toastTimerId = null;
 let activeRefreshPage = "access";
 let selectedStudentLoginClass = "A2";
 let studentLoginClassInitialized = false;
+let studentLoginDirectoryV240 = { mode: "legacy", groups: [] };
 let wardenChecklistTypeFilter = "all";
 let wardenChecklistRecords = [];
 let adminRuntimeCredential = null;
@@ -255,6 +257,7 @@ let adminEditingLiInstitutionCodeV240 = "";
 let activeAdminStudentSubtabV240 = "students";
 let adminStudentConfigLoadedV240 = false;
 let adminStudentMigrationDryRunV240 = null;
+let mockStudentGroupConfigEnabledV240 = false;
 let profilePhotoThumbnails = new Map();
 let profilePhotoFullImages = new Map();
 let profilePhotoThumbnailLoadedKeys = new Set();
@@ -339,6 +342,7 @@ const els = {
   roleGrid: document.querySelector("#roleGrid"),
   studentLoginSelect: document.querySelector("#studentLoginSelect"),
   studentClassFilter: document.querySelector("#studentClassFilter"),
+  studentLoginGroupLabel: document.querySelector("#studentLoginGroupLabel"),
   matricInput: document.querySelector("#matricInput"),
   studentRememberInput: document.querySelector("#studentRememberInput"),
   studentLoginMessage: document.querySelector("#studentLoginMessage"),
@@ -537,6 +541,12 @@ const els = {
   adminStudentMigrationConfirmInput: document.querySelector("#adminStudentMigrationConfirmInput"),
   adminStudentMigrationApplyButton: document.querySelector("#adminStudentMigrationApplyButton"),
   adminStudentMigrationMessage: document.querySelector("#adminStudentMigrationMessage"),
+  adminDynamicLoginStatus: document.querySelector("#adminDynamicLoginStatus"),
+  adminDynamicLoginConfirmLabel: document.querySelector("#adminDynamicLoginConfirmLabel"),
+  adminDynamicLoginConfirmInput: document.querySelector("#adminDynamicLoginConfirmInput"),
+  adminDynamicLoginEnableButton: document.querySelector("#adminDynamicLoginEnableButton"),
+  adminDynamicLoginDisableButton: document.querySelector("#adminDynamicLoginDisableButton"),
+  adminDynamicLoginMessage: document.querySelector("#adminDynamicLoginMessage"),
   adminStudentInstitutionField: document.querySelector("#adminStudentInstitutionField"),
   adminStudentInstitutionInput: document.querySelector("#adminStudentInstitutionInput"),
   adminStudentGroupsRefreshButton: document.querySelector("#adminStudentGroupsRefreshButton"),
@@ -900,6 +910,9 @@ function setupAdminDashboardV200() {
   if (els.adminStudentMigrationDryRunButton) els.adminStudentMigrationDryRunButton.addEventListener("click", runAdminStudentMigrationDryRunV240);
   if (els.adminStudentMigrationConfirmInput) els.adminStudentMigrationConfirmInput.addEventListener("change", updateAdminStudentMigrationApplyStateV240);
   if (els.adminStudentMigrationApplyButton) els.adminStudentMigrationApplyButton.addEventListener("click", applyAdminStudentMigrationV240);
+  if (els.adminDynamicLoginConfirmInput) els.adminDynamicLoginConfirmInput.addEventListener("change", updateAdminDynamicLoginEnableStateV240);
+  if (els.adminDynamicLoginEnableButton) els.adminDynamicLoginEnableButton.addEventListener("click", () => setAdminDynamicLoginEnabledV240(true));
+  if (els.adminDynamicLoginDisableButton) els.adminDynamicLoginDisableButton.addEventListener("click", () => setAdminDynamicLoginEnabledV240(false));
   if (els.adminAddStudentGroupButton) els.adminAddStudentGroupButton.addEventListener("click", () => openAdminStudentGroupEditorV240());
   if (els.adminAddLiInstitutionButton) els.adminAddLiInstitutionButton.addEventListener("click", () => openAdminLiInstitutionEditorV240());
   if (els.adminStudentGroupCancelButton) els.adminStudentGroupCancelButton.addEventListener("click", closeAdminStudentGroupEditorV240);
@@ -1847,6 +1860,60 @@ function renderAdminStudentReadinessV240(readiness) {
     `<li>${escapeHtml(String(item.code || "ISSUE").replace(/_/g, " "))}: ${Number(item.count || 0)}</li>`
   )).join("");
   els.adminStudentConfigIssues.hidden = diagnostics.length === 0;
+  renderAdminDynamicLoginControlV240(readiness);
+}
+
+function renderAdminDynamicLoginControlV240(readiness) {
+  const enabled = Boolean(readiness && readiness.enabled === true);
+  const ready = Boolean(readiness && readiness.ready_for_dynamic_login === true);
+  if (els.adminDynamicLoginStatus) els.adminDynamicLoginStatus.textContent = `Status: ${enabled ? "ON" : "OFF"}`;
+  if (els.adminDynamicLoginConfirmLabel) els.adminDynamicLoginConfirmLabel.hidden = enabled;
+  if (els.adminDynamicLoginConfirmInput) {
+    els.adminDynamicLoginConfirmInput.disabled = enabled || !ready;
+    if (enabled || !ready) els.adminDynamicLoginConfirmInput.checked = false;
+  }
+  if (els.adminDynamicLoginEnableButton) {
+    els.adminDynamicLoginEnableButton.hidden = enabled;
+  }
+  if (els.adminDynamicLoginDisableButton) els.adminDynamicLoginDisableButton.hidden = !enabled;
+  updateAdminDynamicLoginEnableStateV240();
+}
+
+function updateAdminDynamicLoginEnableStateV240() {
+  if (!els.adminDynamicLoginEnableButton || els.adminDynamicLoginEnableButton.hidden) return;
+  els.adminDynamicLoginEnableButton.disabled = !els.adminDynamicLoginConfirmInput ||
+    els.adminDynamicLoginConfirmInput.disabled || !els.adminDynamicLoginConfirmInput.checked;
+}
+
+function setAdminDynamicLoginMessageV240(message, isError) {
+  if (!els.adminDynamicLoginMessage) return;
+  els.adminDynamicLoginMessage.textContent = message || "";
+  els.adminDynamicLoginMessage.classList.toggle("error", Boolean(isError));
+}
+
+async function setAdminDynamicLoginEnabledV240(enabled) {
+  if (!currentSession || currentSession.role !== "admin") return;
+  if (enabled && (!els.adminDynamicLoginConfirmInput || !els.adminDynamicLoginConfirmInput.checked)) return;
+  const button = enabled ? els.adminDynamicLoginEnableButton : els.adminDynamicLoginDisableButton;
+  if (button) button.disabled = true;
+  setAdminDynamicLoginMessageV240(enabled ? "Pengaktifan sedang diproses..." : "Kembali ke login legacy...");
+  try {
+    const result = await apiPost("setStudentGroupConfigEnabled", Object.assign(buildAdminCredentialPayloadV200(), {
+      enabled: enabled,
+      confirm_enable: enabled === true
+    }));
+    if (els.adminDynamicLoginConfirmInput) els.adminDynamicLoginConfirmInput.checked = false;
+    setAdminDynamicLoginMessageV240(result.enabled
+      ? "Dynamic Student Login telah diaktifkan."
+      : "Login legacy telah dipulihkan.");
+    await refreshAdminStudentReadinessV240();
+    await retryLoadStudentsOnly();
+  } catch (error) {
+    setAdminDynamicLoginMessageV240(error.message || "Tetapan Dynamic Student Login gagal dikemas kini.", true);
+  } finally {
+    if (button) button.disabled = false;
+    updateAdminDynamicLoginEnableStateV240();
+  }
 }
 
 async function refreshAdminStudentReadinessV240() {
@@ -1857,6 +1924,7 @@ async function refreshAdminStudentReadinessV240() {
     const readiness = await apiPost("getStudentGroupConfigReadiness", buildAdminCredentialPayloadV200());
     renderAdminStudentReadinessV240(readiness);
     setAdminStudentMigrationMessageV240("Status kesiapsiagaan dikemas kini.");
+    return readiness;
   } catch (error) {
     setAdminStudentMigrationMessageV240(error.message || "Status kesiapsiagaan gagal dimuatkan.", true);
   } finally {
@@ -1941,6 +2009,7 @@ async function applyAdminStudentMigrationV240() {
     updateAdminStudentMigrationApplyStateV240();
     setAdminStudentMigrationMessageV240(`Apply selesai: ${Number(result.rows_written || 0)} rekod ditulis.`);
     await refreshAdminStudentReadinessV240();
+    await retryLoadStudentsOnly();
   } catch (error) {
     setAdminStudentMigrationMessageV240(error.message || "Apply migrasi gagal.", true);
     updateAdminStudentMigrationApplyStateV240();
@@ -2076,7 +2145,7 @@ async function saveAdminStudentGroupV240(event) {
   const payload = Object.assign(buildAdminCredentialPayloadV200(), { student_group: group, group_code: editing ? adminEditingStudentGroupCodeV240 : group.group_code });
   if (editing) payload.expected_config_version = Number(els.adminStudentGroupVersionInput.value);
   els.adminSaveStudentGroupButton.disabled = true;
-  try { await apiPost(editing ? "updateStudentGroup" : "createStudentGroup", payload); closeAdminStudentGroupEditorV240(); await loadAdminStudentConfigV240(); setStudentConfigMessageV240(els.adminStudentGroupsMessage, "Kumpulan berjaya disimpan."); }
+  try { await apiPost(editing ? "updateStudentGroup" : "createStudentGroup", payload); closeAdminStudentGroupEditorV240(); await loadAdminStudentConfigV240(); await refreshPublicStudentsAfterAdminWriteV200(); setStudentConfigMessageV240(els.adminStudentGroupsMessage, "Kumpulan berjaya disimpan."); }
   catch (error) { setStudentConfigMessageV240(els.adminStudentGroupEditorMessage, cleanApiError(error.message || "Kumpulan gagal disimpan."), true); }
   finally { els.adminSaveStudentGroupButton.disabled = false; }
 }
@@ -2089,7 +2158,7 @@ async function saveAdminLiInstitutionV240(event) {
   const payload = Object.assign(buildAdminCredentialPayloadV200(), { li_institution: institution, institution_code: editing ? adminEditingLiInstitutionCodeV240 : institution.institution_code });
   if (editing) payload.expected_config_version = Number(els.adminLiInstitutionVersionInput.value);
   els.adminSaveLiInstitutionButton.disabled = true;
-  try { await apiPost(editing ? "updateLiInstitution" : "createLiInstitution", payload); closeAdminLiInstitutionEditorV240(); await loadAdminStudentConfigV240(); setStudentConfigMessageV240(els.adminLiInstitutionsMessage, "Institusi berjaya disimpan."); }
+  try { await apiPost(editing ? "updateLiInstitution" : "createLiInstitution", payload); closeAdminLiInstitutionEditorV240(); await loadAdminStudentConfigV240(); await refreshPublicStudentsAfterAdminWriteV200(); setStudentConfigMessageV240(els.adminLiInstitutionsMessage, "Institusi berjaya disimpan."); }
   catch (error) { setStudentConfigMessageV240(els.adminLiInstitutionEditorMessage, cleanApiError(error.message || "Institusi gagal disimpan."), true); }
   finally { els.adminSaveLiInstitutionButton.disabled = false; }
 }
@@ -2110,7 +2179,7 @@ async function toggleAdminStudentConfigV240(kind, code, active) {
   const payload = Object.assign(buildAdminCredentialPayloadV200(), { expected_config_version: record.config_version, active });
   payload[kind === "group" ? "group_code" : "institution_code"] = code;
   setAdminStudentConfigBusyV240(true);
-  try { await apiPost(kind === "group" ? "toggleStudentGroupStatus" : "toggleLiInstitutionStatus", payload); await loadAdminStudentConfigV240(); }
+  try { await apiPost(kind === "group" ? "toggleStudentGroupStatus" : "toggleLiInstitutionStatus", payload); await loadAdminStudentConfigV240(); await refreshPublicStudentsAfterAdminWriteV200(); }
   catch (error) { setStudentConfigMessageV240(kind === "group" ? els.adminStudentGroupsMessage : els.adminLiInstitutionsMessage, cleanApiError(error.message || "Status gagal dikemas kini."), true); }
   finally { setAdminStudentConfigBusyV240(false); }
 }
@@ -2372,24 +2441,12 @@ async function toggleAdminStudentStatusV200(studentId, active) {
 
 async function refreshPublicStudentsAfterAdminWriteV200() {
   if (ALLOW_MOCK_MODE) {
-    students = mockAdminStudentsV200
-      .filter((student) => student.status === "AKTIF")
-      .map((student) => ({
-        id: student.student_id,
-        no_matrik: student.no_matrik,
-        name: student.nama,
-        className: student.kelas,
-        gender: student.jantina,
-        status: student.status
-      }));
-    refreshStudentClassChoicesV200();
+    applyStudentLoginDirectoryV240(normalizeStudentLoginDirectoryV240(buildMockStudentLoginDirectoryV240()));
     return;
   }
   try {
-    const response = await apiGet("getStudents");
-    const rows = Array.isArray(response) ? response : response && response.students || [];
-    students = rows.map(mapLiveStudent).filter((student) => student.id && student.name);
-    refreshStudentClassChoicesV200();
+    const response = await apiGet("getStudentLoginDirectory");
+    applyStudentLoginDirectoryV240(normalizeStudentLoginDirectoryV240(response));
   } catch (error) {
     // Admin write is already complete; the next login refresh will reload public students.
   }
@@ -2943,13 +3000,13 @@ function setupStudentClassFilter() {
   }
 
   els.studentClassFilter.dataset.ready = "1";
-  els.studentClassFilter.querySelectorAll("[data-student-class]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedStudentLoginClass = button.dataset.studentClass || "A2";
-      studentLoginClassInitialized = true;
-      renderStudentLoginClassFilter();
-      populateStudents();
-    });
+  els.studentClassFilter.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-student-login-group], [data-student-class]");
+    if (!button || !els.studentClassFilter.contains(button)) return;
+    selectedStudentLoginClass = button.dataset.studentLoginGroup || button.dataset.studentClass || "A2";
+    studentLoginClassInitialized = true;
+    renderStudentLoginClassFilter();
+    populateStudents();
   });
   renderStudentLoginClassFilter();
 }
@@ -2959,8 +3016,23 @@ function renderStudentLoginClassFilter() {
     return;
   }
 
-  els.studentClassFilter.querySelectorAll("[data-student-class]").forEach((button) => {
-    const isActive = button.dataset.studentClass === selectedStudentLoginClass;
+  const directoryGroups = Array.isArray(studentLoginDirectoryV240.groups)
+    ? studentLoginDirectoryV240.groups.filter((group) => (
+      studentLoginDirectoryV240.mode === "legacy" || (Array.isArray(group.students) && group.students.length > 0)
+    ))
+    : [];
+  if (studentLoginDirectoryV240.mode === "dynamic" || directoryGroups.length) {
+    els.studentClassFilter.innerHTML = directoryGroups.map((group) => (
+      `<button class="student-class-pill" type="button" data-student-login-group="${escapeHtml(group.key)}" aria-pressed="false">${escapeHtml(group.label)}</button>`
+    )).join("");
+  }
+  if (els.studentLoginGroupLabel) {
+    els.studentLoginGroupLabel.textContent = studentLoginDirectoryV240.mode === "dynamic" ? "Pilih Kumpulan" : "Pilih Kelas";
+  }
+  els.studentClassFilter.setAttribute("aria-label", studentLoginDirectoryV240.mode === "dynamic" ? "Pilih kumpulan pelajar" : "Pilih kelas pelajar");
+  els.studentClassFilter.querySelectorAll("[data-student-login-group], [data-student-class]").forEach((button) => {
+    const key = button.dataset.studentLoginGroup || button.dataset.studentClass;
+    const isActive = key === selectedStudentLoginClass;
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
@@ -3686,13 +3758,25 @@ async function mockAdminApiPostV200(action, payload) {
       foundation_ready: true,
       migration_ready: true,
       migration_needed: false,
-      enabled: false,
-      mode: "LEGACY_SAFE",
+      enabled: mockStudentGroupConfigEnabledV240,
+      mode: mockStudentGroupConfigEnabledV240 ? "CONFIG_ENABLED" : "LEGACY_SAFE",
       operational_state: "READY_FOR_DYNAMIC_LOGIN",
       ready_for_dynamic_login: true,
       counts: { student_groups: mockAdminStudentGroupsV240.length, li_institutions: mockAdminLiInstitutionsV240.length },
       issues: [],
       migration_issues: []
+    };
+  }
+  if (action === "setStudentGroupConfigEnabled") {
+    if (typeof request.enabled !== "boolean") throw new Error("enabled mesti boolean.");
+    if (request.enabled && request.confirm_enable !== true) throw new Error("Pengesahan pengaktifan diperlukan.");
+    mockStudentGroupConfigEnabledV240 = request.enabled;
+    return {
+      enabled: mockStudentGroupConfigEnabledV240,
+      changed: true,
+      mode: mockStudentGroupConfigEnabledV240 ? "dynamic" : "legacy",
+      operational_state: "READY_FOR_DYNAMIC_LOGIN",
+      audit_logged: true
     };
   }
   if (action === "runStudentInstitutionMigration") {
@@ -3886,6 +3970,9 @@ async function apiGetWithParams(action, params = {}) {
   if (ALLOW_MOCK_MODE && action === "getOutingTypes") {
     return mockPublicOutingTypesV200();
   }
+  if (ALLOW_MOCK_MODE && action === "getStudentLoginDirectory") {
+    return buildMockStudentLoginDirectoryV240();
+  }
   const searchParams = new URLSearchParams({
     action,
     _ts: String(Date.now())
@@ -3940,12 +4027,12 @@ async function loadLiveMasters() {
 
   try {
     const [liveStudents, liveWardens, liveGuards] = await Promise.all([
-      apiGet("getStudents"),
+      apiGet("getStudentLoginDirectory"),
       apiGet("getWardens"),
       apiGet("getGuards")
     ]);
 
-    students = liveStudents.map(mapLiveStudent);
+    applyStudentLoginDirectoryV240(normalizeStudentLoginDirectoryV240(liveStudents));
     wardens = liveWardens.map((warden) => warden.nama_warden || warden.name).filter(Boolean);
     guards = liveGuards.map((guard) => guard.nama_guard || guard.name).filter(Boolean);
     isLiveMode = true;
@@ -9266,7 +9353,7 @@ loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
 
   try {
     const [studentResult, wardenResult, guardResult] = await Promise.allSettled([
-      apiGet("getStudents"),
+      apiGet("getStudentLoginDirectory"),
       apiGet("getWardens"),
       apiGet("getGuards")
     ]);
@@ -9275,12 +9362,12 @@ loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
       throw studentResult.reason || new Error("Gagal memuatkan senarai pelajar.");
     }
 
-    const liveStudents = normalizeStudentListResponse(studentResult.value);
-    students = liveStudents;
+    const directory = normalizeStudentLoginDirectoryV240(studentResult.value);
+    applyStudentLoginDirectoryV240(directory);
     isLiveMode = true;
     dataModeMessage = "Live Mode: Google Sheets";
     updateDataModeIndicator();
-    renderStudentDropdownState(liveStudents);
+    renderStudentDropdownState(students);
 
     if (wardenResult.status === "fulfilled") {
       try {
@@ -9340,7 +9427,8 @@ function renderStudentDropdownState(liveStudents) {
   renderStudentLoginClassFilter();
   const filteredStudents = filterStudentsByLoginClass(liveStudents);
   if (!filteredStudents.length) {
-    const className = selectedStudentLoginClass || "A2";
+    const selectedGroup = (studentLoginDirectoryV240.groups || []).find((group) => group.key === selectedStudentLoginClass);
+    const className = selectedGroup ? selectedGroup.label : (selectedStudentLoginClass || "A2");
     els.studentLoginSelect.innerHTML = `<option value="">Tiada pelajar ${escapeHtml(className)} ditemui.</option>`;
     els.studentLoginSelect.disabled = true;
     setStudentLoginDisabled(true);
@@ -9355,6 +9443,15 @@ function renderStudentDropdownState(liveStudents) {
 }
 
 function ensureStudentLoginClassSelection(studentList) {
+  const directoryGroups = (studentLoginDirectoryV240.groups || []).filter((group) => group.students && group.students.length);
+  if (directoryGroups.length) {
+    const selectedExists = directoryGroups.some((group) => group.key === selectedStudentLoginClass);
+    if (!studentLoginClassInitialized || !selectedExists) {
+      selectedStudentLoginClass = directoryGroups[0].key;
+      studentLoginClassInitialized = true;
+    }
+    return;
+  }
   if (studentLoginClassInitialized) {
     return;
   }
@@ -9375,7 +9472,9 @@ function ensureStudentLoginClassSelection(studentList) {
 }
 
 function filterStudentsByLoginClass(studentList, className = selectedStudentLoginClass) {
-  const filtered = (studentList || []).filter((student) => getStudentLoginClass(student) === className);
+  const filtered = (studentList || []).filter((student) => (
+    student.loginGroupKey ? student.loginGroupKey === className : getStudentLoginClass(student) === className
+  ));
   if (filtered.length || hasA2OrA3Student(studentList)) {
     return filtered;
   }
@@ -9399,6 +9498,83 @@ function setStudentLoginDisabled(disabled) {
   if (button) {
     button.disabled = disabled;
   }
+}
+
+function buildMockStudentLoginDirectoryV240() {
+  const activeStudents = mockAdminStudentsV200.filter((student) => student.status === "AKTIF");
+  if (!mockStudentGroupConfigEnabledV240) {
+    const legacyGroups = ["A2", "A3"].map((code) => ({
+      key: code,
+      label: code,
+      students: activeStudents.filter((student) => student.kelas === code)
+        .map((student) => ({ student_id: student.student_id, nama: student.nama }))
+    }));
+    const liStudents = activeStudents.filter((student) => student.kelas === "LI");
+    if (liStudents.length) {
+      legacyGroups.push({ key: "LI", label: "LI", students: liStudents.map((student) => ({ student_id: student.student_id, nama: student.nama })) });
+    }
+    return { mode: "legacy", groups: legacyGroups };
+  }
+  const groups = [];
+  mockAdminStudentGroupsV240.filter((group) => group.active).sort((left, right) => left.sort_order - right.sort_order)
+    .forEach((group) => {
+      const groupStudents = activeStudents.filter((student) => student.kelas === group.group_code);
+      if (!group.institution_required && groupStudents.length) {
+        groups.push({ key: `GROUP:${group.group_code}`, label: group.display_name, students: groupStudents.map((student) => ({ student_id: student.student_id, nama: student.nama })) });
+        return;
+      }
+      mockAdminLiInstitutionsV240.filter((institution) => institution.active).sort((left, right) => left.sort_order - right.sort_order)
+        .forEach((institution) => {
+          const represented = groupStudents.filter((student) => student.institution_code === institution.institution_code);
+          if (represented.length) groups.push({
+            key: `GROUP:${group.group_code}:${institution.institution_code}`,
+            label: `${group.display_name} ${institution.display_name}`,
+            students: represented.map((student) => ({ student_id: student.student_id, nama: student.nama }))
+          });
+        });
+    });
+  return { mode: "dynamic", groups: groups };
+}
+
+function normalizeStudentLoginDirectoryV240(response) {
+  if (!response || typeof response !== "object" || !["legacy", "dynamic"].includes(response.mode) || !Array.isArray(response.groups)) {
+    throw new Error("Format direktori login pelajar tidak sah.");
+  }
+  const groups = response.groups.map((group) => {
+    const key = String(group && group.key || "").trim();
+    const label = String(group && group.label || "").trim();
+    const entries = Array.isArray(group && group.students) ? group.students : [];
+    if (!key || !label) throw new Error("Kumpulan login pelajar tidak sah.");
+    const normalizedStudents = entries.map((student) => {
+      const id = String(student && student.student_id || "").trim();
+      const name = String(student && student.nama || "").trim();
+      if (!id || !name) throw new Error("Rekod direktori login pelajar tidak sah.");
+      return { student_id: id, nama: name };
+    });
+    return { key, label, students: normalizedStudents };
+  }).filter((group) => response.mode === "legacy" || group.students.length > 0);
+  return { mode: response.mode, groups: groups, fallback: response.fallback === true };
+}
+
+function applyStudentLoginDirectoryV240(directory) {
+  studentLoginDirectoryV240 = directory;
+  students = directory.groups.flatMap((group) => group.students.map((student) => ({
+    id: student.student_id,
+    student_id: student.student_id,
+    name: student.nama,
+    nama: student.nama,
+    loginGroupKey: group.key
+  })));
+  if (ALLOW_MOCK_MODE) {
+    students.forEach((student) => {
+      const mockStudent = mockAdminStudentsV200.find((item) => item.student_id === student.student_id);
+      if (mockStudent) student.no_matrik = mockStudent.no_matrik;
+    });
+  }
+  studentLoginClassInitialized = false;
+  ensureStudentLoginClassSelection(students);
+  renderStudentLoginClassFilter();
+  renderStudentDropdownState(students);
 }
 
 function normalizeStudentListResponse(response) {
@@ -9479,13 +9655,12 @@ async function retryLoadStudentsOnly() {
   clearStudentLoadFailurePanel();
 
   try {
-    const response = await apiGet("getStudents");
-    const liveStudents = normalizeStudentListResponse(response);
-    students = liveStudents;
+    const response = await apiGet("getStudentLoginDirectory");
+    applyStudentLoginDirectoryV240(normalizeStudentLoginDirectoryV240(response));
     isLiveMode = true;
     dataModeMessage = "Live Mode: Google Sheets";
     updateDataModeIndicator();
-    renderStudentDropdownState(liveStudents);
+    renderStudentDropdownState(students);
   } catch (error) {
     console.error("Cuba Lagi gagal memuatkan senarai pelajar.", error);
     setStudentDropdownState("failed");

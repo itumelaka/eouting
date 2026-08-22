@@ -1058,8 +1058,10 @@ textarea {
 
 .student-class-pills {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
+  max-width: 100%;
+  overflow: visible;
   padding-bottom: 2px;
 }
 
@@ -4982,6 +4984,32 @@ button.profile-photo-frame {
   gap: 9px;
   margin-top: 11px;
   padding-top: 11px;
+}
+
+.admin-dynamic-login-tools {
+  border-top: 1px solid rgba(33, 68, 62, 0.14);
+  display: grid;
+  gap: 9px;
+  margin-top: 11px;
+  padding-top: 11px;
+}
+
+.admin-dynamic-login-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  justify-content: space-between;
+}
+
+.admin-dynamic-login-heading strong {
+  color: var(--muted-text);
+  font-size: 0.76rem;
+}
+
+.admin-dynamic-login-tools .form-message {
+  font-size: 0.75rem;
+  min-height: 0;
 }
 
 .admin-migration-title {

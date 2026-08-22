@@ -69,17 +69,18 @@ test("Admin-only Student and Master filters derive their options from group conf
   assert.match(app, /referencedCodes/);
 });
 
-test("readiness indicator is aggregate-only and has no activation control", () => {
+test("readiness indicator remains aggregate-only beside the guarded activation control", () => {
   const panel = html.slice(html.indexOf('id="adminStudentManagementPanel"'), html.indexOf('id="adminMasterPanel"'));
   assert.match(panel, /Student Group Config/);
   assert.match(app, /getStudentGroupConfigReadiness/);
   assert.match(app, /readiness\.counts/);
-  assert.equal(panel.includes("Activate Dynamic Login"), false);
+  assert.match(panel, /adminDynamicLoginEnableButton/);
+  assert.match(panel, /adminDynamicLoginConfirmInput/);
   assert.equal(panel.includes("STUDENT_GROUP_CONFIG_ENABLED"), false);
   assert.equal(app.includes('setProperty("STUDENT_GROUP_CONFIG_ENABLED", "true")'), false);
 });
 
-test("Student login remains the legacy A2/A3/LI flow with unchanged payload boundary", () => {
+test("Student login retains legacy A2/A3/LI fallback with unchanged payload boundary", () => {
   const login = html.slice(html.indexOf('id="studentClassFilter"'), html.indexOf('id="studentLoginSelect"'));
   assert.match(login, /data-student-class="A2"/);
   assert.match(login, /data-student-class="A3"/);
@@ -89,14 +90,15 @@ test("Student login remains the legacy A2/A3/LI flow with unchanged payload boun
   assert.match(loginSubmit, /loginStudent/);
   assert.match(loginSubmit, /student_id/);
   assert.match(loginSubmit, /no_matrik/);
+  assert.equal(loginSubmit.includes("loginGroupKey"), false);
   assert.equal(loginSubmit.includes("getAdminStudentGroups"), false);
   assert.equal(gas.includes('setProperty(STUDENT_GROUP_CONFIG_PROPERTY, "true")'), false);
 });
 
-test("frontend runtime revision advances consistently to r9 without changing displayed version", () => {
+test("frontend runtime revision advances consistently to r10 without changing displayed version", () => {
   assert.match(app, /const APP_VERSION = "2\.4\.0"/);
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r9/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r9/);
-  assert.match(serviceWorker, /eouting-cache-v2\.4\.0-r9/);
-  assert.doesNotMatch(`${html}\n${serviceWorker}`, /2\.4\.0-r8/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r10/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r10/);
+  assert.match(serviceWorker, /eouting-cache-v2\.4\.0-r10/);
+  assert.doesNotMatch(`${html}\n${serviceWorker}`, /2\.4\.0-r9/);
 });

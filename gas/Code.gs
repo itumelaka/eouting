@@ -253,6 +253,7 @@ const SCRIPT_CACHE = {
     outingTypesLegacy: "eouting:v1:outing-types:legacy",
     adminStudentGroupsV240: "eouting:v1:student-groups:admin-v240",
     adminLiInstitutionsV240: "eouting:v1:li-institutions:admin-v240",
+    studentLoginDirectoryV240: "eouting:v1:student-login-directory-v240",
     profilePhotoIndicators: "eouting:v1:profile-photo-indicators",
     operationalTodayRecords: "eouting:v1:operational:today-records"
   },
@@ -357,6 +358,20 @@ function isCachedStudentDirectory_(value) {
   return Array.isArray(value) && value.every((row) => hasOnlyCachedFields_(row, fields, fields));
 }
 
+function isCachedStudentLoginDirectoryV240_(value) {
+  if (!isCachedObject_(value) || ["legacy", "dynamic"].indexOf(value.mode) === -1 || !Array.isArray(value.groups)) {
+    return false;
+  }
+  if (Object.keys(value).some((key) => ["mode", "groups", "fallback"].indexOf(key) === -1)) return false;
+  return value.groups.every((group) => (
+    hasOnlyCachedFields_(group, ["key", "label", "students"], ["key", "label", "students"]) &&
+    typeof group.key === "string" && typeof group.label === "string" && Array.isArray(group.students) &&
+    group.students.every((student) => (
+      hasOnlyCachedFields_(student, ["student_id", "nama"], ["student_id", "nama"])
+    ))
+  ));
+}
+
 function isCachedWardenDirectory_(value) {
   const fields = ["warden_id", "nama_warden", "staffRole", "email", "no_tel", "status", "catatan"];
   return Array.isArray(value) && value.every((row) => hasOnlyCachedFields_(row, fields, fields));
@@ -390,11 +405,17 @@ function isCachedOperationalRows_(value) {
 
 function invalidateStudentDirectoryCache_() {
   removeScriptCache_("students");
+  invalidateStudentLoginDirectoryCacheV240_();
 }
 
 function invalidateStudentGroupConfigCacheV240_() {
   removeScriptCache_("adminStudentGroupsV240");
   removeScriptCache_("adminLiInstitutionsV240");
+  invalidateStudentLoginDirectoryCacheV240_();
+}
+
+function invalidateStudentLoginDirectoryCacheV240_() {
+  removeScriptCache_("studentLoginDirectoryV240");
 }
 
 function invalidateStaffDirectoryCache_(role) {
@@ -429,6 +450,7 @@ function doGet(e) {
     }
 
     if (action === "getStudents") return jsonResponse(getStudents());
+    if (action === "getStudentLoginDirectory") return jsonResponse(getStudentLoginDirectory());
     if (action === "getWardens") return jsonResponse(getWardens());
     if (action === "getGuards") return jsonResponse(getGuards());
     if (action === "getTodayRecords") return jsonResponse(getTodayRecords());
@@ -469,6 +491,7 @@ function doPost(e) {
     if (action === "getAnnouncementBanner") return jsonResponse(getAnnouncementBanner(payload));
     if (action === "getOutingConfigReadiness") return jsonResponse(getOutingConfigReadiness(payload));
     if (action === "getStudentGroupConfigReadiness") return jsonResponse(getStudentGroupConfigReadiness(payload));
+    if (action === "setStudentGroupConfigEnabled") return jsonResponse(setStudentGroupConfigEnabled(payload));
     if (action === "runStudentInstitutionMigration") return jsonResponse(runStudentInstitutionMigration(payload));
     if (action === "getAdminStudentGroups") return jsonResponse(getAdminStudentGroups(payload));
     if (action === "createStudentGroup") return jsonResponse(createStudentGroup(payload));
@@ -2671,6 +2694,112 @@ function addDepartureConfirmationProjection_(rows) {
       departure_confirmation_requested_at: pending ? auditState.requested_at : "",
       no_guard_departure_enabled: featureEnabled
     });
+  });
+}
+
+function getStudentLoginDirectory() {
+  if (!isStudentGroupConfigEnabledV240_()) {
+    return getCachedOrLoad_(
+      "studentLoginDirectoryV240",
+      SCRIPT_CACHE.ttl.students,
+      (value) => isCachedStudentLoginDirectoryV240_(value) && value.mode === "legacy",
+      () => buildLegacyStudentLoginDirectoryV240_(false)
+    );
+  }
+
+  try {
+    const readiness = assessStudentGroupConfigReadinessV240_();
+    if (readiness.ready_for_dynamic_login !== true) {
+      return buildLegacyStudentLoginDirectoryV240_(true);
+    }
+    return getCachedOrLoad_(
+      "studentLoginDirectoryV240",
+      SCRIPT_CACHE.ttl.students,
+      (value) => isCachedStudentLoginDirectoryV240_(value) && value.mode === "dynamic",
+      buildDynamicStudentLoginDirectoryV240_
+    );
+  } catch (error) {
+    return buildLegacyStudentLoginDirectoryV240_(true);
+  }
+}
+
+function buildLegacyStudentLoginDirectoryV240_(fallback) {
+  const buckets = { A2: [], A3: [], LI: [] };
+  getStudents().forEach((student) => {
+    const code = String(student.kelas || "").trim().toUpperCase();
+    if (buckets[code]) buckets[code].push(toPublicStudentLoginEntryV240_(student));
+  });
+  const groups = ["A2", "A3"].map((code) => ({ key: code, label: code, students: sortStudentLoginEntriesV240_(buckets[code]) }));
+  if (buckets.LI.length) groups.push({ key: "LI", label: "LI", students: sortStudentLoginEntriesV240_(buckets.LI) });
+  const result = { mode: "legacy", groups: groups };
+  if (fallback === true) result.fallback = true;
+  return result;
+}
+
+function buildDynamicStudentLoginDirectoryV240_() {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const groupRows = getRowsAsObjects_(getExistingStudentConfigSheetV240_(SHEETS.studentGroups))
+    .map(normalizeAdminStudentGroupRecordV240_)
+    .filter((group) => group.active === true)
+    .sort(compareStudentLoginConfigV240_("group_code"));
+  const institutionRows = getRowsAsObjects_(getExistingStudentConfigSheetV240_(SHEETS.liInstitutions))
+    .map(normalizeAdminLiInstitutionRecordV240_)
+    .filter((institution) => institution.active === true)
+    .sort(compareStudentLoginConfigV240_("institution_code"));
+  const students = getRowsAsObjects_(getExistingStudentConfigSheetV240_(SHEETS.students))
+    .filter((student) => isActive_(student.status));
+  const groups = [];
+
+  groupRows.forEach((group) => {
+    const groupStudents = students.filter((student) => (
+      String(student.kelas || "").trim().toUpperCase() === group.group_code
+    ));
+    if (!group.institution_required) {
+      if (groupStudents.length) {
+        groups.push({
+          key: "GROUP:" + group.group_code,
+          label: group.display_name,
+          students: sortStudentLoginEntriesV240_(groupStudents.map(toPublicStudentLoginEntryV240_))
+        });
+      }
+      return;
+    }
+
+    institutionRows.forEach((institution) => {
+      const institutionStudents = groupStudents.filter((student) => (
+        String(student.institution_code || "").trim().toUpperCase() === institution.institution_code
+      ));
+      if (!institutionStudents.length) return;
+      groups.push({
+        key: "GROUP:" + group.group_code + ":" + institution.institution_code,
+        label: group.display_name + " " + institution.display_name,
+        students: sortStudentLoginEntriesV240_(institutionStudents.map(toPublicStudentLoginEntryV240_))
+      });
+    });
+  });
+
+  return { mode: "dynamic", groups: groups };
+}
+
+function compareStudentLoginConfigV240_(codeField) {
+  return function (left, right) {
+    const sortDifference = Number(left.sort_order || 0) - Number(right.sort_order || 0);
+    if (sortDifference !== 0) return sortDifference;
+    return String(left[codeField] || "").localeCompare(String(right[codeField] || ""));
+  };
+}
+
+function toPublicStudentLoginEntryV240_(student) {
+  return {
+    student_id: String(student.student_id || "").trim(),
+    nama: String(student.nama || "").trim()
+  };
+}
+
+function sortStudentLoginEntriesV240_(students) {
+  return (students || []).filter((student) => student.student_id && student.nama).sort((left, right) => {
+    const nameDifference = left.nama.localeCompare(right.nama);
+    return nameDifference !== 0 ? nameDifference : left.student_id.localeCompare(right.student_id);
   });
 }
 
@@ -6187,10 +6316,9 @@ function assessStudentGroupConfigReadinessV240_() {
   }
   const verificationCounts = migrationVerification && migrationVerification.counts || {};
   const hasMigrationBlocker = Boolean(
-    (migrationPreview && (migrationPreview.unmatched > 0 || migrationPreview.conflicts > 0)) ||
+    (migrationPreview && migrationPreview.unmatched > 0) ||
     Number(verificationCounts.li_invalid_institution || 0) > 0 ||
     Number(verificationCounts.non_li_with_institution || 0) > 0 ||
-    Number(verificationCounts.legacy_mapping_conflicts || 0) > 0 ||
     counts.active_students_with_inactive_or_missing_group > 0
   );
   const migrationNeeded = migrationIssues.length > 0 || Boolean(migrationPreview && migrationPreview.matched_blank > 0);
@@ -6229,6 +6357,46 @@ function assessStudentGroupConfigReadinessV240_() {
 // intentionally provides no flag setter; rollback remains the existing false flag.
 function canEnableStudentGroupConfigV240_() {
   return assessStudentGroupConfigReadinessV240_().ready_for_dynamic_login === true;
+}
+
+function setStudentGroupConfigEnabled(payload) {
+  const admin = validateAdminCredentials_(payload);
+  if (!payload || typeof payload.enabled !== "boolean") {
+    throw new Error("enabled mesti boolean.");
+  }
+  const enable = payload.enabled === true;
+  if (enable && payload.confirm_enable !== true) {
+    throw new Error("Pengaktifan memerlukan confirm_enable=true.");
+  }
+
+  return withScriptLock_(function () {
+    const previous = isStudentGroupConfigEnabledV240_();
+    if (enable && !canEnableStudentGroupConfigV240_()) {
+      throw new Error("Dynamic Student Login belum boleh diaktifkan kerana readiness belum lengkap.");
+    }
+    if (previous !== enable) {
+      PropertiesService.getScriptProperties().setProperty(STUDENT_GROUP_CONFIG_PROPERTY, enable ? "true" : "false");
+      invalidateStudentGroupConfigCacheV240_();
+    }
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const auditLogged = previous === enable ? false : Boolean(appendAuditLog(
+      enable ? "ENABLE_STUDENT_GROUP_CONFIG_V240" : "DISABLE_STUDENT_GROUP_CONFIG_V240",
+      "",
+      "Admin",
+      adminIdentity,
+      JSON.stringify({ enabled: { from: previous, to: enable } }),
+      "STUDENT_CONFIG",
+      "V2.4"
+    ));
+    const readiness = assessStudentGroupConfigReadinessV240_();
+    return {
+      enabled: enable,
+      changed: previous !== enable,
+      mode: enable ? "dynamic" : "legacy",
+      operational_state: readiness.operational_state,
+      audit_logged: auditLogged
+    };
+  }, "Tetapan Dynamic Student Login sedang dikemas kini. Sila cuba sebentar lagi.");
 }
 
 function getSheetHeadersV240_(sheet) {
@@ -6338,6 +6506,7 @@ function migrateStudentInstitutionCodesCoreV240_(dryRun, auditContext) {
       result.rows_written += 1;
     });
     if (result.applied > 0) {
+      invalidateStudentLoginDirectoryCacheV240_();
       const actor = auditContext && auditContext.actor ? auditContext.actor : "SYSTEM_MIGRATION_V2.4";
       const role = auditContext && auditContext.role ? auditContext.role : "SYSTEM";
       result.audit_logged = Boolean(appendAuditLog(

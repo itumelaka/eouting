@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r9">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r10">
   </head>
   <body>
     <header class="app-header">
@@ -82,7 +82,7 @@
         <form class="access-panel" id="studentLoginPanel">
           <h3>Masuk sebagai Pelajar</h3>
           <div class="student-class-filter">
-            <span>Pilih Kelas</span>
+            <span id="studentLoginGroupLabel">Pilih Kelas</span>
             <div class="student-class-pills" id="studentClassFilter" role="group" aria-label="Pilih kelas pelajar">
               <button class="student-class-pill active" type="button" data-student-class="A2" aria-pressed="true">A2</button>
               <button class="student-class-pill" type="button" data-student-class="A3" aria-pressed="false">A3</button>
@@ -656,6 +656,19 @@
                     <button class="danger-action compact-action" id="adminStudentMigrationApplyButton" type="button" disabled>Apply migrasi</button>
                     <p class="form-message" id="adminStudentMigrationMessage" aria-live="polite"></p>
                   </section>
+                  <section class="admin-dynamic-login-tools" aria-label="Kawalan Dynamic Student Login">
+                    <div class="admin-dynamic-login-heading">
+                      <p class="admin-migration-title">Dynamic Student Login</p>
+                      <strong id="adminDynamicLoginStatus">Status: OFF</strong>
+                    </div>
+                    <label class="admin-migration-confirm" id="adminDynamicLoginConfirmLabel">
+                      <input id="adminDynamicLoginConfirmInput" type="checkbox" disabled>
+                      Saya faham login Pelajar akan menggunakan kumpulan dinamik.
+                    </label>
+                    <button class="primary-action compact-action" id="adminDynamicLoginEnableButton" type="button" disabled>Aktifkan Dynamic Login</button>
+                    <button class="secondary-action compact-action" id="adminDynamicLoginDisableButton" type="button" hidden>Kembali ke Login Legacy</button>
+                    <p class="form-message" id="adminDynamicLoginMessage" aria-live="polite"></p>
+                  </section>
                 </div>
               </details>
             </div>
@@ -665,7 +678,7 @@
             <div class="admin-section-toolbar admin-student-toolbar">
               <div>
                 <h3>Pengurusan Pelajar</h3>
-                <p>Urus rekod dan penugasan kumpulan, termasuk Pelajar Latihan Industri (LI). Log masuk Pelajar kekal menggunakan pilihan A2, A3 dan LI.</p>
+                <p>Urus rekod dan penugasan kumpulan, termasuk Pelajar Latihan Industri (LI). Paparan login Pelajar mengikuti mod rollout semasa.</p>
               </div>
               <div class="admin-heading-actions">
                 <button class="secondary-action" id="adminStudentsRefreshButton" type="button">Refresh</button>
@@ -918,6 +931,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r9"></script>
+    <script src="assets/app.js?v=2.4.0-r10"></script>
   </body>
 </html>

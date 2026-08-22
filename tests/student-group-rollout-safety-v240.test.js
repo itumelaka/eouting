@@ -100,13 +100,13 @@ test("enabled mode treats institution_code as authoritative after migration", ()
   assert.equal(result.ready_for_dynamic_login, true);
 });
 
-test("future enablement guard is false until all migration verification is ready", () => {
+test("future enablement guard requires authoritative assignment readiness, not historical prefix consistency", () => {
   const blocked = createRuntime({ sheets: configuredSheets([
-    studentRow({ student_id: "LIUPM-001", kelas: "LI", institution_code: "UMK" })
+    studentRow({ student_id: "LIUPM-001", kelas: "LI", institution_code: "" })
   ]) });
   assert.equal(blocked.context.canEnableStudentGroupConfigV240_(), false);
   const ready = createRuntime({ sheets: configuredSheets([
-    studentRow({ student_id: "LIUPM-001", kelas: "LI", institution_code: "UPM" })
+    studentRow({ student_id: "LIUPM-001", kelas: "LI", institution_code: "UMK" })
   ]) });
   assert.equal(ready.context.canEnableStudentGroupConfigV240_(), true);
 });
@@ -202,7 +202,7 @@ test("repeated guarded apply is idempotent and does not create a second audit ro
   assert.equal(sheets.AUDIT_LOG.rows.length, 2);
 });
 
-test("Admin maintenance UI has refresh, dry-run and disabled acknowledged apply without enable control", () => {
+test("Admin maintenance UI keeps Phase C migration guards without arbitrary property controls", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
   assert.match(html, /adminStudentReadinessRefreshButton/);
@@ -210,8 +210,7 @@ test("Admin maintenance UI has refresh, dry-run and disabled acknowledged apply 
   assert.match(html, /adminStudentMigrationConfirmInput[^>]*disabled/);
   assert.match(html, /adminStudentMigrationApplyButton[^>]*disabled/);
   assert.match(app, /confirm_apply:\s*true/);
-  assert.doesNotMatch(html, /enableStudentGroupConfig/i);
-  assert.doesNotMatch(app, /setProperty\(STUDENT_GROUP_CONFIG_PROPERTY,\s*"true"\)/);
+  assert.doesNotMatch(html, /Script Property|STUDENT_GROUP_CONFIG_ENABLED/);
 });
 
 test("rollback remains non-destructive: false flag and legacy path, with no cleanup helper", () => {
