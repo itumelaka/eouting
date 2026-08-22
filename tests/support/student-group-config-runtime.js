@@ -43,6 +43,10 @@ class FakeSheet {
       setValue: (value) => {
         while (this.rows.length <= row - 1) this.rows.push([]);
         this.rows[row - 1][column - 1] = value;
+      },
+      clearContent: () => {
+        while (this.rows.length <= row - 1) this.rows.push([]);
+        this.rows[row - 1][column - 1] = "";
       }
     };
   }

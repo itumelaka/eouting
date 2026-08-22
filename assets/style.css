@@ -4751,8 +4751,49 @@ button.profile-photo-frame {
 }
 
 .admin-subpanel[hidden],
+.admin-student-inner-panel[hidden],
 .admin-student-editor[hidden] {
   display: none !important;
+}
+
+.admin-student-module-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.admin-student-subtabs {
+  background: linear-gradient(145deg, #eef9f5, #d9ebe5);
+  border-radius: 16px;
+  display: inline-grid;
+  gap: 6px;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  padding: 5px;
+}
+
+.admin-student-subtab {
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  color: #185b50;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+.admin-student-subtab.active {
+  background: #fff;
+  box-shadow: 3px 4px 9px rgba(16, 107, 88, 0.16);
+  color: #096b58;
+}
+
+.admin-student-subtab:focus-visible {
+  outline: 3px solid #096b58;
+  outline-offset: 2px;
 }
 
 .admin-section-toolbar,
@@ -4935,6 +4976,54 @@ button.profile-photo-frame {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.admin-student-config-list {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-student-config-card {
+  align-items: flex-start;
+  background: linear-gradient(145deg, #f8fffc, #dcefe8);
+  border: 1px solid rgba(19, 123, 103, 0.17);
+  border-radius: 20px;
+  box-shadow: var(--clay-shadow-soft);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 17px;
+}
+
+.admin-student-config-card.is-inactive {
+  filter: saturate(0.62);
+  opacity: 0.82;
+}
+
+.admin-student-config-card h4 {
+  margin: 8px 0 4px;
+}
+
+.admin-student-config-card p {
+  color: var(--muted-text);
+  font-size: 0.86rem;
+  margin: 0;
+}
+
+.admin-student-config-check {
+  align-items: center;
+  align-self: end;
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  min-height: 44px;
+}
+
+.admin-student-config-check input {
+  height: 20px;
+  min-height: 20px;
+  width: 20px;
+}
+
 .admin-student-card {
   background: linear-gradient(145deg, #f8fffc, #dcefe8);
   border: 1px solid rgba(19, 123, 103, 0.17);
@@ -5054,6 +5143,7 @@ button.profile-photo-frame {
 
 @media (max-width: 760px) {
   .admin-student-list,
+  .admin-student-config-list,
   .admin-student-form-grid {
     grid-template-columns: 1fr;
   }
@@ -5159,10 +5249,16 @@ button.profile-photo-frame {
   }
 
   .admin-section-toolbar,
+  .admin-student-module-heading,
   .admin-student-editor-heading,
-  .admin-student-card-heading {
+  .admin-student-card-heading,
+  .admin-student-config-card {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .admin-student-subtabs {
+    width: 100%;
   }
 
   .admin-heading-actions .admin-config-status {

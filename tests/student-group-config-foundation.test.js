@@ -113,7 +113,7 @@ test("deactivation guards count only active references and expose no delete muta
   assert.equal(context.countActiveStudentsReferencingGroupV240_("A2", students), 1);
   assert.equal(context.countActiveLiStudentsReferencingInstitutionV240_("UMK", students), 1);
   assert.throws(() => context.assertStudentGroupCanDeactivateV240_("A2", students), /1 pelajar aktif/i);
-  assert.throws(() => context.assertLiInstitutionCanDeactivateV240_("UMK", students), /1 pelajar LI aktif/i);
+  assert.throws(() => context.assertLiInstitutionCanDeactivateV240_("UMK", students), /1 pelajar aktif/i);
   assert.equal(context.assertStudentGroupCanDeactivateV240_("A3", students), true);
   assert.equal(typeof context.deleteStudentGroup, "undefined");
 });

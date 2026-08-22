@@ -251,6 +251,8 @@ const SCRIPT_CACHE = {
     guards: "eouting:v1:directory:guards",
     outingTypesConfig: "eouting:v1:outing-types:config-v2",
     outingTypesLegacy: "eouting:v1:outing-types:legacy",
+    adminStudentGroupsV240: "eouting:v1:student-groups:admin-v240",
+    adminLiInstitutionsV240: "eouting:v1:li-institutions:admin-v240",
     profilePhotoIndicators: "eouting:v1:profile-photo-indicators",
     operationalTodayRecords: "eouting:v1:operational:today-records"
   },
@@ -390,6 +392,11 @@ function invalidateStudentDirectoryCache_() {
   removeScriptCache_("students");
 }
 
+function invalidateStudentGroupConfigCacheV240_() {
+  removeScriptCache_("adminStudentGroupsV240");
+  removeScriptCache_("adminLiInstitutionsV240");
+}
+
 function invalidateStaffDirectoryCache_(role) {
   const normalizedRole = String(role || "").trim().toUpperCase();
   if (normalizedRole === "WARDEN") removeScriptCache_("wardens");
@@ -462,6 +469,14 @@ function doPost(e) {
     if (action === "getAnnouncementBanner") return jsonResponse(getAnnouncementBanner(payload));
     if (action === "getOutingConfigReadiness") return jsonResponse(getOutingConfigReadiness(payload));
     if (action === "getStudentGroupConfigReadiness") return jsonResponse(getStudentGroupConfigReadiness(payload));
+    if (action === "getAdminStudentGroups") return jsonResponse(getAdminStudentGroups(payload));
+    if (action === "createStudentGroup") return jsonResponse(createStudentGroup(payload));
+    if (action === "updateStudentGroup") return jsonResponse(updateStudentGroup(payload));
+    if (action === "toggleStudentGroupStatus") return jsonResponse(toggleStudentGroupStatus(payload));
+    if (action === "getAdminLiInstitutions") return jsonResponse(getAdminLiInstitutions(payload));
+    if (action === "createLiInstitution") return jsonResponse(createLiInstitution(payload));
+    if (action === "updateLiInstitution") return jsonResponse(updateLiInstitution(payload));
+    if (action === "toggleLiInstitutionStatus") return jsonResponse(toggleLiInstitutionStatus(payload));
     if (action === "createOutingType") return jsonResponse(createOutingType(payload));
     if (action === "updateOutingType") return jsonResponse(updateOutingType(payload));
     if (action === "toggleOutingType") return jsonResponse(toggleOutingType(payload));
@@ -1485,8 +1500,9 @@ function validateStudentInput_(input, options) {
   if (noTel.length > 50) {
     throw new Error("no_tel pelajar terlalu panjang.");
   }
-  if (["A2", "A3", "LI"].indexOf(kelas) === -1) {
-    throw new Error("kelas pelajar mesti A2, A3 atau LI.");
+  const allowedGroupCodes = Array.isArray(config.allowedGroupCodes) ? config.allowedGroupCodes : null;
+  if (allowedGroupCodes ? allowedGroupCodes.indexOf(kelas) === -1 : ["A2", "A3", "LI"].indexOf(kelas) === -1) {
+    throw new Error(allowedGroupCodes ? "Kumpulan pelajar tidak sah." : "kelas pelajar mesti A2, A3 atau LI.");
   }
   if (jantina.length > 50) {
     throw new Error("jantina pelajar terlalu panjang.");
@@ -1520,6 +1536,7 @@ function normalizeStudentRecord_(row) {
     jantina: String(source.jantina || "").trim(),
     status: String(source.status || "").trim().toUpperCase(),
     catatan: String(source.catatan || "").trim(),
+    institution_code: String(source.institution_code || "").trim().toUpperCase(),
     has_profile_photo: hasCellValue_(source.photo_file_id),
     photo_updated_at: normalizeProfilePhotoUpdatedAt_(source.photo_updated_at)
   };
@@ -1590,8 +1607,11 @@ function findStudentRowByMatric_(sheet, noMatrik, excludedStudentId) {
 
 function getAdminStudents(payload) {
   validateAdminCredentials_(payload);
-  return sortAdminStudents_(getRowsAsObjects_(getSheet_(SHEETS.students))
-    .map(normalizeStudentRecord_));
+  const rows = getRowsAsObjects_(getSheet_(SHEETS.students)).map(normalizeStudentRecord_);
+  const assignmentConfig = getStudentAssignmentConfigV240_();
+  return assignmentConfig
+    ? sortAdminStudentsByConfigV240_(rows, assignmentConfig.groups)
+    : sortAdminStudents_(rows);
 }
 
 function createStudent(payload) {
@@ -1599,14 +1619,17 @@ function createStudent(payload) {
   const input = getStudentInput_(payload);
   return withScriptLock_(function () {
     const sheet = getSheet_(SHEETS.students);
-    const validated = validateStudentInput_(input, { defaultActive: true });
+    const assignmentConfig = getStudentAssignmentConfigV240_();
+    const validated = assignmentConfig
+      ? validateAdminStudentAssignmentV240_(input, { defaultActive: true }, assignmentConfig, null)
+      : validateStudentInput_(input, { defaultActive: true });
     if (findStudentRowById_(sheet, validated.student_id)) {
       throw new Error("student_id telah wujud.");
     }
     if (findStudentRowByMatric_(sheet, validated.no_matrik, "")) {
       throw new Error("no_matrik telah wujud.");
     }
-    appendObjectRow_(sheet, HEADERS.STUDENTS, validated);
+    appendObjectRow_(sheet, assignmentConfig ? STUDENT_HEADERS_V240 : HEADERS.STUDENTS, validated);
     invalidateStudentDirectoryCache_();
     const adminIdentity = getSafeAdminIdentity_(admin);
     appendAuditLog(
@@ -1614,7 +1637,7 @@ function createStudent(payload) {
       "",
       "Admin",
       adminIdentity,
-      JSON.stringify({ kelas: validated.kelas, status: validated.status }),
+      JSON.stringify({ kelas: validated.kelas, institution_code: validated.institution_code || "", status: validated.status }),
       "STUDENT",
       validated.student_id
     );
@@ -1641,18 +1664,23 @@ function updateStudent(payload) {
     }
     const current = normalizeStudentRecord_(found.record);
     const merged = { ...current };
-    ["no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"]
+    ["no_matrik", "nama", "email", "no_tel", "kelas", "institution_code", "jantina", "status", "catatan"]
       .forEach((field) => {
         if (Object.prototype.hasOwnProperty.call(input, field)) {
           merged[field] = input[field];
         }
       });
-    const validated = validateStudentInput_(merged, { studentId: current.student_id });
+    const assignmentConfig = getStudentAssignmentConfigV240_();
+    const validated = assignmentConfig
+      ? validateAdminStudentAssignmentV240_(merged, { studentId: current.student_id }, assignmentConfig, current)
+      : validateStudentInput_(merged, { studentId: current.student_id });
     if (findStudentRowByMatric_(sheet, validated.no_matrik, current.student_id)) {
       throw new Error("no_matrik telah wujud.");
     }
     const changes = {};
-    ["no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"]
+    const changeFields = ["no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"];
+    if (assignmentConfig) changeFields.push("institution_code");
+    changeFields
       .forEach((field) => {
         if (String(current[field] || "") !== String(validated[field] || "")) {
           changes[field] = true;
@@ -5614,6 +5642,357 @@ function assertStudentConfigCodeImmutableV240_(currentCode, submittedCode, field
   return current;
 }
 
+function getStudentConfigInputV240_(payload, fieldName) {
+  const source = payload || {};
+  return source[fieldName] && typeof source[fieldName] === "object" ? source[fieldName] : source;
+}
+
+function getExistingStudentConfigSheetV240_(sheetName) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(sheetName);
+  if (!sheet) {
+    throw new Error(sheetName + " belum tersedia. Jalankan setupStudentGroupConfigV240 terlebih dahulu.");
+  }
+  return sheet;
+}
+
+function normalizeAdminStudentGroupRecordV240_(row) {
+  const validated = validateStudentGroupConfigRecordV240_(row);
+  return Object.assign({}, validated, {
+    created_at: row.created_at || "",
+    created_by: row.created_by || "",
+    updated_at: row.updated_at || "",
+    updated_by: row.updated_by || ""
+  });
+}
+
+function normalizeAdminLiInstitutionRecordV240_(row) {
+  const validated = validateLiInstitutionConfigRecordV240_(row);
+  return Object.assign({}, validated, {
+    created_at: row.created_at || "",
+    created_by: row.created_by || "",
+    updated_at: row.updated_at || "",
+    updated_by: row.updated_by || ""
+  });
+}
+
+function findStudentConfigRowByCodeV240_(sheet, codeField, code) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+  const headers = values[0].map((header) => String(header).trim());
+  const codeIndex = headers.indexOf(codeField);
+  if (codeIndex === -1) return null;
+  for (let index = 1; index < values.length; index += 1) {
+    if (String(values[index][codeIndex] || "").trim().toUpperCase() === code) {
+      const record = {};
+      headers.forEach((header, columnIndex) => { record[header] = values[index][columnIndex]; });
+      return { sheet: sheet, rowNumber: index + 1, record: record };
+    }
+  }
+  return null;
+}
+
+function getAdminStudentGroups(payload) {
+  validateAdminCredentials_(payload);
+  const sheet = getExistingStudentConfigSheetV240_(SHEETS.studentGroups);
+  return sortStudentConfigRowsV240_(
+    getRowsAsObjects_(sheet).map(normalizeAdminStudentGroupRecordV240_),
+    "group_code"
+  );
+}
+
+function getAdminLiInstitutions(payload) {
+  validateAdminCredentials_(payload);
+  const sheet = getExistingStudentConfigSheetV240_(SHEETS.liInstitutions);
+  return sortStudentConfigRowsV240_(
+    getRowsAsObjects_(sheet).map(normalizeAdminLiInstitutionRecordV240_),
+    "institution_code"
+  );
+}
+
+function createStudentGroup(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const input = getStudentConfigInputV240_(payload, "student_group");
+  return withScriptLock_(function () {
+    const sheet = getExistingStudentConfigSheetV240_(SHEETS.studentGroups);
+    const groupCode = normalizeStudentGroupCodeV240_(input.group_code || payload.group_code);
+    if (findStudentConfigRowByCodeV240_(sheet, "group_code", groupCode)) {
+      throw new Error("group_code telah wujud.");
+    }
+    const validated = validateStudentGroupConfigRecordV240_(Object.assign({}, input, {
+      group_code: groupCode,
+      config_version: 1
+    }));
+    const timestamp = now_();
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const record = Object.assign({}, validated, {
+      created_at: timestamp,
+      created_by: adminIdentity,
+      updated_at: timestamp,
+      updated_by: adminIdentity
+    });
+    appendObjectRow_(sheet, HEADERS.STUDENT_GROUPS, record);
+    invalidateStudentGroupConfigCacheV240_();
+    appendAuditLog("CREATE_STUDENT_GROUP", "", "Admin", adminIdentity, JSON.stringify({
+      active: record.active,
+      institution_required: record.institution_required,
+      sort_order: record.sort_order,
+      config_version: record.config_version
+    }), "STUDENT_GROUP", record.group_code);
+    return normalizeAdminStudentGroupRecordV240_(record);
+  });
+}
+
+function updateStudentGroup(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const groupCode = normalizeStudentGroupCodeV240_(payload && payload.group_code);
+  const expectedVersion = validateExpectedConfigVersion_(payload && payload.expected_config_version);
+  const input = getStudentConfigInputV240_(payload, "student_group");
+  if (Object.prototype.hasOwnProperty.call(input, "group_code")) {
+    assertStudentConfigCodeImmutableV240_(groupCode, input.group_code, "group_code");
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "active")) {
+    throw new Error("Status active hanya boleh diubah melalui toggleStudentGroupStatus.");
+  }
+  return withScriptLock_(function () {
+    const sheet = getExistingStudentConfigSheetV240_(SHEETS.studentGroups);
+    const found = findStudentConfigRowByCodeV240_(sheet, "group_code", groupCode);
+    if (!found) throw new Error("Kumpulan pelajar tidak dijumpai.");
+    const current = normalizeAdminStudentGroupRecordV240_(found.record);
+    assertConfigVersionMatches_(current.config_version, expectedVersion);
+    const merged = Object.assign({}, current);
+    ["display_name", "sort_order", "institution_required"].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(input, field)) merged[field] = input[field];
+    });
+    const validated = validateStudentGroupConfigRecordV240_(merged);
+    const changedFields = ["display_name", "sort_order", "institution_required"].filter((field) => (
+      String(current[field]) !== String(validated[field])
+    ));
+    if (!changedFields.length) throw new Error("Tiada perubahan konfigurasi untuk disimpan.");
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const updates = {
+      display_name: validated.display_name,
+      sort_order: validated.sort_order,
+      institution_required: validated.institution_required,
+      config_version: current.config_version + 1,
+      updated_at: now_(),
+      updated_by: adminIdentity
+    };
+    updateRowByHeaders_(sheet, found.rowNumber, updates);
+    invalidateStudentGroupConfigCacheV240_();
+    appendAuditLog("UPDATE_STUDENT_GROUP", "", "Admin", adminIdentity, JSON.stringify({
+      changed_fields: changedFields,
+      previous_config_version: current.config_version,
+      config_version: updates.config_version
+    }), "STUDENT_GROUP", groupCode);
+    return normalizeAdminStudentGroupRecordV240_(Object.assign({}, current, updates));
+  });
+}
+
+function toggleStudentGroupStatus(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const groupCode = normalizeStudentGroupCodeV240_(payload && payload.group_code);
+  const expectedVersion = validateExpectedConfigVersion_(payload && payload.expected_config_version);
+  const active = requireBoolean_(payload && payload.active, "active");
+  return withScriptLock_(function () {
+    const sheet = getExistingStudentConfigSheetV240_(SHEETS.studentGroups);
+    const found = findStudentConfigRowByCodeV240_(sheet, "group_code", groupCode);
+    if (!found) throw new Error("Kumpulan pelajar tidak dijumpai.");
+    const current = normalizeAdminStudentGroupRecordV240_(found.record);
+    assertConfigVersionMatches_(current.config_version, expectedVersion);
+    if (current.active === active) throw new Error(active ? "Kumpulan sudah aktif." : "Kumpulan sudah tidak aktif.");
+    if (!active) {
+      assertStudentGroupCanDeactivateV240_(groupCode, getRowsAsObjects_(getSheet_(SHEETS.students)));
+    }
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const updates = { active: active, config_version: current.config_version + 1, updated_at: now_(), updated_by: adminIdentity };
+    updateRowByHeaders_(sheet, found.rowNumber, updates);
+    invalidateStudentGroupConfigCacheV240_();
+    appendAuditLog(active ? "ACTIVATE_STUDENT_GROUP" : "DEACTIVATE_STUDENT_GROUP", "", "Admin", adminIdentity, JSON.stringify({
+      active: { from: current.active, to: active },
+      previous_config_version: current.config_version,
+      config_version: updates.config_version
+    }), "STUDENT_GROUP", groupCode);
+    return normalizeAdminStudentGroupRecordV240_(Object.assign({}, current, updates));
+  });
+}
+
+function createLiInstitution(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const input = getStudentConfigInputV240_(payload, "li_institution");
+  return withScriptLock_(function () {
+    const sheet = getExistingStudentConfigSheetV240_(SHEETS.liInstitutions);
+    const institutionCode = normalizeLiInstitutionCodeV240_(input.institution_code || payload.institution_code);
+    if (findStudentConfigRowByCodeV240_(sheet, "institution_code", institutionCode)) {
+      throw new Error("institution_code telah wujud.");
+    }
+    const validated = validateLiInstitutionConfigRecordV240_(Object.assign({}, input, {
+      institution_code: institutionCode,
+      config_version: 1
+    }));
+    const timestamp = now_();
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const record = Object.assign({}, validated, {
+      created_at: timestamp,
+      created_by: adminIdentity,
+      updated_at: timestamp,
+      updated_by: adminIdentity
+    });
+    appendObjectRow_(sheet, HEADERS.LI_INSTITUTIONS, record);
+    invalidateStudentGroupConfigCacheV240_();
+    appendAuditLog("CREATE_LI_INSTITUTION", "", "Admin", adminIdentity, JSON.stringify({
+      active: record.active,
+      sort_order: record.sort_order,
+      config_version: record.config_version
+    }), "LI_INSTITUTION", record.institution_code);
+    return normalizeAdminLiInstitutionRecordV240_(record);
+  });
+}
+
+function updateLiInstitution(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const institutionCode = normalizeLiInstitutionCodeV240_(payload && payload.institution_code);
+  const expectedVersion = validateExpectedConfigVersion_(payload && payload.expected_config_version);
+  const input = getStudentConfigInputV240_(payload, "li_institution");
+  if (Object.prototype.hasOwnProperty.call(input, "institution_code")) {
+    assertStudentConfigCodeImmutableV240_(institutionCode, input.institution_code, "institution_code");
+  }
+  if (Object.prototype.hasOwnProperty.call(input, "active")) {
+    throw new Error("Status active hanya boleh diubah melalui toggleLiInstitutionStatus.");
+  }
+  return withScriptLock_(function () {
+    const sheet = getExistingStudentConfigSheetV240_(SHEETS.liInstitutions);
+    const found = findStudentConfigRowByCodeV240_(sheet, "institution_code", institutionCode);
+    if (!found) throw new Error("Institusi LI tidak dijumpai.");
+    const current = normalizeAdminLiInstitutionRecordV240_(found.record);
+    assertConfigVersionMatches_(current.config_version, expectedVersion);
+    const merged = Object.assign({}, current);
+    ["display_name", "sort_order"].forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(input, field)) merged[field] = input[field];
+    });
+    const validated = validateLiInstitutionConfigRecordV240_(merged);
+    const changedFields = ["display_name", "sort_order"].filter((field) => String(current[field]) !== String(validated[field]));
+    if (!changedFields.length) throw new Error("Tiada perubahan konfigurasi untuk disimpan.");
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const updates = {
+      display_name: validated.display_name,
+      sort_order: validated.sort_order,
+      config_version: current.config_version + 1,
+      updated_at: now_(),
+      updated_by: adminIdentity
+    };
+    updateRowByHeaders_(sheet, found.rowNumber, updates);
+    invalidateStudentGroupConfigCacheV240_();
+    appendAuditLog("UPDATE_LI_INSTITUTION", "", "Admin", adminIdentity, JSON.stringify({
+      changed_fields: changedFields,
+      previous_config_version: current.config_version,
+      config_version: updates.config_version
+    }), "LI_INSTITUTION", institutionCode);
+    return normalizeAdminLiInstitutionRecordV240_(Object.assign({}, current, updates));
+  });
+}
+
+function toggleLiInstitutionStatus(payload) {
+  const admin = validateAdminCredentials_(payload);
+  const institutionCode = normalizeLiInstitutionCodeV240_(payload && payload.institution_code);
+  const expectedVersion = validateExpectedConfigVersion_(payload && payload.expected_config_version);
+  const active = requireBoolean_(payload && payload.active, "active");
+  return withScriptLock_(function () {
+    const sheet = getExistingStudentConfigSheetV240_(SHEETS.liInstitutions);
+    const found = findStudentConfigRowByCodeV240_(sheet, "institution_code", institutionCode);
+    if (!found) throw new Error("Institusi LI tidak dijumpai.");
+    const current = normalizeAdminLiInstitutionRecordV240_(found.record);
+    assertConfigVersionMatches_(current.config_version, expectedVersion);
+    if (current.active === active) throw new Error(active ? "Institusi sudah aktif." : "Institusi sudah tidak aktif.");
+    if (!active) {
+      const assignmentConfig = getStudentAssignmentConfigV240_();
+      if (!assignmentConfig) throw new Error("Konfigurasi penugasan pelajar belum sedia untuk semakan rujukan.");
+      assertLiInstitutionCanDeactivateV240_(institutionCode, getRowsAsObjects_(getSheet_(SHEETS.students)), assignmentConfig.groups);
+    }
+    const adminIdentity = getSafeAdminIdentity_(admin);
+    const updates = { active: active, config_version: current.config_version + 1, updated_at: now_(), updated_by: adminIdentity };
+    updateRowByHeaders_(sheet, found.rowNumber, updates);
+    invalidateStudentGroupConfigCacheV240_();
+    appendAuditLog(active ? "ACTIVATE_LI_INSTITUTION" : "DEACTIVATE_LI_INSTITUTION", "", "Admin", adminIdentity, JSON.stringify({
+      active: { from: current.active, to: active },
+      previous_config_version: current.config_version,
+      config_version: updates.config_version
+    }), "LI_INSTITUTION", institutionCode);
+    return normalizeAdminLiInstitutionRecordV240_(Object.assign({}, current, updates));
+  });
+}
+
+function getStudentAssignmentConfigV240_() {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const groupSheet = spreadsheet.getSheetByName(SHEETS.studentGroups);
+    const institutionSheet = spreadsheet.getSheetByName(SHEETS.liInstitutions);
+    const studentsSheet = spreadsheet.getSheetByName(SHEETS.students);
+    if (!groupSheet || !institutionSheet || !studentsSheet) return null;
+    if (getSheetHeadersV240_(studentsSheet).indexOf("institution_code") === -1) return null;
+    const groups = getRowsAsObjects_(groupSheet).map(normalizeAdminStudentGroupRecordV240_);
+    const institutions = getRowsAsObjects_(institutionSheet).map(normalizeAdminLiInstitutionRecordV240_);
+    if (!groups.length) return null;
+    const groupCodes = {};
+    groups.forEach((group) => {
+      if (groupCodes[group.group_code]) throw new Error("Kod kumpulan pendua.");
+      groupCodes[group.group_code] = true;
+    });
+    const institutionCodes = {};
+    institutions.forEach((institution) => {
+      if (institutionCodes[institution.institution_code]) throw new Error("Kod institusi pendua.");
+      institutionCodes[institution.institution_code] = true;
+    });
+    return {
+      groups: sortStudentConfigRowsV240_(groups, "group_code"),
+      institutions: sortStudentConfigRowsV240_(institutions, "institution_code")
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function validateAdminStudentAssignmentV240_(input, options, assignmentConfig, currentStudent) {
+  const source = input || {};
+  const groups = assignmentConfig.groups || [];
+  const institutions = assignmentConfig.institutions || [];
+  const validated = validateStudentInput_(source, Object.assign({}, options || {}, {
+    allowedGroupCodes: groups.map((group) => group.group_code)
+  }));
+  const group = findStudentGroupConfigByCodeV240_(groups, validated.kelas);
+  if (!group) throw new Error("Kumpulan pelajar tidak dijumpai.");
+  const current = currentStudent || null;
+  const groupChanged = !current || current.kelas !== validated.kelas;
+  if (!group.active && groupChanged) throw new Error("Kumpulan tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
+
+  const rawInstitutionCode = String(source.institution_code || "").trim().toUpperCase();
+  if (!group.institution_required) {
+    if (current && current.kelas === validated.kelas && current.institution_code && !rawInstitutionCode) {
+      throw new Error("Rekod mempunyai institution_code yang tidak sepadan. Betulkan penugasan secara eksplisit sebelum menyimpan perubahan lain.");
+    }
+    if (rawInstitutionCode) throw new Error("institution_code mesti kosong untuk kumpulan ini.");
+    validated.institution_code = "";
+    return validated;
+  }
+  if (!rawInstitutionCode) throw new Error("Institusi diperlukan untuk kumpulan ini.");
+  const institutionCode = normalizeLiInstitutionCodeV240_(rawInstitutionCode);
+  const institution = findLiInstitutionConfigByCodeV240_(institutions, institutionCode);
+  if (!institution) throw new Error("Institusi LI tidak dijumpai.");
+  const institutionChanged = !current || current.institution_code !== institutionCode || groupChanged;
+  if (!institution.active && institutionChanged) throw new Error("Institusi LI tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
+  validated.institution_code = institutionCode;
+  return validated;
+}
+
+function sortAdminStudentsByConfigV240_(rows, groups) {
+  const order = {};
+  (groups || []).forEach((group, index) => { order[group.group_code] = index + 1; });
+  return rows.slice().sort((left, right) => {
+    const classDifference = (order[left.kelas] || 999) - (order[right.kelas] || 999);
+    if (classDifference !== 0) return classDifference;
+    return String(left.nama || left.student_id || "").localeCompare(String(right.nama || right.student_id || ""));
+  });
+}
+
 function getStudentGroupConfigReadiness(payload) {
   validateAdminCredentials_(payload);
   return assessStudentGroupConfigReadinessV240_();
@@ -5882,11 +6261,24 @@ function countActiveStudentsReferencingGroupV240_(groupCode, studentRows) {
   )).length;
 }
 
-function countActiveLiStudentsReferencingInstitutionV240_(institutionCode, studentRows) {
+function countActiveLiStudentsReferencingInstitutionV240_(institutionCode, studentRows, groupRows) {
   const normalizedCode = normalizeLiInstitutionCodeV240_(institutionCode);
+  const institutionRequiredGroups = {};
+  if (Array.isArray(groupRows) && groupRows.length) {
+    groupRows.forEach((row) => {
+      try {
+        const group = validateStudentGroupConfigRecordV240_(row);
+        if (group.institution_required) institutionRequiredGroups[group.group_code] = true;
+      } catch (error) {
+        // Invalid configuration is handled by readiness; it cannot authorize deactivation.
+      }
+    });
+  } else {
+    institutionRequiredGroups.LI = true;
+  }
   return (studentRows || []).filter((student) => (
     isActive_(student.status) &&
-    String(student.kelas || "").trim().toUpperCase() === "LI" &&
+    institutionRequiredGroups[String(student.kelas || "").trim().toUpperCase()] === true &&
     String(student.institution_code || "").trim().toUpperCase() === normalizedCode
   )).length;
 }
@@ -5899,10 +6291,10 @@ function assertStudentGroupCanDeactivateV240_(groupCode, studentRows) {
   return true;
 }
 
-function assertLiInstitutionCanDeactivateV240_(institutionCode, studentRows) {
-  const referenceCount = countActiveLiStudentsReferencingInstitutionV240_(institutionCode, studentRows);
+function assertLiInstitutionCanDeactivateV240_(institutionCode, studentRows, groupRows) {
+  const referenceCount = countActiveLiStudentsReferencingInstitutionV240_(institutionCode, studentRows, groupRows);
   if (referenceCount > 0) {
-    throw new Error("Institusi LI tidak boleh dinyahaktif kerana masih dirujuk oleh " + referenceCount + " pelajar LI aktif.");
+    throw new Error("Institusi LI tidak boleh dinyahaktif kerana masih dirujuk oleh " + referenceCount + " pelajar aktif dalam kumpulan yang memerlukan institusi.");
   }
   return true;
 }

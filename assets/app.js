@@ -126,6 +126,15 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "updateStaff",
   "toggleStaffStatus",
   "getAdminStudents",
+  "getAdminStudentGroups",
+  "createStudentGroup",
+  "updateStudentGroup",
+  "toggleStudentGroupStatus",
+  "getAdminLiInstitutions",
+  "createLiInstitution",
+  "updateLiInstitution",
+  "toggleLiInstitutionStatus",
+  "getStudentGroupConfigReadiness",
   "createStudent",
   "updateStudent",
   "toggleStudentStatus",
@@ -238,6 +247,12 @@ let operationalOutingTypesV220 = buildLegacyStudentOutingTypesV200();
 let adminEditingTypeCode = "";
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
+let adminStudentGroupsV240 = [];
+let adminLiInstitutionsV240 = [];
+let adminEditingStudentGroupCodeV240 = "";
+let adminEditingLiInstitutionCodeV240 = "";
+let activeAdminStudentSubtabV240 = "students";
+let adminStudentConfigLoadedV240 = false;
 let profilePhotoThumbnails = new Map();
 let profilePhotoFullImages = new Map();
 let profilePhotoThumbnailLoadedKeys = new Set();
@@ -269,6 +284,8 @@ const rollingNumberValues = new Map();
 const rollingNumberFrames = new Map();
 let mockAdminOutingTypesV200 = ALLOW_MOCK_MODE ? buildMockAdminOutingTypesV200() : [];
 let mockAdminStudentsV200 = ALLOW_MOCK_MODE ? buildMockAdminStudentsV200() : [];
+let mockAdminStudentGroupsV240 = ALLOW_MOCK_MODE ? buildMockAdminStudentGroupsV240() : [];
+let mockAdminLiInstitutionsV240 = ALLOW_MOCK_MODE ? buildMockAdminLiInstitutionsV240() : [];
 let mockAdminStaffV210 = ALLOW_MOCK_MODE ? [
   { staff_id: "W001", nama: "Warden Mock", role: "WARDEN", status: "Aktif", email: "", no_tel: "", catatan: "", pin_configured: true },
   { staff_id: "G001", nama: "Guard Mock", role: "GUARD", status: "Aktif", email: "", no_tel: "", catatan: "", pin_configured: true }
@@ -502,6 +519,51 @@ const els = {
   adminStudentNoteInput: document.querySelector("#adminStudentNoteInput"),
   adminStudentEditorMessage: document.querySelector("#adminStudentEditorMessage"),
   adminSaveStudentButton: document.querySelector("#adminSaveStudentButton"),
+  adminStudentPeopleSubtab: document.querySelector("#adminStudentPeopleSubtab"),
+  adminStudentGroupsSubtab: document.querySelector("#adminStudentGroupsSubtab"),
+  adminLiInstitutionsSubtab: document.querySelector("#adminLiInstitutionsSubtab"),
+  adminStudentPeoplePanel: document.querySelector("#adminStudentPeoplePanel"),
+  adminStudentGroupsPanel: document.querySelector("#adminStudentGroupsPanel"),
+  adminLiInstitutionsPanel: document.querySelector("#adminLiInstitutionsPanel"),
+  adminStudentConfigStatus: document.querySelector("#adminStudentConfigStatus"),
+  adminStudentConfigStatusLabel: document.querySelector("#adminStudentConfigStatusLabel"),
+  adminStudentConfigStatusDetail: document.querySelector("#adminStudentConfigStatusDetail"),
+  adminStudentConfigIssues: document.querySelector("#adminStudentConfigIssues"),
+  adminStudentInstitutionField: document.querySelector("#adminStudentInstitutionField"),
+  adminStudentInstitutionInput: document.querySelector("#adminStudentInstitutionInput"),
+  adminStudentGroupsRefreshButton: document.querySelector("#adminStudentGroupsRefreshButton"),
+  adminAddStudentGroupButton: document.querySelector("#adminAddStudentGroupButton"),
+  adminStudentGroupsMessage: document.querySelector("#adminStudentGroupsMessage"),
+  adminStudentGroupList: document.querySelector("#adminStudentGroupList"),
+  adminStudentGroupEditor: document.querySelector("#adminStudentGroupEditor"),
+  adminStudentGroupEditorTitle: document.querySelector("#adminStudentGroupEditorTitle"),
+  adminStudentGroupCancelButton: document.querySelector("#adminStudentGroupCancelButton"),
+  adminStudentGroupForm: document.querySelector("#adminStudentGroupForm"),
+  adminStudentGroupVersionInput: document.querySelector("#adminStudentGroupVersionInput"),
+  adminStudentGroupCodeInput: document.querySelector("#adminStudentGroupCodeInput"),
+  adminStudentGroupNameInput: document.querySelector("#adminStudentGroupNameInput"),
+  adminStudentGroupSortInput: document.querySelector("#adminStudentGroupSortInput"),
+  adminStudentGroupInstitutionRequiredInput: document.querySelector("#adminStudentGroupInstitutionRequiredInput"),
+  adminStudentGroupActiveField: document.querySelector("#adminStudentGroupActiveField"),
+  adminStudentGroupActiveInput: document.querySelector("#adminStudentGroupActiveInput"),
+  adminStudentGroupEditorMessage: document.querySelector("#adminStudentGroupEditorMessage"),
+  adminSaveStudentGroupButton: document.querySelector("#adminSaveStudentGroupButton"),
+  adminLiInstitutionsRefreshButton: document.querySelector("#adminLiInstitutionsRefreshButton"),
+  adminAddLiInstitutionButton: document.querySelector("#adminAddLiInstitutionButton"),
+  adminLiInstitutionsMessage: document.querySelector("#adminLiInstitutionsMessage"),
+  adminLiInstitutionList: document.querySelector("#adminLiInstitutionList"),
+  adminLiInstitutionEditor: document.querySelector("#adminLiInstitutionEditor"),
+  adminLiInstitutionEditorTitle: document.querySelector("#adminLiInstitutionEditorTitle"),
+  adminLiInstitutionCancelButton: document.querySelector("#adminLiInstitutionCancelButton"),
+  adminLiInstitutionForm: document.querySelector("#adminLiInstitutionForm"),
+  adminLiInstitutionVersionInput: document.querySelector("#adminLiInstitutionVersionInput"),
+  adminLiInstitutionCodeInput: document.querySelector("#adminLiInstitutionCodeInput"),
+  adminLiInstitutionNameInput: document.querySelector("#adminLiInstitutionNameInput"),
+  adminLiInstitutionSortInput: document.querySelector("#adminLiInstitutionSortInput"),
+  adminLiInstitutionActiveField: document.querySelector("#adminLiInstitutionActiveField"),
+  adminLiInstitutionActiveInput: document.querySelector("#adminLiInstitutionActiveInput"),
+  adminLiInstitutionEditorMessage: document.querySelector("#adminLiInstitutionEditorMessage"),
+  adminSaveLiInstitutionButton: document.querySelector("#adminSaveLiInstitutionButton"),
   adminAnnouncementForm: document.querySelector("#adminAnnouncementForm"),
   adminAnnouncementText: document.querySelector("#adminAnnouncementText"),
   adminAnnouncementImportant: document.querySelector("#adminAnnouncementImportant"),
@@ -820,6 +882,25 @@ function setupAdminDashboardV200() {
   if (els.adminStudentSearchInput) {
     els.adminStudentSearchInput.addEventListener("input", renderAdminStudentsV200);
   }
+  if (els.adminStudentPeopleSubtab) els.adminStudentPeopleSubtab.addEventListener("click", () => setAdminStudentSubtabV240("students"));
+  if (els.adminStudentGroupsSubtab) els.adminStudentGroupsSubtab.addEventListener("click", () => setAdminStudentSubtabV240("groups"));
+  if (els.adminLiInstitutionsSubtab) els.adminLiInstitutionsSubtab.addEventListener("click", () => setAdminStudentSubtabV240("institutions"));
+  if (els.adminStudentClassInput) els.adminStudentClassInput.addEventListener("change", () => updateAdminStudentInstitutionFieldV240());
+  if (els.adminStudentGroupsRefreshButton) els.adminStudentGroupsRefreshButton.addEventListener("click", loadAdminStudentConfigV240);
+  if (els.adminLiInstitutionsRefreshButton) els.adminLiInstitutionsRefreshButton.addEventListener("click", loadAdminStudentConfigV240);
+  if (els.adminAddStudentGroupButton) els.adminAddStudentGroupButton.addEventListener("click", () => openAdminStudentGroupEditorV240());
+  if (els.adminAddLiInstitutionButton) els.adminAddLiInstitutionButton.addEventListener("click", () => openAdminLiInstitutionEditorV240());
+  if (els.adminStudentGroupCancelButton) els.adminStudentGroupCancelButton.addEventListener("click", closeAdminStudentGroupEditorV240);
+  if (els.adminLiInstitutionCancelButton) els.adminLiInstitutionCancelButton.addEventListener("click", closeAdminLiInstitutionEditorV240);
+  if (els.adminStudentGroupForm) els.adminStudentGroupForm.addEventListener("submit", saveAdminStudentGroupV240);
+  if (els.adminLiInstitutionForm) els.adminLiInstitutionForm.addEventListener("submit", saveAdminLiInstitutionV240);
+  if (els.adminStudentGroupList) els.adminStudentGroupList.addEventListener("click", handleAdminStudentGroupActionV240);
+  if (els.adminLiInstitutionList) els.adminLiInstitutionList.addEventListener("click", handleAdminLiInstitutionActionV240);
+  [els.adminStudentGroupCodeInput, els.adminLiInstitutionCodeInput].forEach((input) => {
+    if (input) input.addEventListener("input", () => {
+      if (!input.readOnly) input.value = input.value.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+    });
+  });
   els.adminTypeCodeInput.addEventListener("input", () => {
     if (!els.adminTypeCodeInput.readOnly) {
       els.adminTypeCodeInput.value = els.adminTypeCodeInput.value
@@ -998,6 +1079,12 @@ function clearAdminRuntimeCredentialV200() {
   adminEditingTypeCode = "";
   adminStudentsV200 = [];
   adminEditingStudentIdV200 = "";
+  adminStudentGroupsV240 = [];
+  adminLiInstitutionsV240 = [];
+  adminEditingStudentGroupCodeV240 = "";
+  adminEditingLiInstitutionCodeV240 = "";
+  adminStudentConfigLoadedV240 = false;
+  activeAdminStudentSubtabV240 = "students";
   activeAdminSectionV200 = "monitoring";
   adminMonitoringV210 = null;
   adminMasterV210 = { page: 1, total_pages: 1, total: 0, records: [] };
@@ -1244,7 +1331,10 @@ function setAdminSectionV200(section) {
   });
   if (nextSection === "monitoring" && !adminMonitoringV210) loadAdminMonitoringV210();
   if (nextSection === "master" && !adminMasterV210.records.length) loadAdminMasterV210(1);
-  if (nextSection === "students" && !adminStudentsV200.length) loadAdminStudentsV200();
+  if (nextSection === "students") {
+    if (!adminStudentsV200.length) loadAdminStudentsV200();
+    if (!adminStudentConfigLoadedV240) loadAdminStudentConfigV240();
+  }
   if (nextSection === "staff" && !adminStaffV210.length) loadAdminStaffV210();
   if (nextSection === "outing") {
     if (!adminOutingTypes.length) loadAdminOutingTypesV200();
@@ -1643,6 +1733,7 @@ function normalizeAdminStudentV200(student) {
     email: String(item.email || "").trim(),
     no_tel: String(item.no_tel || "").trim(),
     kelas: String(item.kelas || "").trim().toUpperCase(),
+    institution_code: String(item.institution_code || "").trim().toUpperCase(),
     jantina: String(item.jantina || "").trim(),
     status: String(item.status || "").trim().toUpperCase(),
     catatan: String(item.catatan || "").trim(),
@@ -1650,6 +1741,262 @@ function normalizeAdminStudentV200(student) {
     photo_updated_at: item.photo_updated_at || ""
   };
 }
+
+function normalizeAdminStudentGroupV240(item) {
+  return {
+    group_code: String(item && item.group_code || "").trim().toUpperCase(),
+    display_name: String(item && item.display_name || "").trim(),
+    institution_required: item && item.institution_required === true,
+    active: item && item.active === true,
+    sort_order: Number(item && item.sort_order || 0),
+    config_version: Number(item && item.config_version || 0)
+  };
+}
+
+function normalizeAdminLiInstitutionV240(item) {
+  return {
+    institution_code: String(item && item.institution_code || "").trim().toUpperCase(),
+    display_name: String(item && item.display_name || "").trim(),
+    active: item && item.active === true,
+    sort_order: Number(item && item.sort_order || 0),
+    config_version: Number(item && item.config_version || 0)
+  };
+}
+
+function setAdminStudentSubtabV240(tabName) {
+  const allowed = ["students", "groups", "institutions"];
+  activeAdminStudentSubtabV240 = allowed.includes(tabName) ? tabName : "students";
+  [
+    ["students", els.adminStudentPeopleSubtab, els.adminStudentPeoplePanel],
+    ["groups", els.adminStudentGroupsSubtab, els.adminStudentGroupsPanel],
+    ["institutions", els.adminLiInstitutionsSubtab, els.adminLiInstitutionsPanel]
+  ].forEach(([name, tab, panel]) => {
+    if (tab) {
+      tab.classList.toggle("active", name === activeAdminStudentSubtabV240);
+      tab.setAttribute("aria-selected", String(name === activeAdminStudentSubtabV240));
+    }
+    if (panel) panel.hidden = name !== activeAdminStudentSubtabV240;
+  });
+  if (!adminStudentConfigLoadedV240 && activeAdminStudentSubtabV240 !== "students") loadAdminStudentConfigV240();
+}
+
+async function loadAdminStudentConfigV240() {
+  if (!currentSession || currentSession.role !== "admin") return;
+  setAdminStudentConfigBusyV240(true);
+  const credential = buildAdminCredentialPayloadV200();
+  const results = await Promise.allSettled([
+    apiPost("getAdminStudentGroups", credential),
+    apiPost("getAdminLiInstitutions", credential),
+    apiPost("getStudentGroupConfigReadiness", credential)
+  ]);
+  adminStudentGroupsV240 = results[0].status === "fulfilled"
+    ? (Array.isArray(results[0].value) ? results[0].value : []).map(normalizeAdminStudentGroupV240)
+    : [];
+  adminLiInstitutionsV240 = results[1].status === "fulfilled"
+    ? (Array.isArray(results[1].value) ? results[1].value : []).map(normalizeAdminLiInstitutionV240)
+    : [];
+  adminStudentConfigLoadedV240 = true;
+  renderAdminStudentGroupListV240();
+  renderAdminLiInstitutionListV240();
+  renderAdminStudentGroupOptionsV240();
+  renderAdminStudentReadinessV240(results[2].status === "fulfilled" ? results[2].value : null);
+  setStudentConfigMessageV240(els.adminStudentGroupsMessage, results[0].status === "rejected" ? "Konfigurasi kumpulan belum tersedia." : "", results[0].status === "rejected");
+  setStudentConfigMessageV240(els.adminLiInstitutionsMessage, results[1].status === "rejected" ? "Konfigurasi institusi belum tersedia." : "", results[1].status === "rejected");
+  setAdminStudentConfigBusyV240(false);
+}
+
+function setAdminStudentConfigBusyV240(busy) {
+  [els.adminStudentGroupsRefreshButton, els.adminLiInstitutionsRefreshButton, els.adminAddStudentGroupButton, els.adminAddLiInstitutionButton]
+    .forEach((button) => { if (button) button.disabled = Boolean(busy); });
+}
+
+function renderAdminStudentReadinessV240(readiness) {
+  if (!els.adminStudentConfigStatus) return;
+  const foundationReady = Boolean(readiness && readiness.foundation_ready);
+  const migrationNeeded = Boolean(readiness && readiness.migration_needed);
+  const state = !foundationReady ? "issue" : (migrationNeeded ? "legacy" : "active");
+  const label = !foundationReady ? "Issue detected" : (migrationNeeded ? "Migration required" : "Ready");
+  els.adminStudentConfigStatus.dataset.state = state;
+  els.adminStudentConfigStatusLabel.textContent = `Student Group Config: ${label}`;
+  els.adminStudentConfigStatusDetail.textContent = !readiness
+    ? "Status konfigurasi tidak dapat dibaca. Pengurusan Pelajar kekal dalam mod legasi."
+    : `Mod ${readiness.mode === "CONFIG_ENABLED" ? "config" : "legasi selamat"}. ${Number(readiness.counts && readiness.counts.student_groups || 0)} kumpulan, ${Number(readiness.counts && readiness.counts.li_institutions || 0)} institusi.`;
+  const diagnostics = readiness ? [...(readiness.issues || []), ...(readiness.migration_issues || [])] : [];
+  els.adminStudentConfigIssues.innerHTML = diagnostics.map((item) => (
+    `<li>${escapeHtml(String(item.code || "ISSUE").replace(/_/g, " "))}: ${Number(item.count || 0)}</li>`
+  )).join("");
+  els.adminStudentConfigIssues.hidden = diagnostics.length === 0;
+}
+
+function getAdminStudentGroupV240(code) {
+  return adminStudentGroupsV240.find((group) => group.group_code === String(code || "").trim().toUpperCase()) || null;
+}
+
+function renderSelectOptionsV240(select, rows, valueField, currentValue, emptyLabel) {
+  if (!select) return;
+  const previous = currentValue === undefined ? select.value : currentValue;
+  const options = rows.map((row) => {
+    const value = row[valueField];
+    return `<option value="${escapeHtml(value)}">${escapeHtml(row.display_name || value)}${row.active !== true ? " (Tidak Aktif — semasa)" : ""}</option>`;
+  });
+  select.innerHTML = emptyLabel ? `<option value="">${escapeHtml(emptyLabel)}</option>${options.join("")}` : options.join("");
+  if (Array.from(select.options).some((option) => option.value === previous)) select.value = previous;
+}
+
+function renderAdminStudentGroupOptionsV240(currentStudent) {
+  const currentGroupCode = String(currentStudent && currentStudent.kelas || "").trim().toUpperCase();
+  let groups = adminStudentGroupsV240.filter((group) => group.active);
+  const currentGroup = getAdminStudentGroupV240(currentGroupCode);
+  if (currentGroup && !currentGroup.active && !groups.some((group) => group.group_code === currentGroup.group_code)) groups = groups.concat([currentGroup]);
+  if (!groups.length) {
+    groups = [
+      { group_code: "A2", display_name: "A2", active: true },
+      { group_code: "A3", display_name: "A3", active: true },
+      { group_code: "LI", display_name: "LI — Pelajar Latihan Industri", active: true, institution_required: false }
+    ];
+  }
+  renderSelectOptionsV240(els.adminStudentClassInput, groups, "group_code", currentGroupCode || undefined, "");
+  const referencedCodes = new Set(adminStudentsV200.map((student) => student.kelas).filter(Boolean));
+  const filterGroups = adminStudentGroupsV240.length
+    ? adminStudentGroupsV240.filter((group) => group.active || referencedCodes.has(group.group_code))
+    : groups;
+  [els.adminStudentClassFilter, els.adminMasterClass, document.querySelector("#statsClassSelect")].forEach((select) => {
+    if (!select) return;
+    renderSelectOptionsV240(select, filterGroups, "group_code", select.value, "Semua");
+  });
+  updateAdminStudentInstitutionFieldV240(currentStudent && currentStudent.institution_code);
+}
+
+function updateAdminStudentInstitutionFieldV240(preferredInstitutionCode) {
+  if (!els.adminStudentInstitutionField || !els.adminStudentInstitutionInput) return;
+  const group = getAdminStudentGroupV240(els.adminStudentClassInput && els.adminStudentClassInput.value);
+  const requiresInstitution = Boolean(group && group.institution_required);
+  els.adminStudentInstitutionField.hidden = !requiresInstitution;
+  els.adminStudentInstitutionInput.disabled = !requiresInstitution;
+  els.adminStudentInstitutionInput.required = requiresInstitution;
+  if (!requiresInstitution) {
+    els.adminStudentInstitutionInput.innerHTML = "";
+    return;
+  }
+  const editingStudent = adminStudentsV200.find((student) => student.student_id === adminEditingStudentIdV200);
+  const currentCode = String(preferredInstitutionCode || editingStudent && editingStudent.institution_code || "").trim().toUpperCase();
+  let institutions = adminLiInstitutionsV240.filter((institution) => institution.active);
+  const current = adminLiInstitutionsV240.find((institution) => institution.institution_code === currentCode);
+  if (current && !current.active && !institutions.some((institution) => institution.institution_code === currentCode)) institutions = institutions.concat([current]);
+  renderSelectOptionsV240(els.adminStudentInstitutionInput, institutions, "institution_code", currentCode, "Pilih institusi");
+}
+
+function renderAdminStudentGroupListV240() {
+  if (!els.adminStudentGroupList) return;
+  els.adminStudentGroupList.innerHTML = adminStudentGroupsV240.length
+    ? adminStudentGroupsV240.map((group) => adminStudentConfigCardV240(group, "group")).join("")
+    : '<div class="empty-state">Tiada konfigurasi kumpulan tersedia.</div>';
+}
+
+function renderAdminLiInstitutionListV240() {
+  if (!els.adminLiInstitutionList) return;
+  els.adminLiInstitutionList.innerHTML = adminLiInstitutionsV240.length
+    ? adminLiInstitutionsV240.map((institution) => adminStudentConfigCardV240(institution, "institution")).join("")
+    : '<div class="empty-state">Tiada konfigurasi institusi tersedia.</div>';
+}
+
+function adminStudentConfigCardV240(record, kind) {
+  const isGroup = kind === "group";
+  const code = isGroup ? record.group_code : record.institution_code;
+  return `<article class="admin-student-config-card ${record.active ? "is-active" : "is-inactive"}">
+    <div><div class="admin-student-code-row"><span class="admin-student-id">${escapeHtml(code)}</span><span class="clay-status-badge ${record.active ? "is-active" : "is-inactive"}">${record.active ? "Aktif" : "Tidak Aktif"}</span></div>
+    <h4>${escapeHtml(record.display_name || code)}</h4><p>Susunan ${Number(record.sort_order)} · Versi ${Number(record.config_version)}${isGroup ? ` · ${record.institution_required ? "Institusi diperlukan" : "Tanpa institusi"}` : ""}</p></div>
+    <div class="admin-student-actions"><button class="secondary-action" type="button" data-config-edit="${kind}" data-config-code="${escapeHtml(code)}">Edit</button>
+    <button class="${record.active ? "danger-action" : "success-action"}" type="button" data-config-toggle="${kind}" data-config-code="${escapeHtml(code)}" data-next-active="${record.active ? "false" : "true"}">${record.active ? "Nyahaktif" : "Aktifkan"}</button></div>
+  </article>`;
+}
+
+function openAdminStudentGroupEditorV240(code) {
+  const group = code ? getAdminStudentGroupV240(code) : null;
+  adminEditingStudentGroupCodeV240 = group ? group.group_code : "";
+  els.adminStudentGroupForm.reset();
+  els.adminStudentGroupEditorTitle.textContent = group ? "Edit Kumpulan" : "Tambah Kumpulan";
+  els.adminStudentGroupCodeInput.value = group ? group.group_code : "";
+  els.adminStudentGroupCodeInput.readOnly = Boolean(group);
+  els.adminStudentGroupNameInput.value = group ? group.display_name : "";
+  els.adminStudentGroupSortInput.value = group ? group.sort_order : Math.max(10, ...adminStudentGroupsV240.map((item) => item.sort_order + 10));
+  els.adminStudentGroupInstitutionRequiredInput.checked = Boolean(group && group.institution_required);
+  els.adminStudentGroupActiveInput.checked = group ? group.active : true;
+  els.adminStudentGroupActiveField.hidden = Boolean(group);
+  els.adminStudentGroupVersionInput.value = group ? group.config_version : 0;
+  els.adminStudentGroupEditorMessage.textContent = "";
+  els.adminStudentGroupEditor.hidden = false;
+  els.adminStudentGroupCodeInput.focus();
+}
+
+function openAdminLiInstitutionEditorV240(code) {
+  const institution = adminLiInstitutionsV240.find((item) => item.institution_code === code) || null;
+  adminEditingLiInstitutionCodeV240 = institution ? institution.institution_code : "";
+  els.adminLiInstitutionForm.reset();
+  els.adminLiInstitutionEditorTitle.textContent = institution ? "Edit Institusi" : "Tambah Institusi";
+  els.adminLiInstitutionCodeInput.value = institution ? institution.institution_code : "";
+  els.adminLiInstitutionCodeInput.readOnly = Boolean(institution);
+  els.adminLiInstitutionNameInput.value = institution ? institution.display_name : "";
+  els.adminLiInstitutionSortInput.value = institution ? institution.sort_order : Math.max(10, ...adminLiInstitutionsV240.map((item) => item.sort_order + 10));
+  els.adminLiInstitutionActiveInput.checked = institution ? institution.active : true;
+  els.adminLiInstitutionActiveField.hidden = Boolean(institution);
+  els.adminLiInstitutionVersionInput.value = institution ? institution.config_version : 0;
+  els.adminLiInstitutionEditorMessage.textContent = "";
+  els.adminLiInstitutionEditor.hidden = false;
+  els.adminLiInstitutionCodeInput.focus();
+}
+
+function closeAdminStudentGroupEditorV240() { adminEditingStudentGroupCodeV240 = ""; if (els.adminStudentGroupEditor) els.adminStudentGroupEditor.hidden = true; }
+function closeAdminLiInstitutionEditorV240() { adminEditingLiInstitutionCodeV240 = ""; if (els.adminLiInstitutionEditor) els.adminLiInstitutionEditor.hidden = true; }
+
+async function saveAdminStudentGroupV240(event) {
+  event.preventDefault();
+  const group = { group_code: els.adminStudentGroupCodeInput.value.trim().toUpperCase(), display_name: els.adminStudentGroupNameInput.value.trim(), sort_order: Number(els.adminStudentGroupSortInput.value), institution_required: els.adminStudentGroupInstitutionRequiredInput.checked };
+  const editing = Boolean(adminEditingStudentGroupCodeV240);
+  if (!editing) group.active = els.adminStudentGroupActiveInput.checked;
+  const payload = Object.assign(buildAdminCredentialPayloadV200(), { student_group: group, group_code: editing ? adminEditingStudentGroupCodeV240 : group.group_code });
+  if (editing) payload.expected_config_version = Number(els.adminStudentGroupVersionInput.value);
+  els.adminSaveStudentGroupButton.disabled = true;
+  try { await apiPost(editing ? "updateStudentGroup" : "createStudentGroup", payload); closeAdminStudentGroupEditorV240(); await loadAdminStudentConfigV240(); setStudentConfigMessageV240(els.adminStudentGroupsMessage, "Kumpulan berjaya disimpan."); }
+  catch (error) { setStudentConfigMessageV240(els.adminStudentGroupEditorMessage, cleanApiError(error.message || "Kumpulan gagal disimpan."), true); }
+  finally { els.adminSaveStudentGroupButton.disabled = false; }
+}
+
+async function saveAdminLiInstitutionV240(event) {
+  event.preventDefault();
+  const institution = { institution_code: els.adminLiInstitutionCodeInput.value.trim().toUpperCase(), display_name: els.adminLiInstitutionNameInput.value.trim(), sort_order: Number(els.adminLiInstitutionSortInput.value) };
+  const editing = Boolean(adminEditingLiInstitutionCodeV240);
+  if (!editing) institution.active = els.adminLiInstitutionActiveInput.checked;
+  const payload = Object.assign(buildAdminCredentialPayloadV200(), { li_institution: institution, institution_code: editing ? adminEditingLiInstitutionCodeV240 : institution.institution_code });
+  if (editing) payload.expected_config_version = Number(els.adminLiInstitutionVersionInput.value);
+  els.adminSaveLiInstitutionButton.disabled = true;
+  try { await apiPost(editing ? "updateLiInstitution" : "createLiInstitution", payload); closeAdminLiInstitutionEditorV240(); await loadAdminStudentConfigV240(); setStudentConfigMessageV240(els.adminLiInstitutionsMessage, "Institusi berjaya disimpan."); }
+  catch (error) { setStudentConfigMessageV240(els.adminLiInstitutionEditorMessage, cleanApiError(error.message || "Institusi gagal disimpan."), true); }
+  finally { els.adminSaveLiInstitutionButton.disabled = false; }
+}
+
+function handleAdminStudentGroupActionV240(event) { handleAdminStudentConfigActionV240(event, "group"); }
+function handleAdminLiInstitutionActionV240(event) { handleAdminStudentConfigActionV240(event, "institution"); }
+
+function handleAdminStudentConfigActionV240(event, kind) {
+  const edit = event.target.closest(`[data-config-edit="${kind}"]`);
+  if (edit) { if (kind === "group") openAdminStudentGroupEditorV240(edit.dataset.configCode); else openAdminLiInstitutionEditorV240(edit.dataset.configCode); return; }
+  const toggle = event.target.closest(`[data-config-toggle="${kind}"]`);
+  if (toggle) toggleAdminStudentConfigV240(kind, toggle.dataset.configCode, toggle.dataset.nextActive === "true");
+}
+
+async function toggleAdminStudentConfigV240(kind, code, active) {
+  const record = kind === "group" ? getAdminStudentGroupV240(code) : adminLiInstitutionsV240.find((item) => item.institution_code === code);
+  if (!record || !window.confirm(`Sahkan untuk ${active ? "aktifkan" : "nyahaktifkan"} ${record.display_name || code}?`)) return;
+  const payload = Object.assign(buildAdminCredentialPayloadV200(), { expected_config_version: record.config_version, active });
+  payload[kind === "group" ? "group_code" : "institution_code"] = code;
+  setAdminStudentConfigBusyV240(true);
+  try { await apiPost(kind === "group" ? "toggleStudentGroupStatus" : "toggleLiInstitutionStatus", payload); await loadAdminStudentConfigV240(); }
+  catch (error) { setStudentConfigMessageV240(kind === "group" ? els.adminStudentGroupsMessage : els.adminLiInstitutionsMessage, cleanApiError(error.message || "Status gagal dikemas kini."), true); }
+  finally { setAdminStudentConfigBusyV240(false); }
+}
+
+function setStudentConfigMessageV240(element, message, isError) { if (!element) return; element.textContent = message || ""; element.classList.toggle("error", Boolean(isError)); }
 
 async function loadAdminStudentsV200() {
   if (!currentSession || currentSession.role !== "admin" || !els.adminStudentList) return;
@@ -1659,6 +2006,7 @@ async function loadAdminStudentsV200() {
     const response = await apiPost("getAdminStudents", buildAdminCredentialPayloadV200());
     adminStudentsV200 = (Array.isArray(response) ? response : response && response.students || [])
       .map(normalizeAdminStudentV200);
+    renderAdminStudentGroupOptionsV240();
     setAdminStudentsMessageV200("");
     renderAdminStudentsV200();
     loadProfilePhotoThumbnailsForStudents(adminStudentsV200.filter((student) => student.has_profile_photo).map((student) => student.student_id));
@@ -1693,7 +2041,7 @@ function setAdminStudentsMessageV200(message, isError) {
 
 function safeAdminStudentErrorV200(error, fallback) {
   const message = String(error && error.message || "");
-  if (/duplicate|sudah digunakan|telah wujud|diperlukan|tidak sah|tidak ditemui/i.test(message)) {
+  if (/duplicate|sudah digunakan|telah wujud|diperlukan|tidak sah|tidak ditemui|tidak aktif|kumpulan|institusi|config_version/i.test(message)) {
     return message;
   }
   return fallback;
@@ -1739,12 +2087,12 @@ function adminStudentCardV200(student) {
               ${liBadge}
             </div>
             <h4>${escapeHtml(student.nama)}</h4>
-            <p>${escapeHtml(student.no_matrik)} · ${escapeHtml(student.kelas || "-")} · ${escapeHtml(student.jantina || "-")}</p>
+            <p>${escapeHtml(student.no_matrik)} · ${escapeHtml(getAdminStudentGroupV240(student.kelas)?.display_name || student.kelas || "-")} · ${escapeHtml(student.jantina || "-")}</p>
           </div>
         </div>
         <span class="clay-status-badge ${isActive ? "is-active" : "is-inactive"}">${isActive ? "Aktif" : "Tidak Aktif"}</span>
       </div>
-      <p class="admin-student-contact">${contact}</p>
+      <p class="admin-student-contact">${contact}${student.institution_code ? ` · Institusi: ${escapeHtml(adminLiInstitutionsV240.find((item) => item.institution_code === student.institution_code)?.display_name || student.institution_code)}` : ""}</p>
       ${student.catatan ? `<p class="admin-student-note">${escapeHtml(student.catatan)}</p>` : ""}
       <div class="admin-student-actions">
         <button class="secondary-action" type="button" data-admin-student-edit="${escapeHtml(student.student_id)}">Edit</button>
@@ -1784,7 +2132,9 @@ function openAdminStudentCreateEditorV200() {
   els.adminStudentForm.reset();
   els.adminStudentEditorTitle.textContent = "Tambah Pelajar";
   els.adminStudentIdInput.readOnly = false;
-  els.adminStudentClassInput.value = "A2";
+  renderAdminStudentGroupOptionsV240();
+  if (Array.from(els.adminStudentClassInput.options).some((option) => option.value === "A2")) els.adminStudentClassInput.value = "A2";
+  updateAdminStudentInstitutionFieldV240();
   els.adminStudentStatusInput.value = "AKTIF";
   els.adminStudentEditorMessage.textContent = "";
   els.adminStudentEditor.hidden = false;
@@ -1802,7 +2152,9 @@ function openAdminStudentEditEditorV200(studentId) {
   els.adminStudentNameInput.value = student.nama;
   els.adminStudentEmailInput.value = student.email;
   els.adminStudentPhoneInput.value = student.no_tel;
+  renderAdminStudentGroupOptionsV240(student);
   els.adminStudentClassInput.value = student.kelas || "A2";
+  updateAdminStudentInstitutionFieldV240(student.institution_code);
   els.adminStudentGenderInput.value = student.jantina;
   els.adminStudentStatusInput.value = student.status || "AKTIF";
   els.adminStudentNoteInput.value = student.catatan;
@@ -1816,6 +2168,8 @@ function closeAdminStudentEditorV200() {
   if (els.adminStudentForm) els.adminStudentForm.reset();
   if (els.adminStudentIdInput) els.adminStudentIdInput.readOnly = false;
   if (els.adminStudentEditorMessage) els.adminStudentEditorMessage.textContent = "";
+  if (els.adminStudentInstitutionField) els.adminStudentInstitutionField.hidden = true;
+  if (els.adminStudentInstitutionInput) { els.adminStudentInstitutionInput.disabled = true; els.adminStudentInstitutionInput.required = false; }
   if (els.adminStudentEditor) els.adminStudentEditor.hidden = true;
 }
 
@@ -1827,6 +2181,9 @@ function buildAdminStudentFormPayloadV200() {
     email: els.adminStudentEmailInput.value.trim(),
     no_tel: els.adminStudentPhoneInput.value.trim(),
     kelas: els.adminStudentClassInput.value,
+    institution_code: els.adminStudentInstitutionInput && !els.adminStudentInstitutionInput.disabled
+      ? els.adminStudentInstitutionInput.value
+      : "",
     jantina: els.adminStudentGenderInput.value,
     status: els.adminStudentStatusInput.value,
     catatan: els.adminStudentNoteInput.value.trim()
@@ -2920,8 +3277,23 @@ function buildMockAdminStudentsV200() {
   return [
     { student_id: "A2-MOCK-001", no_matrik: "00120001", nama: "Pelajar Mock A2", email: "a2.mock@example.test", no_tel: "0123456789", kelas: "A2", jantina: "Lelaki", status: "AKTIF", catatan: "" },
     { student_id: "A3-MOCK-001", no_matrik: "00130001", nama: "Pelajar Mock A3", email: "", no_tel: "", kelas: "A3", jantina: "Perempuan", status: "AKTIF", catatan: "" },
-    { student_id: "LI-MOCK-001", no_matrik: "00009001", nama: "Pelajar Latihan Industri Mock", email: "li.mock@example.test", no_tel: "01100009001", kelas: "LI", jantina: "Perempuan", status: "AKTIF", catatan: "Untuk QA local sahaja" },
-    { student_id: "LI-MOCK-002", no_matrik: "00009002", nama: "Pelajar LI Tidak Aktif", email: "", no_tel: "", kelas: "LI", jantina: "Lelaki", status: "TIDAK AKTIF", catatan: "" }
+    { student_id: "LI-MOCK-001", no_matrik: "00009001", nama: "Pelajar Latihan Industri Mock", email: "li.mock@example.test", no_tel: "01100009001", kelas: "LI", institution_code: "UMK", jantina: "Perempuan", status: "AKTIF", catatan: "Untuk QA local sahaja" },
+    { student_id: "LI-MOCK-002", no_matrik: "00009002", nama: "Pelajar LI Tidak Aktif", email: "", no_tel: "", kelas: "LI", institution_code: "UPM", jantina: "Lelaki", status: "TIDAK AKTIF", catatan: "" }
+  ];
+}
+
+function buildMockAdminStudentGroupsV240() {
+  return [
+    { group_code: "A2", display_name: "A2", institution_required: false, active: true, sort_order: 10, config_version: 1 },
+    { group_code: "A3", display_name: "A3", institution_required: false, active: true, sort_order: 20, config_version: 1 },
+    { group_code: "LI", display_name: "LI", institution_required: true, active: true, sort_order: 30, config_version: 1 }
+  ];
+}
+
+function buildMockAdminLiInstitutionsV240() {
+  return [
+    { institution_code: "UMK", display_name: "UMK", active: true, sort_order: 10, config_version: 1 },
+    { institution_code: "UPM", display_name: "UPM", active: true, sort_order: 20, config_version: 1 }
   ];
 }
 
@@ -3188,6 +3560,55 @@ async function mockAdminApiPostV200(action, payload) {
   }
   if (action === "toggleStaffStatus") {
     const staff = mockAdminStaffV210.find((item) => item.role === request.role && item.staff_id === request.staff_id); if (!staff) throw new Error("Staff tidak ditemui."); staff.status = request.active ? "Aktif" : "Tidak Aktif"; return cloneMockAdminValueV200(staff);
+  }
+  if (action === "getStudentGroupConfigReadiness") {
+    return {
+      ready: true,
+      foundation_ready: true,
+      migration_ready: true,
+      migration_needed: false,
+      enabled: false,
+      mode: "LEGACY_SAFE",
+      counts: { student_groups: mockAdminStudentGroupsV240.length, li_institutions: mockAdminLiInstitutionsV240.length },
+      issues: [],
+      migration_issues: []
+    };
+  }
+  if (action === "getAdminStudentGroups") return cloneMockAdminValueV200(mockAdminStudentGroupsV240);
+  if (action === "getAdminLiInstitutions") return cloneMockAdminValueV200(mockAdminLiInstitutionsV240);
+  if (action === "createStudentGroup") {
+    const input = request.student_group || {};
+    const code = String(input.group_code || request.group_code || "").trim().toUpperCase();
+    if (!code || mockAdminStudentGroupsV240.some((item) => item.group_code === code)) throw new Error(code ? "group_code telah wujud." : "group_code diperlukan.");
+    const created = { ...input, group_code: code, active: input.active === true, config_version: 1 };
+    mockAdminStudentGroupsV240.push(created);
+    return cloneMockAdminValueV200(created);
+  }
+  if (action === "createLiInstitution") {
+    const input = request.li_institution || {};
+    const code = String(input.institution_code || request.institution_code || "").trim().toUpperCase();
+    if (!code || mockAdminLiInstitutionsV240.some((item) => item.institution_code === code)) throw new Error(code ? "institution_code telah wujud." : "institution_code diperlukan.");
+    const created = { ...input, institution_code: code, active: input.active === true, config_version: 1 };
+    mockAdminLiInstitutionsV240.push(created);
+    return cloneMockAdminValueV200(created);
+  }
+  if (["updateStudentGroup", "toggleStudentGroupStatus"].includes(action)) {
+    const current = mockAdminStudentGroupsV240.find((item) => item.group_code === String(request.group_code || "").toUpperCase());
+    if (!current) throw new Error("Kumpulan tidak ditemui.");
+    if (Number(request.expected_config_version) !== current.config_version) throw new Error("CONFIG_VERSION_CONFLICT");
+    if (action === "updateStudentGroup") Object.assign(current, request.student_group || {}, { group_code: current.group_code });
+    else current.active = request.active === true;
+    current.config_version += 1;
+    return cloneMockAdminValueV200(current);
+  }
+  if (["updateLiInstitution", "toggleLiInstitutionStatus"].includes(action)) {
+    const current = mockAdminLiInstitutionsV240.find((item) => item.institution_code === String(request.institution_code || "").toUpperCase());
+    if (!current) throw new Error("Institusi tidak ditemui.");
+    if (Number(request.expected_config_version) !== current.config_version) throw new Error("CONFIG_VERSION_CONFLICT");
+    if (action === "updateLiInstitution") Object.assign(current, request.li_institution || {}, { institution_code: current.institution_code });
+    else current.active = request.active === true;
+    current.config_version += 1;
+    return cloneMockAdminValueV200(current);
   }
   if (action === "getAdminStudents") {
     return cloneMockAdminValueV200(mockAdminStudentsV200);

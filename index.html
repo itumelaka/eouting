@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="assets/pwa-logo.png">
-    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r7">
+    <link rel="stylesheet" href="assets/style.css?v=2.4.0-r8">
   </head>
   <body>
     <header class="app-header">
@@ -628,10 +628,30 @@
 
           <section class="admin-subpanel" id="adminStudentManagementPanel" role="tabpanel"
             aria-labelledby="adminStudentsTab" hidden>
+            <div class="admin-student-module-heading">
+              <nav class="admin-student-subtabs" role="tablist" aria-label="Tetapan Pelajar">
+                <button class="admin-student-subtab active" id="adminStudentPeopleSubtab" type="button" role="tab"
+                  aria-selected="true" aria-controls="adminStudentPeoplePanel">Pelajar</button>
+                <button class="admin-student-subtab" id="adminStudentGroupsSubtab" type="button" role="tab"
+                  aria-selected="false" aria-controls="adminStudentGroupsPanel">Kumpulan</button>
+                <button class="admin-student-subtab" id="adminLiInstitutionsSubtab" type="button" role="tab"
+                  aria-selected="false" aria-controls="adminLiInstitutionsPanel">Institusi LI</button>
+              </nav>
+              <details class="admin-config-status" id="adminStudentConfigStatus" data-state="legacy">
+                <summary><span class="admin-config-status-dot" aria-hidden="true"></span><span id="adminStudentConfigStatusLabel">Student Group Config: Semakan</span></summary>
+                <div class="admin-config-status-popover">
+                  <p id="adminStudentConfigStatusDetail">Memuatkan status konfigurasi...</p>
+                  <ul id="adminStudentConfigIssues" hidden></ul>
+                </div>
+              </details>
+            </div>
+
+            <section class="admin-student-inner-panel" id="adminStudentPeoplePanel" role="tabpanel"
+              aria-labelledby="adminStudentPeopleSubtab">
             <div class="admin-section-toolbar admin-student-toolbar">
               <div>
                 <h3>Pengurusan Pelajar</h3>
-                <p>Urus pelajar A2, A3 dan Pelajar Latihan Industri (LI) dalam tab STUDENTS sedia ada.</p>
+                <p>Urus rekod dan penugasan kumpulan, termasuk Pelajar Latihan Industri (LI). Log masuk Pelajar kekal menggunakan pilihan A2, A3 dan LI.</p>
               </div>
               <div class="admin-heading-actions">
                 <button class="secondary-action" id="adminStudentsRefreshButton" type="button">Refresh</button>
@@ -698,6 +718,9 @@
                       <option value="LI">LI — Pelajar Latihan Industri</option>
                     </select>
                   </label>
+                  <label id="adminStudentInstitutionField" hidden>Institusi
+                    <select id="adminStudentInstitutionInput" name="institution_code" disabled></select>
+                  </label>
                   <label>Jantina
                     <input id="adminStudentGenderInput" name="jantina" type="text" maxlength="50"
                       placeholder="Contoh: Lelaki / Perempuan">
@@ -715,6 +738,62 @@
                 <p class="form-message" id="adminStudentEditorMessage" aria-live="polite"></p>
                 <button class="primary-action" id="adminSaveStudentButton" type="submit">Simpan Pelajar</button>
               </form>
+            </section>
+            </section>
+
+            <section class="admin-student-inner-panel" id="adminStudentGroupsPanel" role="tabpanel"
+              aria-labelledby="adminStudentGroupsSubtab" hidden>
+              <div class="admin-section-toolbar">
+                <div><h3>Kumpulan Pelajar</h3><p>Urus kod kumpulan, paparan dan keperluan institusi tanpa mengubah log masuk Pelajar.</p></div>
+                <div class="admin-heading-actions">
+                  <button class="secondary-action" id="adminStudentGroupsRefreshButton" type="button">Refresh</button>
+                  <button class="primary-action" id="adminAddStudentGroupButton" type="button">+ Tambah Kumpulan</button>
+                </div>
+              </div>
+              <p class="form-message" id="adminStudentGroupsMessage" aria-live="polite"></p>
+              <div class="admin-student-config-list" id="adminStudentGroupList" aria-live="polite"></div>
+              <section class="admin-editor admin-student-editor" id="adminStudentGroupEditor" hidden aria-labelledby="adminStudentGroupEditorTitle">
+                <div class="admin-editor-heading"><div><h3 id="adminStudentGroupEditorTitle">Tambah Kumpulan</h3><p>group_code kekal selepas dicipta.</p></div><button class="secondary-action" id="adminStudentGroupCancelButton" type="button">Batal</button></div>
+                <form id="adminStudentGroupForm" class="admin-config-form" autocomplete="off">
+                  <input id="adminStudentGroupVersionInput" type="hidden" value="0">
+                  <div class="admin-form-grid admin-student-form-grid">
+                    <label>Kod Kumpulan<input id="adminStudentGroupCodeInput" type="text" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_]{1,31}" required></label>
+                    <label>Nama Paparan<input id="adminStudentGroupNameInput" type="text" maxlength="100" required></label>
+                    <label>Susunan<input id="adminStudentGroupSortInput" type="number" min="1" step="1" required></label>
+                    <label class="admin-student-config-check"><input id="adminStudentGroupInstitutionRequiredInput" type="checkbox"> Institusi diperlukan</label>
+                    <label class="admin-student-config-check" id="adminStudentGroupActiveField"><input id="adminStudentGroupActiveInput" type="checkbox" checked> Aktif</label>
+                  </div>
+                  <p class="form-message" id="adminStudentGroupEditorMessage" aria-live="polite"></p>
+                  <button class="primary-action" id="adminSaveStudentGroupButton" type="submit">Simpan Kumpulan</button>
+                </form>
+              </section>
+            </section>
+
+            <section class="admin-student-inner-panel" id="adminLiInstitutionsPanel" role="tabpanel"
+              aria-labelledby="adminLiInstitutionsSubtab" hidden>
+              <div class="admin-section-toolbar">
+                <div><h3>Institusi LI</h3><p>Urus institusi yang tersedia untuk kumpulan yang memerlukan penempatan institusi.</p></div>
+                <div class="admin-heading-actions">
+                  <button class="secondary-action" id="adminLiInstitutionsRefreshButton" type="button">Refresh</button>
+                  <button class="primary-action" id="adminAddLiInstitutionButton" type="button">+ Tambah Institusi</button>
+                </div>
+              </div>
+              <p class="form-message" id="adminLiInstitutionsMessage" aria-live="polite"></p>
+              <div class="admin-student-config-list" id="adminLiInstitutionList" aria-live="polite"></div>
+              <section class="admin-editor admin-student-editor" id="adminLiInstitutionEditor" hidden aria-labelledby="adminLiInstitutionEditorTitle">
+                <div class="admin-editor-heading"><div><h3 id="adminLiInstitutionEditorTitle">Tambah Institusi</h3><p>institution_code kekal selepas dicipta.</p></div><button class="secondary-action" id="adminLiInstitutionCancelButton" type="button">Batal</button></div>
+                <form id="adminLiInstitutionForm" class="admin-config-form" autocomplete="off">
+                  <input id="adminLiInstitutionVersionInput" type="hidden" value="0">
+                  <div class="admin-form-grid admin-student-form-grid">
+                    <label>Kod Institusi<input id="adminLiInstitutionCodeInput" type="text" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_]{1,31}" required></label>
+                    <label>Nama Paparan<input id="adminLiInstitutionNameInput" type="text" maxlength="100" required></label>
+                    <label>Susunan<input id="adminLiInstitutionSortInput" type="number" min="1" step="1" required></label>
+                    <label class="admin-student-config-check" id="adminLiInstitutionActiveField"><input id="adminLiInstitutionActiveInput" type="checkbox" checked> Aktif</label>
+                  </div>
+                  <p class="form-message" id="adminLiInstitutionEditorMessage" aria-live="polite"></p>
+                  <button class="primary-action" id="adminSaveLiInstitutionButton" type="submit">Simpan Institusi</button>
+                </form>
+              </section>
             </section>
           </section>
 
@@ -825,6 +904,6 @@
       </div>
     </div>
 
-    <script src="assets/app.js?v=2.4.0-r7"></script>
+    <script src="assets/app.js?v=2.4.0-r8"></script>
   </body>
 </html>
