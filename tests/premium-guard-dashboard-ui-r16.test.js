@@ -30,15 +30,12 @@ test("r16 keeps one authenticated Guard dashboard and the shared session/logout 
   assert.equal((html.match(/id="logoutButton"/g) || []).length, 1);
 });
 
-test("Current Hostel Residents remains authenticated, grouped, dynamic and names-only", () => {
-  assert.match(html, /id="guardCurrentHostelRoster"[^>]*aria-live="polite"/);
-  const roster = sourceBetween("function currentHostelRosterHtmlV240", "function renderStaffCurrentHostelRosterV240");
-  const access = sourceBetween("function buildCurrentHostelRosterAccessPayloadV240", "function renderPublicCurrentHostelSummaryV240");
-  assert.match(roster, /groups\.map/);
-  assert.match(roster, /student\.nama/);
-  assert.match(roster, /current-hostel-total/);
-  assert.doesNotMatch(roster, /no_matrik|student_id|guardian|phone/);
-  assert.match(access, /currentSession\.role === "warden" \|\| currentSession\.role === "guard"/);
+test("Current Hostel Residents is absent from Guard while Warden, Admin and public views remain", () => {
+  const guardPanel = html.slice(html.indexOf('<section class="tab-panel guard-dashboard"'), html.indexOf('<section class="tab-panel" id="dashboard"'));
+  assert.doesNotMatch(guardPanel, /Penghuni Semasa Asrama|guardCurrentHostelRoster/);
+  assert.match(html, /id="wardenCurrentHostelRoster"[^>]*aria-live="polite"/);
+  assert.match(html, /id="adminCurrentHostelRoster"[^>]*aria-live="polite"/);
+  assert.match(html, /id="publicCurrentHostelKpis"[^>]*aria-live="polite"/);
 });
 
 test("waiting-to-leave and currently-out queues retain authoritative lifecycle filters", () => {
@@ -163,10 +160,10 @@ test("Guard urgency, emergency, actions and accessibility have explicit visual s
   assert.match(guardCss, /transition:\s*none/);
 });
 
-test("r16 Guard visuals remain under the r17 cache while displayed version stays v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r17/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r17/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r17/);
+test("r16 Guard visuals remain under the r18 cache while displayed version stays v2.4.0", () => {
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r15/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
   assert.equal(version.version, "2.4.0");

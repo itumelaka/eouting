@@ -180,22 +180,24 @@ test("public and authenticated endpoints are routed across separate GET and POST
   assert.match(extractFunction(gasSource, "getCurrentHostelRoster"), /validateCurrentHostelRosterViewer_\(payload\)/);
 });
 
-test("public UI fetches only aggregate presence while staff dashboards fetch authenticated roster", () => {
+test("public UI remains aggregate-only while Warden and Admin retain authenticated rosters", () => {
   assert.match(extractFunction(appSource, "loadPublicCurrentHostelSummaryV240"), /apiGet\("getCurrentHostelSummary"\)/);
   assert.doesNotMatch(extractFunction(appSource, "refreshMonitoringRecords"), /getCurrentHostelRoster/);
   assert.match(extractFunction(appSource, "buildCurrentHostelRosterAccessPayloadV240"), /buildAdminCredentialPayloadV200|buildTodayRecordsAccessPayload/);
   assert.match(htmlSource, /id="publicCurrentHostelKpis"/);
   assert.match(htmlSource, /id="wardenCurrentHostelRoster"/);
-  assert.match(htmlSource, /id="guardCurrentHostelRoster"/);
+  assert.doesNotMatch(htmlSource, /id="guardCurrentHostelRoster"/);
   assert.match(htmlSource, /id="adminCurrentHostelRoster"/);
 });
 
-test("operational refresh paths reload presence after public refresh, Guard/Warden refresh, and Admin refresh", () => {
+test("presence refresh remains for public, Warden and Admin but is removed from Guard", () => {
   assert.match(extractFunction(appSource, "refreshMonitoringRecords"), /loadPublicCurrentHostelSummaryV240/);
-  assert.match(extractFunction(appSource, "refreshGuardRecords"), /getCurrentHostelRoster/);
+  assert.doesNotMatch(extractFunction(appSource, "refreshGuardRecords"), /getCurrentHostelRoster/);
   assert.match(extractFunction(appSource, "loadWardenRecordsOnly"), /getCurrentHostelRoster/);
   assert.match(extractFunction(appSource, "loadAdminMonitoringV210"), /getCurrentHostelRoster/);
   assert.match(extractFunction(appSource, "loadTodayRecords"), /getCurrentHostelRoster/);
+  assert.match(extractFunction(appSource, "loadTodayRecords"), /currentSession\.role === "warden"/);
+  assert.doesNotMatch(extractFunction(appSource, "renderGuard"), /renderStaffCurrentHostelRosterV240/);
 });
 
 test("resident UI remains compact and expandable without exposing private identity fields", () => {

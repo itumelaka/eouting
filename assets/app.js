@@ -233,6 +233,7 @@ let isWardenLoading = false;
 let wardenHasLoadedOnce = false;
 let guardRefreshIntervalId = null;
 let guardLastUpdatedAt = null;
+let guardSearchQueryV18 = "";
 let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
 let monitorIsLoading = false;
@@ -432,12 +433,14 @@ const els = {
   wardenRefreshButton: null,
   wardenLastUpdated: null,
   wardenLoading: null,
-  wardenUtilityActions: null,
   wardenReloadAction: null,
   guardApprovedList: document.querySelector("#guardApprovedList"),
   guardOutList: document.querySelector("#guardOutList"),
   guardRefreshButton: null,
   guardLastUpdated: null,
+  guardOperationalControls: document.querySelector("#guardOperationalControls"),
+  guardStudentSearch: document.querySelector("#guardStudentSearch"),
+  guardSearchClear: document.querySelector("#guardSearchClear"),
   allRecordsList: document.querySelector("#allRecordsList"),
   countPending: document.querySelector("#countPending"),
   countApproved: document.querySelector("#countApproved"),
@@ -603,7 +606,7 @@ const els = {
   adminActionQueue: document.querySelector("#adminActionQueue"),
   adminMonitoringList: document.querySelector("#adminMonitoringList"),
   wardenCurrentHostelRoster: document.querySelector("#wardenCurrentHostelRoster"),
-  guardCurrentHostelRoster: document.querySelector("#guardCurrentHostelRoster"),
+  adminReportActions: document.querySelector("#adminReportActions"),
   adminMasterRefreshButton: document.querySelector("#adminMasterRefreshButton"),
   adminMasterSearch: document.querySelector("#adminMasterSearch"),
   adminMasterMonth: document.querySelector("#adminMasterMonth"),
@@ -3450,6 +3453,7 @@ els.logoutButton.addEventListener("click", () => {
   stopStudentAutoRefresh();
   stopGuardAutoRefresh();
   stopMonitoringAutoRefresh();
+  resetGuardSearchV18();
   currentSession = null;
   staffCurrentHostelRosterV240 = null;
   clearAnnouncementBannerV1();
@@ -4074,12 +4078,12 @@ async function loadTodayRecords() {
     const recordsPromise = isAuthenticated
       ? apiPost("getTodayRecords", accessPayload)
       : apiGet("getTodayRecords");
-    const staffRole = currentSession && ["warden", "guard"].includes(currentSession.role);
-    const rosterPromise = staffRole
+    const needsStaffRoster = currentSession && currentSession.role === "warden";
+    const rosterPromise = needsStaffRoster
       ? apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
       : Promise.resolve(null);
     const [records, roster] = await Promise.all([Promise.resolve(recordsPromise), rosterPromise]);
-    if (staffRole) staffCurrentHostelRosterV240 = roster;
+    if (needsStaffRoster) staffCurrentHostelRosterV240 = roster;
     outingRecords = records.map(isAuthenticated ? mapLiveRecord : mapPublicMonitoringRecord);
     if (currentSession && currentSession.role === "student") {
       studentLastUpdatedAt = new Date();
@@ -5822,12 +5826,11 @@ function ensureGuardRefreshControls() {
 
     controls.appendChild(els.guardRefreshButton);
     controls.appendChild(els.guardLastUpdated);
-    const approvedTitle = els.guardApprovedList.previousElementSibling &&
-      els.guardApprovedList.previousElementSibling.classList &&
-      els.guardApprovedList.previousElementSibling.classList.contains("list-title")
-      ? els.guardApprovedList.previousElementSibling
-      : els.guardApprovedList;
-    els.guardApprovedList.parentNode.insertBefore(controls, approvedTitle);
+    if (els.guardOperationalControls) {
+      els.guardOperationalControls.insertBefore(controls, els.guardOperationalControls.firstChild);
+    } else {
+      els.guardApprovedList.parentNode.insertBefore(controls, els.guardApprovedList);
+    }
   }
 
   if (els.guardRefreshButton.dataset.guardRefreshReady !== "1") {
@@ -5864,11 +5867,7 @@ async function refreshGuardRecords(source) {
 
   try {
     if (isLiveMode) {
-      const [records, roster] = await Promise.all([
-        apiPost("getTodayRecords", buildTodayRecordsAccessPayload()),
-        apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
-      ]);
-      staffCurrentHostelRosterV240 = roster;
+      const records = await apiPost("getTodayRecords", buildTodayRecordsAccessPayload());
       outingRecords = records.map(mapLiveRecord);
       render();
       loadProfilePhotoThumbnailsForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
@@ -7097,11 +7096,10 @@ function currentHostelRosterHtmlV240(roster) {
 }
 
 function renderStaffCurrentHostelRosterV240() {
-  if (!currentSession || !["admin", "warden", "guard"].includes(currentSession.role)) return;
+  if (!currentSession || !["admin", "warden"].includes(currentSession.role)) return;
   const target = {
     admin: els.adminCurrentHostelRoster,
-    warden: els.wardenCurrentHostelRoster,
-    guard: els.guardCurrentHostelRoster
+    warden: els.wardenCurrentHostelRoster
   }[currentSession.role];
   if (!target) return;
   target.innerHTML = staffCurrentHostelRosterV240
@@ -8418,21 +8416,20 @@ function uniqueRecordsByRequestId(records) {
 
 function renderGuard() {
   ensureGuardRefreshControls();
-  globalThis.renderStaffCurrentHostelRosterV240?.();
-  const approvedRecords = uniqueRecordsByRequestId(
+  const approvedRecords = filterGuardRecordsBySearchV18(uniqueRecordsByRequestId(
     outingRecords.filter((record) => record.status === STATUS.approved)
-  );
-  const outRecords = uniqueRecordsByRequestId(outingRecords.filter((record) => (
+  ));
+  const outRecords = filterGuardRecordsBySearchV18(uniqueRecordsByRequestId(outingRecords.filter((record) => (
     record.status === STATUS.out && !isOvernightNotReturnedV15(record)
-  )));
+  ))));
 
   els.guardApprovedList.innerHTML = approvedRecords.length
     ? approvedRecords.map((record) => recordCard(record, "guard-out")).join("")
-    : emptyState("Tiada pelajar yang telah diluluskan untuk keluar.");
+    : emptyState(guardOperationalEmptyMessageV18("Tiada pelajar yang telah diluluskan untuk keluar."));
 
   els.guardOutList.innerHTML = outRecords.length
     ? outRecords.map((record) => recordCard(record, "guard-in")).join("")
-    : emptyState("Tiada pelajar sedang keluar.");
+    : emptyState(guardOperationalEmptyMessageV18("Tiada pelajar sedang keluar."));
 
   els.guardApprovedList.querySelectorAll("[data-out]").forEach((button) => {
     button.addEventListener("click", () => confirmOut(button.dataset.out, button));
@@ -10081,10 +10078,87 @@ if (refreshMonitoringRecordsOriginalV15) {
 function enhanceOperationalMonitoringV15() {
   ensureOvernightMonitoringSectionsV15();
   renderOvernightNotReturnedSectionsV15();
+  ensureGuardSearchV18();
   ensureQuickFiltersV15();
   ensureCsvExportButtonsV15();
-  ensureReleaseNotesV15();
   updateFooterActionsVisibility();
+}
+
+function normalizeGuardSearchQueryV18(value) {
+  return String(value || "").trim().toLocaleLowerCase("ms-MY");
+}
+
+function guardRecordSearchValuesV18(record) {
+  const item = record || {};
+  return [
+    item.studentName,
+    item.nama,
+    item.name,
+    item.student_id,
+    item.studentId,
+    item.no_matrik,
+    item.noMatrik,
+    item.request_id,
+    item.id,
+    item.className,
+    item.kelas
+  ];
+}
+
+function guardRecordMatchesSearchV18(record, query) {
+  const normalizedQuery = normalizeGuardSearchQueryV18(query);
+  return !normalizedQuery || guardRecordSearchValuesV18(record).some((value) => (
+    String(value || "").toLocaleLowerCase("ms-MY").includes(normalizedQuery)
+  ));
+}
+
+function filterGuardRecordsBySearchV18(records) {
+  return records.filter((record) => guardRecordMatchesSearchV18(record, guardSearchQueryV18));
+}
+
+function guardOperationalEmptyMessageV18(normalMessage) {
+  return normalizeGuardSearchQueryV18(guardSearchQueryV18)
+    ? "Tiada pelajar sepadan dengan carian."
+    : normalMessage;
+}
+
+function renderGuardSearchResultsV18() {
+  if (!currentSession || currentSession.role !== "guard") return;
+  renderGuard();
+  renderOvernightNotReturnedSectionsV15();
+  ensureQuickFiltersV15();
+}
+
+function updateGuardSearchClearV18() {
+  if (els.guardSearchClear) {
+    els.guardSearchClear.hidden = !String(guardSearchQueryV18 || "").length;
+  }
+}
+
+function resetGuardSearchV18() {
+  guardSearchQueryV18 = "";
+  if (els.guardStudentSearch) els.guardStudentSearch.value = "";
+  updateGuardSearchClearV18();
+}
+
+function ensureGuardSearchV18() {
+  if (!els.guardStudentSearch || !els.guardSearchClear) return;
+  if (els.guardStudentSearch.value !== guardSearchQueryV18) {
+    els.guardStudentSearch.value = guardSearchQueryV18;
+  }
+  updateGuardSearchClearV18();
+  if (els.guardStudentSearch.dataset.guardSearchReady === "1") return;
+  els.guardStudentSearch.dataset.guardSearchReady = "1";
+  els.guardStudentSearch.addEventListener("input", () => {
+    guardSearchQueryV18 = els.guardStudentSearch.value;
+    updateGuardSearchClearV18();
+    renderGuardSearchResultsV18();
+  });
+  els.guardSearchClear.addEventListener("click", () => {
+    resetGuardSearchV18();
+    renderGuardSearchResultsV18();
+    els.guardStudentSearch.focus();
+  });
 }
 
 const QUICK_FILTERS_V15 = [
@@ -10127,6 +10201,9 @@ const GUARD_FILTER_EMPTY_MESSAGES_V15 = {
 };
 
 function guardFilterEmptyMessageV15(container, filterValue) {
+  if (typeof guardSearchQueryV18 !== "undefined" && String(guardSearchQueryV18 || "").trim()) {
+    return "Tiada pelajar sepadan dengan carian.";
+  }
   const section = container === els.guardApprovedList ? "approved" : "out";
   return GUARD_FILTER_EMPTY_MESSAGES_V15[section][filterValue] || "Tiada rekod untuk filter ini.";
 }
@@ -10161,7 +10238,12 @@ function ensureQuickFilterGroupV15(scope, containers, anchor, filters, emptyMess
   group.innerHTML = filters.map(([value, label], index) => (
     `<button class="quick-filter-button${index === 0 ? " active" : ""}" type="button" data-filter-value="${value}">${label}</button>`
   )).join("");
-  anchor.parentNode.insertBefore(group, anchor);
+  if (scope === "guard" && els.guardOperationalControls) {
+    const searchControl = els.guardOperationalControls.querySelector("#guardSearchControl");
+    els.guardOperationalControls.insertBefore(group, searchControl || null);
+  } else {
+    anchor.parentNode.insertBefore(group, anchor);
+  }
   group.querySelectorAll("[data-filter-value]").forEach((button) => {
     button.addEventListener("click", () => {
       group.querySelectorAll("[data-filter-value]").forEach((item) => item.classList.remove("active"));
@@ -10233,10 +10315,10 @@ function renderOvernightNotReturnedSectionsV15() {
 function renderOvernightListV15(selector, mode) {
   const list = document.querySelector(selector);
   if (!list) return;
-  const records = uniqueRecordsByRequestId(outingRecords.filter(isOvernightNotReturnedV15));
+  const records = filterGuardRecordsBySearchV18(uniqueRecordsByRequestId(outingRecords.filter(isOvernightNotReturnedV15)));
   list.innerHTML = records.length
     ? records.map((record) => recordCard(record, mode)).join("")
-    : emptyState("Tiada rekod Pulang Bermalam yang belum pulang.");
+    : emptyState(guardOperationalEmptyMessageV18("Tiada rekod Pulang Bermalam yang belum pulang."));
   list.querySelectorAll("[data-in]").forEach((button) => {
     button.addEventListener("click", () => confirmIn(button.dataset.in, button));
   });
@@ -10252,27 +10334,22 @@ function isOvernightNotReturnedV15(record) {
 }
 
 function ensureCsvExportButtonsV15() {
-  const footer = document.querySelector(".app-footer");
-  if (!footer) return;
-  if (document.querySelector("#exportTodayCsvButton")) {
-    updateFooterActionsVisibility();
-    return;
-  }
+  const reportActions = els.adminReportActions || document.querySelector("#adminReportActions");
+  if (!reportActions || document.querySelector("#exportTodayCsvButton")) return;
   const todayButton = document.createElement("button");
   todayButton.id = "exportTodayCsvButton";
-  todayButton.className = "system-refresh-button";
+  todayButton.className = "secondary-action admin-report-button";
   todayButton.type = "button";
   todayButton.textContent = "Muat Turun Laporan Hari Ini";
   todayButton.addEventListener("click", () => exportRecordsCsvV15("today"));
   const monthButton = document.createElement("button");
   monthButton.id = "exportMonthCsvButton";
-  monthButton.className = "system-refresh-button";
+  monthButton.className = "secondary-action admin-report-button";
   monthButton.type = "button";
   monthButton.textContent = "Muat Turun Laporan Bulanan";
   monthButton.addEventListener("click", () => exportRecordsCsvV15("month"));
-  footer.appendChild(todayButton);
-  footer.appendChild(monthButton);
-  updateFooterActionsVisibility();
+  reportActions.appendChild(todayButton);
+  reportActions.appendChild(monthButton);
 }
 
 function exportRecordsCsvV15(scope) {
@@ -10461,8 +10538,6 @@ function updateFooterActionsVisibility() {
   );
 
   [
-    document.querySelector("#exportTodayCsvButton"),
-    document.querySelector("#exportMonthCsvButton"),
     document.querySelector("#releaseNotesButton")
   ].filter(Boolean).forEach((button) => {
     button.hidden = !isWardenScreen;
@@ -11578,58 +11653,30 @@ function ensureWardenRefreshControls() {
   }
 
   if (!els.wardenRefreshPanel) {
-    const panel = document.createElement("section");
-    panel.className = "warden-refresh-panel";
+    const panel = document.createElement("div");
+    panel.className = "warden-operational-controls";
     panel.id = "wardenRefreshPanel";
+    panel.setAttribute("aria-label", "Kawalan permohonan Warden");
     panel.innerHTML = `
-      <div class="warden-refresh-top">
-        <div>
-          <h3>Utiliti Warden</h3>
-          <small id="wardenLastUpdated"></small>
-        </div>
-        <button class="secondary-action warden-refresh-button" id="wardenRefreshButton" type="button">Refresh Permohonan</button>
-      </div>
+      <button class="secondary-action warden-refresh-button" id="wardenRefreshButton" type="button">Refresh Permohonan</button>
+      <small id="wardenLastUpdated" aria-live="polite"></small>
       <div class="warden-loading" id="wardenLoading" hidden>Memuatkan permohonan warden...</div>
-      <div class="warden-utility-actions" id="wardenUtilityActions"></div>
       <div class="warden-reload-action" id="wardenReloadAction"></div>
     `;
 
-    const heading = wardenPanel.querySelector(".section-heading");
-    if (heading && heading.nextSibling) {
-      wardenPanel.insertBefore(panel, heading.nextSibling);
-    } else {
-      wardenPanel.insertBefore(panel, wardenPanel.firstChild);
-    }
+    wardenPanel.insertBefore(panel, wardenPanel.firstChild);
 
     els.wardenRefreshPanel = panel;
     els.wardenRefreshButton = panel.querySelector("#wardenRefreshButton");
     els.wardenLastUpdated = panel.querySelector("#wardenLastUpdated");
     els.wardenLoading = panel.querySelector("#wardenLoading");
-    els.wardenUtilityActions = panel.querySelector("#wardenUtilityActions");
     els.wardenReloadAction = panel.querySelector("#wardenReloadAction");
   }
-
-  moveWardenUtilityButtons();
 
   if (els.wardenRefreshButton && els.wardenRefreshButton.dataset.ready !== "1") {
     els.wardenRefreshButton.dataset.ready = "1";
     els.wardenRefreshButton.addEventListener("click", () => refreshWardenRecords("button"));
   }
-}
-
-function moveWardenUtilityButtons() {
-  if (!els.wardenUtilityActions) {
-    return;
-  }
-
-  const footer = document.querySelector(".app-footer");
-  if (!footer) {
-    return;
-  }
-
-  Array.from(footer.querySelectorAll("button")).forEach((button) => {
-    els.wardenUtilityActions.appendChild(button);
-  });
 }
 
 async function refreshWardenRecords(source) {

@@ -10,7 +10,8 @@ const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
 const version = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
 const adminCssStart = css.indexOf("Premium Institutional Admin Dashboard — r17");
-const adminCss = css.slice(adminCssStart);
+const adminCssEnd = css.indexOf("Production UI regression patch", adminCssStart);
+const adminCss = css.slice(adminCssStart, adminCssEnd);
 
 function sourceBetween(start, end) {
   const from = app.indexOf(start);
@@ -190,9 +191,9 @@ test("Admin layout is responsive, touch-safe and accessibility-aware", () => {
 });
 
 test("r17 cache is consistent while displayed application version stays v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r17/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r17/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r17/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r16/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
   assert.equal(version.version, "2.4.0");

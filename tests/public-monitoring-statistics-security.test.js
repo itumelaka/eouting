@@ -303,7 +303,7 @@ test("authenticated records use POST and retain operational names without undefi
   ]) {
     const { calls, context } = createFrontendRecordContext(session);
     await context.loadTodayRecords();
-    assert.equal(calls.post, session.role === "student" ? 1 : 2);
+    assert.equal(calls.post, session.role === "warden" ? 2 : 1);
     assert.equal(calls.get, 0);
     assert.equal(context.outingRecords[0].nama, "PELAJAR SULIT");
     assert.equal(Object.values(context.outingRecords[0]).includes(undefined), false);

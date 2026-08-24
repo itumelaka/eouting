@@ -186,6 +186,6 @@ test("version.json stays stable while the new UI phase advances runtime cache re
   const version = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
   const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
   assert.equal(version.version, "2.4.0");
-  assert.match(html, /2\.4\.0-r17/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r17/);
+  assert.match(html, /2\.4\.0-r18/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
 });

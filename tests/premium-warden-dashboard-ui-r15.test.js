@@ -30,7 +30,8 @@ function sourceBetweenLast(start, end) {
 
 test("r15 keeps one authenticated Warden dashboard and compact session controls", () => {
   assert.equal((html.match(/<section class="tab-panel warden-dashboard" id="warden"/g) || []).length, 1);
-  assert.match(html, /warden-dashboard-kicker">Operasi Warden &amp; HEP/);
+  const wardenPanel = html.slice(html.indexOf('id="warden"'), html.indexOf('id="guard"'));
+  assert.doesNotMatch(wardenPanel, /Operasi Warden &amp; HEP|Semakan Warden|Luluskan atau tolak permohonan/);
   assert.equal((html.match(/id="sessionRole"/g) || []).length, 1);
   assert.equal((html.match(/id="sessionName"/g) || []).length, 1);
   assert.equal((html.match(/id="logoutButton"/g) || []).length, 1);
@@ -120,6 +121,14 @@ test("Student departure-confirmation request and semester checklist controls rem
   assert.match(checklist, /Refresh Permohonan|ensureWardenRefreshControls/);
 });
 
+test("Warden refresh remains a compact operational control without a utility panel", () => {
+  const controls = sourceBetweenLast("function ensureWardenRefreshControls", "async function refreshWardenRecords");
+  assert.match(controls, /warden-operational-controls/);
+  assert.match(controls, /Refresh Permohonan/);
+  assert.match(controls, /refreshWardenRecords\("button"\)/);
+  assert.doesNotMatch(controls, /Utiliti Warden|warden-utility-actions|moveWardenUtilityButtons/);
+});
+
 test("r15 Warden styling is dark, indigo, responsive and operationally scoped", () => {
   assert.match(wardenCss, /body:has\(#appWorkspace\.active #warden\.tab-panel\.active\)/);
   assert.match(wardenCss, /#818cf8|#4f46e5/);
@@ -155,9 +164,9 @@ test("focus, disabled and reduced-motion states remain explicit", () => {
 });
 
 test("r15 Warden visuals remain under the r17 cache while displayed version stays v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r17/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r17/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r17/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r14/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
 });

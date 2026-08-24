@@ -86,6 +86,8 @@ function loadGuardRenderContext(records) {
       }
     },
     ensureGuardRefreshControls() {},
+    filterGuardRecordsBySearchV18: (items) => items,
+    guardOperationalEmptyMessageV18: (message) => message,
     emptyState: (message) => `<div class="empty-state">${message}</div>`,
     recordCard(record, mode) {
       const action = mode === "guard-in" ? `<button data-in="${record.request_id}">Sahkan Masuk</button>` : "";

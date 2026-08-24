@@ -112,9 +112,9 @@ test("accessibility styling covers focus, touch targets, autofill and reduced mo
 });
 
 test("r13 access UI remains intact under the r17 frontend cache revision", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r17/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r17/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r17/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r13/);
 });

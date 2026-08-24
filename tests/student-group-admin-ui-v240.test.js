@@ -97,8 +97,8 @@ test("Student login retains legacy A2/A3/LI fallback with unchanged payload boun
 
 test("frontend runtime revision advances consistently to r17 without changing displayed version", () => {
   assert.match(app, /const APP_VERSION = "2\.4\.0"/);
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r17/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r17/);
-  assert.match(serviceWorker, /eouting-cache-v2\.4\.0-r17/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
+  assert.match(serviceWorker, /eouting-cache-v2\.4\.0-r18/);
   assert.doesNotMatch(`${html}\n${serviceWorker}`, /2\.4\.0-r13/);
 });
