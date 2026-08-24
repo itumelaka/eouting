@@ -8681,3 +8681,150 @@ body:has(#admin.admin-dashboard.active) #admin .admin-subtab {
     white-space: nowrap;
   }
 }
+
+/* ==================================================
+   Global Typography & Contrast Audit — r20
+   ================================================== */
+
+/* Preserve readable disabled controls without fading their entire contents. */
+:where(button, .primary-action, .secondary-action, .danger-action, .success-action, .action-button):disabled,
+:where(button, .return-selfie-picker)[aria-disabled="true"] {
+  opacity: 1;
+}
+
+body:has(#accessScreen:not(.hidden)) .access-panel :where(input, select):disabled {
+  background: #d7e0e8;
+  border-color: #91a3b4;
+  color: #3f5265;
+  cursor: not-allowed;
+  opacity: 1;
+  -webkit-text-fill-color: #3f5265;
+}
+
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(button, .return-selfie-picker):disabled,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(button, .return-selfie-picker)[aria-disabled="true"],
+body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(button, .action-button):disabled {
+  background: #3f5367;
+  border-color: #66798b;
+  color: #e1e9f0;
+  filter: none;
+  opacity: 1;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard :where(button, .action-button):disabled {
+  background: #4a3a29;
+  border-color: #776044;
+  color: #f6ead5;
+  filter: none;
+  opacity: 1;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(button, input, select, textarea):disabled {
+  background: #263b49;
+  border-color: #526979;
+  color: #d6e1e8;
+  filter: none;
+  opacity: 1;
+  -webkit-text-fill-color: #d6e1e8;
+}
+
+.return-selfie-proof .is-disabled,
+.student-profile-photo-picker.is-disabled {
+  filter: grayscale(0.35);
+  opacity: 1;
+}
+
+/* Light Statistik surfaces must never inherit the Admin dashboard's pale ink. */
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .student-record-heading h3 {
+  color: #ffffff;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .student-record-heading p {
+  color: #b9ccd7;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .stats-card {
+  color: #172c3d;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .stats-card span {
+  color: #40566a;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .stats-card strong {
+  color: #0b263d;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel :where(.leaderboard-card, .class-summary-card) {
+  color: #172c3d;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .individual-stats-table {
+  color: #172c3d;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .individual-stats-table th {
+  background: #e5edf5;
+  color: #0b263d;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .individual-stats-table td {
+  color: #263b4c;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .individual-stats-table tbody tr:hover td,
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .individual-stats-table tbody tr:focus-within td {
+  background: #edf6f4;
+  color: #102b36;
+}
+
+body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .individual-stats-table td::before {
+  color: #465d70;
+}
+
+/* The dark premium Admin editor previously inherited a light-theme label patch. */
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid label,
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-config-fieldset > legend {
+  color: #e4eef5;
+}
+
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid .admin-field-helper,
+body:has(#admin.admin-dashboard.active) #admin .admin-config-fieldset > p {
+  color: #b4c5d0;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(.admin-student-card, .admin-student-config-card, .admin-type-card).is-inactive {
+  filter: saturate(0.7);
+  opacity: 1;
+}
+
+/* Keep placeholders distinct, and make browser autofill match each surface. */
+body:has(#accessScreen:not(.hidden)) .access-panel :where(input, textarea)::placeholder,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm :where(input, textarea)::placeholder {
+  color: #566d82;
+  opacity: 1;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard #guardStudentSearch::placeholder {
+  color: #b5c4d4;
+  opacity: 1;
+}
+
+body:has(#admin.admin-dashboard.active) #admin :where(input, textarea)::placeholder {
+  color: #9db0bd;
+  opacity: 1;
+}
+
+body:has(#accessScreen:not(.hidden)) .access-panel input:-webkit-autofill,
+body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm :where(input, textarea):-webkit-autofill {
+  caret-color: #0b1e36;
+  -webkit-box-shadow: 0 0 0 1000px #f7fafd inset;
+  -webkit-text-fill-color: #0b1e36;
+}
+
+body:has(#appWorkspace.active #guard.tab-panel.active) #guard #guardStudentSearch:-webkit-autofill,
+body:has(#admin.admin-dashboard.active) #admin :where(input, textarea):-webkit-autofill {
+  caret-color: #f2f8fc;
+  -webkit-box-shadow: 0 0 0 1000px #071a30 inset;
+  -webkit-text-fill-color: #f2f8fc;
+}

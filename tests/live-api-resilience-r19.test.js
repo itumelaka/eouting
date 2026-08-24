@@ -384,10 +384,10 @@ test("Student directory is applied before optional Warden and Guard master compl
   assert.ok(source.indexOf("renderStudentDropdownState(students)") < source.indexOf("await staffRequests"));
 });
 
-test("r19 cache is consistent and the canonical endpoint remains the only live request source", () => {
-  assert.match(htmlSource, /assets\/style\.css\?v=2\.4\.0-r19/);
-  assert.match(htmlSource, /assets\/app\.js\?v=2\.4\.0-r19/);
-  assert.match(workerSource, /eouting-cache-v2\.4\.0-r19/);
+test("r19 resilience remains intact under the r20 presentation cache", () => {
+  assert.match(htmlSource, /assets\/style\.css\?v=2\.4\.0-r20/);
+  assert.match(htmlSource, /assets\/app\.js\?v=2\.4\.0-r20/);
+  assert.match(workerSource, /eouting-cache-v2\.4\.0-r20/);
   assert.match(extractFunction(appSource, "fetchApiGetWithRetry"), /getGasWebAppUrlV200\(\)/);
   assert.doesNotMatch(appSource, /sessionStorage[^\n]*googleusercontent|localStorage[^\n]*googleusercontent/);
 });

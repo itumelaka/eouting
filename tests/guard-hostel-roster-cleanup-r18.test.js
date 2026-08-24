@@ -53,12 +53,12 @@ test("Guard search, chips and action handlers remain intact", () => {
   assert.match(guardRender, /confirmIn\(button\.dataset\.in, button\)/);
 });
 
-test("Guard automatic refresh remains 30 seconds under the r19 runtime", () => {
+test("Guard automatic refresh remains 30 seconds under the r20 presentation cache", () => {
   const autoRefresh = sourceBetween("function startGuardAutoRefresh", "function stopGuardAutoRefresh");
   assert.match(autoRefresh, /refreshGuardRecords\("auto"\)/);
   assert.match(autoRefresh, /30000/);
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r19/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r19/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r19/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r20/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r20/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r20/);
   assert.match(app, /const APP_VERSION = "2\.4\.0"/);
 });

@@ -100,10 +100,10 @@ test("focus, disabled, autofill and reduced-motion states remain explicit", () =
   assert.match(studentCss, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test("Student r14 visuals remain under the r17 runtime cache while display version stays v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r19/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r19/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r19/);
+test("Student r14 visuals remain under the r20 presentation cache while display version stays v2.4.0", () => {
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r20/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r20/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r20/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r14/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
 });

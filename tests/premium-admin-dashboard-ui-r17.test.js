@@ -191,9 +191,9 @@ test("Admin layout is responsive, touch-safe and accessibility-aware", () => {
 });
 
 test("r17 cache is consistent while displayed application version stays v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r19/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r19/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r19/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r20/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r20/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r20/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r16/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
   assert.equal(version.version, "2.4.0");
