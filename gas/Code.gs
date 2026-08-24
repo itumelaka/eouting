@@ -255,7 +255,8 @@ const SCRIPT_CACHE = {
     adminLiInstitutionsV240: "eouting:v1:li-institutions:admin-v240",
     studentLoginDirectoryV240: "eouting:v1:student-login-directory-v240",
     profilePhotoIndicators: "eouting:v1:profile-photo-indicators",
-    operationalTodayRecords: "eouting:v1:operational:today-records"
+    operationalTodayRecords: "eouting:v1:operational:today-records",
+    currentHostelPresence: "eouting:v1:operational:current-hostel-presence"
   },
   ttl: {
     students: 600,
@@ -263,7 +264,8 @@ const SCRIPT_CACHE = {
     guards: 900,
     outingTypes: 600,
     profilePhotoIndicators: 600,
-    operationalTodayRecords: 20
+    operationalTodayRecords: 20,
+    currentHostelPresence: 20
   }
 };
 
@@ -408,6 +410,27 @@ function invalidateStudentDirectoryCache_() {
   invalidateStudentLoginDirectoryCacheV240_();
 }
 
+function isCachedCurrentHostelPresence_(value) {
+  if (!hasOnlyCachedFields_(
+    value,
+    ["generated_at", "total_active_students", "total_out_now", "total_in_hostel", "groups"],
+    ["generated_at", "total_active_students", "total_out_now", "total_in_hostel", "groups"]
+  ) || !Array.isArray(value.groups)) {
+    return false;
+  }
+  return value.groups.every(function (group) {
+    return hasOnlyCachedFields_(group, ["key", "label", "count", "students"], ["key", "label", "count", "students"]) &&
+      Array.isArray(group.students) &&
+      group.students.every(function (student) {
+        return hasOnlyCachedFields_(student, ["nama"], ["nama"]);
+      });
+  });
+}
+
+function invalidateCurrentHostelPresenceCache_() {
+  removeScriptCache_("currentHostelPresence");
+}
+
 function invalidateStudentGroupConfigCacheV240_() {
   removeScriptCache_("adminStudentGroupsV240");
   removeScriptCache_("adminLiInstitutionsV240");
@@ -416,6 +439,7 @@ function invalidateStudentGroupConfigCacheV240_() {
 
 function invalidateStudentLoginDirectoryCacheV240_() {
   removeScriptCache_("studentLoginDirectoryV240");
+  invalidateCurrentHostelPresenceCache_();
 }
 
 function invalidateStaffDirectoryCache_(role) {
@@ -435,6 +459,7 @@ function invalidateProfilePhotoIndicatorCache_() {
 
 function invalidateOperationalRecordsCache_() {
   removeScriptCache_("operationalTodayRecords");
+  invalidateCurrentHostelPresenceCache_();
 }
 
 function doGet(e) {
@@ -2663,11 +2688,30 @@ function cancelStudentRequest(payload) {
 }
 
 function getDepartureConfirmationAuditState_(requestId, auditRows) {
-  const normalizedRequestId = String(requestId || "").trim();
-  const state = { requested: false, requested_at: "", completed: false, completed_at: "" };
+  return getDepartureConfirmationAuditStateFromMap_(
+    requestId,
+    buildDepartureConfirmationAuditStateMap_(auditRows)
+  );
+}
+
+function createEmptyDepartureConfirmationAuditState_() {
+  return { requested: false, requested_at: "", completed: false, completed_at: "" };
+}
+
+function buildDepartureConfirmationAuditStateMap_(auditRows) {
+  const departureAuditStateByRequest = new Map();
   (auditRows || []).forEach(function (row) {
-    if (String(row && row.request_id || "").trim() !== normalizedRequestId) return;
     const action = String(row && row.action || "").trim();
+    if (action !== DEPARTURE_CONFIRMATION_AUDIT.requested &&
+        action !== DEPARTURE_CONFIRMATION_AUDIT.wardenCheckout) {
+      return;
+    }
+    const requestId = String(row && row.request_id || "").trim();
+    let state = departureAuditStateByRequest.get(requestId);
+    if (!state) {
+      state = createEmptyDepartureConfirmationAuditState_();
+      departureAuditStateByRequest.set(requestId, state);
+    }
     if (action === DEPARTURE_CONFIRMATION_AUDIT.requested && !state.requested) {
       state.requested = true;
       state.requested_at = row.timestamp || "";
@@ -2677,7 +2721,12 @@ function getDepartureConfirmationAuditState_(requestId, auditRows) {
       state.completed_at = row.timestamp || "";
     }
   });
-  return state;
+  return departureAuditStateByRequest;
+}
+
+function getDepartureConfirmationAuditStateFromMap_(requestId, departureAuditStateByRequest) {
+  return departureAuditStateByRequest.get(String(requestId || "").trim()) ||
+    createEmptyDepartureConfirmationAuditState_();
 }
 
 function addDepartureConfirmationProjection_(rows) {
@@ -2687,9 +2736,10 @@ function addDepartureConfirmationProjection_(rows) {
   } catch (error) {
     auditRows = [];
   }
+  const departureAuditStateByRequest = buildDepartureConfirmationAuditStateMap_(auditRows);
   const featureEnabled = isNoGuardDepartureEnabled_();
   return (rows || []).map(function (row) {
-    const auditState = getDepartureConfirmationAuditState_(row.request_id, auditRows);
+    const auditState = getDepartureConfirmationAuditStateFromMap_(row.request_id, departureAuditStateByRequest);
     const pending = String(row.status || "").trim() === STATUS.approved && auditState.requested && !auditState.completed;
     return Object.assign({}, row, {
       departure_confirmation_pending: pending,
@@ -3772,11 +3822,18 @@ function validateCurrentHostelRosterViewer_(payload) {
 }
 
 function loadCurrentHostelPresence_() {
-  return buildCurrentHostelPresenceFromRows_(
-    getRowsAsObjects_(getSheet_(SHEETS.students)),
-    getRowsAsObjects_(getSheet_(SHEETS.requests)),
-    getStudentLoginDirectory(),
-    now_()
+  return getCachedOrLoad_(
+    "currentHostelPresence",
+    SCRIPT_CACHE.ttl.currentHostelPresence,
+    isCachedCurrentHostelPresence_,
+    function () {
+      return buildCurrentHostelPresenceFromRows_(
+        getRowsAsObjects_(getSheet_(SHEETS.students)),
+        getRowsAsObjects_(getSheet_(SHEETS.requests)),
+        getStudentLoginDirectory(),
+        now_()
+      );
+    }
   );
 }
 
@@ -3785,24 +3842,64 @@ function currentHostelRequestTimestamp_(row) {
   return parsed ? parsed.getTime() : 0;
 }
 
-function selectAuthoritativeCurrentRequestForStudent_(student, requestRows) {
-  let selected = null;
-  let selectedTimestamp = -1;
-  (requestRows || []).forEach(function (row) {
-    if (!isRecordForStudent_(row, student)) return;
-    const timestamp = currentHostelRequestTimestamp_(row);
-    if (!selected || timestamp >= selectedTimestamp) {
-      selected = row;
-      selectedTimestamp = timestamp;
+function currentHostelRequestIdentityKey_(studentId, noMatrik) {
+  const normalizedStudentId = normalizeText_(studentId);
+  const normalizedNoMatrik = normalizeText_(noMatrik);
+  if (normalizedStudentId && normalizedNoMatrik) {
+    return "BOTH:" + JSON.stringify([normalizedStudentId, normalizedNoMatrik]);
+  }
+  if (normalizedStudentId) return "STUDENT:" + normalizedStudentId;
+  if (normalizedNoMatrik) return "MATRIC:" + normalizedNoMatrik;
+  return "";
+}
+
+function isLaterCurrentHostelRequestCandidate_(candidate, selected) {
+  return !selected || candidate.timestamp > selected.timestamp ||
+    (candidate.timestamp === selected.timestamp && candidate.rowIndex >= selected.rowIndex);
+}
+
+function buildLatestCurrentHostelRequestMap_(requestRows) {
+  const latestRequestByStudent = new Map();
+  (requestRows || []).forEach(function (row, rowIndex) {
+    const key = currentHostelRequestIdentityKey_(row && row.student_id, row && row.no_matrik);
+    if (!key) return;
+    const candidate = {
+      row: row,
+      timestamp: currentHostelRequestTimestamp_(row),
+      rowIndex: rowIndex
+    };
+    const selected = latestRequestByStudent.get(key);
+    if (isLaterCurrentHostelRequestCandidate_(candidate, selected)) {
+      latestRequestByStudent.set(key, candidate);
     }
   });
-  return selected;
+  return latestRequestByStudent;
+}
+
+function selectAuthoritativeCurrentRequestForStudent_(student, latestRequestByStudent) {
+  const studentId = normalizeText_(student && student.student_id);
+  const noMatrik = normalizeText_(student && student.no_matrik);
+  const keys = [
+    currentHostelRequestIdentityKey_(studentId, noMatrik),
+    currentHostelRequestIdentityKey_(studentId, ""),
+    currentHostelRequestIdentityKey_("", noMatrik)
+  ];
+  let selected = null;
+  keys.forEach(function (key) {
+    if (!key) return;
+    const candidate = latestRequestByStudent.get(key);
+    if (candidate && isLaterCurrentHostelRequestCandidate_(candidate, selected)) {
+      selected = candidate;
+    }
+  });
+  return selected ? selected.row : null;
 }
 
 function buildCurrentHostelPresenceFromRows_(studentRows, requestRows, loginDirectory, generatedAt) {
   const activeStudents = (studentRows || []).filter(function (student) {
     return isActive_(student.status);
   });
+  const latestRequestByStudent = buildLatestCurrentHostelRequestMap_(requestRows);
   const configuredGroups = Array.isArray(loginDirectory && loginDirectory.groups)
     ? loginDirectory.groups
     : [];
@@ -3824,7 +3921,7 @@ function buildCurrentHostelPresenceFromRows_(studentRows, requestRows, loginDire
   let totalOutNow = 0;
 
   activeStudents.forEach(function (student) {
-    const currentRequest = selectAuthoritativeCurrentRequestForStudent_(student, requestRows);
+    const currentRequest = selectAuthoritativeCurrentRequestForStudent_(student, latestRequestByStudent);
     const currentlyOut = String(currentRequest && currentRequest.status || "").trim().toUpperCase() === STATUS.out;
     if (currentlyOut) {
       totalOutNow += 1;
@@ -4022,13 +4119,13 @@ function getOperationalTodayRecords(payload) {
   const projectedRows = role === "warden"
     ? addWardenDeparturePriorityProjection_(rows)
     : rows;
-  const roleProjectedRows = role === "warden" || role === "student"
-    ? addDepartureConfirmationProjection_(projectedRows)
-    : projectedRows;
   const visibleRows = authenticatedStudent
-    ? roleProjectedRows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
-    : roleProjectedRows;
-  return projectGuardianContactBoundary_(visibleRows, role);
+    ? projectedRows.filter((row) => normalizeText_(row.student_id) === normalizeText_(authenticatedStudent.student_id))
+    : projectedRows;
+  const roleProjectedRows = role === "warden" || role === "student"
+    ? addDepartureConfirmationProjection_(visibleRows)
+    : visibleRows;
+  return projectGuardianContactBoundary_(roleProjectedRows, role);
 }
 
 function projectGuardianContactBoundary_(rows, role) {

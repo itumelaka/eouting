@@ -33,6 +33,9 @@ function presenceContext() {
     "parseDateForSort_",
     "isRecordForStudent_",
     "currentHostelRequestTimestamp_",
+    "currentHostelRequestIdentityKey_",
+    "isLaterCurrentHostelRequestCandidate_",
+    "buildLatestCurrentHostelRequestMap_",
     "selectAuthoritativeCurrentRequestForStudent_",
     "buildCurrentHostelPresenceFromRows_",
     "toPublicCurrentHostelSummary_",
@@ -100,7 +103,8 @@ test("presence semantics keep every lifecycle except authoritative KELUAR in hos
 test("latest authoritative lifecycle wins over a historical KELUAR snapshot", () => {
   const context = presenceContext();
   const { students, requests } = fixture();
-  const current = context.selectAuthoritativeCurrentRequestForStudent_(students.find((item) => item.student_id === "S9"), requests);
+  const latestRequestByStudent = context.buildLatestCurrentHostelRequestMap_(requests);
+  const current = context.selectAuthoritativeCurrentRequestForStudent_(students.find((item) => item.student_id === "S9"), latestRequestByStudent);
   assert.equal(current.status, "SELESAI");
 });
 

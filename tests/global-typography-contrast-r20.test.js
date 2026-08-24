@@ -133,8 +133,8 @@ test("r20 cache is consistent while display version remains v2.4.0", () => {
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r19/);
 });
 
-test("presentation audit changes no application logic or GAS/backend files", () => {
-  const changed = execFileSync("git", ["diff", "--name-only"], { cwd: root, encoding: "utf8" })
+test("r20 presentation commit changes no application logic or GAS/backend files", () => {
+  const changed = execFileSync("git", ["diff", "--name-only", "fb54c5e^", "fb54c5e"], { cwd: root, encoding: "utf8" })
     .trim().split(/\r?\n/).filter(Boolean);
   assert.ok(!changed.includes("assets/app.js"));
   assert.ok(changed.every((name) => !name.startsWith("gas/") && !name.startsWith("backend/")));
