@@ -164,9 +164,9 @@ test("focus, disabled and reduced-motion states remain explicit", () => {
 });
 
 test("r15 Warden visuals remain under the r17 cache while displayed version stays v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r19/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r19/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r19/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r14/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
 });

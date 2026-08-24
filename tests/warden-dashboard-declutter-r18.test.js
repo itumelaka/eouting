@@ -93,10 +93,10 @@ test("Guard r18 search and lifecycle controls remain untouched", () => {
   assert.match(app, /Sahkan Masuk/);
 });
 
-test("r18 cache remains consistent and display version remains v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
-  assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r19/);
+test("r18 behavior remains consistent under r19 and display version remains v2.4.0", () => {
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r19/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r19/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r19/);
+  assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r18/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
 });

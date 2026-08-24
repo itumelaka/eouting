@@ -1937,6 +1937,21 @@ textarea {
   margin-top: 3px;
 }
 
+.current-hostel-status {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.current-hostel-status:empty {
+  display: none;
+}
+
+.current-hostel-status.error {
+  color: #b42318;
+}
+
 .current-hostel-kpis,
 .current-hostel-groups {
   display: grid;
@@ -8127,6 +8142,8 @@ body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster {
 
 body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-heading h4 { color: #ffffff; }
 body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-heading p { color: #a9c9c8; }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-status { color: #b9d9d5; }
+body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-status.error { color: #fecaca; }
 body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-total { color: #dffbf6; }
 body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-group-roster { background: rgba(4, 29, 47, 0.78); border-color: rgba(94, 234, 212, 0.18); }
 body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .current-hostel-group-roster summary { color: #e8fffb; }

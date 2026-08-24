@@ -214,7 +214,7 @@ test("mock public config supports active data, empty and one-shot error without 
   const mockSource = extractFunction("mockPublicOutingTypesV200");
   const getSource = extractFunction("apiGetWithParams");
   assert.match(getSource, /ALLOW_MOCK_MODE && action === "getOutingTypes"/);
-  assert.match(getSource, /return mockPublicOutingTypesV200\(\)/);
+  assert.match(getSource, /return Promise\.resolve\(mockPublicOutingTypesV200\(\)\)/);
   assert.match(mockSource, /scenario === "empty"/);
   assert.match(mockSource, /scenario === "optional"/);
   assert.match(mockSource, /require_purpose: false/);

@@ -149,6 +149,11 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "updateNoGuardDepartureConfig"
 ]);
 const LIVE_API_UNSTABLE_MESSAGE = "Sambungan live tidak stabil. Sila cuba lagi.";
+const LIVE_GET_TIMEOUT_MS_V19 = 22000;
+const LIVE_GET_MAX_ATTEMPTS_V19 = 2;
+const LIVE_GET_RETRY_MIN_DELAY_MS_V19 = 500;
+const LIVE_GET_RETRY_MAX_DELAY_MS_V19 = 1200;
+const inFlightApiGetsV19 = new Map();
 
 let students = [
   { id: "S001", no_matrik: "M001", name: "Ahmad Hakimi", className: "A2", gender: "Lelaki", status: "Aktif" },
@@ -603,6 +608,7 @@ const els = {
   adminMonitoringUpdated: document.querySelector("#adminMonitoringUpdated"),
   adminMonitoringKpis: document.querySelector("#adminMonitoringKpis"),
   adminCurrentHostelRoster: document.querySelector("#adminCurrentHostelRoster"),
+  adminCurrentHostelStatus: document.querySelector("#adminCurrentHostelStatus"),
   adminActionQueue: document.querySelector("#adminActionQueue"),
   adminMonitoringList: document.querySelector("#adminMonitoringList"),
   wardenCurrentHostelRoster: document.querySelector("#wardenCurrentHostelRoster"),
@@ -1110,6 +1116,7 @@ async function restoreSavedAdminSessionV220() {
 
 function clearAdminRuntimeCredentialV200() {
   adminRuntimeCredential = null;
+  staffCurrentHostelRosterV240 = null;
   adminOutingTypes = [];
   adminEditingTypeCode = "";
   adminStudentsV200 = [];
@@ -1135,6 +1142,15 @@ function clearAdminRuntimeCredentialV200() {
   if (els.adminTypeEditor) els.adminTypeEditor.hidden = true;
   if (els.adminStudentList) els.adminStudentList.innerHTML = "";
   if (els.adminStudentsMessage) els.adminStudentsMessage.textContent = "";
+  if (els.adminMonitoringMessage) {
+    els.adminMonitoringMessage.textContent = "";
+    els.adminMonitoringMessage.classList.remove("error");
+  }
+  if (els.adminCurrentHostelStatus) {
+    els.adminCurrentHostelStatus.textContent = "";
+    els.adminCurrentHostelStatus.classList.remove("error");
+  }
+  if (els.adminCurrentHostelRoster) els.adminCurrentHostelRoster.innerHTML = "";
   if (els.adminStudentForm) els.adminStudentForm.reset();
   if (els.adminStudentEditor) els.adminStudentEditor.hidden = true;
   const tabs = document.querySelector(".tabs");
@@ -1381,33 +1397,71 @@ function setAdminSectionV200(section) {
 
 async function loadAdminMonitoringV210() {
   if (!currentSession || currentSession.role !== "admin") return;
+  const sessionAtRequest = currentSession;
+  const hadMonitoring = Boolean(adminMonitoringV210);
+  const hadRoster = Boolean(staffCurrentHostelRosterV240);
   els.adminMonitoringRefreshButton.disabled = true;
   globalThis.setButtonLoadingVisualV220?.(els.adminMonitoringRefreshButton, true);
   els.adminMonitoringMessage.textContent = "Memuatkan pemantauan semasa...";
-  els.adminMonitoringList.innerHTML = '<div class="empty-state">Memuatkan rekod...</div>';
-  if (els.adminActionQueue) els.adminActionQueue.innerHTML = '<div class="empty-state">Menyusun keutamaan operasi...</div>';
+  els.adminMonitoringMessage.classList.remove("error");
+  if (!hadMonitoring) {
+    els.adminMonitoringList.innerHTML = '<div class="empty-state">Memuatkan rekod...</div>';
+    if (els.adminActionQueue) els.adminActionQueue.innerHTML = '<div class="empty-state">Menyusun keutamaan operasi...</div>';
+  }
+  setAdminCurrentHostelStatusV19(hadRoster ? "Mengemas kini senarai penghuni..." : "Memuatkan senarai penghuni...", false);
   try {
-    const [monitoring, roster] = await Promise.all([
+    const [monitoringResult, rosterResult] = await Promise.allSettled([
       apiPost("getAdminMonitoring", buildAdminCredentialPayloadV200()),
-      isLiveMode
-        ? apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
-        : Promise.resolve(null)
+      apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
     ]);
-    adminMonitoringV210 = monitoring;
-    staffCurrentHostelRosterV240 = roster;
-    els.adminMonitoringMessage.textContent = "";
-    els.adminMonitoringUpdated.textContent = `Terakhir dikemas kini: ${formatDisplayDateTime(adminMonitoringV210.generated_at)}`;
-    renderAdminMonitoringV210();
-    loadProfilePhotoThumbnailsForStudents((adminMonitoringV210.records || []).map((record) => record.student_id));
-  } catch (error) {
-    adminMonitoringV210 = null;
-    els.adminMonitoringMessage.textContent = "Pemantauan gagal dimuatkan.";
-    els.adminMonitoringMessage.classList.add("error");
-    els.adminMonitoringList.innerHTML = '<div class="empty-state"><button class="secondary-action" type="button" onclick="loadAdminMonitoringV210()">Cuba Lagi</button></div>';
-    if (els.adminActionQueue) els.adminActionQueue.innerHTML = '<div class="empty-state">Queue tindakan tidak tersedia.</div>';
+    if (currentSession !== sessionAtRequest || currentSession.role !== "admin") return;
+
+    if (monitoringResult.status === "fulfilled") {
+      adminMonitoringV210 = monitoringResult.value;
+      els.adminMonitoringMessage.textContent = "";
+      els.adminMonitoringMessage.classList.remove("error");
+      els.adminMonitoringUpdated.textContent = `Terakhir dikemas kini: ${formatDisplayDateTime(adminMonitoringV210.generated_at)}`;
+      renderAdminMonitoringV210();
+      loadProfilePhotoThumbnailsForStudents((adminMonitoringV210.records || []).map((record) => record.student_id));
+    } else {
+      els.adminMonitoringMessage.textContent = hadMonitoring
+        ? "Refresh pemantauan gagal. Data terakhir masih dipaparkan."
+        : "Pemantauan gagal dimuatkan.";
+      els.adminMonitoringMessage.classList.add("error");
+      if (!hadMonitoring) {
+        els.adminMonitoringList.innerHTML = '<div class="empty-state"><button class="secondary-action" type="button" onclick="loadAdminMonitoringV210()">Cuba Lagi</button></div>';
+        if (els.adminActionQueue) els.adminActionQueue.innerHTML = '<div class="empty-state">Queue tindakan tidak tersedia.</div>';
+      }
+    }
+
+    if (rosterResult.status === "fulfilled") {
+      staffCurrentHostelRosterV240 = rosterResult.value;
+      renderStaffCurrentHostelRosterV240();
+      setAdminCurrentHostelStatusV19("", false);
+    } else {
+      showAdminCurrentHostelFailureV19(hadRoster);
+    }
   } finally {
     els.adminMonitoringRefreshButton.disabled = false;
     globalThis.setButtonLoadingVisualV220?.(els.adminMonitoringRefreshButton, false);
+  }
+}
+
+function setAdminCurrentHostelStatusV19(message, isError) {
+  if (!els.adminCurrentHostelStatus) return;
+  els.adminCurrentHostelStatus.textContent = message || "";
+  els.adminCurrentHostelStatus.classList.toggle("error", Boolean(isError));
+}
+
+function showAdminCurrentHostelFailureV19(hasLastGoodRoster) {
+  setAdminCurrentHostelStatusV19(
+    hasLastGoodRoster
+      ? "Refresh senarai penghuni gagal. Data terakhir masih dipaparkan."
+      : "Senarai penghuni gagal dimuatkan.",
+    true
+  );
+  if (!hasLastGoodRoster && els.adminCurrentHostelRoster) {
+    els.adminCurrentHostelRoster.innerHTML = emptyState("Senarai penghuni gagal dimuatkan. Sila cuba Refresh.");
   }
 }
 
@@ -3977,57 +4031,140 @@ function cloneMockAdminValueV200(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-async function apiGet(action) {
+function apiGet(action) {
   return apiGetWithParams(action);
 }
 
-async function apiGetWithParams(action, params = {}) {
+function apiGetWithParams(action, params = {}) {
   if (ALLOW_MOCK_MODE && action === "getOutingTypes") {
-    return mockPublicOutingTypesV200();
+    return Promise.resolve(mockPublicOutingTypesV200());
   }
   if (ALLOW_MOCK_MODE && action === "getStudentLoginDirectory") {
-    return buildMockStudentLoginDirectoryV240();
+    return Promise.resolve(buildMockStudentLoginDirectoryV240());
   }
-  const searchParams = new URLSearchParams({
-    action,
-    _ts: String(Date.now())
-  });
+  const normalizedParams = normalizeApiGetParamsV19(params);
+  const requestKey = getApiGetInFlightKeyV19(action, normalizedParams);
+  const pendingRequest = inFlightApiGetsV19.get(requestKey);
+  if (pendingRequest) return pendingRequest;
 
-  Object.keys(params).forEach((key) => {
-    if (params[key] !== undefined && params[key] !== null && params[key] !== "") {
-      searchParams.set(key, params[key]);
-    }
-  });
+  const searchParams = new URLSearchParams({ action });
+  normalizedParams.forEach(([key, value]) => searchParams.set(key, value));
+  const request = fetchApiGetWithRetry(action, searchParams);
+  inFlightApiGetsV19.set(requestKey, request);
+  const clearRequest = () => {
+    if (inFlightApiGetsV19.get(requestKey) === request) inFlightApiGetsV19.delete(requestKey);
+  };
+  request.then(clearRequest, clearRequest);
+  return request;
+}
 
-  return fetchApiGetWithRetry(action, searchParams);
+function normalizeApiGetParamsV19(params) {
+  return Object.keys(params || {})
+    .filter((key) => key !== "_ts" && params[key] !== undefined && params[key] !== null && params[key] !== "")
+    .sort()
+    .map((key) => [key, String(params[key])]);
+}
+
+function getApiGetInFlightKeyV19(action, normalizedParams) {
+  return JSON.stringify([String(action || ""), normalizedParams || []]);
+}
+
+function getLiveGetRetryDelayV19() {
+  const range = LIVE_GET_RETRY_MAX_DELAY_MS_V19 - LIVE_GET_RETRY_MIN_DELAY_MS_V19 + 1;
+  return LIVE_GET_RETRY_MIN_DELAY_MS_V19 + Math.floor(Math.random() * range);
 }
 
 async function fetchApiGetWithRetry(action, searchParams) {
-  const retryDelays = [0, 600, 1200];
   let lastError = null;
 
-  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
-    if (retryDelays[attempt]) {
-      await delay(retryDelays[attempt]);
-    }
-
+  for (let attempt = 1; attempt <= LIVE_GET_MAX_ATTEMPTS_V19; attempt += 1) {
+    if (attempt > 1) await delay(getLiveGetRetryDelayV19());
     searchParams.set("_ts", String(Date.now()));
+    const controller = new AbortController();
+    let timedOut = false;
+    const startedAt = Date.now();
+    let response = null;
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, LIVE_GET_TIMEOUT_MS_V19);
 
     try {
-      const response = await fetch(`${getGasWebAppUrlV200()}?${searchParams.toString()}`, {
-        cache: "no-store"
+      response = await fetch(`${getGasWebAppUrlV200()}?${searchParams.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal
       });
       return await parseApiResponse(response, action);
     } catch (error) {
-      lastError = error;
-      console.warn(`Live API GET failed. Attempt ${attempt + 1}/${retryDelays.length}.`, {
+      lastError = classifyLiveGetErrorV19(error, response, timedOut);
+      const willRetry = lastError.retryable === true && attempt < LIVE_GET_MAX_ATTEMPTS_V19;
+      console.warn("Live API GET attempt failed.", {
         action,
-        message: error.message
+        attempt,
+        elapsed_ms: Math.max(0, Date.now() - startedAt),
+        status: lastError.status || 0,
+        final_hostname: lastError.finalHostname || "",
+        category: lastError.category || "unknown",
+        will_retry: willRetry
       });
+      if (!willRetry) throw lastError;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   }
 
   throw lastError || new Error(LIVE_API_UNSTABLE_MESSAGE);
+}
+
+function createLiveApiErrorV19(message, metadata) {
+  const error = new Error(message || LIVE_API_UNSTABLE_MESSAGE);
+  const details = metadata || {};
+  error.category = details.category || "unknown";
+  error.status = Number(details.status) || 0;
+  error.finalHostname = String(details.finalHostname || "");
+  error.retryable = details.retryable === true;
+  return error;
+}
+
+function getResponseHostnameV19(response) {
+  try {
+    return response && response.url ? new URL(response.url).hostname.toLowerCase() : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function isTransientHttpStatusV19(status) {
+  const code = Number(status) || 0;
+  return code === 408 || code === 429 || code >= 500;
+}
+
+function isGoogleRedirectHostnameV19(hostname) {
+  return String(hostname || "").toLowerCase() === "script.googleusercontent.com";
+}
+
+function classifyLiveGetErrorV19(error, response, timedOut) {
+  if (error && typeof error.retryable === "boolean") return error;
+  const status = Number(response && response.status) || 0;
+  const finalHostname = getResponseHostnameV19(response);
+  if (timedOut) {
+    return createLiveApiErrorV19(LIVE_API_UNSTABLE_MESSAGE, {
+      category: "timeout", status, finalHostname, retryable: true
+    });
+  }
+  if (error && error.name === "AbortError") {
+    return createLiveApiErrorV19(LIVE_API_UNSTABLE_MESSAGE, {
+      category: "abort", status, finalHostname, retryable: true
+    });
+  }
+  if (isTransientHttpStatusV19(status)) {
+    return createLiveApiErrorV19(LIVE_API_UNSTABLE_MESSAGE, {
+      category: `http_${status}`, status, finalHostname, retryable: true
+    });
+  }
+  return createLiveApiErrorV19(LIVE_API_UNSTABLE_MESSAGE, {
+    category: "network", status, finalHostname, retryable: status === 0
+  });
 }
 
 async function loadLiveMasters() {
@@ -4121,31 +4258,48 @@ async function apiPost(action, payload) {
 async function parseApiResponse(response, action) {
   const text = await response.text();
   const trimmed = text.trim();
+  const status = Number(response.status) || 0;
+  const finalHostname = getResponseHostnameV19(response);
 
   if (trimmed.startsWith("<")) {
-    console.warn("Live API returned HTML instead of JSON.", {
-      action,
-      status: response.status,
-      preview: trimmed.slice(0, 160)
+    const redirectFailure = isGoogleRedirectHostnameV19(finalHostname);
+    throw createLiveApiErrorV19(LIVE_API_UNSTABLE_MESSAGE, {
+      category: redirectFailure ? "google_redirect_html" : "html_response",
+      status,
+      finalHostname,
+      retryable: redirectFailure || isTransientHttpStatusV19(status)
     });
-    throw new Error(LIVE_API_UNSTABLE_MESSAGE);
   }
 
   let result = null;
   try {
     result = JSON.parse(text);
   } catch (error) {
-    console.warn("Live API JSON parse failed.", {
-      action,
-      status: response.status,
-      message: error.message,
-      preview: trimmed.slice(0, 160)
+    throw createLiveApiErrorV19(LIVE_API_UNSTABLE_MESSAGE, {
+      category: "invalid_json",
+      status,
+      finalHostname,
+      retryable: isTransientHttpStatusV19(status)
     });
-    throw new Error(LIVE_API_UNSTABLE_MESSAGE);
   }
 
-  if (!response.ok || !result.ok) {
-    throw new Error(cleanApiError(result.error));
+  if (!result || result.ok !== true) {
+    throw createLiveApiErrorV19(cleanApiError(result && result.error), {
+      category: "application",
+      status,
+      finalHostname,
+      retryable: false
+    });
+  }
+
+  if (!response.ok) {
+    const redirected404 = status === 404 && isGoogleRedirectHostnameV19(finalHostname);
+    throw createLiveApiErrorV19(cleanApiError(result.error), {
+      category: redirected404 ? "google_redirect_404" : `http_${status || "error"}`,
+      status,
+      finalHostname,
+      retryable: redirected404 || isTransientHttpStatusV19(status)
+    });
   }
 
   return result.data;
@@ -9476,44 +9630,19 @@ function getExpectedReturnDate(record) {
 const loadLiveMastersOriginal = loadLiveMasters;
 loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
   setStudentDropdownState("loading");
+  const studentRequest = apiGet("getStudentLoginDirectory");
+  const staffRequests = Promise.allSettled([
+    apiGet("getWardens"),
+    apiGet("getGuards")
+  ]);
 
   try {
-    const [studentResult, wardenResult, guardResult] = await Promise.allSettled([
-      apiGet("getStudentLoginDirectory"),
-      apiGet("getWardens"),
-      apiGet("getGuards")
-    ]);
-
-    if (studentResult.status !== "fulfilled") {
-      throw studentResult.reason || new Error("Gagal memuatkan senarai pelajar.");
-    }
-
-    const directory = normalizeStudentLoginDirectoryV240(studentResult.value);
+    const directory = normalizeStudentLoginDirectoryV240(await studentRequest);
     applyStudentLoginDirectoryV240(directory);
     isLiveMode = true;
     dataModeMessage = "Live Mode: Google Sheets";
     updateDataModeIndicator();
     renderStudentDropdownState(students);
-
-    if (wardenResult.status === "fulfilled") {
-      try {
-        updateWardenMasterList(wardenResult.value);
-      } catch (error) {
-        console.warn("Respons senarai warden tidak sah.", error);
-      }
-    } else {
-      console.warn("Gagal memuatkan senarai warden.", wardenResult.reason);
-    }
-
-    if (guardResult.status === "fulfilled") {
-      try {
-        updateGuardMasterList(guardResult.value);
-      } catch (error) {
-        console.warn("Respons senarai guard tidak sah.", error);
-      }
-    } else {
-      console.warn("Gagal memuatkan senarai guard.", guardResult.reason);
-    }
   } catch (error) {
     console.error("Gagal memuatkan senarai pelajar dari Google Sheets.", error);
     isLiveMode = true;
@@ -9522,6 +9651,27 @@ loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
     setStudentDropdownState("failed");
     showStudentLoadFailurePanel();
     showModeNotice("Gagal memuatkan data dari Google Sheets. Sila tekan Cuba Lagi.");
+  }
+
+  const [wardenResult, guardResult] = await staffRequests;
+  if (wardenResult.status === "fulfilled") {
+    try {
+      updateWardenMasterList(wardenResult.value);
+    } catch (error) {
+      console.warn("Respons senarai warden tidak sah.", error);
+    }
+  } else {
+    console.warn("Gagal memuatkan senarai warden.", wardenResult.reason);
+  }
+
+  if (guardResult.status === "fulfilled") {
+    try {
+      updateGuardMasterList(guardResult.value);
+    } catch (error) {
+      console.warn("Respons senarai guard tidak sah.", error);
+    }
+  } else {
+    console.warn("Gagal memuatkan senarai guard.", guardResult.reason);
   }
 };
 

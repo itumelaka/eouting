@@ -160,10 +160,10 @@ test("Guard urgency, emergency, actions and accessibility have explicit visual s
   assert.match(guardCss, /transition:\s*none/);
 });
 
-test("r16 Guard visuals remain under the r18 cache while displayed version stays v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r18/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r18/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
+test("r16 Guard visuals remain under the r19 cache while displayed version stays v2.4.0", () => {
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r19/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r19/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r19/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r15/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
   assert.equal(version.version, "2.4.0");

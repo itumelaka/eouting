@@ -23,11 +23,17 @@ function extractFunction(name) {
 }
 
 function buildParser() {
+  const helperSources = [
+    "createLiveApiErrorV19",
+    "getResponseHostnameV19",
+    "isTransientHttpStatusV19",
+    "isGoogleRedirectHostnameV19"
+  ].map(extractFunction).join("\n");
   const cleanSource = extractFunction("cleanApiError");
   const parserSource = extractFunction("parseApiResponse");
   return Function(
     "LIVE_API_UNSTABLE_MESSAGE",
-    `${cleanSource}\n${parserSource}\nreturn parseApiResponse;`
+    `${helperSources}\n${cleanSource}\n${parserSource}\nreturn parseApiResponse;`
   )(SAFE_MESSAGE);
 }
 

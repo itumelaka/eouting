@@ -120,10 +120,10 @@ test("r18 search is mobile-safe, keyboard visible and touch sized", () => {
   assert.match(css, /#guard :where\(button, summary, \[tabindex\]\):focus-visible/);
 });
 
-test("frontend cache revision is consistently r18 with display version unchanged", () => {
-  assert.match(html, /style\.css\?v=2\.4\.0-r18/);
-  assert.match(html, /app\.js\?v=2\.4\.0-r18/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r18/);
+test("r18 Guard search remains green under the r19 runtime cache", () => {
+  assert.match(html, /style\.css\?v=2\.4\.0-r19/);
+  assert.match(html, /app\.js\?v=2\.4\.0-r19/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r19/);
   assert.match(app, /const APP_VERSION = "2\.4\.0"/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
 });
