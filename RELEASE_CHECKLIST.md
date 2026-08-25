@@ -2,7 +2,23 @@
 
 Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah rollout. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (22 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Aplikasi kekal v2.4.0 dengan frontend/cache `2.4.0-r17` dan service worker `eouting-cache-v2.4.0-r17`; backend production kekal GAS Version 55. Premium Institutional UI r13–r17, Dynamic Student Login dan Current Hostel Residents berstatus COMPLETE / PRODUCTION VERIFIED. Baseline penuh ialah **656/656**.
+> Catatan semasa (25 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production ialah v2.4.0 dengan frontend/cache `2.4.0-r20`, service worker `eouting-cache-v2.4.0-r20` dan GAS Version 55. Version 56 yang membawa P0-1/P0-2 ialah HOLD / NOT PRODUCTION. Regression r20 ialah **713/713** dan full suite repo termasuk P0 ialah **726/726**.
+
+## Close-out r19/r20 dan Version 56 HOLD — 25 Ogos 2026
+
+- [x] r19: GET timeout 22 saat per attempt, dua total attempts, transient-only retry + jitter, safe diagnostics dan in-flight identical GET deduplication.
+- [x] r19: kegagalan monitoring/roster Admin diasingkan, last-good Admin data dipelihara, dan Student login directory boleh render sebelum master Warden/Guard selesai; regression **699/699**, GAS kekal Version 55.
+- [x] r20: audit typography/contrast global menutup jadual Statistik Admin, dark/light inheritance, disabled/placeholder/autofill, helper Admin, placeholder Guard dan inactive cards selepas review desktop/mobile; regression **713/713**, frontend-only.
+- [x] P0-1 Current Hostel `O(S×R) -> O(S+R)` + shared 20-second presence cache lulus **720/720** tanpa perubahan schema/privacy/roster/grouping.
+- [x] P0-2 Departure Audit `O(K×A) -> O(K+A)` lulus combined **726/726** tanpa perubahan schema atau semantik Warden/Guard.
+- [x] P0-1/P0-2 direkod sebagai implemented/tested tetapi held from production; Version 56 telah dirollback dan production kekal Version 55.
+
+### Gate Version 56 sebelum dipertimbangkan semula
+
+- [ ] Tunggu sekurang-kurangnya 24 jam sebelum validation run pada staging Version 56 yang diasingkan.
+- [ ] Lulus 10 health request sequential dengan `_ts` unik, tiga request health concurrency 3 dan lima current-hostel summary request.
+- [ ] Pastikan sifar HTML/404, sifar timeout, semua hostel-summary di bawah 22 saat dan public privacy aggregate-only kekal.
+- [ ] Catat bahawa gate ini operational validation, bukan SLA kekal; controlled production retry memerlukan keputusan release baharu.
 
 ## Close-out Premium Institutional UI r13–r17 — 22 Ogos 2026
 
@@ -49,7 +65,7 @@ Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah ro
 Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
 
 - [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
-- [ ] Jalankan full regression suite dan pastikan baseline semasa sekurang-kurangnya **656/656**, bersama syntax checks dan `git diff --check`.
+- [ ] Jalankan full regression suite dan pastikan baseline repo semasa sekurang-kurangnya **726/726**, bersama syntax checks dan `git diff --check`.
 - [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
 - [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
 - [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.

@@ -1,8 +1,22 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 55 / cache `2.4.0-r17`** pada 22 Ogos 2026. Fasa 1–6, Generic Application Date Window, Student Groups, Dynamic Student Login, active-request form suppression, Current Hostel Residents dan Premium Institutional UI r13–r17 lengkap serta production verified. Baseline kanonik semasa ialah **656/656**; rekod fasa terdahulu dikekalkan sebagai sejarah selesai.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 55 / cache `2.4.0-r20`** pada 25 Ogos 2026. r19/r20 lengkap dan production verified; P0-1/P0-2 implemented/tested tetapi Version 56 kekal HOLD / NOT PRODUCTION. Regression r20 ialah **713/713** dan full suite repo termasuk P0 ialah **726/726**.
+
+## Active / Release hold
+
+- [ ] Selepas sekurang-kurangnya 24 jam, validasi staging Version 56 dengan 10 health request sequential `_ts` unik, concurrency 3 dan lima current-hostel summary request.
+- [ ] Syarat controlled retry: sifar HTML/404, sifar timeout, semua hostel-summary di bawah 22 saat dan privacy public kekal aggregate-only. Ini gate operasi, bukan SLA kekal.
+- [ ] Tambah resilience POST berstruktur kemudian: Announcement Banner authenticated POST belum mempunyai `AbortController`/timeout setara GET dan failure kini menyembunyikan banner secara senyap.
+- [ ] Rancang active/archive Sheets serta summary/index sebelum volume sejarah/concurrency menjadi material; jangan anggap migrasi Postgres/Supabase diperlukan pada skala semasa.
 
 ## Done / Completed
+
+### r19/r20 dan backend performance P0 — 25 Ogos 2026
+
+- [x] r19 live GET resilience lengkap pada cache `2.4.0-r19` dengan timeout 22 saat, dua attempts, transient-only retry/jitter, diagnostics selamat, in-flight dedupe dan isolation/last-good Admin; **699/699**.
+- [x] r20 typography/contrast audit lengkap pada cache `2.4.0-r20` selepas review desktop/mobile; **713/713**, tanpa perubahan GAS.
+- [x] Audit scalability selesai: GAS + optimized/archive Sheets dipilih sebagai medium-term path; database migration bukan keperluan semasa.
+- [x] P0-1 `O(S×R) -> O(S+R)` + shared 20-second presence cache diuji **720/720**; P0-2 `O(K×A) -> O(K+A)` menghasilkan combined **726/726**. Kedua-duanya tiada schema change dan held from production.
 
 ### Authenticated UI regression fix — 22 Ogos 2026
 

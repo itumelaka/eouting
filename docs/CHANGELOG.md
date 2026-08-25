@@ -1,5 +1,55 @@
 # Changelog
 
+## 2026-08-25 — r19/r20 production close-out dan Version 56 HOLD (v2.4.0)
+
+### Keadaan production semasa
+
+- Frontend production kekal display `v2.4.0` dan kini menggunakan asset/cache `2.4.0-r20` / `eouting-cache-v2.4.0-r20`.
+- Backend production ialah GAS **Version 55**. Version 56 wujud tetapi **bukan production**, berada pada status **HOLD**, dan deployment staging P0 diasingkan serta dikekalkan sementara untuk validasi kestabilan.
+- Commit P0 `f086c9d` wujud pada `main` tempatan sahaja ketika close-out ini; branch tempatan adalah satu commit di hadapan `origin/main`. Dokumentasi ini tidak menyatakan commit tersebut telah berada pada remote.
+
+### r19 — ketahanan live API frontend
+
+- Frontend/cache `2.4.0-r19` menetapkan timeout setiap cubaan GET live kepada 22 saat, mengehadkan jumlah kepada dua cubaan, dan hanya retry kegagalan transient dengan jitter serta diagnostic yang selamat.
+- Permintaan GET serupa yang masih in-flight dideduplikasi. Kegagalan monitoring Admin dan roster penghuni semasa diasingkan, data Admin last-good dikekalkan apabila refresh gagal, dan direktori login Pelajar boleh dirender sebelum master Warden/Guard selesai.
+- Full regression r19 lulus **699/699**. Perubahan ini frontend-only; GAS production kekal Version 55. Ia mengurangkan impak kegagalan sementara, bukan menjamin semua kegagalan delivery Apps Script dapat dicegah.
+
+### r20 — audit typography dan contrast global
+
+- Frontend/cache `2.4.0-r20` membaiki kebolehbacaan jadual cerah Statistik Admin, konflik warna inherited dark/light, disabled state, placeholder, browser autofill, label/helper konfigurasi Admin, placeholder carian Guard dan kad Admin inactive.
+- Semakan wakil desktop dan mobile selesai. Full regression r20 lulus **713/713**; tiada perubahan backend atau GAS.
+
+### Audit performance dan scalability
+
+- GAS + Google Sheets kekal sesuai untuk skala ITU semasa yang kecil dan satu kampus. Risiko utama ialah row sejarah yang berulang kali diproses sebagai state operasi semasa, bukannya keperluan segera untuk migrasi database.
+- Julat perancangan, bukan hard limit: bawah kira-kira 5k–10k request umumnya manageable; sekitar 10k–25k optimisasi sepatutnya tersedia; sekitar 25k–50k current-hostel dan query sejarah tanpa cache menjadi high risk; sekitar 50k–100k dengan concurrency material memerlukan struktur active/archive serta summary/index.
+- Dapatan utama ialah current-hostel `O(S×R)`, departure audit `O(K×A)`, full historical request scans, contention `ScriptLock` global, polling tab tersembunyi, dan rendering semua data/foto dalam Admin Students. Strategi archive diperlukan kemudian.
+- Laluan medium-term pilihan ialah GAS + Sheets yang dioptimumkan dan diarchive. Postgres/Supabase hanya pilihan skala besar masa hadapan; migrasi database tidak diperlukan sekarang.
+
+### P0-1 dan P0-2 — implemented/tested, held from production
+
+- P0-1 menukar reconstruction current-hostel daripada `O(S×R)` kepada `O(S+R)` melalui satu Map latest-request-by-student. Semantik latest request dikekalkan: hanya latest authoritative `KELUAR` bermaksud Pelajar berada di luar. Snapshot presence `ScriptCache` dikongsi selama 20 saat dengan invalidation berpusat; public kekal aggregate-only, manakala roster authenticated dan grouping tidak berubah. Tiada perubahan schema. Regression selepas P0-1 lulus **720/720**.
+- P0-2 menukar projection departure audit daripada `O(K×A)` kepada `O(K+A)` melalui satu Map audit-state mengikut `request_id`, mengekalkan hanya action audit sedia ada yang relevan dan semantik urutan row. Row Student authenticated ditapis sebelum enrichment apabila selamat; semantik Warden/Guard tidak berubah. Tiada perubahan schema. Combined regression lulus **726/726**.
+- Kedua-duanya telah diimplementasi dan diuji tetapi **held from production**; production Version 55 tidak mempunyai optimisasi P0 tersebut.
+
+### Insiden delivery Version 56 dan rollback
+
+1. Source P0-1 + P0-2 dihantar ke Apps Script dan stored Version 56 `eOuting v2.4.0 performance P0-1 P0-2` diwujudkan.
+2. Deployment production ditukar sementara daripada Version 55 kepada Version 56.
+3. Production menunjukkan kegagalan delivery Apps Script berselang: HTML 404 daripada `script.googleusercontent.com`, latency teruk, kegagalan fetch/CORS-like di browser, dan health endpoint turut terjejas.
+4. Production dirollback kepada Version 55 dan selepas itu lulus **10/10** health checks.
+5. Deployment staging awam berasingan pada Version 56 menghasilkan semula ketidakstabilan, manakala control deployment Version 55 yang baharu stabil.
+6. Staging Version 56 kemudian kembali sihat tanpa perubahan source atau metadata. Execution history menunjukkan execution `doGet` Version 56 yang berkorelasi selesai normal dalam beberapa saat ketika client masih stalled atau kemudian menerima HTML 404.
+7. Bukti paling kuat konsisten dengan anomali rollout/propagation pada redirect atau result-delivery selepas execution yang berkaitan dengan Version 56. Google tidak mengesahkan outage, dan P0 tidak dianggap terbukti bebas daripada isu; **source-level evidence did not demonstrate P0 logic as the cause**.
+
+Announcement Banner turut gagal dimuat semasa window insiden. Banner menggunakan POST authenticated dan backend path itu tidak berubah dalam Version 56. POST belum mempunyai `AbortController` atau timeout 22 saat setara GET, dan network/server error ditukar secara senyap kepada banner tersembunyi. Pemerhatian konsisten dengan insiden delivery yang lebih luas, tetapi tiada execution `doPost` banner tertentu dapat dikenal pasti secara unik. Ketahanan POST ialah backlog masa hadapan, bukan kerja yang telah diimplementasi.
+
+### Gate sebelum mempertimbangkan Version 56 semula
+
+- Selepas sekurang-kurangnya 24 jam, staging Version 56 yang diasingkan perlu lulus 10 health request berurutan dengan `_ts` unik, tiga health request serentak, dan lima current-hostel summary request.
+- Sebelum controlled production retry: sifar response HTML/404, sifar timeout, semua hostel-summary di bawah timeout frontend 22 saat, dan privacy public kekal aggregate-only.
+- Ini ialah operational validation gate untuk retry ini, bukan SLA kekal. Tiada deployment semula dibenarkan oleh close-out dokumentasi ini.
+
 ## 2026-08-22 — Authenticated UI regression fix (v2.4.0)
 
 - Commit production `996d9c0` memulihkan header/logo utama selepas login untuk Student, Warden/HEP, Guard dan Admin, bersama paparan tarikh, hari dan masa authenticated yang kompak serta responsif.

@@ -1,6 +1,14 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan frontend/cache `2.4.0-r17` dan service worker `eouting-cache-v2.4.0-r17`. Production menggunakan GAS Version 55, Dynamic Student Login aktif, dan full Node baseline **656/656**. Manifest, endpoint dan backend kanonik kekal seperti sedia ada.
+Versi repo semasa: **v2.4.0** dengan frontend/cache production `2.4.0-r20` dan service worker `eouting-cache-v2.4.0-r20`. Production menggunakan GAS Version 55; full Node suite repo termasuk P0 backend yang di-HOLD ialah **726/726**. Version 56 bukan production.
+
+## Performance dan scalability
+
+GAS + Google Sheets masih sesuai untuk skala kecil/satu kampus ITU semasa. Bottleneck utama ialah row sejarah yang berulang kali diperlakukan sebagai current operational state: reconstruction current-hostel lama `O(S×R)`, departure audit projection lama `O(K×A)`, full historical request scans, contention `ScriptLock` global, polling tab tersembunyi dan Admin Students yang merender semua data/foto.
+
+Julat perancangan berikut bukan hard limit: bawah kira-kira 5k–10k request biasanya manageable; sekitar 10k–25k optimisasi perlu tersedia; sekitar 25k–50k current-hostel dan historical query tanpa cache menjadi high risk; sekitar 50k–100k dengan concurrency material memerlukan pemisahan active/archive serta summary/index. Strategi archive diperlukan kemudian. Migrasi database tidak diperlukan sekarang; laluan medium-term pilihan ialah GAS + Sheets yang dioptimumkan/diarchive, sementara Postgres/Supabase hanyalah pilihan skala besar masa hadapan.
+
+P0-1 yang telah diimplementasi dan diuji tetapi held from production menukar current-hostel kepada `O(S+R)` melalui Map latest-request-by-student satu laluan, mengekalkan hanya latest authoritative `KELUAR` sebagai outside. Snapshot presence `ScriptCache` dikongsi selama 20 saat dan invalidation dipusatkan; aggregate public, roster authenticated dan grouping kekal sama. P0-2 menukar departure audit kepada `O(K+A)` melalui Map mengikut `request_id`, mengekalkan action relevan serta row-order semantics dan menapis Student authenticated lebih awal apabila selamat. Warden/Guard dan schema tidak berubah.
 
 Premium Institutional UI r13–r17 memberi Access/Login, Student, Warden/HEP, Guard dan Admin gaya responsif khusus role di atas boundary sedia ada. Refresh visual tidak menukar auth authority, API contract, lifecycle, Current Hostel Residents privacy model atau profile-photo authorization.
 
@@ -427,7 +435,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source semasa ialah `eouting-cache-v2.4.0-r17` dan query `2.4.0-r17`. Cache operasi backend 20 saat menyimpan source row sahaja; urgency dan penghuni semasa sentiasa diturunkan daripada source authoritative.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source production semasa ialah `eouting-cache-v2.4.0-r20` dan query `2.4.0-r20`. Version 55 mengekalkan behavior production sedia ada; shared 20-second presence snapshot P0 berada dalam Version 56 yang di-HOLD dan tidak boleh dianggap live production.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

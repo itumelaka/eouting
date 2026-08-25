@@ -6,9 +6,13 @@ Status repo semasa: **v2.4.0 — production verified**.
 
 Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **22 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 55, cache/asset `2.4.0-r17` dan service worker `eouting-cache-v2.4.0-r17`. Config-driven outing serta Dynamic Student Login aktif dan ready. Production UI smoke ialah **VERIFIED** dan production beroperasi normal.
+Verdict semasa pada **25 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 55, cache/asset `2.4.0-r20` dan service worker `eouting-cache-v2.4.0-r20`. Config-driven outing serta Dynamic Student Login aktif dan ready. Production UI smoke ialah **VERIFIED** dan production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX dan Current Hostel Residents semuanya **COMPLETE / PRODUCTION VERIFIED**. Premium Institutional Access UI serta refresh dashboard Student, Warden/HEP, Guard dan Admin juga **COMPLETE / PRODUCTION VERIFIED**, membentuk satu sistem visual institusi dark navy yang bersatu. Normal Guard flow kekal primary/default. Full Node suite kanonik semasa lulus **656/656**.
+`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX dan Current Hostel Residents semuanya **COMPLETE / PRODUCTION VERIFIED**. Premium Institutional UI, live API resilience r19 dan global typography/contrast r20 juga **COMPLETE / PRODUCTION VERIFIED**. Normal Guard flow kekal primary/default. Regression production r20 lulus **713/713**; full suite repo termasuk P0 yang belum production lulus **726/726**.
+
+Version 56 mengandungi P0-1 Current Hostel Presence dan P0-2 Departure Audit Projection yang telah diimplementasi serta diuji, tetapi statusnya **HOLD / NOT PRODUCTION**. Deployment production sempat ditukar daripada Version 55 kepada Version 56, kemudian dirollback selepas kegagalan delivery Apps Script berselang. Production Version 55 selepas rollback lulus 10/10 health checks; staging Version 56 diasingkan dan dikekalkan sementara. Source-level evidence did not demonstrate P0 logic as the cause, tetapi Google tidak mengesahkan outage dan P0 tidak dianggap terbukti bebas daripada isu.
+
+Commit P0 `f086c9d` hanya direkodkan sebagai HEAD tempatan; `main` tempatan satu commit di hadapan `origin/main` pada close-out ini.
 
 Batch regression UI production commit `996d9c0` (`fix: restore authenticated header and admin mobile ui`) telah lengkap dan berada pada `main`. Header/logo serta metadata tarikh/hari/masa authenticated kini kelihatan dan responsif untuk Student, Warden/HEP, Guard dan Admin; kontras editor Admin serta sub-navigation Admin mobile juga telah diperbaiki dan disahkan melalui verifikasi browser/mobile.
 
@@ -47,7 +51,7 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache source revision ialah `2.4.0-r17` dan service worker ialah `eouting-cache-v2.4.0-r17`.
+- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache production revision ialah `2.4.0-r20` dan service worker ialah `eouting-cache-v2.4.0-r20`.
 - Backend GAS production ialah **Version 55** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
@@ -101,7 +105,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.4.0; asset query dan cache source konsisten pada `2.4.0-r17` / `eouting-cache-v2.4.0-r17`.
+- Displayed version/footer ialah v2.4.0; asset query dan cache source production konsisten pada `2.4.0-r20` / `eouting-cache-v2.4.0-r20`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.

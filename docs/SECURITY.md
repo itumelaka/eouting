@@ -87,7 +87,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source semasa ialah `eouting-cache-v2.4.0-r17`; displayed app version ialah v2.4.0.
+- Cache source production semasa ialah `eouting-cache-v2.4.0-r20`; displayed app version ialah v2.4.0 dan backend production kekal Version 55. P0-1/P0-2 tidak mengubah aggregate-only public boundary, authenticated roster authorization atau schema, dan Version 56 kekal HOLD.
 - Cache operasi backend 20 saat menyimpan source row, bukan derived urgency; `operational_urgency` dihitung selepas cache read menggunakan masa semasa.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
