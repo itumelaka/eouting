@@ -8828,3 +8828,23 @@ body:has(#admin.admin-dashboard.active) #admin :where(input, textarea):-webkit-a
   -webkit-box-shadow: 0 0 0 1000px #071a30 inset;
   -webkit-text-fill-color: #f2f8fc;
 }
+
+/* Public Monitoring Contrast Fix — r21 */
+body:has(#accessScreen:not(.hidden)) #publicMonitoringPanel .section-heading h2 {
+  color: #ffffff;
+}
+
+body:has(#accessScreen:not(.hidden)) #publicMonitoringPanel .section-heading p,
+body:has(#accessScreen:not(.hidden)) #publicMonitoringPanel #monitorLastUpdated {
+  color: #b5c4d4;
+}
+
+#publicMonitoringPanel .monitor-summary .monitor-status-card span {
+  color: #40566a;
+}
+
+#publicMonitoringPanel #monitorSummary .monitor-status-card > strong[data-rolling-number].rolling-number {
+  color: #0b263d;
+  opacity: 1;
+  -webkit-text-fill-color: #0b263d;
+}

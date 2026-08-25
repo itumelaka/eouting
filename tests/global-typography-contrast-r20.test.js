@@ -125,10 +125,10 @@ test("semantic badges and role colors remain distinct", () => {
   assert.match(css, /#pelajar[\s\S]*?\.badge-returned\s*\{[^}]*color:\s*#03291d/);
 });
 
-test("r20 cache is consistent while display version remains v2.4.0", () => {
-  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r20/);
-  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r20/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r20/);
+test("r20 audit remains green under the r21 cache while display version remains v2.4.0", () => {
+  assert.match(html, /assets\/style\.css\?v=2\.4\.0-r21/);
+  assert.match(html, /assets\/app\.js\?v=2\.4\.0-r21/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r21/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
   assert.doesNotMatch(`${html}\n${worker}`, /2\.4\.0-r19/);
 });

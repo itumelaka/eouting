@@ -120,10 +120,10 @@ test("r18 search is mobile-safe, keyboard visible and touch sized", () => {
   assert.match(css, /#guard :where\(button, summary, \[tabindex\]\):focus-visible/);
 });
 
-test("r18 Guard search remains green under the r20 presentation cache", () => {
-  assert.match(html, /style\.css\?v=2\.4\.0-r20/);
-  assert.match(html, /app\.js\?v=2\.4\.0-r20/);
-  assert.match(worker, /eouting-cache-v2\.4\.0-r20/);
+test("r18 Guard search remains green under the r21 presentation cache", () => {
+  assert.match(html, /style\.css\?v=2\.4\.0-r21/);
+  assert.match(html, /app\.js\?v=2\.4\.0-r21/);
+  assert.match(worker, /eouting-cache-v2\.4\.0-r21/);
   assert.match(app, /const APP_VERSION = "2\.4\.0"/);
   assert.match(html, /eOuting ITU • v2\.4\.0/);
 });
