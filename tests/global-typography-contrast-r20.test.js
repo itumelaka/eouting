@@ -37,6 +37,11 @@ test("r20 audit layer exists and keeps focus-visible and reduced-motion safeguar
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
+test("shared muted text token remains readable on light surfaces", () => {
+  assert.match(css, /:root\s*\{[^}]*--muted-text:\s*#526078/);
+  assert.ok(contrast("#526078", "#ffffff") >= 4.5);
+});
+
 test("Admin Statistik table uses dark readable ink on every light surface", () => {
   assert.match(rule("#adminStatisticsPanel .individual-stats-table"), /color:\s*#172c3d/);
   assert.match(rule("#adminStatisticsPanel .individual-stats-table th"), /background:\s*#e5edf5/);
@@ -86,12 +91,18 @@ test("Guard Search placeholder is readable on its dark control", () => {
 });
 
 test("Admin config labels, helper text, placeholders and disabled inputs are readable", () => {
-  assert.match(rule("#admin .admin-editor .admin-form-grid label"), /color:\s*#e4eef5/);
-  assert.match(rule("#admin .admin-editor .admin-form-grid .admin-field-helper"), /color:\s*#b4c5d0/);
+  assert.match(css, /\.admin-form-grid\s*\{[\s\S]*?background:\s*linear-gradient\(145deg,\s*#f7fcff,\s*#e5f3fb\)/);
+  assert.match(css, /\.admin-config-fieldset legend\s*\{[\s\S]*?background:\s*#ffffff/);
+  assert.match(rule("#admin .admin-editor .admin-form-grid label"), /color:\s*#12344a/);
+  assert.match(rule("#admin .admin-editor .admin-form-grid .admin-field-helper"), /color:\s*#52677d/);
+  assert.match(rule("#admin .admin-config-fieldset > p"), /color:\s*#b4c5d0/);
   assert.match(rule("#admin :where(input, textarea)::placeholder"), /color:\s*#9db0bd/);
   const disabled = rule("#admin :where(button, input, select, textarea):disabled");
   assert.match(disabled, /color:\s*#d6e1e8/);
   assert.match(disabled, /opacity:\s*1/);
+  assert.ok(contrast("#12344a", "#f7fcff") >= 4.5);
+  assert.ok(contrast("#52677d", "#f7fcff") >= 4.5);
+  assert.ok(contrast("#12344a", "#ffffff") >= 4.5);
 });
 
 test("active, inactive, readiness and Dynamic Login states keep explicit readable colors", () => {

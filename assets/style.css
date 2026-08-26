@@ -1,6 +1,7 @@
 :root {
   --ink: #142033;
   --muted: #5b6678;
+  --muted-text: #526078;
   --line: #d8e0ec;
   --paper: #ffffff;
   --wash: #f4f7fb;
@@ -8613,24 +8614,6 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #ruleNotice {
   display: none;
 }
 
-body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid label,
-body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-config-fieldset > legend {
-  color: #12344a;
-}
-
-body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid .admin-field-helper {
-  color: #52677d;
-}
-
-body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid :where(input, select, textarea)::placeholder {
-  color: #9fb2c1;
-  opacity: 1;
-}
-
-body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid :where(input, select, textarea):disabled {
-  opacity: 0.72;
-}
-
 body:has(#admin.admin-dashboard.active) #admin .admin-subnav {
   gap: 10px 12px;
 }
@@ -8782,13 +8765,16 @@ body:has(#admin.admin-dashboard.active) #adminStatisticsPanel .individual-stats-
   color: #465d70;
 }
 
-/* The dark premium Admin editor previously inherited a light-theme label patch. */
+/* Admin uses dark framing around deliberately light form grids and legend pills. */
 body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid label,
 body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-config-fieldset > legend {
-  color: #e4eef5;
+  color: #12344a;
 }
 
-body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid .admin-field-helper,
+body:has(#admin.admin-dashboard.active) #admin .admin-editor .admin-form-grid .admin-field-helper {
+  color: #52677d;
+}
+
 body:has(#admin.admin-dashboard.active) #admin .admin-config-fieldset > p {
   color: #b4c5d0;
 }
