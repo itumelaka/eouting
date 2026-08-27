@@ -151,6 +151,41 @@ test("readiness rejects duplicates, malformed version/time/day and inconsistent 
   assert.match(reasons, /BAD_DEPARTURE.*require_leave_date=true/i);
 });
 
+test("departure days require a leave-date field only for non-same-day configurations", () => {
+  const sameDayWithoutLeaveDate = createGasContext({
+    configs: [completeConfig({
+      type_code: "OUTING_BIASA",
+      same_day_only: true,
+      require_leave_date: false,
+      departure_allowed_days: "JUMAAT"
+    })]
+  }).context.getOutingConfigReadiness({ pin: "2468" });
+  assert.equal(sameDayWithoutLeaveDate.ready, true);
+  assert.deepEqual(Array.from(sameDayWithoutLeaveDate.reasons), []);
+
+  const multiDayWithoutLeaveDate = createGasContext({
+    configs: [completeConfig({
+      type_code: "MULTI_DAY_NO_DATE",
+      same_day_only: false,
+      require_leave_date: false,
+      departure_allowed_days: "JUMAAT"
+    })]
+  }).context.getOutingConfigReadiness({ pin: "2468" });
+  assert.equal(multiDayWithoutLeaveDate.ready, false);
+  assert.match(multiDayWithoutLeaveDate.reasons.join("\n"), /MULTI_DAY_NO_DATE.*require_leave_date=true/i);
+
+  const multiDayWithLeaveDate = createGasContext({
+    configs: [completeConfig({
+      type_code: "MULTI_DAY_WITH_DATE",
+      same_day_only: false,
+      require_leave_date: true,
+      departure_allowed_days: "JUMAAT"
+    })]
+  }).context.getOutingConfigReadiness({ pin: "2468" });
+  assert.equal(multiDayWithLeaveDate.ready, true);
+  assert.deepEqual(Array.from(multiDayWithLeaveDate.reasons), []);
+});
+
 test("require_selfie controls confirmIn state and custom-type frontend eligibility", () => {
   const { context } = createGasContext({ flag: true });
   const updates = [];

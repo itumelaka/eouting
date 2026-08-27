@@ -1474,7 +1474,7 @@ function assessOutingConfigReadinessV220_() {
         requireTypeCode: true,
         typeCode: stored.type_code
       });
-      if (validated.departure_allowed_days && !validated.require_leave_date) {
+      if (validated.departure_allowed_days && !validated.same_day_only && !validated.require_leave_date) {
         throw new Error("departure_allowed_days memerlukan require_leave_date=true.");
       }
     } catch (error) {
