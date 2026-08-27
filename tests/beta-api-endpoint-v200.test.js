@@ -91,7 +91,7 @@ test("GitHub Pages beta ignores query overrides and uses only its fixed deployme
   assert.equal(result.isBeta, true);
   assert.match(result.url, /FIXED_GITHUB_BETA_ID/);
   assert.notEqual(result.url, validBetaUrl);
-  assert.match(appSource, /AKfycbxabjcCzkbRgXAAUUV417DrvstQDx-Ys6yaAXQGVtXbJosdzaN7LGSx5i_VUaQY0km1\/exec/);
+  assert.match(appSource, /AKfycbx0C7oBBB4sWnZO25a-I1MS4X0fVS0hBZhFsrNATkwU43LhRR3GTFfz_HFhNwxp2h2Q\/exec/);
 });
 
 test("production eouting and unrelated GitHub Pages paths keep production GAS", () => {
