@@ -154,6 +154,17 @@ const LIVE_GET_MAX_ATTEMPTS_V19 = 2;
 const LIVE_GET_RETRY_MIN_DELAY_MS_V19 = 500;
 const LIVE_GET_RETRY_MAX_DELAY_MS_V19 = 1200;
 const inFlightApiGetsV19 = new Map();
+const READ_ONLY_POST_ACTIONS_PERF01 = new Set([
+  "getTodayRecords",
+  "getCurrentHostelRoster",
+  "getStudentAnnualSummary",
+  "getAnnouncementBanner",
+  "getAnnouncementBannerAdmin",
+  "getNoGuardDepartureConfig",
+  "getOutingConfigReadiness",
+  "getStudentGroupConfigReadiness"
+]);
+const inFlightApiPostsPerf01 = new Map();
 
 let students = [
   { id: "S001", no_matrik: "M001", name: "Ahmad Hakimi", className: "A2", gender: "Lelaki", status: "Aktif" },
@@ -236,8 +247,14 @@ let wardenRefreshIntervalId = null;
 let wardenLastUpdatedAt = null;
 let isWardenLoading = false;
 let wardenHasLoadedOnce = false;
+let wardenMutationGenerationPerf01 = 0;
+let wardenReconcileRequestedGenerationPerf01 = 0;
+let wardenReconcileInFlightPerf01 = null;
 let guardRefreshIntervalId = null;
+let isGuardLoading = false;
 let guardLastUpdatedAt = null;
+let wardenDirectoryLoadPromisePerf01 = Promise.resolve();
+let guardDirectoryLoadPromisePerf01 = Promise.resolve();
 let guardSearchQueryV18 = "";
 let monitoringRefreshIntervalId = null;
 let monitorLastUpdatedAt = null;
@@ -4242,17 +4259,55 @@ async function loadTodayRecords() {
   }
 }
 
+function normalizeReadOnlyPostValuePerf01(value) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeReadOnlyPostValuePerf01);
+  }
+  if (value && typeof value === "object") {
+    return Object.keys(value).sort().reduce((normalized, key) => {
+      normalized[key] = normalizeReadOnlyPostValuePerf01(value[key]);
+      return normalized;
+    }, {});
+  }
+  return value === undefined ? null : value;
+}
+
+function getReadOnlyPostInFlightKeyPerf01(action, payload) {
+  return JSON.stringify([action, normalizeReadOnlyPostValuePerf01(payload || {})]);
+}
+
 async function apiPost(action, payload) {
   if (ALLOW_MOCK_MODE && MOCK_ADMIN_ACTIONS_V200.has(action)) {
     return mockAdminApiPostV200(action, payload);
   }
-  const response = await fetch(getGasWebAppUrlV200(), {
+  const requestKey = READ_ONLY_POST_ACTIONS_PERF01.has(action)
+    ? getReadOnlyPostInFlightKeyPerf01(action, payload)
+    : "";
+  if (requestKey) {
+    const pendingEntry = inFlightApiPostsPerf01.get(requestKey);
+    if (pendingEntry) return pendingEntry.request;
+  }
+
+  const request = fetch(getGasWebAppUrlV200(), {
     method: "POST",
     cache: "no-store",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ action, ...payload })
+  }).then((response) => parseApiResponse(response, action));
+
+  if (!requestKey) return request;
+  inFlightApiPostsPerf01.set(requestKey, {
+    request,
+    wardenMutationGeneration: wardenMutationGenerationPerf01
   });
-  return parseApiResponse(response, action);
+  const clearRequest = () => {
+    const pendingEntry = inFlightApiPostsPerf01.get(requestKey);
+    if (pendingEntry && pendingEntry.request === request) {
+      inFlightApiPostsPerf01.delete(requestKey);
+    }
+  };
+  request.then(clearRequest, clearRequest);
+  return request;
 }
 
 async function parseApiResponse(response, action) {
@@ -5469,16 +5524,17 @@ async function compressStudentProfilePhoto(file) {
 
 function startStudentSession(student) {
   try {
-    startSession("student", student);
+    const initialRecordsRequest = startSession("student", student);
     loadStudentOutingTypesV200();
     const studentId = student.student_id || student.studentId || student.id || "";
     loadProfilePhotoThumbnailsForStudents([studentId]);
-    loadFullProfilePhotoForStudent(studentId).then(() => renderStudentProfilePhotoArea()).catch(() => {});
+    return initialRecordsRequest;
   } catch (error) {
     console.warn("Student view render warning:", error);
     if (!els.studentRecordsList || !els.studentRecordsList.innerHTML.trim()) {
       showError("Paparan rekod gagal dimuat. Sila tekan Refresh Status.", "Paparan Rekod");
     }
+    return null;
   }
 }
 
@@ -5580,14 +5636,13 @@ async function restoreSavedSession() {
       className: session.kelas || "",
       kelas: session.kelas || ""
     };
-    startStudentSession(student);
-    if (isLiveMode) {
-      await loadTodayRecords();
-    }
+    const initialRecordsRequest = startStudentSession(student);
+    if (initialRecordsRequest) await initialRecordsRequest;
     return true;
   }
 
   if (session.role === "warden") {
+    await wardenDirectoryLoadPromisePerf01;
     const wardenName = session.nama_warden || session.displayName || "";
     const isKnownWarden = wardens.some((warden) => normalizeValue(warden) === normalizeValue(wardenName));
     if (!session.pin || !isKnownWarden) {
@@ -5606,6 +5661,7 @@ async function restoreSavedSession() {
   }
 
   if (session.role === "guard") {
+    await guardDirectoryLoadPromisePerf01;
     const guardName = session.nama_guard || session.displayName || "";
     const isKnownGuard = guards.some((guard) => normalizeValue(guard) === normalizeValue(guardName));
     if (!session.pin || !isKnownGuard) {
@@ -6008,6 +6064,8 @@ async function refreshGuardRecords(source) {
   if (!currentSession || currentSession.role !== "guard") {
     return;
   }
+  if (isGuardLoading) return false;
+  isGuardLoading = true;
 
   ensureGuardRefreshControls();
   const button = els.guardRefreshButton;
@@ -6038,6 +6096,7 @@ async function refreshGuardRecords(source) {
     showSignedInTab("guard");
     showError("Status guard gagal dimuat semula. Sila cuba lagi.", "Refresh Gagal");
   } finally {
+    isGuardLoading = false;
     if (button) {
       button.disabled = false;
       button.textContent = originalText || "Refresh Status";
@@ -6333,9 +6392,11 @@ function startSession(role, user) {
   applyRoleView();
   render();
   if (typeof loadAnnouncementBannerV1 === "function") loadAnnouncementBannerV1();
+  let initialRecordsRequest = null;
   if (role === "student") {
     studentAnnualSummary = null;
-    refreshStudentLiveRecords(true);
+    initialRecordsRequest = Promise.resolve(refreshStudentLiveRecords(true));
+    initialRecordsRequest.catch(() => {});
     startStudentAutoRefresh();
   }
   if (role === "guard") {
@@ -6345,6 +6406,7 @@ function startSession(role, user) {
   if ((role === "warden" || role === "guard") && typeof loadOperationalOutingTypesV220 === "function") {
     loadOperationalOutingTypesV220();
   }
+  return initialRecordsRequest;
 }
 
 async function loadOperationalOutingTypesV220() {
@@ -8698,18 +8760,19 @@ async function updateStatus(id, status, button) {
   try {
     if (isLiveMode) {
       const action = status === STATUS.approved ? "approveRequest" : "rejectRequest";
-      await apiPost(action, {
+      const updatedRecord = await apiPost(action, {
         request_id: id,
         nama_warden: currentSession.user.name,
         pin: currentSession.user.pin || "",
         catatan: status === STATUS.rejected ? "Ditolak oleh warden." : ""
       });
-      await loadTodayRecords();
+      applyAuthoritativeWardenRecordPerf01(id, updatedRecord);
       showSuccess(
         status === STATUS.approved ? "Permohonan telah diluluskan." : "Permohonan telah ditolak.",
         status === STATUS.approved ? approvalStatusLabel(currentSession.user) : "Ditolak"
       );
-      return;
+      reconcileWardenRecordsAfterActionPerf01();
+      return updatedRecord;
     }
 
     outingRecords = outingRecords.map((record) => {
@@ -8739,6 +8802,46 @@ async function updateStatus(id, status, button) {
     clearOperationalActionLoading(loadingState);
     delete wardenActionLocks[id];
   }
+}
+
+function applyAuthoritativeWardenRecordPerf01(id, record) {
+  if (!record || typeof record !== "object") return;
+  wardenMutationGenerationPerf01 += 1;
+  const authoritativeRecord = mapLiveRecord(record);
+  let replaced = false;
+  outingRecords = outingRecords.map((existingRecord) => {
+    if (getRecordId(existingRecord) !== id) return existingRecord;
+    replaced = true;
+    return authoritativeRecord;
+  });
+  if (!replaced) outingRecords.unshift(authoritativeRecord);
+  render();
+}
+
+async function reconcileWardenRecordsAfterActionPerf01() {
+  wardenReconcileRequestedGenerationPerf01 = wardenMutationGenerationPerf01;
+  if (wardenReconcileInFlightPerf01) return wardenReconcileInFlightPerf01;
+
+  wardenReconcileInFlightPerf01 = (async () => {
+    while (true) {
+      const reconciliationGeneration = wardenReconcileRequestedGenerationPerf01;
+      try {
+        const records = await fetchWardenOperationalRecordsPerf01(reconciliationGeneration);
+        if (wardenMutationGenerationPerf01 === reconciliationGeneration) {
+          applyWardenOperationalRecordsPerf01(records);
+          render();
+          updateWardenLastUpdated();
+        }
+      } catch (error) {
+        console.error("Rekonsiliasi permohonan warden gagal.", error);
+      }
+
+      if (wardenReconcileRequestedGenerationPerf01 === reconciliationGeneration) break;
+    }
+  })().finally(() => {
+    wardenReconcileInFlightPerf01 = null;
+  });
+  return wardenReconcileInFlightPerf01;
 }
 
 async function confirmOut(id, button) {
@@ -9631,10 +9734,16 @@ const loadLiveMastersOriginal = loadLiveMasters;
 loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
   setStudentDropdownState("loading");
   const studentRequest = apiGet("getStudentLoginDirectory");
-  const staffRequests = Promise.allSettled([
-    apiGet("getWardens"),
-    apiGet("getGuards")
-  ]);
+  wardenDirectoryLoadPromisePerf01 = apiGet("getWardens").then((rows) => {
+    updateWardenMasterList(rows);
+  }).catch((error) => {
+    console.warn("Gagal memuatkan senarai warden.", error);
+  });
+  guardDirectoryLoadPromisePerf01 = apiGet("getGuards").then((rows) => {
+    updateGuardMasterList(rows);
+  }).catch((error) => {
+    console.warn("Gagal memuatkan senarai guard.", error);
+  });
 
   try {
     const directory = normalizeStudentLoginDirectoryV240(await studentRequest);
@@ -9653,26 +9762,6 @@ loadLiveMasters = async function loadLiveMastersWithStudentLoadingState() {
     showModeNotice("Gagal memuatkan data dari Google Sheets. Sila tekan Cuba Lagi.");
   }
 
-  const [wardenResult, guardResult] = await staffRequests;
-  if (wardenResult.status === "fulfilled") {
-    try {
-      updateWardenMasterList(wardenResult.value);
-    } catch (error) {
-      console.warn("Respons senarai warden tidak sah.", error);
-    }
-  } else {
-    console.warn("Gagal memuatkan senarai warden.", wardenResult.reason);
-  }
-
-  if (guardResult.status === "fulfilled") {
-    try {
-      updateGuardMasterList(guardResult.value);
-    } catch (error) {
-      console.warn("Respons senarai guard tidak sah.", error);
-    }
-  } else {
-    console.warn("Gagal memuatkan senarai guard.", guardResult.reason);
-  }
 };
 
 function setStudentDropdownState(state) {
@@ -11833,6 +11922,7 @@ async function refreshWardenRecords(source) {
   if (!currentSession || currentSession.role !== "warden") {
     return;
   }
+  if (isWardenLoading) return false;
 
   ensureWardenRefreshControls();
   const button = els.wardenRefreshButton;
@@ -11899,15 +11989,46 @@ async function loadWardenRecordsOnly() {
     return;
   }
 
-  const [records, roster] = await Promise.all([
-    apiPost("getTodayRecords", buildTodayRecordsAccessPayload()),
+  const [, roster] = await Promise.all([
+    loadWardenOperationalRecordsOnlyPerf01(),
     apiPost("getCurrentHostelRoster", buildCurrentHostelRosterAccessPayloadV240())
   ]);
+  staffCurrentHostelRosterV240 = roster;
+}
+
+async function loadWardenOperationalRecordsOnlyPerf01() {
+  if (!isLiveMode) return;
+  const loadGeneration = wardenMutationGenerationPerf01;
+  const records = await fetchWardenOperationalRecordsPerf01();
+  if (wardenMutationGenerationPerf01 !== loadGeneration) return outingRecords;
+  applyWardenOperationalRecordsPerf01(records);
+  return outingRecords;
+}
+
+async function fetchWardenOperationalRecordsPerf01(requiredMutationGeneration) {
+  const payload = buildTodayRecordsAccessPayload();
+  const requestKey = getReadOnlyPostInFlightKeyPerf01("getTodayRecords", payload);
+  const pendingEntry = inFlightApiPostsPerf01.get(requestKey);
+  if (
+    Number.isInteger(requiredMutationGeneration)
+    && pendingEntry
+    && pendingEntry.wardenMutationGeneration < requiredMutationGeneration
+  ) {
+    try {
+      await pendingEntry.request;
+    } catch (error) {
+      // A fresh reconciliation is still required after an older read fails.
+    }
+  }
+  const records = await apiPost("getTodayRecords", payload);
   if (!Array.isArray(records)) {
     throw new Error("Format rekod warden tidak sah.");
   }
-  outingRecords = records.map(mapLiveRecord);
-  staffCurrentHostelRosterV240 = roster;
+  return records.map(mapLiveRecord);
+}
+
+function applyWardenOperationalRecordsPerf01(records) {
+  outingRecords = records;
   if (typeof loadProfilePhotoThumbnailsForStudents === "function") {
     loadProfilePhotoThumbnailsForStudents(outingRecords.filter((record) => record.has_profile_photo).map((record) => record.student_id || record.studentId));
   }

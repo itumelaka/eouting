@@ -3052,20 +3052,22 @@ function approveRequest(payload) {
   }
   const wardenStaffRole = deriveWardenStaffRole(warden);
 
-  const found = withScriptLock_(function () {
+  const transition = withScriptLock_(function () {
     const authoritative = findRowByRequestId_(requestId);
     if (!authoritative) throw new Error("Permohonan tidak dijumpai.");
     if (authoritative.record.status !== STATUS.pending) {
       throw new Error("Hanya permohonan MENUNGGU_KELULUSAN boleh diluluskan.");
     }
+    const approvedAt = now_();
     updateRowByHeaders_(authoritative.sheet, authoritative.rowNumber, {
       status: STATUS.approved,
       warden_approve_by: warden.nama_warden,
-      masa_approve: now_()
+      masa_approve: approvedAt
     });
     SpreadsheetApp.flush();
-    return authoritative;
+    return { found: authoritative, approvedAt: approvedAt };
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
+  const found = transition.found;
 
   invalidateOperationalRecordsCache_();
   appendAuditLog("APPROVE_REQUEST", requestId, wardenStaffRole === "HEP" ? "HEP" : "Warden", warden.nama_warden, JSON.stringify({
@@ -3073,7 +3075,10 @@ function approveRequest(payload) {
     no_matrik: found.record.no_matrik || "",
     jenis_permohonan: found.record.jenis_permohonan || ""
   }));
-  const updatedRecord = Object.assign({}, findRowByRequestId_(requestId).record, {
+  const updatedRecord = Object.assign({}, found.record, {
+    status: STATUS.approved,
+    warden_approve_by: warden.nama_warden,
+    masa_approve: transition.approvedAt,
     warden_approve_role: wardenStaffRole
   });
   sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("✅", "Permohonan " + wardenApprovalStatusLabel_(updatedRecord), updatedRecord), updatedRecord));
@@ -3094,21 +3099,24 @@ function rejectRequest(payload) {
     throw new Error("Warden tidak dijumpai atau tidak aktif.");
   }
 
-  const found = withScriptLock_(function () {
+  const transition = withScriptLock_(function () {
     const authoritative = findRowByRequestId_(requestId);
     if (!authoritative) throw new Error("Permohonan tidak dijumpai.");
     if (authoritative.record.status !== STATUS.pending) {
       throw new Error("Hanya permohonan MENUNGGU_KELULUSAN boleh ditolak.");
     }
+    const rejectedAt = now_();
+    const rejectionNote = payload.catatan || authoritative.record.catatan || "";
     updateRowByHeaders_(authoritative.sheet, authoritative.rowNumber, {
       status: STATUS.rejected,
       warden_approve_by: warden.nama_warden,
-      masa_approve: now_(),
-      catatan: payload.catatan || authoritative.record.catatan || ""
+      masa_approve: rejectedAt,
+      catatan: rejectionNote
     });
     SpreadsheetApp.flush();
-    return authoritative;
+    return { found: authoritative, rejectedAt: rejectedAt, rejectionNote: rejectionNote };
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
+  const found = transition.found;
   invalidateOperationalRecordsCache_();
 
   appendAuditLog("REJECT_REQUEST", requestId, "Warden", warden.nama_warden, JSON.stringify({
@@ -3117,7 +3125,12 @@ function rejectRequest(payload) {
     jenis_permohonan: found.record.jenis_permohonan || "",
     catatan: payload.catatan || ""
   }));
-  const updatedRecord = findRowByRequestId_(requestId).record;
+  const updatedRecord = Object.assign({}, found.record, {
+    status: STATUS.rejected,
+    warden_approve_by: warden.nama_warden,
+    masa_approve: transition.rejectedAt,
+    catatan: transition.rejectionNote
+  });
   sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("❌", "Permohonan Ditolak Warden", updatedRecord), updatedRecord));
   return updatedRecord;
 }
@@ -3148,13 +3161,14 @@ function confirmOut(payload) {
     }
     const departureConfig = resolveSubmissionOutingTypeConfigV200_(found.record.jenis_permohonan);
     if (departureConfig) validateGuardDepartureV220_(found.record, departureConfig, now);
+    const departureAt = now_();
     updateRowByHeaders_(found.sheet, found.rowNumber, {
       status: STATUS.out,
-      masa_keluar: now_(),
+      masa_keluar: departureAt,
       guard_keluar_by: guard.nama_guard
     });
     SpreadsheetApp.flush();
-    return { found: found, alreadyConfirmed: false };
+    return { found: found, alreadyConfirmed: false, departureAt: departureAt };
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
   const found = transition.found;
   if (transition.alreadyConfirmed) {
@@ -3167,7 +3181,11 @@ function confirmOut(payload) {
     no_matrik: found.record.no_matrik || "",
     jenis_permohonan: found.record.jenis_permohonan || ""
   }));
-  const updatedRecord = findRowByRequestId_(requestId).record;
+  const updatedRecord = Object.assign({}, found.record, {
+    status: STATUS.out,
+    masa_keluar: transition.departureAt,
+    guard_keluar_by: guard.nama_guard
+  });
   sendTelegramMessage_(buildTelegramStatusMessage_(telegramTitle_("🚪", "Pelajar Disahkan Keluar", updatedRecord), updatedRecord));
   return updatedRecord;
 }
@@ -3202,21 +3220,27 @@ function confirmIn(payload) {
     const late = determineHistoricalLateValue_(found.record, now);
     const guardReturnNote = String(payload.catatan || payload.catatan_masuk || "").trim();
     const requiresReturnSelfie = normalizeText_(found.record.selfie_status) !== "tidak_diperlukan";
+    const returnedAt = now_();
+    const returnSelfieStatus = requiresReturnSelfie ? "BELUM_HANTAR" : "TIDAK_DIPERLUKAN";
+    const returnNote = guardReturnNote || found.record.catatan || "";
 
     updateRowByHeaders_(found.sheet, found.rowNumber, {
       status: STATUS.done,
-      masa_masuk: now_(),
+      masa_masuk: returnedAt,
       guard_masuk_by: guard.nama_guard,
       lewat: late,
-      selfie_status: requiresReturnSelfie ? "BELUM_HANTAR" : "TIDAK_DIPERLUKAN",
-      catatan: guardReturnNote || found.record.catatan || ""
+      selfie_status: returnSelfieStatus,
+      catatan: returnNote
     });
     SpreadsheetApp.flush();
     return {
       found: found,
       alreadyConfirmed: false,
       late: late,
-      guardReturnNote: guardReturnNote
+      guardReturnNote: guardReturnNote,
+      returnedAt: returnedAt,
+      returnSelfieStatus: returnSelfieStatus,
+      returnNote: returnNote
     };
   }, "Permohonan sedang dikemas kini. Sila cuba sebentar lagi.");
   const found = transition.found;
@@ -3235,7 +3259,14 @@ function confirmIn(payload) {
     lewat: transition.late,
     catatan_masuk: transition.guardReturnNote
   }));
-  const updatedRecord = findRowByRequestId_(requestId).record;
+  const updatedRecord = Object.assign({}, found.record, {
+    status: STATUS.done,
+    masa_masuk: transition.returnedAt,
+    guard_masuk_by: guard.nama_guard,
+    lewat: transition.late,
+    selfie_status: transition.returnSelfieStatus,
+    catatan: transition.returnNote
+  });
   sendTelegramMessage_(buildTelegramStatusMessage_(
     telegramTitle_(transition.late === "Ya" ? "⚠️" : "🏁", transition.late === "Ya" ? "Pelajar Masuk Lewat" : "Pelajar Selesai Outing", updatedRecord),
     updatedRecord

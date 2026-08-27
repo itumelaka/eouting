@@ -260,10 +260,13 @@ test("setup migration adds only missing columns and reuses Script Properties", (
 test("existing confirmIn status transition and Guard note remain intact", () => {
   const confirmInSource = extractFunction(gasSource, "confirmIn", "submitReturnSelfie");
   assert.match(confirmInSource, /status:\s*STATUS\.done/);
-  assert.match(confirmInSource, /masa_masuk:\s*now_\(\)/);
+  assert.match(confirmInSource, /const returnedAt = now_\(\)/);
+  assert.match(confirmInSource, /masa_masuk:\s*returnedAt/);
   assert.match(confirmInSource, /guard_masuk_by:\s*guard\.nama_guard/);
-  assert.match(confirmInSource, /selfie_status:\s*requiresReturnSelfie\s*\?\s*"BELUM_HANTAR"\s*:\s*"TIDAK_DIPERLUKAN"/);
-  assert.match(confirmInSource, /catatan:\s*guardReturnNote/);
+  assert.match(confirmInSource, /const returnSelfieStatus = requiresReturnSelfie\s*\?\s*"BELUM_HANTAR"\s*:\s*"TIDAK_DIPERLUKAN"/);
+  assert.match(confirmInSource, /selfie_status:\s*returnSelfieStatus/);
+  assert.match(confirmInSource, /const returnNote = guardReturnNote \|\| found\.record\.catatan \|\| ""/);
+  assert.match(confirmInSource, /catatan:\s*returnNote/);
 });
 
 test("service worker bypasses sensitive API and selfie image responses", () => {

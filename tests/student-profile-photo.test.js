@@ -439,6 +439,9 @@ test("Admin photo indicators intentionally rerender after the single asynchronou
   assert.match(loader, /filter\(\(student\) => student\.has_profile_photo\)/);
   assert.match(consumers, /currentSession\.role === "admin"[\s\S]*activeAdminSectionV200 === "students"[\s\S]*renderAdminStudentsV200\(\)/);
   assert.match(extractFunction(app, "openProfilePhotoPreview", "closeProfilePhotoPreview"), /loadFullProfilePhotoForStudent/);
+  const studentStartup = extractFunction(app, "startStudentSession", "rememberSessionIfRequested");
+  assert.match(studentStartup, /loadProfilePhotoThumbnailsForStudents/);
+  assert.doesNotMatch(studentStartup, /loadFullProfilePhotoForStudent/);
 });
 
 test("preview remains absent from public monitoring and does not expose Drive identifiers", () => {

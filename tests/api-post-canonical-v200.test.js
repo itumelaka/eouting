@@ -63,9 +63,81 @@ test("canonical apiPost keeps mock guard before live fetch", () => {
 test("canonical live transport is no-store and uses the shared parser", () => {
   const source = extractFunction("apiPost");
   assert.match(source, /cache:\s*["']no-store["']/);
-  assert.match(source, /return parseApiResponse\(response, action\)/);
+  assert.match(source, /\.then\(\(response\) => parseApiResponse\(response, action\)\)/);
   assert.doesNotMatch(source, /response\.json\s*\(/);
   assert.match(source, /body:\s*JSON\.stringify\(\{ action, \.\.\.payload \}\)/);
+});
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function buildApiPostRuntime(fetch) {
+  const constantsStart = appSource.indexOf("const READ_ONLY_POST_ACTIONS_PERF01");
+  const constantsEnd = appSource.indexOf("let students", constantsStart);
+  const source = [
+    appSource.slice(constantsStart, constantsEnd),
+    extractFunction("normalizeReadOnlyPostValuePerf01"),
+    extractFunction("getReadOnlyPostInFlightKeyPerf01"),
+    extractFunction("apiPost")
+  ].join("\n");
+  return Function("fetch", "parseApiResponse", `
+    const ALLOW_MOCK_MODE = false;
+    const MOCK_ADMIN_ACTIONS_V200 = new Set();
+    let wardenMutationGenerationPerf01 = 0;
+    const getGasWebAppUrlV200 = () => "https://example.test/exec";
+    const mockAdminApiPostV200 = () => null;
+    ${source}
+    return { apiPost, inFlightApiPostsPerf01 };
+  `)(fetch, async (response) => response);
+}
+
+test("read-only POSTs share in-flight work and clear after success and failure", async () => {
+  const gates = [];
+  let fetchCount = 0;
+  const runtime = buildApiPostRuntime(() => {
+    fetchCount += 1;
+    const gate = deferred();
+    gates.push(gate);
+    return gate.promise;
+  });
+
+  const first = runtime.apiPost("getTodayRecords", { pin: "1234", role: "warden" });
+  const second = runtime.apiPost("getTodayRecords", { role: "warden", pin: "1234" });
+  assert.equal(fetchCount, 1, "equivalent payloads must share one POST");
+  gates[0].resolve({ records: [] });
+  await Promise.all([first, second]);
+  assert.equal(runtime.inFlightApiPostsPerf01.size, 0);
+
+  const failed = runtime.apiPost("getStudentAnnualSummary", { student_id: "S1" });
+  assert.equal(fetchCount, 2);
+  gates[1].reject(new Error("network"));
+  await assert.rejects(failed, /network/);
+  assert.equal(runtime.inFlightApiPostsPerf01.size, 0);
+
+  const retried = runtime.apiPost("getStudentAnnualSummary", { student_id: "S1" });
+  assert.equal(fetchCount, 3, "a failed entry must not suppress a later retry");
+  gates[2].resolve({ total: 0 });
+  await retried;
+});
+
+test("mutation POSTs are never deduplicated", async () => {
+  let fetchCount = 0;
+  const runtime = buildApiPostRuntime(() => {
+    fetchCount += 1;
+    return Promise.resolve({ ok: true });
+  });
+  await Promise.all([
+    runtime.apiPost("approveRequest", { request_id: "REQ-1" }),
+    runtime.apiPost("approveRequest", { request_id: "REQ-1" })
+  ]);
+  assert.equal(fetchCount, 2);
 });
 
 test("all Admin outing and student mock actions are intercepted only behind mock mode", () => {

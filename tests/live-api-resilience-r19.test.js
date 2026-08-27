@@ -374,14 +374,15 @@ test("logout reset and request-session guard prevent stale authenticated data re
   assert.match(load, /currentSession !== sessionAtRequest/);
 });
 
-test("Student directory is applied before optional Warden and Guard master completion", () => {
+test("Student, Warden and Guard directories apply independently", () => {
   const start = appSource.indexOf("loadLiveMasters = async function loadLiveMastersWithStudentLoadingState");
   const end = appSource.indexOf("function setStudentDropdownState", start);
   const source = appSource.slice(start, end);
   assert.match(source, /const studentRequest = apiGet\("getStudentLoginDirectory"\)/);
-  assert.match(source, /const staffRequests = Promise\.allSettled/);
-  assert.ok(source.indexOf("await studentRequest") < source.indexOf("await staffRequests"));
-  assert.ok(source.indexOf("renderStudentDropdownState(students)") < source.indexOf("await staffRequests"));
+  assert.match(source, /wardenDirectoryLoadPromisePerf01 = apiGet\("getWardens"\)\.then\(\(rows\) => \{\s*updateWardenMasterList\(rows\)/);
+  assert.match(source, /guardDirectoryLoadPromisePerf01 = apiGet\("getGuards"\)\.then\(\(rows\) => \{\s*updateGuardMasterList\(rows\)/);
+  assert.doesNotMatch(source, /Promise\.allSettled\(\[\s*apiGet\("getWardens"\),\s*apiGet\("getGuards"\)/);
+  assert.doesNotMatch(source, /await Promise\.all\(\[wardenDirectoryLoadPromisePerf01, guardDirectoryLoadPromisePerf01\]\)/);
 });
 
 test("r19 resilience remains intact under the r21 presentation cache", () => {

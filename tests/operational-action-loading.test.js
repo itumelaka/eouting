@@ -78,12 +78,16 @@ function createWardenFixture() {
     currentSession: { role: "warden", user: { name: "WARDEN", pin: "1234" } },
     isLiveMode: true,
     STATUS: { approved: "Diluluskan Warden", rejected: "Ditolak Warden" },
-    outingRecords: [],
+    outingRecords: [{ id: "REQ-1", status: "Menunggu Kelulusan" }],
     apiPost: (action, payload) => {
       apiCalls.push({ action, payload });
-      return apiGate.promise;
+      return action === "getTodayRecords" ? refreshGate.promise : apiGate.promise;
     },
-    loadTodayRecords: () => refreshGate.promise,
+    mapLiveRecord: (record) => ({ ...record }),
+    getRecordId: (record) => record.id,
+    fetchWardenOperationalRecordsPerf01: () => refreshGate.promise,
+    applyWardenOperationalRecordsPerf01() {},
+    updateWardenLastUpdated() {},
     showSuccess() {},
     showModeNotice() {},
     showError() {},
@@ -91,6 +95,9 @@ function createWardenFixture() {
   });
   vm.runInContext([
     "const wardenActionLocks = {};",
+    "let wardenMutationGenerationPerf01 = 0;",
+    "let wardenReconcileRequestedGenerationPerf01 = 0;",
+    "let wardenReconcileInFlightPerf01 = null;",
     extractFunction("setOperationalActionLoading", "clearOperationalActionLoading"),
     extractFunction("clearOperationalActionLoading", "updateStatus"),
     extractFunction("updateStatus", "confirmOut")
@@ -142,7 +149,7 @@ function createGuardFixture(kind) {
   return { context, apiGate, refreshGate, apiCalls, group, buttons };
 }
 
-test("Warden approve enters loading once and stays protected through refresh", async () => {
+test("Warden approve applies the authoritative record and unlocks before reconciliation", async () => {
   const fixture = createWardenFixture();
   const [approve, reject] = fixture.buttons;
   const action = fixture.context.updateStatus("REQ-1", fixture.context.STATUS.approved, approve);
@@ -155,16 +162,18 @@ test("Warden approve enters loading once and stays protected through refresh", a
   assert.equal(approve.childNodes[1].textContent, "Meluluskan...");
   assert.equal(approve.getAttribute("aria-busy"), "true");
 
-  fixture.apiGate.resolve({});
+  fixture.apiGate.resolve({ id: "REQ-1", status: fixture.context.STATUS.approved });
   await flushPromises();
-  assert.equal(approve.disabled, true, "approve must remain locked during record refresh/render");
-  fixture.refreshGate.resolve();
   await action;
 
   assert.equal(approve.disabled, false);
   assert.equal(reject.disabled, false);
   assert.equal(approve.childNodes[0].textContent, "Luluskan");
   assert.equal(approve.classList.contains("is-loading"), false);
+  assert.equal(fixture.context.outingRecords[0].status, fixture.context.STATUS.approved);
+  assert.equal(fixture.apiCalls.length, 1, "reconciliation must not launch a second mutation");
+  fixture.refreshGate.resolve([]);
+  await flushPromises();
 });
 
 test("Warden reject enters loading once and restores both controls after failure", async () => {
@@ -237,7 +246,9 @@ test("operational loading is DOM-safe and reuses the reduced-motion Clay spinner
   assert.match(loadingSource, /student-submit-spinner operational-action-spinner/);
   assert.match(loadingSource, /controls\.forEach[\s\S]*control\.disabled = true/);
   assert.match(clearSource, /control\.disabled = disabled/);
-  assert.ok(wardenSource.indexOf("await loadTodayRecords()") < wardenSource.indexOf("clearOperationalActionLoading"));
+  assert.doesNotMatch(wardenSource, /await loadTodayRecords\(\)/);
+  assert.match(wardenSource, /applyAuthoritativeWardenRecordPerf01/);
+  assert.match(wardenSource, /reconcileWardenRecordsAfterActionPerf01\(\)/);
   assert.ok(outSource.indexOf("await loadTodayRecords()") < outSource.indexOf("clearOperationalActionLoading"));
   assert.ok(inSource.indexOf("await loadTodayRecords()") < inSource.indexOf("clearOperationalActionLoading"));
   assert.match(styleSource, /\.record-actions \.action-button\.is-loading:disabled/);
