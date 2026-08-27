@@ -5537,15 +5537,20 @@ button.profile-photo-frame {
    Premium Institutional Access UI — r13
    ================================================== */
 :root {
-  --access-navy-950: #030d1d;
-  --access-navy-900: #071a33;
-  --access-navy-800: #0a2851;
+  --access-navy-950: #07172b;
+  --access-navy-900: #0c2946;
+  --access-navy-800: #123b62;
   --access-blue-700: #0d47a1;
   --access-blue-500: #2196f3;
   --access-off-white: #f7fafd;
   --access-muted: #9fb3c8;
   --access-line: rgba(159, 190, 224, 0.24);
-  --access-glass: rgba(7, 26, 51, 0.88);
+  --access-glass: rgba(13, 41, 70, 0.88);
+  --access-panel-start: rgba(18, 50, 82, 0.96);
+  --access-panel-end: rgba(9, 30, 55, 0.98);
+  --access-card-start: rgba(22, 56, 91, 0.96);
+  --access-card-end: rgba(11, 34, 61, 0.98);
+  --access-control-surface: rgba(18, 47, 76, 0.9);
   --access-shadow: 0 24px 70px rgba(0, 6, 18, 0.34);
   --access-focus: #7dd3fc;
 }
@@ -5554,7 +5559,7 @@ body:has(#accessScreen:not(.hidden)) {
   background:
     radial-gradient(circle at 12% 2%, rgba(33, 150, 243, 0.2), transparent 31rem),
     radial-gradient(circle at 91% 22%, rgba(31, 98, 196, 0.16), transparent 28rem),
-    linear-gradient(145deg, var(--access-navy-950) 0%, var(--access-navy-900) 50%, #092448 100%);
+    linear-gradient(145deg, var(--access-navy-950) 0%, var(--access-navy-900) 50%, #12365a 100%);
   color: var(--access-off-white);
   isolation: isolate;
   min-height: 100vh;
@@ -5593,7 +5598,7 @@ body:has(#accessScreen:not(.hidden))::after {
 body:has(#accessScreen:not(.hidden)) .app-header {
   background:
     radial-gradient(circle at 72% -80%, rgba(33, 150, 243, 0.35), transparent 45%),
-    linear-gradient(115deg, #041228 0%, #082b5c 58%, #0b3d78 100%);
+    linear-gradient(115deg, #0a203a 0%, #103966 58%, #164d87 100%);
   border-bottom: 1px solid rgba(126, 184, 239, 0.26);
   box-shadow: 0 18px 54px rgba(0, 5, 17, 0.32);
   padding: 14px clamp(16px, 3vw, 42px);
@@ -5706,7 +5711,7 @@ body:has(#accessScreen:not(.hidden)) .access-screen {
 
 body:has(#accessScreen:not(.hidden)) .access-heading {
   background:
-    linear-gradient(135deg, rgba(19, 53, 96, 0.86), rgba(7, 26, 51, 0.88));
+    linear-gradient(135deg, rgba(27, 67, 110, 0.88), var(--access-glass));
   border: 1px solid var(--access-line);
   border-radius: 18px;
   box-shadow: var(--access-shadow), inset 0 1px rgba(255, 255, 255, 0.06);
@@ -5750,7 +5755,7 @@ body:has(#accessScreen:not(.hidden)) .access-heading h2 {
 body:has(#accessScreen:not(.hidden)) .access-heading p { color: var(--access-muted); }
 
 body:has(#accessScreen:not(.hidden)) .admin-management-button {
-  background: rgba(7, 28, 55, 0.78);
+  background: var(--access-control-surface);
   border: 1px solid rgba(74, 222, 128, 0.32);
   border-radius: 12px;
   box-shadow: none;
@@ -5773,7 +5778,7 @@ body:has(#accessScreen:not(.hidden)) .clay-role-nav {
 body:has(#accessScreen:not(.hidden)) .role-card.clay-role-button {
   --role-accent: #2196f3;
   align-content: start;
-  background: linear-gradient(155deg, rgba(17, 49, 89, 0.96), rgba(6, 23, 47, 0.96));
+  background: linear-gradient(155deg, var(--access-card-start), var(--access-card-end));
   border: 1px solid rgba(96, 165, 250, 0.26);
   border-radius: 16px;
   box-shadow: 0 18px 40px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.06), inset 0 0 28px color-mix(in srgb, var(--role-accent) 5%, transparent);
@@ -5867,7 +5872,7 @@ body:has(#accessScreen:not(.hidden)) .role-card.clay-role-button[aria-pressed="t
 body:has(#accessScreen:not(.hidden)) .access-panel {
   background:
     radial-gradient(circle at 100% 0%, rgba(33, 150, 243, 0.13), transparent 19rem),
-    linear-gradient(145deg, rgba(11, 39, 75, 0.96), rgba(4, 18, 39, 0.98));
+    linear-gradient(145deg, var(--access-panel-start), var(--access-panel-end));
   border: 1px solid rgba(125, 211, 252, 0.24);
   border-top: 3px solid #2196f3;
   border-radius: 18px;
@@ -6186,7 +6191,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) {
   background:
     radial-gradient(circle at 12% 0%, rgba(33, 150, 243, 0.2), transparent 32rem),
     radial-gradient(circle at 92% 28%, rgba(29, 78, 216, 0.14), transparent 28rem),
-    linear-gradient(150deg, var(--access-navy-950) 0%, var(--access-navy-900) 52%, #092448 100%);
+    linear-gradient(150deg, var(--access-navy-950) 0%, var(--access-navy-900) 52%, #12365a 100%);
   color: var(--access-off-white);
   min-height: 100vh;
 }
@@ -6224,7 +6229,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar {
   align-items: center;
   background:
     radial-gradient(circle at 0 0, rgba(33, 150, 243, 0.2), transparent 15rem),
-    linear-gradient(135deg, rgba(12, 43, 83, 0.94), rgba(5, 22, 46, 0.96));
+    linear-gradient(135deg, var(--access-card-start), var(--access-panel-end));
   border: 1px solid rgba(96, 165, 250, 0.3);
   border-left: 4px solid var(--access-blue-500);
   border-radius: 16px;
@@ -6248,7 +6253,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) .session-bar strong {
 }
 
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #logoutButton {
-  background: rgba(8, 32, 64, 0.78);
+  background: var(--access-control-surface);
   border: 1px solid rgba(125, 211, 252, 0.32);
   border-radius: 11px;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
@@ -6260,7 +6265,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #logoutButton {
 body:has(#appWorkspace.active #pelajar.tab-panel.active) .tabs { display: none; }
 
 body:has(#appWorkspace.active #pelajar.tab-panel.active) .announcement-banner {
-  background: rgba(8, 30, 60, 0.9);
+  background: var(--access-control-surface);
   border-color: rgba(125, 211, 252, 0.24);
   box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
   color: #e7f3ff;
@@ -6295,7 +6300,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar { color: var(-
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .identity-panel {
   background:
     radial-gradient(circle at 100% 0%, rgba(33, 150, 243, 0.12), transparent 17rem),
-    linear-gradient(145deg, rgba(11, 39, 75, 0.94), rgba(5, 21, 44, 0.96));
+    linear-gradient(145deg, var(--access-panel-start), var(--access-panel-end));
   border: 1px solid rgba(96, 165, 250, 0.28);
   border-left: 5px solid var(--access-blue-500);
   border-radius: 17px;
@@ -6366,7 +6371,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-profi
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-status-section {
   background:
     radial-gradient(circle at 100% 0%, rgba(33, 150, 243, 0.15), transparent 19rem),
-    linear-gradient(145deg, rgba(10, 38, 74, 0.96), rgba(4, 18, 39, 0.98));
+    linear-gradient(145deg, var(--access-panel-start), var(--access-panel-end));
   border: 1px solid rgba(96, 165, 250, 0.3);
   border-left: 5px solid var(--access-blue-500);
   border-radius: 19px;
@@ -6386,7 +6391,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-curre
 
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-current-card {
   --student-state-accent: var(--access-blue-500);
-  background: linear-gradient(150deg, rgba(16, 51, 91, 0.94), rgba(5, 23, 48, 0.98));
+  background: linear-gradient(150deg, var(--access-card-start), var(--access-card-end));
   border: 1px solid color-mix(in srgb, var(--student-state-accent) 42%, transparent);
   border-left: 5px solid var(--student-state-accent);
   border-radius: 16px;
@@ -6465,7 +6470,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-reque
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar #requestForm {
   background:
     radial-gradient(circle at 100% 0%, rgba(33, 150, 243, 0.1), transparent 18rem),
-    linear-gradient(145deg, rgba(10, 37, 72, 0.96), rgba(4, 18, 39, 0.98));
+    linear-gradient(145deg, var(--access-panel-start), var(--access-panel-end));
   border: 1px solid rgba(96, 165, 250, 0.28);
   border-top: 3px solid var(--access-blue-500);
   border-radius: 18px;
@@ -6520,7 +6525,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar :where(.primar
 
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .secondary-action,
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .history-toggle {
-  background: rgba(10, 44, 82, 0.84);
+  background: var(--access-control-surface);
   border: 1px solid rgba(125, 211, 252, 0.3);
   border-radius: 10px;
   color: #e4f2ff;
@@ -6557,7 +6562,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .return-selfie
 }
 
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-outing-history {
-  background: linear-gradient(145deg, rgba(10, 37, 72, 0.94), rgba(4, 18, 39, 0.98));
+  background: linear-gradient(145deg, var(--access-panel-start), var(--access-panel-end));
   border: 1px solid rgba(96, 165, 250, 0.24);
   border-radius: 18px;
   box-shadow: 0 18px 44px rgba(0, 5, 18, 0.28), inset 0 1px rgba(255, 255, 255, 0.05);
@@ -6586,7 +6591,7 @@ body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-recor
 }
 
 body:has(#appWorkspace.active #pelajar.tab-panel.active) #pelajar .student-history-compact-list {
-  background: rgba(5, 23, 47, 0.74);
+  background: var(--access-control-surface);
   border-color: rgba(125, 211, 252, 0.18);
   border-radius: 13px;
 }
@@ -6704,7 +6709,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) {
   background:
     radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.2), transparent 34rem),
     radial-gradient(circle at 92% 24%, rgba(124, 58, 237, 0.14), transparent 30rem),
-    linear-gradient(150deg, var(--access-navy-950) 0%, #071a37 52%, #101b45 100%);
+    linear-gradient(150deg, var(--access-navy-950) 0%, #102d4d 52%, #1a2d58 100%);
   color: var(--access-off-white);
   min-height: 100vh;
 }
@@ -6742,7 +6747,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar {
   align-items: center;
   background:
     radial-gradient(circle at 0 0, rgba(129, 140, 248, 0.24), transparent 17rem),
-    linear-gradient(135deg, rgba(25, 35, 82, 0.96), rgba(11, 22, 54, 0.97));
+    linear-gradient(135deg, rgba(32, 45, 92, 0.96), rgba(16, 32, 68, 0.97));
   border: 1px solid rgba(165, 180, 252, 0.34);
   border-left: 5px solid #818cf8;
   border-radius: 16px;
@@ -6768,7 +6773,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) .session-bar strong {
 }
 
 body:has(#appWorkspace.active #warden.tab-panel.active) #logoutButton {
-  background: rgba(31, 41, 89, 0.86);
+  background: rgba(42, 54, 105, 0.88);
   border: 1px solid rgba(196, 181, 253, 0.32);
   border-radius: 11px;
   color: #f2efff;
@@ -6777,7 +6782,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) #logoutButton {
 }
 
 body:has(#appWorkspace.active #warden.tab-panel.active) .tabs {
-  background: rgba(9, 22, 50, 0.82);
+  background: rgba(17, 34, 66, 0.88);
   border: 1px solid rgba(129, 140, 248, 0.18);
   border-radius: 13px;
   gap: 5px;
@@ -6800,7 +6805,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) .tab-button.active {
 }
 
 body:has(#appWorkspace.active #warden.tab-panel.active) .announcement-banner {
-  background: rgba(12, 27, 60, 0.92);
+  background: rgba(20, 40, 75, 0.94);
   border-color: rgba(165, 180, 252, 0.24);
   box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
   color: #edf2ff;
@@ -6826,7 +6831,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) #ruleNotice {
 body:has(#appWorkspace.active #warden.tab-panel.active) #warden { color: #e8eef8; }
 
 body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-operational-controls {
-  background: linear-gradient(145deg, rgba(19, 37, 78, 0.92), rgba(9, 22, 51, 0.96));
+  background: linear-gradient(145deg, rgba(27, 48, 91, 0.94), rgba(14, 33, 65, 0.97));
   border: 1px solid rgba(129, 140, 248, 0.24);
   border-radius: 12px;
   box-shadow: 0 10px 24px rgba(0, 5, 18, 0.2), inset 0 1px rgba(255, 255, 255, 0.04);
@@ -6857,7 +6862,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) #warden .warden-reload-a
 body:has(#appWorkspace.active #warden.tab-panel.active) #warden .current-hostel-roster {
   background:
     radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.1), transparent 18rem),
-    linear-gradient(145deg, rgba(12, 48, 68, 0.94), rgba(7, 27, 51, 0.98));
+    linear-gradient(145deg, rgba(18, 61, 82, 0.95), rgba(11, 38, 65, 0.98));
   border: 1px solid rgba(45, 212, 191, 0.28);
   border-left: 5px solid #2dd4bf;
   border-radius: 18px;
@@ -6922,7 +6927,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) #warden :where(#wardenLi
 body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-card {
   background:
     radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.1), transparent 17rem),
-    linear-gradient(150deg, rgba(16, 37, 77, 0.96), rgba(7, 20, 47, 0.98));
+    linear-gradient(150deg, rgba(24, 50, 93, 0.97), rgba(12, 32, 64, 0.98));
   border: 1px solid rgba(129, 140, 248, 0.25);
   border-left: 4px solid #818cf8;
   border-radius: 16px;
@@ -6960,7 +6965,7 @@ body:has(#appWorkspace.active #warden.tab-panel.active) #warden .profile-photo-f
 }
 
 body:has(#appWorkspace.active #warden.tab-panel.active) #warden .record-detail {
-  background: rgba(5, 19, 44, 0.68);
+  background: rgba(12, 32, 61, 0.76);
   border: 1px solid rgba(129, 140, 248, 0.14);
   border-radius: 11px;
   color: #c8d5e5;
@@ -7329,7 +7334,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) {
   background:
     radial-gradient(circle at 8% 0%, rgba(245, 158, 11, 0.16), transparent 32rem),
     radial-gradient(circle at 94% 24%, rgba(249, 115, 22, 0.1), transparent 28rem),
-    linear-gradient(150deg, var(--access-navy-950) 0%, #071a32 54%, #172038 100%);
+    linear-gradient(150deg, var(--access-navy-950) 0%, #102b48 54%, #22314b 100%);
   color: var(--access-off-white);
   min-height: 100vh;
 }
@@ -7367,7 +7372,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) .session-bar {
   align-items: center;
   background:
     radial-gradient(circle at 0 0, rgba(245, 158, 11, 0.2), transparent 17rem),
-    linear-gradient(135deg, rgba(36, 39, 59, 0.97), rgba(10, 24, 49, 0.98));
+    linear-gradient(135deg, rgba(48, 51, 72, 0.97), rgba(17, 37, 67, 0.98));
   border: 1px solid rgba(251, 191, 36, 0.28);
   border-left: 5px solid #f59e0b;
   border-radius: 16px;
@@ -7402,7 +7407,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) #logoutButton {
 }
 
 body:has(#appWorkspace.active #guard.tab-panel.active) .tabs {
-  background: rgba(9, 22, 45, 0.84);
+  background: rgba(17, 35, 62, 0.9);
   border: 1px solid rgba(245, 158, 11, 0.16);
   border-radius: 13px;
   gap: 5px;
@@ -7425,7 +7430,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) .tab-button.active {
 }
 
 body:has(#appWorkspace.active #guard.tab-panel.active) .announcement-banner {
-  background: rgba(12, 27, 55, 0.92);
+  background: rgba(21, 42, 72, 0.94);
   border-color: rgba(245, 158, 11, 0.2);
   box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
   color: #f8eddc;
@@ -7452,7 +7457,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) #guard { color: #e8eef8; 
 body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-heading {
   background:
     radial-gradient(circle at 100% 0%, rgba(249, 115, 22, 0.15), transparent 19rem),
-    linear-gradient(145deg, rgba(30, 40, 66, 0.97), rgba(8, 22, 47, 0.98));
+    linear-gradient(145deg, rgba(42, 53, 79, 0.97), rgba(16, 36, 65, 0.98));
   border: 1px solid rgba(245, 158, 11, 0.28);
   border-left: 5px solid #f59e0b;
   border-radius: 17px;
@@ -7484,7 +7489,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-dashboard-h
 
 body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-refresh-panel {
   align-items: center;
-  background: linear-gradient(145deg, rgba(43, 40, 47, 0.92), rgba(10, 24, 49, 0.96));
+  background: linear-gradient(145deg, rgba(54, 51, 59, 0.94), rgba(17, 38, 68, 0.97));
   border: 1px solid rgba(245, 158, 11, 0.22);
   border-radius: 13px;
   display: flex;
@@ -7523,7 +7528,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-operational
 
 body:has(#appWorkspace.active #guard.tab-panel.active) #guard .guard-search-control {
   align-items: center;
-  background: linear-gradient(145deg, rgba(17, 36, 63, 0.98), rgba(7, 22, 46, 0.99));
+  background: linear-gradient(145deg, rgba(26, 49, 78, 0.98), rgba(15, 37, 65, 0.99));
   border: 1px solid rgba(245, 158, 11, 0.26);
   border-radius: 13px;
   display: flex;
@@ -7639,7 +7644,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) #guard :where(#guardAppro
 body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-card.guard-operational-card {
   background:
     radial-gradient(circle at 100% 0%, rgba(245, 158, 11, 0.09), transparent 17rem),
-    linear-gradient(150deg, rgba(19, 39, 68, 0.97), rgba(7, 21, 45, 0.99));
+    linear-gradient(150deg, rgba(29, 52, 82, 0.97), rgba(15, 36, 64, 0.99));
   border: 1px solid rgba(245, 158, 11, 0.24);
   border-left: 4px solid #f59e0b;
   border-radius: 16px;
@@ -7652,7 +7657,7 @@ body:has(#appWorkspace.active #guard.tab-panel.active) #guard .record-card.guard
 body:has(#appWorkspace.active #guard.tab-panel.active) #guard #guardOutList .record-card.guard-operational-card {
   background:
     radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.08), transparent 17rem),
-    linear-gradient(150deg, rgba(13, 42, 64, 0.97), rgba(6, 24, 43, 0.99));
+    linear-gradient(150deg, rgba(21, 55, 77, 0.97), rgba(13, 39, 61, 0.99));
   border-color: rgba(45, 212, 191, 0.23);
   border-left-color: #2dd4bf;
 }
@@ -7872,7 +7877,7 @@ body:has(#admin.admin-dashboard.active) {
   background:
     radial-gradient(circle at 7% 0%, rgba(16, 185, 129, 0.17), transparent 34rem),
     radial-gradient(circle at 94% 18%, rgba(6, 182, 212, 0.1), transparent 30rem),
-    linear-gradient(150deg, var(--access-navy-950) 0%, #071b32 52%, #0d2638 100%);
+    linear-gradient(150deg, var(--access-navy-950) 0%, #0f2d47 52%, #17394b 100%);
   color: var(--access-off-white);
   min-height: 100vh;
 }
@@ -7910,7 +7915,7 @@ body:has(#admin.admin-dashboard.active) .session-bar {
   align-items: center;
   background:
     radial-gradient(circle at 0 0, rgba(16, 185, 129, 0.22), transparent 18rem),
-    linear-gradient(135deg, rgba(12, 51, 55, 0.97), rgba(7, 25, 48, 0.98));
+    linear-gradient(135deg, rgba(19, 64, 69, 0.97), rgba(14, 39, 65, 0.98));
   border: 1px solid rgba(52, 211, 153, 0.3);
   border-left: 5px solid #10b981;
   border-radius: 16px;
@@ -7945,7 +7950,7 @@ body:has(#admin.admin-dashboard.active) #logoutButton {
 }
 
 body:has(#admin.admin-dashboard.active) .announcement-banner {
-  background: rgba(9, 31, 53, 0.92);
+  background: rgba(17, 45, 70, 0.94);
   border-color: rgba(52, 211, 153, 0.2);
   box-shadow: 0 12px 30px rgba(0, 5, 18, 0.22);
   color: #e7f8f2;
@@ -7972,7 +7977,7 @@ body:has(#admin.admin-dashboard.active) #admin { color: #dce8f3; }
 body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-heading {
   background:
     radial-gradient(circle at 100% 0%, rgba(6, 182, 212, 0.13), transparent 20rem),
-    linear-gradient(145deg, rgba(14, 50, 61, 0.97), rgba(7, 23, 47, 0.98));
+    linear-gradient(145deg, rgba(22, 64, 75, 0.97), rgba(14, 38, 64, 0.98));
   border: 1px solid rgba(52, 211, 153, 0.28);
   border-left: 5px solid #10b981;
   border-radius: 17px;
@@ -8003,7 +8008,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-dashboard-heading p {
 }
 
 body:has(#admin.admin-dashboard.active) #admin .admin-subnav {
-  background: rgba(7, 27, 49, 0.9);
+  background: rgba(15, 42, 68, 0.94);
   border: 1px solid rgba(52, 211, 153, 0.18);
   border-radius: 14px;
   box-shadow: 0 14px 34px rgba(0, 5, 18, 0.24), inset 0 1px rgba(255, 255, 255, 0.04);
@@ -8033,7 +8038,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-subtab.active {
 body:has(#admin.admin-dashboard.active) #admin .admin-subpanel {
   background:
     radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.055), transparent 24rem),
-    linear-gradient(150deg, rgba(11, 31, 56, 0.94), rgba(6, 22, 43, 0.97));
+    linear-gradient(150deg, rgba(19, 46, 73, 0.95), rgba(13, 36, 61, 0.98));
   border: 1px solid rgba(52, 211, 153, 0.14);
   border-radius: 18px;
   box-shadow: 0 18px 42px rgba(0, 5, 18, 0.25), inset 0 1px rgba(255, 255, 255, 0.035);
@@ -8098,7 +8103,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-kpi-grid {
 }
 
 body:has(#admin.admin-dashboard.active) #admin .admin-kpi-card {
-  background: linear-gradient(145deg, rgba(17, 47, 71, 0.96), rgba(8, 29, 53, 0.98));
+  background: linear-gradient(145deg, rgba(25, 60, 85, 0.96), rgba(15, 43, 70, 0.98));
   border: 1px solid rgba(52, 211, 153, 0.18);
   border-left: 4px solid #10b981;
   border-radius: 13px;
@@ -8132,7 +8137,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-ops-kpi-pending-emergency 
 body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster {
   background:
     radial-gradient(circle at 100% 0%, rgba(45, 212, 191, 0.1), transparent 18rem),
-    linear-gradient(145deg, rgba(10, 54, 67, 0.95), rgba(6, 30, 50, 0.98));
+    linear-gradient(145deg, rgba(17, 67, 81, 0.95), rgba(13, 43, 67, 0.98));
   border: 1px solid rgba(45, 212, 191, 0.26);
   border-left: 5px solid #2dd4bf;
   border-radius: 16px;
@@ -8152,7 +8157,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster .cur
 body:has(#admin.admin-dashboard.active) #admin .admin-current-hostel-roster :where(ul, .current-hostel-empty-group) { border-top-color: rgba(94, 234, 212, 0.16); color: #c5dedb; }
 
 body:has(#admin.admin-dashboard.active) #admin .admin-action-queue {
-  background: linear-gradient(145deg, rgba(14, 39, 66, 0.95), rgba(7, 25, 48, 0.98));
+  background: linear-gradient(145deg, rgba(22, 53, 80, 0.95), rgba(14, 40, 67, 0.98));
   border: 1px solid rgba(52, 211, 153, 0.18);
   border-radius: 16px;
   box-shadow: 0 16px 38px rgba(0, 5, 18, 0.24);
@@ -8165,7 +8170,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-action-grid {
 }
 
 body:has(#admin.admin-dashboard.active) #admin .admin-action-card {
-  background: rgba(11, 31, 55, 0.9);
+  background: rgba(19, 45, 72, 0.94);
   border-color: rgba(148, 163, 184, 0.2);
   border-left-color: #64748b;
   border-radius: 12px;
@@ -8192,7 +8197,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-ops-list {
 
 body:has(#admin.admin-dashboard.active) #admin .admin-ops-card,
 body:has(#admin.admin-dashboard.active) #admin .admin-staff-card {
-  background: linear-gradient(145deg, rgba(15, 42, 67, 0.94), rgba(7, 27, 50, 0.98));
+  background: linear-gradient(145deg, rgba(23, 56, 82, 0.95), rgba(14, 41, 68, 0.98));
   border-color: rgba(52, 211, 153, 0.16);
   border-radius: 13px;
   box-shadow: 0 14px 32px rgba(0, 5, 18, 0.22);
@@ -8227,7 +8232,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-student-module-heading {
 }
 
 body:has(#admin.admin-dashboard.active) #admin .admin-student-subtabs {
-  background: rgba(5, 23, 43, 0.82);
+  background: rgba(14, 39, 64, 0.9);
   border: 1px solid rgba(52, 211, 153, 0.16);
   border-radius: 11px;
   gap: 4px;
@@ -8300,7 +8305,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-migration-confirm { color:
 body:has(#admin.admin-dashboard.active) #admin .admin-student-filters,
 body:has(#admin.admin-dashboard.active) #admin .stats-filter-card,
 body:has(#admin.admin-dashboard.active) #admin .admin-master-filters {
-  background: linear-gradient(145deg, rgba(15, 48, 66, 0.9), rgba(8, 29, 50, 0.95));
+  background: linear-gradient(145deg, rgba(23, 61, 80, 0.93), rgba(15, 43, 68, 0.97));
   border: 1px solid rgba(52, 211, 153, 0.15);
   border-radius: 13px;
   box-shadow: none;
@@ -8310,12 +8315,12 @@ body:has(#admin.admin-dashboard.active) #admin :where(label, legend) { color: #d
 body:has(#admin.admin-dashboard.active) #admin .admin-field-helper { color: #9fb5c5; }
 
 body:has(#admin.admin-dashboard.active) #admin :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
-  background: rgba(5, 22, 42, 0.88);
+  background: rgba(15, 41, 65, 0.94);
   border-color: rgba(103, 232, 249, 0.2);
   color: #f2f8fc;
 }
 
-body:has(#admin.admin-dashboard.active) #admin :where(input, select, textarea)::placeholder { color: #78909f; }
+body:has(#admin.admin-dashboard.active) #admin :where(input, select, textarea)::placeholder { color: #a4b7c4; }
 body:has(#admin.admin-dashboard.active) #admin :where(input[type="checkbox"], input[type="radio"]) { accent-color: #10b981; }
 
 body:has(#admin.admin-dashboard.active) #admin .admin-student-list,
@@ -8327,7 +8332,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-student-config-list {
 body:has(#admin.admin-dashboard.active) #admin .admin-student-card,
 body:has(#admin.admin-dashboard.active) #admin .admin-student-config-card,
 body:has(#admin.admin-dashboard.active) #admin .admin-type-card {
-  background: linear-gradient(145deg, rgba(15, 45, 67, 0.96), rgba(7, 27, 49, 0.98));
+  background: linear-gradient(145deg, rgba(23, 59, 83, 0.96), rgba(14, 41, 67, 0.98));
   border: 1px solid rgba(52, 211, 153, 0.17);
   border-radius: 14px;
   box-shadow: 0 14px 32px rgba(0, 5, 18, 0.22);
@@ -8356,7 +8361,7 @@ body:has(#admin.admin-dashboard.active) #admin .student-li-badge { background: #
 body:has(#admin.admin-dashboard.active) #admin .admin-student-editor,
 body:has(#admin.admin-dashboard.active) #admin .admin-editor,
 body:has(#admin.admin-dashboard.active) #admin .admin-announcement-form {
-  background: linear-gradient(145deg, rgba(14, 45, 65, 0.97), rgba(6, 25, 47, 0.99));
+  background: linear-gradient(145deg, rgba(22, 59, 80, 0.97), rgba(13, 39, 65, 0.99));
   border: 1px solid rgba(52, 211, 153, 0.18);
   border-radius: 15px;
   box-shadow: 0 16px 36px rgba(0, 5, 18, 0.25);
@@ -8369,7 +8374,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-announcement-boundary { ba
 body:has(#admin.admin-dashboard.active) #admin .admin-announcement-state { color: #9fb5c5; }
 
 body:has(#admin.admin-dashboard.active) #admin .admin-config-fieldset {
-  background: rgba(5, 22, 42, 0.62);
+  background: rgba(14, 39, 64, 0.74);
   border-color: rgba(103, 232, 249, 0.14);
   border-radius: 12px;
 }
@@ -8385,7 +8390,7 @@ body:has(#admin.admin-dashboard.active) #admin .admin-announcement-options label
 
 body:has(#admin.admin-dashboard.active) #admin .stats-section,
 body:has(#admin.admin-dashboard.active) #admin .admin-table-wrap {
-  background: rgba(7, 26, 47, 0.72);
+  background: rgba(15, 42, 67, 0.82);
   border: 1px solid rgba(52, 211, 153, 0.12);
   border-radius: 13px;
   padding: 12px;
