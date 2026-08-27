@@ -1,18 +1,28 @@
 # Deployment eOuting ITU
 
-Versi aplikasi production semasa: **v2.4.0**, cache/asset `2.4.0-r20`, service worker `eouting-cache-v2.4.0-r20` dan GAS **Version 55**. Regression production r20 ialah **713/713**; full suite repo termasuk P0 yang di-HOLD ialah **726/726**.
+Versi aplikasi production semasa: **v2.4.0**, cache/asset `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21` dan GAS **Version 57**. Full regression terakhir sebelum release ialah **744/744**.
 
-## Version 56 HOLD selepas insiden delivery — 25 Ogos 2026
+## Production Version 57 — verified 27 Ogos 2026
+
+- Frontend aktif tunggal ialah repository `itumelaka/eouting` pada `https://itumelaka.github.io/eouting/`. Repository `itumelaka/eoutingV2` telah retired/archived read-only dan routing `/eoutingV2` tidak lagi disokong.
+- Existing production deployment berada pada Version 57 dengan description `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`. Staging juga Version 57.
+- Isolated Version 55 dikekalkan sebagai rollback/control dan bukan active production. Jangan arahkan frontend production kepadanya kecuali rollback terkawal diluluskan.
+- Production smoke selesai dengan berjaya; Admin Config Readiness memaparkan `Config Active`.
+- Readiness fix membenarkan configured `departure_allowed_days` dengan `same_day_only=true` walaupun `require_leave_date=false`. Non-same-day masih memerlukan leave date; runtime departure-day enforcement, Pulang Bermalam dan Guard approved-date validation tidak berubah.
+- PERF-01 Phase 1 dan UI contrast/brightness close-out disahkan melalui full suite **744/744** dan pemerhatian pengguna production yang lebih pantas/lancar.
+- Deferred performance backlog kekal berasingan: Telegram synchronous latency, GET timeout/retry policy, cache TTL/polling efficiency, large first-load images/assets dan broader lock/index architecture. Tiada satu pun item ini dianggap fixed oleh Version 57.
+
+## Version 56 HOLD selepas insiden delivery — rekod sejarah 25 Ogos 2026
 
 - P0-1 + P0-2 dipush ke source Apps Script, stored Version 56 `eOuting v2.4.0 performance P0-1 P0-2` dicipta dan production ditukar sementara daripada Version 55 kepada Version 56.
 - Version 56 menunjukkan intermittent HTML 404 `script.googleusercontent.com`, latency teruk, browser fetch/CORS-like failures dan kegagalan health endpoint. Production segera dirollback kepada Version 55 dan kemudian lulus 10/10 health checks.
 - Staging awam Version 56 yang diasingkan turut menghasilkan semula instability; fresh Version 55 control stabil. Staging Version 56 kemudian sihat tanpa perubahan source/metadata, sementara execution `doGet` berkorelasi selesai normal dalam beberapa saat walaupun client stalled atau menerima HTML 404.
 - Bukti paling kuat menunjukkan anomali rollout/propagation redirect/result-delivery selepas execution yang berkaitan dengan Version 56. Google tidak mengesahkan outage dan P0 tidak dianggap terbukti innocent; **source-level evidence did not demonstrate P0 logic as the cause**.
-- Production kini Version 55 dengan description rollback semasa `eOuting v2.4.0 temporary rollback for production stability`. Version 56 **NOT PRODUCTION / HOLD** dan stagingnya dikekalkan sementara; close-out ini tidak membenarkan sebarang deployment.
+- Pada close-out sejarah ini production kembali kepada Version 55 dengan description `eOuting v2.4.0 temporary rollback for production stability`. Keadaan itu telah digantikan oleh rollout Version 57 pada 27 Ogos 2026.
 
 Announcement Banner authenticated POST turut gagal dimuat dalam window sama. Backend path banner tidak berubah dalam Version 56, tetapi POST tidak mempunyai `AbortController`/timeout 22 saat setara GET dan network/server errors disenyapkan sebagai banner tersembunyi. Corak itu konsisten dengan insiden delivery lebih luas, namun tiada execution banner `doPost` tertentu dapat dikenal pasti secara unik. POST resilience kekal backlog.
 
-### Operational gate sebelum controlled retry
+### Operational gate sebelum controlled retry — rekod sejarah
 
 Selepas sekurang-kurangnya 24 jam, staging Version 56 yang diasingkan mesti lulus 10 health request sequential dengan `_ts` unik, tiga health request pada concurrency 3, dan lima current-hostel summary request. Gate memerlukan sifar HTML/404, sifar timeout, semua hostel-summary di bawah timeout frontend 22 saat dan privacy public kekal aggregate-only. Ini gate validasi operasi untuk retry, bukan SLA kekal.
 
@@ -22,7 +32,7 @@ Selepas sekurang-kurangnya 24 jam, staging Version 56 yang diasingkan mesti lulu
 - Smoke login berjaya untuk A2, A3, LI UMK dan LI UPM. Rollback operasi ialah `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
 - Active-request form suppression disahkan bagi Pelajar dengan request aktif dan tiada request.
 - Public aggregate Current Hostel Residents serta authenticated Guard roster disahkan; privacy split dan dynamic grouping tepat.
-- Production deployment GAS kini Version 55 dengan description rollback semasa `eOuting v2.4.0 temporary rollback for production stability`; frontend semasa ialah r20. UI r13–r20 tidak memerlukan `clasp push`, GAS version atau deployment baharu.
+- Milestone ini menggunakan Version 55 dan frontend r20 pada 25 Ogos; current production kemudian maju ke Version 57/r21 pada 27 Ogos. UI r13–r20 sendiri tidak memerlukan deployment backend baharu.
 - Operasi penghuni semasa hendaklah ditafsir sebagai “Anggaran semasa berdasarkan rekod keluar/masuk eOuting.” Hanya `KELUAR` bermaksud outside; approved-but-not-checked-out kekal in hostel, `SELESAI` kembali in hostel dan inactive Student dikecualikan.
 
 ## Generic Application Date Window production close-out — 22 Ogos 2026
@@ -124,7 +134,7 @@ Jika duplicate runaway bagi request/stage yang sama disahkan, emergency containm
 
 ## Notis Banner V1 — Live
 
-Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache production semasa ialah `2.4.0-r20`.
+Production GAS Version 37 menyediakan `getAnnouncementBannerAdmin`, `updateAnnouncementBanner` dan `getAnnouncementBanner`; frontend `Notis Banner` telah live dan disahkan. Satu banner global menggunakan Script Properties yang diwujudkan pada simpanan Admin pertama, tanpa sheet `ANNOUNCEMENTS` atau setup property manual. Close-out sejarah ini menggunakan cache `2.2.0-r4`; active cache production semasa ialah `2.4.0-r21`.
 
 Admin UI, save, Normal `MAKLUMAN`, authenticated display, timestamp, ticker berterusan, pause hover/focus/touch, reduced-motion statik dan privacy Public Pemantauan telah disahkan. Focused tests lulus **12/12** dan full Node suite **287/287**. Ayat panduan Pelajar pendua turut dibuang sementara Announcement Banner, `ruleNotice` kuning dan borang kekal. Tiada deployment tambahan diperlukan untuk close-out dokumentasi ini.
 
@@ -177,9 +187,9 @@ Rollout ini tidak mengaktifkan config-driven submission dan tidak menukar endpoi
 
 Urutan backup, migration idempotent, legacy check, readiness hijau dan controlled activation telah selesai. Production kini menggunakan config-driven submission. Lima flow seed dan consumer dinamik mesti terus diuji apabila konfigurasi operational berubah; active custom config tidak dikecualikan daripada readiness dan regression QA.
 
-## Release Beta v2.0
+## Release Beta v2.0 — sejarah; frontend beta telah retired
 
-Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Display version/`version.json` kekal `v2.4.0`, manakala query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation production semasa diselaraskan kepada `2.4.0-r20`.
+Runbook authoritative ialah [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md). Display version/`version.json` kekal `v2.4.0`, manakala query CSS/JS, `CACHE_NAME`, app-shell URLs dan regression expectation production semasa diselaraskan kepada `2.4.0-r21`. Arahan beta berikut dikekalkan sebagai sejarah sahaja; `eoutingV2` bukan frontend aktif.
 
 Beta pertama hendaklah menguji lima seed dan sekurang-kurangnya satu jenis custom. Gate mesti meliputi `require_selfie=true/false`, `require_warden_approval=true/false`, audit `AUTO_APPROVE_REQUEST`, Guard transition, Telegram, statistik dan filter. `require_warden_approval=false` kekal high-impact walaupun auto-approval kini eksplisit dan diaudit.
 
@@ -318,7 +328,7 @@ Frontend:
 
 - buka `https://itumelaka.github.io/eouting/`;
 - semak footer dan update popup;
-- semak asset query `2.4.0-r20` dan Cache Storage `eouting-cache-v2.4.0-r20`, khususnya selepas refresh/reopen PWA mobile;
+- semak asset query `2.4.0-r21` dan Cache Storage `eouting-cache-v2.4.0-r21`, khususnya selepas refresh/reopen PWA mobile;
 - login Admin, refresh berulang dan sahkan restore hanya selepas backend validation serta tab bukan default kekal lazy;
 - login Pelajar pada telefon, buka foto profil dan sahkan `Ambil Foto`, `Pilih dari Galeri` serta `Batal`; return-selfie mesti kekal sama;
 - buka Public Monitoring sekali dan pastikan loading, scroll, data serta timestamp betul;

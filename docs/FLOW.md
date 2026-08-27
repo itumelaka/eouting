@@ -1,6 +1,6 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production **v2.4.0**, cache `2.4.0-r20`, GAS Version 55, config outing active + ready dan Dynamic Student Login ON. Full Node suite repo termasuk P0 backend yang di-HOLD ialah **726/726**. r19/r20 dan P0-1/P0-2 tidak mengubah lifecycle, role authority, schema atau privacy flow di bawah; Version 56 bukan production.
+Dokumen ini menerangkan flow production **v2.4.0**, cache `2.4.0-r21`, GAS Version 57, config outing `Config Active` dan Dynamic Student Login ON. Full Node suite terakhir sebelum rollout 27 Ogos 2026 ialah **744/744**. PERF-01 Phase 1 dan readiness fix tidak mengubah lifecycle, role authority, Pulang Bermalam, Guard date validation, schema atau privacy flow di bawah.
 
 ## Flow keluar normal dan No-Guard
 

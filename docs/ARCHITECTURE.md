@@ -1,6 +1,6 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan frontend/cache production `2.4.0-r20` dan service worker `eouting-cache-v2.4.0-r20`. Production menggunakan GAS Version 55; full Node suite repo termasuk P0 backend yang di-HOLD ialah **726/726**. Version 56 bukan production.
+Versi repo semasa: **v2.4.0** dengan frontend/cache production `2.4.0-r21` dan service worker `eouting-cache-v2.4.0-r21`. Production serta staging menggunakan GAS Version 57; isolated Version 55 ialah rollback/control. Full Node suite terakhir sebelum rollout 27 Ogos 2026 ialah **744/744**.
 
 ## Performance dan scalability
 
@@ -435,7 +435,7 @@ Public Monitoring tidak merender `profilePhotoMarkup`, data URI, thumbnail atau 
 
 ## PWA dan Cache
 
-Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source production semasa ialah `eouting-cache-v2.4.0-r20` dan query `2.4.0-r20`. Version 55 mengekalkan behavior production sedia ada; shared 20-second presence snapshot P0 berada dalam Version 56 yang di-HOLD dan tidak boleh dianggap live production.
+Displayed version kekal konsisten pada `APP_VERSION`, footer dan `version.json`. Cache/asset source production semasa ialah `eouting-cache-v2.4.0-r21` dan query `2.4.0-r21`. Shared 20-second presence snapshot dan departure audit projection telah masuk production Version 57; Version 55 kekal isolated rollback/control.
 
 Service worker tidak membaca atau menulis response API/GAS, external request atau imej selfie sensitif dalam Cache Storage. Semasa activate, cache lama eOuting dibuang dan client semasa dituntut. Static app shell kekal cacheable. Popup `Update Available` kekal bergantung pada flow update sedia ada.
 

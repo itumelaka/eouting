@@ -2,7 +2,18 @@
 
 Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah rollout. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
 
-> Catatan semasa (25 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production ialah v2.4.0 dengan frontend/cache `2.4.0-r20`, service worker `eouting-cache-v2.4.0-r20` dan GAS Version 55. Version 56 yang membawa P0-1/P0-2 ialah HOLD / NOT PRODUCTION. Regression r20 ialah **713/713** dan full suite repo termasuk P0 ialah **726/726**.
+> Catatan semasa (27 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production ialah v2.4.0 dengan frontend/cache `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21` dan GAS Version 57. Staging juga Version 57; isolated Version 55 ialah rollback/control. Full regression terakhir sebelum release ialah **744/744**.
+
+## Close-out Production Version 57 — 27 Ogos 2026
+
+- [x] Satu-satunya frontend aktif ialah `itumelaka/eouting` pada `https://itumelaka.github.io/eouting/`; `itumelaka/eoutingV2` retired/archived read-only dan routing `/eoutingV2` dibuang.
+- [x] Existing production deployment dikemas kini kepada GAS Version 57 dengan description `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`; staging turut Version 57.
+- [x] Isolated Version 55 direkod sebagai rollback/control sahaja, bukan active production.
+- [x] Production smoke berjaya dan Admin Config Readiness memaparkan `Config Active`.
+- [x] PERF-01 Phase 1 disahkan bagi directory/login/restore, Warden approve/reject, read-only POST sharing, mutation reads dan hostel/departure projections tanpa perubahan business rules.
+- [x] Readiness same-day `OUTING_BIASA` diperbetulkan tanpa mengubah departure-day enforcement; Pulang Bermalam dan Guard approved-date validation kekal.
+- [x] Global typography, Public Monitoring KPI contrast dan conservative dark-surface brightness refinement lengkap; full regression **744/744**.
+- [x] Tiada claim bahawa Telegram synchronous latency, GET timeout/retry, cache TTL/polling, large first-load assets atau broader lock/index architecture telah diselesaikan.
 
 ## Close-out r19/r20 dan Version 56 HOLD — 25 Ogos 2026
 
@@ -13,7 +24,7 @@ Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah ro
 - [x] P0-2 Departure Audit `O(K×A) -> O(K+A)` lulus combined **726/726** tanpa perubahan schema atau semantik Warden/Guard.
 - [x] P0-1/P0-2 direkod sebagai implemented/tested tetapi held from production; Version 56 telah dirollback dan production kekal Version 55.
 
-### Gate Version 56 sebelum dipertimbangkan semula
+### Gate Version 56 sebelum dipertimbangkan semula — rekod sejarah, superseded oleh rollout Version 57
 
 - [ ] Tunggu sekurang-kurangnya 24 jam sebelum validation run pada staging Version 56 yang diasingkan.
 - [ ] Lulus 10 health request sequential dengan `_ts` unik, tiga request health concurrency 3 dan lima current-hostel summary request.
@@ -65,7 +76,7 @@ Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah ro
 Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
 
 - [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
-- [ ] Jalankan full regression suite dan pastikan baseline repo semasa sekurang-kurangnya **726/726**, bersama syntax checks dan `git diff --check`.
+- [ ] Jalankan full regression suite dan pastikan baseline repo semasa sekurang-kurangnya **744/744**, bersama syntax checks dan `git diff --check`.
 - [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
 - [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
 - [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.

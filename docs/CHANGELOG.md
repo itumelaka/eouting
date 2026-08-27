@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-08-27 — Version 57 production rollout close-out (v2.4.0)
+
+### Production state
+
+- Rollout selesai dan production verified pada 27 Ogos 2026 selepas smoke testing berjaya. Frontend aktif tunggal ialah repository `itumelaka/eouting` pada `https://itumelaka.github.io/eouting/`.
+- `itumelaka/eoutingV2` telah retired dan diarchive sebagai historical read-only repository. Routing frontend `/eoutingV2` serta beta endpoint selection telah dibuang daripada active codebase.
+- GAS production dan staging masing-masing berada pada **Version 57**. Description production ialah `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`. Deployment Version 55 yang diasingkan kekal sebagai rollback/control, bukan production aktif.
+- Admin Config Readiness menunjukkan `Config Active`. Full regression terakhir sebelum release lulus **744/744**; pengguna production melaporkan loading yang nyata lebih pantas dan lancar.
+
+### PERF-01 Phase 1
+
+- Commit `f086c9d` mengoptimumkan projection Current Hostel Presence dan Departure Audit tanpa mengubah schema atau lifecycle.
+- Commit `44631ec` mengurangkan latency directory/login/dashboard dan action: hasil Warden approve/reject authoritative digunakan segera dengan reconciliation coalesced, roster tidak direload untuk approval/rejection sahaja, read-only POST berkongsi request in-flight, refresh overlap dicegah, saved Student restore tidak menggandakan today-record load, full profile photo dimuat on-demand, dan directory Warden/Guard diterapkan secara bebas.
+- Redundant request-sheet scans dalam mutation dikurangkan dengan menggunakan rekod authoritative yang telah dibaca dan update yang telah ditulis. ScriptLock dan semantics approve/reject/confirm-out/confirm-in/submit kekal.
+- Pengoptimuman yang masih deferred, bukan fixed: Telegram synchronous pada write path, polisi timeout/retry GET, kecekapan TTL cache dan polling, imej/aset first-load yang besar, serta architecture lock/index yang lebih luas.
+
+### Config dan UI
+
+- Commit `a27a979` membetulkan readiness false-positive: `departure_allowed_days` memerlukan `require_leave_date=true` hanya apabila `same_day_only=false`. Runtime departure-day enforcement, flow `OUTING_BIASA`, Pulang Bermalam dan Guard date validation tidak berubah.
+- `PULANG_BERMALAM` kekal sengaja configurable untuk permohonan pada mana-mana hari. Guard masih tidak boleh mengesahkan keluar sebelum approved leave date.
+- Commits `1f14435` dan `028a0e4` meningkatkan global typography serta Public Monitoring KPI contrast. Commit `3bf27e0` mencerahkan dark navy/teal surfaces secara konservatif; suite brightness/contrast termasuk dalam full regression **744/744**.
+- Commit `12d7114` menetapkan satu frontend aktif sahaja. Commit `db8fac5` yang pernah menunjuk beta frontend kepada staging dikekalkan sebagai sejarah sebelum beta routing ditamatkan.
+
 ## 2026-08-25 — r19/r20 production close-out dan Version 56 HOLD (v2.4.0)
 
 ### Keadaan production semasa

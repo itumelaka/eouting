@@ -1,22 +1,34 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 55 / cache `2.4.0-r20`** pada 25 Ogos 2026. r19/r20 lengkap dan production verified; P0-1/P0-2 implemented/tested tetapi Version 56 kekal HOLD / NOT PRODUCTION. Regression r20 ialah **713/713** dan full suite repo termasuk P0 ialah **726/726**.
+Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 57 / cache `2.4.0-r21`** selepas rollout production verified pada 27 Ogos 2026. Frontend aktif tunggal ialah `itumelaka/eouting`; `eoutingV2` telah retired/archived. Production dan staging menggunakan Version 57, manakala isolated Version 55 ialah rollback/control. Full regression terakhir sebelum release ialah **744/744**.
 
-## Active / Release hold
+## Active / Deferred performance work
 
-- [ ] Selepas sekurang-kurangnya 24 jam, validasi staging Version 56 dengan 10 health request sequential `_ts` unik, concurrency 3 dan lima current-hostel summary request.
-- [ ] Syarat controlled retry: sifar HTML/404, sifar timeout, semua hostel-summary di bawah 22 saat dan privacy public kekal aggregate-only. Ini gate operasi, bukan SLA kekal.
-- [ ] Tambah resilience POST berstruktur kemudian: Announcement Banner authenticated POST belum mempunyai `AbortController`/timeout setara GET dan failure kini menyembunyikan banner secara senyap.
-- [ ] Rancang active/archive Sheets serta summary/index sebelum volume sejarah/concurrency menjadi material; jangan anggap migrasi Postgres/Supabase diperlukan pada skala semasa.
+- [ ] Kurangkan latency write path daripada panggilan Telegram synchronous tanpa mengubah delivery/lifecycle semantics; asynchronous outbox belum diimplementasi.
+- [ ] Semak semula timeout/retry GET supaya transient failure kekal resilient tanpa menguatkan latency berulang.
+- [ ] Audit TTL cache, invalidation dan polling supaya cache miss serta auto/manual refresh tidak menghasilkan kerja berulang yang tidak perlu.
+- [ ] Kurangkan imej/aset first-load yang besar; full profile photo sudah on-demand tetapi compression/broader asset strategy belum dibuat.
+- [ ] Rancang architecture lock/index yang lebih luas, termasuk active/archive Sheets serta summary/index, sebelum volume sejarah atau concurrency menjadi material. Migrasi Postgres/Supabase bukan keperluan semasa.
+- [ ] Tambah resilience POST berstruktur kemudian: Announcement Banner authenticated POST belum mempunyai timeout setara GET dan failure kini menyembunyikan banner secara senyap.
 
 ## Done / Completed
+
+### Production Version 57 close-out — 27 Ogos 2026
+
+- [x] Production dan staging diselaraskan kepada GAS Version 57; description production ialah `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix` dan isolated Version 55 direkod sebagai rollback/control.
+- [x] Production smoke lulus, Admin menunjukkan `Config Active`, dan full regression terakhir sebelum release lulus **744/744**.
+- [x] PERF-01 Phase 1 mempercepat directory/login/restore, Warden approve/reject, read-only POST sharing, redundant mutation reads dan hostel/departure projections tanpa mengubah lifecycle atau business rules.
+- [x] Readiness `OUTING_BIASA` membenarkan `same_day_only=true` + configured `departure_allowed_days` tanpa `require_leave_date`; non-same-day masih memerlukan leave date.
+- [x] Pulang Bermalam kekal boleh dipohon pada mana-mana hari dan Guard kekal menolak pengesahan keluar sebelum approved leave date.
+- [x] Typography global, Public Monitoring KPI contrast dan conservative dark-surface brightness refinement disahkan.
+- [x] `itumelaka/eouting` ditetapkan sebagai satu-satunya frontend aktif; `eoutingV2` retired/archived dan routing legacy dibuang.
 
 ### r19/r20 dan backend performance P0 — 25 Ogos 2026
 
 - [x] r19 live GET resilience lengkap pada cache `2.4.0-r19` dengan timeout 22 saat, dua attempts, transient-only retry/jitter, diagnostics selamat, in-flight dedupe dan isolation/last-good Admin; **699/699**.
 - [x] r20 typography/contrast audit lengkap pada cache `2.4.0-r20` selepas review desktop/mobile; **713/713**, tanpa perubahan GAS.
 - [x] Audit scalability selesai: GAS + optimized/archive Sheets dipilih sebagai medium-term path; database migration bukan keperluan semasa.
-- [x] P0-1 `O(S×R) -> O(S+R)` + shared 20-second presence cache diuji **720/720**; P0-2 `O(K×A) -> O(K+A)` menghasilkan combined **726/726**. Kedua-duanya tiada schema change dan held from production.
+- [x] P0-1 `O(S×R) -> O(S+R)` + shared 20-second presence cache diuji **720/720**; P0-2 `O(K×A) -> O(K+A)` menghasilkan combined **726/726**. Status held ini ialah rekod sejarah 25 Ogos; kedua-duanya kemudian masuk production Version 57 selepas rollout 27 Ogos.
 
 ### Authenticated UI regression fix — 22 Ogos 2026
 

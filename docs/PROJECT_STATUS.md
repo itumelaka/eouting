@@ -6,13 +6,13 @@ Status repo semasa: **v2.4.0 — production verified**.
 
 Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **25 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 55, cache/asset `2.4.0-r20` dan service worker `eouting-cache-v2.4.0-r20`. Config-driven outing serta Dynamic Student Login aktif dan ready. Production UI smoke ialah **VERIFIED** dan production beroperasi normal.
+Verdict semasa pada **27 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 57, cache/asset `2.4.0-r21` dan service worker `eouting-cache-v2.4.0-r21`. Description deployment production ialah `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`; staging turut menggunakan Version 57 dan isolated Version 55 ialah rollback/control sahaja. Config-driven outing serta Dynamic Student Login aktif, Admin memaparkan `Config Active`, production smoke ialah **VERIFIED**, dan production beroperasi normal.
 
-`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX dan Current Hostel Residents semuanya **COMPLETE / PRODUCTION VERIFIED**. Premium Institutional UI, live API resilience r19 dan global typography/contrast r20 juga **COMPLETE / PRODUCTION VERIFIED**. Normal Guard flow kekal primary/default. Regression production r20 lulus **713/713**; full suite repo termasuk P0 yang belum production lulus **726/726**.
+`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX, Current Hostel Residents dan PERF-01 Phase 1 semuanya **COMPLETE / PRODUCTION VERIFIED**. Typography global, Public Monitoring KPI contrast dan conservative dark-surface brightness refinement juga lengkap. Normal Guard flow kekal primary/default. Full regression terakhir sebelum release lulus **744/744** dan pengguna production memerhatikan loading yang lebih pantas/lancar.
 
-Version 56 mengandungi P0-1 Current Hostel Presence dan P0-2 Departure Audit Projection yang telah diimplementasi serta diuji, tetapi statusnya **HOLD / NOT PRODUCTION**. Deployment production sempat ditukar daripada Version 55 kepada Version 56, kemudian dirollback selepas kegagalan delivery Apps Script berselang. Production Version 55 selepas rollback lulus 10/10 health checks; staging Version 56 diasingkan dan dikekalkan sementara. Source-level evidence did not demonstrate P0 logic as the cause, tetapi Google tidak mengesahkan outage dan P0 tidak dianggap terbukti bebas daripada isu.
+Frontend aktif tunggal ialah repository `itumelaka/eouting` dan GitHub Pages `https://itumelaka.github.io/eouting/`. Repository `itumelaka/eoutingV2` telah retired serta diarchive read-only sebagai sejarah; routing `/eoutingV2` tidak lagi wujud dalam active frontend.
 
-Commit P0 `f086c9d` hanya direkodkan sebagai HEAD tempatan; `main` tempatan satu commit di hadapan `origin/main` pada close-out ini.
+Version 56 ialah milestone insiden/rollback sejarah. P0-1/P0-2 dan PERF-01 Phase 1 kini berada dalam production Version 57; Version 55 tidak lagi active production dan dikekalkan secara terasing sebagai rollback/control.
 
 Batch regression UI production commit `996d9c0` (`fix: restore authenticated header and admin mobile ui`) telah lengkap dan berada pada `main`. Header/logo serta metadata tarikh/hari/masa authenticated kini kelihatan dan responsif untuk Student, Warden/HEP, Guard dan Admin; kontras editor Admin serta sub-navigation Admin mobile juga telah diperbaiki dan disahkan melalui verifikasi browser/mobile.
 
@@ -20,7 +20,8 @@ Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Anno
 
 Production boundary semasa:
 
-- frontend release ialah `v2.4.0` dan backend production ialah GAS **Version 55**;
+- frontend release aktif tunggal ialah `v2.4.0` di `itumelaka/eouting`; backend production ialah GAS **Version 57** dan staging juga Version 57;
+- isolated GAS Version 55 ialah rollback/control, bukan active production;
 - Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
 - endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
 - `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
@@ -29,11 +30,13 @@ Production boundary semasa:
 - `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false tetapi current production state ialah enabled; Admin hanya mengawal config dan Warden kekal fallback confirmer;
 - canonical Web App contract ialah `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING`, `ANYONE_ANONYMOUS`;
 - readiness hijau dan chip Admin memaparkan `Config Active`;
+- `departure_allowed_days` hanya memerlukan `require_leave_date=true` apabila `same_day_only=false`; same-day `OUTING_BIASA` kekal ready tanpa tarikh keluar manual;
 - `require_selfie`, audit auto-approval, statistik, Telegram, filter operasi dan label contextual membaca config secara dinamik;
 - application rules dan departure rules dipisahkan melalui optional date window + `allowed_days`/time window serta `departure_allowed_days`/`earliest_departure_time`;
 - `application_open_date`/`application_close_date` ialah generic `YYYY-MM-DD`, inklusif dan additive; blank production rows mengekalkan behavior lama dan backend `Asia/Kuala_Lumpur` menguatkuasakan sebelum append;
 - blank `application_open_time` atau `application_close_time` bermaksud tiada threshold bagi medan tersebut; Admin boleh menggunakan `Kosongkan`, blank kekal blank, dan `allowed_days` tetap authoritative;
 - `PULANG_BERMALAM` boleh dipohon pada mana-mana hari, departure semasa ialah Jumaat dan earliest time `17:00`, boleh diubah Admin mengikut arahan HEP.
+- Guard departure-date enforcement kekal authoritative: pengesahan keluar sebelum approved leave date ditolak;
 - custom `KLINIK` (`Keluar ke Klinik`) beroperasi sebagai same-day tanpa tarikh manual, memerlukan masa balik, lokasi, kenderaan, kelulusan Warden dan selfie; shared date-section fallback menggunakan `Maklumat Permohonan` / `Tarikh Keluar` apabila section itu visible;
 - blank `earliest_departure_time` bermaksud tiada sekatan masa paling awal dan Admin boleh mengosongkannya tanpa current-time fallback;
 - operational urgency backend memisahkan `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED` daripada lifecycle;
@@ -51,8 +54,14 @@ Production boundary semasa:
 
 Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 
-- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache production revision ialah `2.4.0-r20` dan service worker ialah `eouting-cache-v2.4.0-r20`.
-- Backend GAS production ialah **Version 55** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
+### Performance selepas PERF-01 Phase 1
+
+Directory Pelajar/staff, saved-session startup, Warden approve/reject response, read-only POST in-flight sharing, request-sheet mutation reads serta hostel/departure audit projection telah dioptimumkan tanpa perubahan business rules. Reconciliation Warden kekal eventual tetapi response mutation authoritative menang serta-merta; approve/reject tidak lagi memaksa roster refresh yang tidak berkaitan.
+
+Kerja seterusnya kekal deferred dan **belum selesai**: latency Telegram synchronous, polisi timeout/retry GET, kecekapan TTL cache dan polling, saiz imej/aset first-load, serta architecture lock/index yang lebih luas.
+
+- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache production revision ialah `2.4.0-r21` dan service worker ialah `eouting-cache-v2.4.0-r21`.
+- Backend GAS production ialah **Version 57** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
 - Google Sheets kekal database/source of truth.
 - Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
 - `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
@@ -105,7 +114,7 @@ Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
 - Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
 - Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
 - API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.4.0; asset query dan cache source production konsisten pada `2.4.0-r20` / `eouting-cache-v2.4.0-r20`.
+- Displayed version/footer ialah v2.4.0; asset query dan cache source production konsisten pada `2.4.0-r21` / `eouting-cache-v2.4.0-r21`.
 - Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
 - Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
 - Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
@@ -148,7 +157,7 @@ Migration production melalui `setupAdminOutingConfigV200()` pada 22 Ogos 2026 me
 
 Student smoke dengan future open date memaparkan `Permohonan dibuka mulai 1 Oktober 2026.`, membenarkan attempt mencapai GAS dan menerima backend rejection sebelum persistence. Inspection `OUTING_REQUESTS` mengesahkan zero row test. Safe Student projection membawa dua tarikh bagi guidance sahaja; config version internals, creator/updater dan timestamp tidak diluaskan.
 
-Milestone ini menggunakan frontend/cache r7 dan GAS Version 52; ia kekal rekod sejarah sebelum current production r17 / GAS Version 55.
+Milestone ini menggunakan frontend/cache r7 dan GAS Version 52; ia kekal rekod sejarah sebelum current production r21 / GAS Version 57.
 
 ## Phase 6 — COMPLETE / PRODUCTION VERIFIED
 

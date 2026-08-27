@@ -1,6 +1,6 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision production `2.4.0-r20`, production GAS Version 55 dan baseline repo termasuk P0 yang di-HOLD **726/726**. Version 56 bukan production.
+Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision production `2.4.0-r21`, production GAS Version 57 dan baseline close-out 27 Ogos 2026 **744/744**. Staging juga Version 57; isolated Version 55 ialah rollback/control.
 
 ## Keperluan
 
@@ -100,7 +100,7 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline kanonik repo semasa termasuk P0-1/P0-2 yang held from production ialah **726/726 lulus**. Milestone r19 ialah **699/699**, P0-1 **720/720**, dan production r20 **713/713**; angka suite lebih lama kekal milestone sejarah.
+Baseline kanonik repo semasa ialah **744/744 lulus**. Milestone r19 **699/699**, P0-1 **720/720**, combined P0 **726/726** dan production r20 **713/713** kekal angka sejarah.
 
 Focused date-window coverage berada dalam suite schema/Admin/Student/submission sedia ada. Ia meliputi idempotent header migration, blank compatibility, save/clear/reload, invalid/reversed/same-day ranges, safe projection, inclusive Malaysia midnight boundaries, additive day/time rules dan backend rejection tanpa append.
 
@@ -267,7 +267,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 ## PWA dan Cache
 
 - Semak footer v2.4.0 dan popup update.
-- Semak Cache Storage production menggunakan `eouting-cache-v2.4.0-r20` dan asset query `2.4.0-r20`; displayed app version ialah v2.4.0.
+- Semak Cache Storage production menggunakan `eouting-cache-v2.4.0-r21` dan asset query `2.4.0-r21`; displayed app version ialah v2.4.0.
 - Semak request GAS/API dalam Network dan pastikan ia tidak dimasukkan ke Cache Storage.
 - Semak request external dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
 - Static HTML/CSS/JS/icon boleh kekal dicache.
