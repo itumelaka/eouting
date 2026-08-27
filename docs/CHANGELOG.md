@@ -317,7 +317,7 @@ Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.
 
 - **Release:** menyelaraskan runtime, footer, `version.json`, asset query strings dan cache PWA kepada `2.0.0`.
 - **PWA:** menggunakan namespace cache baharu `eouting-cache-v2.0.0`; activation terus membuang cache eOuting lama sahaja.
-- **Routing:** mengekalkan `/eouting/` pada endpoint GAS production dan `/eoutingV2/` pada endpoint beta tetap tanpa query override di luar localhost.
+- **Routing sejarah (telah ditamatkan):** release ini pernah mengekalkan `/eouting/` pada endpoint GAS production dan `/eoutingV2/` pada endpoint beta tetap. Sokongan frontend `eoutingV2` kini retired; hanya `https://itumelaka.github.io/eouting/` aktif.
 - **Safety:** GAS/API kekal network-only, imej selfie dan response sensitif tidak dicache, serta `OUTING_CONFIG_V2_ENABLED` kekal `false`.
 - **Backend:** GAS production Version 24 dan login Admin telah melalui smoke test sebelum release frontend ini.
 - **Production rollout:** frontend berjaya diterbitkan di `https://itumelaka.github.io/eouting/` melalui merge commit `4eedcbe` (`release: deploy eOuting v2.0.0`). Footer memaparkan `v2.0.0`, tiada badge `BETA API` dan data production digunakan.
