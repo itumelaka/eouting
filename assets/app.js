@@ -1,5 +1,5 @@
 const APP_VERSION = "2.4.0";
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz_6q5iNceFXwsxv3s6ul2MwpssIwpJjjESQ_PsNzCxE2_rHSrzcsrRWJITwjbRDPa7/exec";
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzPkL1HvQG0XnEyjwfXdtZ05luKIsrkKKjmvO9miH5TLS3NwWywxRIYNZqnPBNkH7LGDg/exec";
 const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
 
 function isLocalBetaApiHostV200(hostname) {
