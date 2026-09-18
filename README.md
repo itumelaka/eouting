@@ -2,7 +2,7 @@
 
 eOuting ITU ialah sistem digital untuk merekod, meluluskan dan memantau pergerakan keluar masuk pelajar Institut Teknologi Unggas.
 
-Versi repo semasa: **v2.4.0 — Production Verified**.
+Versi production semasa: **v2.4.0 — operational, insiden delivery intermittent sedang dipantau**.
 
 - Frontend/PWA: [GitHub Pages](https://itumelaka.github.io/eouting/)
 - Backend: Google Apps Script (GAS) Web App
@@ -13,6 +13,34 @@ Versi repo semasa: **v2.4.0 — Production Verified**.
 `itumelaka/eouting` dan `https://itumelaka.github.io/eouting/` ialah satu-satunya frontend aktif. Repository `itumelaka/eoutingV2` telah retired dan diarchive sebagai rujukan sejarah read-only; routing `/eoutingV2` tidak lagi disokong oleh frontend aktif.
 
 ## Status Production v2.4.0
+
+> **Status 18 September 2026:** production masih kekal GitHub Pages + Google Apps Script + Google Sheets dan belum dipindahkan ke Cloudflare. Migration Cloudflare sedang dibangunkan dan diuji secara berasingan menggunakan Worker staging `eouting-api-proxy-staging` dan D1 `eouting_staging`. Worker/D1 belum menjadi dependency production dan frontend production belum ditukar.
+
+### Cloudflare D1 Migration Staging — 18 September 2026
+
+Migration staging kini telah membuktikan beberapa flow utama menggunakan frontend local `http://localhost:8000` tanpa menukar production.
+
+Komponen yang telah diuji berjaya melalui D1 staging:
+
+- login Pelajar;
+- login Warden/HEP;
+- login Guard menggunakan `nama_guard + pin`;
+- directory login Pelajar;
+- konfigurasi `OUTING_TYPES`;
+- `getTodayRecords`;
+- paparan `Status Semasa` Pelajar termasuk lifecycle `KELUAR`;
+- borang permohonan Pelajar disembunyikan apabila request aktif wujud;
+- dashboard/checklist Warden menerima rekod operasi daripada D1;
+- dashboard Guard menerima rekod operasi daripada D1;
+- operational urgency asas mengikut threshold production;
+- role approval `HEP` / `WARDEN` diterbitkan daripada prefix `warden_id`;
+- profile-photo indicator dan departure-confirmation projection asas tersedia pada response operasi.
+
+Pada 18 September 2026, 17 rekod `PULANG_BERMALAM` staging bagi tarikh tersebut telah diimport secara terkawal ke `OUTING_REQUESTS` D1 untuk validation dashboard. Import ini ialah data staging terkawal dan **bukan mekanisme sync production**. Selepas data tersebut tersedia dalam D1, paparan Pelajar, Warden dan Guard menunjukkan lifecycle semasa dengan betul.
+
+Migration masih belum lengkap. Antara fungsi yang masih bergantung pada GAS atau belum mencapai parity penuh ialah `getCurrentHostelRoster`, submission request Pelajar, mutation approve/reject Warden, confirm keluar/masuk Guard secara production-parity penuh, pembatalan Pelajar, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh, notification/audit automation serta mekanisme migration/sync data lengkap.
+
+Production tidak boleh dianggap migrated sehingga flow tersebut selesai, data D1 lengkap, regression test selesai dan frontend production ditukar secara terkawal.
 
 Frontend production v2.4.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
