@@ -6545,7 +6545,7 @@ function assessStudentGroupConfigReadinessV240_() {
     if (activeStudent && (!group || group.active !== true)) {
       counts.active_students_with_inactive_or_missing_group += 1;
     }
-    if (groupCode === "LI") {
+    if (group && group.institution_required === true) {
       if (!institution) counts.li_students_missing_or_invalid_institution += 1;
       if (activeStudent && (!institution || institution.active !== true)) {
         counts.active_li_students_with_inactive_or_missing_institution += 1;

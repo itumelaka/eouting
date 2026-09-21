@@ -127,3 +127,34 @@ test("Admin readiness endpoint authenticates and exposes aggregate diagnostics o
   assert.equal(serialized.includes("created_by"), false);
   assert.equal(serialized.includes("config_version"), false);
 });
+
+test("institution-required custom group is treated as LI-style group", () => {
+  const sheets = configuredSheets([
+    studentRow({
+      student_id: "UNISZA001",
+      kelas: "UNISZA",
+      institution_code: "UNISZA"
+    })
+  ]);
+
+  sheets.STUDENT_GROUPS.rows.push(
+    groupRow("UNISZA", {
+      display_name: "LI-UNISZA",
+      institution_required: true,
+      active: true
+    })
+  );
+
+  sheets.LI_INSTITUTIONS.rows.push(
+    institutionRow("UNISZA", {
+      display_name: "UNISZA",
+      active: true
+    })
+  );
+
+  const { context } = createRuntime({ sheets });
+  const result = context.assessStudentGroupConfigReadinessV240_();
+
+  assert.equal(result.counts.non_li_students_with_institution, 0);
+  assert.equal(result.counts.li_students_missing_or_invalid_institution, 0);
+});
