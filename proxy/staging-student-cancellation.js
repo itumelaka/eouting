@@ -1,3 +1,5 @@
+import { mirrorOutingRequestToSheets } from "./staging-worker-base.js";
+
 const text = value => String(value ?? "").trim();
 const normalized = value => text(value).toLowerCase();
 const fault = (status, code, message) => Object.assign(new Error(message), { status, code });
@@ -164,5 +166,19 @@ export async function handleStudentCancellation(request, env, headers, options =
   } catch { /* Persistence already succeeded; do not make the client replay the mutation. */ }
 
   await sendCancellationTelegram(updated, previousStatus, env, options.fetchImpl || fetch);
+  try {
+  await mirrorOutingRequestToSheets(
+    env,
+    updated,
+    options.fetchImpl || fetch
+  );
+} catch (mirrorError) {
+  console.error(JSON.stringify({
+    action: "cancelStudentRequest",
+    request_id: requestId,
+    event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
+    error: String(mirrorError && mirrorError.message || mirrorError)
+  }));
+}
   return new Response(JSON.stringify({ ok: true, data: updated }), { status: 200, headers });
 }

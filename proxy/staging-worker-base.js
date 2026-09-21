@@ -125,8 +125,40 @@ async function handleWardenDecision(request, env, headers, action, options = {})
       approve ? 'APPROVE_REQUEST' : 'REJECT_REQUEST', requestId, approve && role === 'HEP' ? 'HEP' : 'Warden',
       staff.nama, JSON.stringify(details), '', '').run();
   } catch { /* Best effort after successful persistence, matching GAS. */ }
-  await decisionTelegram(updated, action, env, options.fetchImpl || fetch);
-  return new Response(JSON.stringify({ ok: true, data: updated }), { status: 200, headers });
+let mirrorWarning = "";
+
+try {
+  await mirrorOutingRequestToSheets(
+    env,
+    updated,
+    options.fetchImpl || fetch
+  );
+} catch (mirrorError) {
+  mirrorWarning = "OUTING_REQUEST_SHEETS_MIRROR_FAILED";
+
+  console.error(JSON.stringify({
+    action: action,
+    request_id: requestId,
+    event: mirrorWarning,
+    error: String(mirrorError && mirrorError.message || mirrorError)
+  }));
+}
+
+await decisionTelegram(updated, action, env, options.fetchImpl || fetch);
+
+const responseData = {
+  ok: true,
+  data: updated
+};
+
+if (mirrorWarning) {
+  responseData.warning = mirrorWarning;
+}
+
+return new Response(JSON.stringify(responseData), {
+  status: 200,
+  headers
+});
 }
 
 return { handleWardenDecision };
@@ -242,6 +274,92 @@ function trustedUrl(value, redirect = false) {
   return url;
 }
 __name(trustedUrl, "trustedUrl");
+async function mirrorOutingRequestToSheets(env, record, fetchImpl = fetch) {
+  if (!env.GAS_UPSTREAM_URL || !env.D1_MIRROR_SECRET) {
+    throw new Error("D1 to Sheets mirror configuration unavailable");
+  }
+
+  if (!record || typeof record !== "object" || !record.request_id) {
+    throw new Error("D1 outing request mirror record invalid");
+  }
+
+  const upstream = trustedUrl(env.GAS_UPSTREAM_URL);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const body = JSON.stringify({
+      action: "mirrorOutingRequestFromD1",
+      mirror_secret: env.D1_MIRROR_SECRET,
+      record: record
+    });
+
+    let response = await fetchImpl(upstream.href, {
+      method: "POST",
+      body,
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-store",
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      redirect: "manual",
+      signal: controller.signal
+    });
+
+    if (response.status === 302 || response.status === 303) {
+      const destination = trustedUrl(
+        response.headers.get("Location"),
+        true
+      );
+
+      await response.body?.cancel();
+
+      response = await fetchImpl(destination.href, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Cache-Control": "no-store"
+        },
+        redirect: "manual",
+        signal: controller.signal
+      });
+    }
+
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error("D1 to Sheets mirror upstream failed");
+    }
+
+    const bytes = await readBounded(
+      response.body,
+      MAX_RESPONSE_BYTES,
+      new Error("D1 to Sheets mirror response too large")
+    );
+
+    let result;
+
+    try {
+      result = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+      );
+    } catch {
+      throw new Error("D1 to Sheets mirror response invalid");
+    }
+
+    if (
+      !result ||
+      result.ok !== true ||
+      !result.data ||
+      result.data.mirrored !== true
+    ) {
+      throw new Error("D1 to Sheets mirror rejected");
+    }
+
+    return result.data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 const stagingSubmitRequestV230 = (() => {
 const ACTIVE_STATUSES = [
   "MENUNGGU_KELULUSAN",
@@ -673,7 +791,38 @@ async function handleSubmitRequest(request, env, headers, dependencies = {}) {
   }
 
   await sendTelegram(env, record, config.display_name, dependencies.fetchImpl || fetch);
-  return new Response(JSON.stringify({ ok: true, data: record }), { status: 201, headers });
+
+let mirrorWarning = "";
+try {
+  await mirrorOutingRequestToSheets(
+    env,
+    record,
+    dependencies.fetchImpl || fetch
+  );
+} catch (mirrorError) {
+  mirrorWarning = "OUTING_REQUEST_SHEETS_MIRROR_FAILED";
+
+  console.error(JSON.stringify({
+    action: "submitRequest",
+    request_id: requestId,
+    event: mirrorWarning,
+    error: String(mirrorError && mirrorError.message || mirrorError)
+  }));
+}
+
+const responseData = {
+  ok: true,
+  data: record
+};
+
+if (mirrorWarning) {
+  responseData.warning = mirrorWarning;
+}
+
+return new Response(JSON.stringify(responseData), {
+  status: 201,
+  headers
+});
 }
 
 async function mirrorOutingTypeToD1(env, row) {
@@ -2138,6 +2287,17 @@ const guard = await env.DB.prepare(
     }
   }
 
+try {
+  await mirrorOutingRequestToSheets(env, updatedRecord, fetch);
+} catch (mirrorError) {
+  console.error(JSON.stringify({
+    action: "confirmOut",
+    request_id: requestId,
+    event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
+    error: String(mirrorError && mirrorError.message || mirrorError)
+  }));
+}
+
   return new Response(JSON.stringify({
     ok: true,
     data: {
@@ -2526,6 +2686,17 @@ if (
   }
 }
 
+try {
+  await mirrorOutingRequestToSheets(env, updatedRecord, fetch);
+} catch (mirrorError) {
+  console.error(JSON.stringify({
+    action: "confirmIn",
+    request_id: requestId,
+    event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
+    error: String(mirrorError && mirrorError.message || mirrorError)
+  }));
+}
+
   return new Response(JSON.stringify({
     ok: true,
     data: {
@@ -2744,5 +2915,6 @@ __name(handleRequest, "handleRequest");
 var worker_default = { fetch: handleRequest };
 export {
   worker_default as default,
-  handleRequest
+  handleRequest,
+  mirrorOutingRequestToSheets
 };
