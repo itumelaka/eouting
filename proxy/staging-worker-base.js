@@ -1034,6 +1034,50 @@ const row = await env.DB.prepare(
   });
 }
 
+if (url.pathname === "/api/d1/getStudentAnnualSummary") {
+  action = "getStudentAnnualSummary";
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return finish(null, 204);
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const studentId = String(payload?.student_id || "").trim();
+  const noMatrik = String(payload?.no_matrik || "").trim();
+  if (!studentId || !noMatrik) {
+    throw fault(401, "STUDENT_SESSION_INVALID", "Akses sesi pelajar tidak sah");
+  }
+  const student = await env.DB.prepare(
+    `SELECT student_id FROM STUDENTS
+     WHERE student_id = ? AND no_matrik = ? AND status = 'Aktif'
+     LIMIT 1`
+  ).bind(studentId, noMatrik).first();
+  if (!student) {
+    throw fault(401, "STUDENT_SESSION_INVALID", "Akses sesi pelajar tidak sah");
+  }
+
+  const year = Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric"
+  }).format(new Date()));
+  const result = await env.DB.prepare(
+    `SELECT tarikh, jenis_permohonan, status FROM OUTING_REQUESTS
+     WHERE student_id = ? AND tarikh >= ? AND tarikh < ?
+       AND status IN ('MENUNGGU_KELULUSAN', 'DILULUSKAN_WARDEN', 'KELUAR',
+                      'SELESAI', 'DITOLAK_WARDEN', 'DIBATALKAN_PELAJAR')
+     ORDER BY tarikh DESC`
+  ).bind(student.student_id, `${year}-01-01`, `${year + 1}-01-01`).all();
+  const history_records = result.results || [];
+  return finish(JSON.stringify({ ok: true, data: {
+    year,
+    total_outings: history_records.filter((record) => record.status === "SELESAI").length,
+    history_records
+  } }), 200);
+}
+
 if (url.pathname === "/api/d1/getTodayRecords") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");

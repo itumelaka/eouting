@@ -16,6 +16,7 @@ const D1_POST_ENDPOINTS = {
   loginWarden: "loginWarden",
   loginGuard: "loginGuard",
   getTodayRecords: "getTodayRecords",
+  getStudentAnnualSummary: "getStudentAnnualSummary",
   confirmOut: "confirmOut",
   confirmIn: "confirmIn",
   submitRequest: "submitRequest",
