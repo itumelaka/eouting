@@ -676,7 +676,99 @@ async function handleSubmitRequest(request, env, headers, dependencies = {}) {
   return new Response(JSON.stringify({ ok: true, data: record }), { status: 201, headers });
 }
 
-return { handleSubmitRequest };
+async function mirrorOutingTypeToD1(env, row) {
+  if (!env.DB || !row || typeof row !== "object") {
+    throw new Error("D1 outing type mirror unavailable");
+  }
+
+  const typeCode = normalizeText(row.type_code).toUpperCase();
+  const config = validateOutingType(row, typeCode);
+  const bool = (field) => config[field] ? 1 : 0;
+
+  await env.DB.prepare(`
+    INSERT INTO OUTING_TYPES (
+      type_code, display_name, description, active, sort_order,
+      allowed_days, application_open_time, application_close_time,
+      fixed_return_time, same_day_only, require_leave_date,
+      require_return_date, require_return_time, require_guardian_phone,
+      require_guardian_relation, require_emergency_reason,
+      require_purpose, require_location, require_vehicle,
+      require_warden_approval, require_selfie, config_version,
+      created_at, created_by, updated_at, updated_by,
+      departure_allowed_days, earliest_departure_time,
+      application_open_date, application_close_date
+    )
+    VALUES (
+      ?,?,?,?,?,?,?,?,?,?,
+      ?,?,?,?,?,?,?,?,?,?,
+      ?,?,?,?,?,?,?,?,?,?
+    )
+    ON CONFLICT(type_code) DO UPDATE SET
+      display_name = excluded.display_name,
+      description = excluded.description,
+      active = excluded.active,
+      sort_order = excluded.sort_order,
+      allowed_days = excluded.allowed_days,
+      application_open_time = excluded.application_open_time,
+      application_close_time = excluded.application_close_time,
+      fixed_return_time = excluded.fixed_return_time,
+      same_day_only = excluded.same_day_only,
+      require_leave_date = excluded.require_leave_date,
+      require_return_date = excluded.require_return_date,
+      require_return_time = excluded.require_return_time,
+      require_guardian_phone = excluded.require_guardian_phone,
+      require_guardian_relation = excluded.require_guardian_relation,
+      require_emergency_reason = excluded.require_emergency_reason,
+      require_purpose = excluded.require_purpose,
+      require_location = excluded.require_location,
+      require_vehicle = excluded.require_vehicle,
+      require_warden_approval = excluded.require_warden_approval,
+      require_selfie = excluded.require_selfie,
+      config_version = excluded.config_version,
+      created_at = excluded.created_at,
+      created_by = excluded.created_by,
+      updated_at = excluded.updated_at,
+      updated_by = excluded.updated_by,
+      departure_allowed_days = excluded.departure_allowed_days,
+      earliest_departure_time = excluded.earliest_departure_time,
+      application_open_date = excluded.application_open_date,
+      application_close_date = excluded.application_close_date
+  `).bind(
+    config.type_code,
+    config.display_name,
+    config.description,
+    bool("active"),
+    config.sort_order,
+    config.allowed_days,
+    config.application_open_time,
+    config.application_close_time,
+    config.fixed_return_time,
+    bool("same_day_only"),
+    bool("require_leave_date"),
+    bool("require_return_date"),
+    bool("require_return_time"),
+    bool("require_guardian_phone"),
+    bool("require_guardian_relation"),
+    bool("require_emergency_reason"),
+    bool("require_purpose"),
+    bool("require_location"),
+    bool("require_vehicle"),
+    bool("require_warden_approval"),
+    bool("require_selfie"),
+    config.config_version,
+    normalizeText(row.created_at),
+    normalizeText(row.created_by),
+    normalizeText(row.updated_at),
+    normalizeText(row.updated_by),
+    config.departure_allowed_days,
+    config.earliest_departure_time,
+    config.application_open_date,
+    config.application_close_date
+  ).run();
+}
+
+return { handleSubmitRequest, mirrorOutingTypeToD1 };
+
 })();
 
 async function handleRequest(request, env = {}) {
@@ -2596,7 +2688,26 @@ if (
         if (!result || Array.isArray(result) || typeof result.ok !== "boolean") {
           throw fault(502, "UPSTREAM_INVALID_RESPONSE", "Invalid upstream response");
         }
-        return bytes;
+        if (
+  result.ok === true &&
+  ["createOutingType", "updateOutingType", "toggleOutingType"].includes(action)
+) {
+  try {
+    await stagingSubmitRequestV230.mirrorOutingTypeToD1(env, result.data);
+  } catch (mirrorError) {
+    console.error(JSON.stringify({
+      request_id: requestId,
+      action,
+      event: "OUTING_TYPE_D1_MIRROR_FAILED",
+      error: String(mirrorError && mirrorError.message || mirrorError)
+    }));
+
+    result.warning = "OUTING_TYPE_D1_MIRROR_FAILED";
+    return new TextEncoder().encode(JSON.stringify(result));
+  }
+}
+
+return bytes;
       }, "delivery");
       try {
         return finish(await Promise.race([delivery(), timeout]), 200);
