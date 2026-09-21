@@ -1,5 +1,29 @@
 const APP_VERSION = "2.4.0";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzPkL1HvQG0XnEyjwfXdtZ05luKIsrkKKjmvO9miH5TLS3NwWywxRIYNZqnPBNkH7LGDg/exec";
+// Staging only: set an approved HTTPS Worker /api/gas URL for localhost testing.
+// Production always retains GAS_WEB_APP_URL; Worker URL is used only for localhost staging.
+const WORKER_API_BASE_URL = "https://eouting-api-proxy-staging.itumelaka.workers.dev/api/gas";
+const D1_API_BASE_URL = "https://eouting-api-proxy-staging.itumelaka.workers.dev/api/d1";
+const D1_GET_ENDPOINTS = {
+  getWardens: "wardens",
+  getGuards: "guards",
+  getStudentLoginDirectory: "studentLoginDirectory",
+  getOutingTypes: "outingTypes"
+};
+
+const D1_POST_ENDPOINTS = {
+  loginStudent: "loginStudent",
+  loginWarden: "loginWarden",
+  loginGuard: "loginGuard",
+  getTodayRecords: "getTodayRecords",
+  confirmOut: "confirmOut",
+  confirmIn: "confirmIn",
+  submitRequest: "submitRequest",
+  approveRequest: "approveRequest",
+  rejectRequest: "rejectRequest",
+  cancelStudentRequest: "cancelStudentRequest"
+};
+
 const BETA_API_OVERRIDE_SESSION_KEY_V200 = "eouting_beta_api_override_v200";
 
 function isLocalBetaApiHostV200(hostname) {
@@ -27,7 +51,7 @@ function normalizeBetaApiOverrideV200(value) {
   }
 }
 
-function resolveGasWebAppUrlV200(locationLike, storage) {
+function resolveGasWebAppUrlV200(locationLike, storage, workerApiBase = "") {
   const currentLocation = locationLike || {};
   const isLocalhost = isLocalBetaApiHostV200(currentLocation.hostname);
   const productionResult = { url: GAS_WEB_APP_URL, isBeta: false };
@@ -39,6 +63,18 @@ function resolveGasWebAppUrlV200(locationLike, storage) {
       // Storage may be unavailable; production endpoint remains authoritative.
     }
     return productionResult;
+  }
+
+  if (workerApiBase) {
+    try {
+      const workerUrl = new URL(workerApiBase);
+      if (workerUrl.protocol === "https:" && !workerUrl.port && !workerUrl.username &&
+          !workerUrl.password && !workerUrl.search && !workerUrl.hash && workerUrl.pathname === "/api/gas") {
+        return { url: workerUrl.href, isBeta: true };
+      }
+    } catch (error) {
+      // Invalid staging configuration falls back to the established resolver.
+    }
   }
 
   let queryValue = null;
@@ -81,7 +117,24 @@ function resolveGasWebAppUrlV200(locationLike, storage) {
   return { url: normalizedStoredUrl, isBeta: true };
 }
 
-const ACTIVE_API_ENDPOINT_V200 = resolveGasWebAppUrlV200(window.location, window.sessionStorage);
+function getSafeWindowStorageV250(storageName) {
+  try {
+    const storage = window[storageName];
+    if (storage && typeof storage.getItem === "function") return storage;
+  } catch (error) {
+    // Sandboxed or privacy-restricted browsers may deny storage access.
+  }
+  return {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {}
+  };
+}
+
+const SAFE_SESSION_STORAGE_V250 = getSafeWindowStorageV250("sessionStorage");
+const USE_D1_STAGING_V300 = isLocalBetaApiHostV200(window.location.hostname);
+const ACTIVE_API_ENDPOINT_V200 =
+  resolveGasWebAppUrlV200(window.location, SAFE_SESSION_STORAGE_V250, WORKER_API_BASE_URL);
 
 function getGasWebAppUrlV200() {
   return ACTIVE_API_ENDPOINT_V200.url;
@@ -4073,6 +4126,10 @@ function getLiveGetRetryDelayV19() {
 
 async function fetchApiGetWithRetry(action, searchParams) {
   let lastError = null;
+  const d1Endpoint = USE_D1_STAGING_V300 ? D1_GET_ENDPOINTS[action] : null;
+  const requestBaseUrl = d1Endpoint
+    ? `${D1_API_BASE_URL}/${d1Endpoint}`
+    : getGasWebAppUrlV200();
 
   for (let attempt = 1; attempt <= LIVE_GET_MAX_ATTEMPTS_V19; attempt += 1) {
     if (attempt > 1) await delay(getLiveGetRetryDelayV19());
@@ -4087,7 +4144,7 @@ async function fetchApiGetWithRetry(action, searchParams) {
     }, LIVE_GET_TIMEOUT_MS_V19);
 
     try {
-      response = await fetch(`${getGasWebAppUrlV200()}?${searchParams.toString()}`, {
+      response = await fetch(`${requestBaseUrl}?${searchParams.toString()}`, {
         cache: "no-store",
         signal: controller.signal
       });
@@ -4268,12 +4325,29 @@ async function apiPost(action, payload) {
     if (pendingEntry) return pendingEntry.request;
   }
 
-  const request = fetch(getGasWebAppUrlV200(), {
+  const requestPayload = { action, ...payload };
+  const d1Endpoint = USE_D1_STAGING_V300 ? D1_POST_ENDPOINTS[action] : null;
+  const postUrl = d1Endpoint
+    ? `${D1_API_BASE_URL}/${d1Endpoint}`
+    : getGasWebAppUrlV200();
+
+  const request = fetch(postUrl, {
     method: "POST",
     cache: "no-store",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action, ...payload })
-  }).then((response) => parseApiResponse(response, action));
+    body: JSON.stringify(requestPayload)
+  }).then((response) => parseApiResponse(response, action)).catch((error) => {
+    const isWorkerRequest = String(postUrl).includes(".workers.dev/");
+    if (isWorkerRequest && error.category !== "application" && error.category !== "proxy_transport") {
+      // A connection loss after sending cannot prove that GAS did not commit.
+      const uncertain = new Error("Status tindakan belum dapat dipastikan. Semak rekod terkini sebelum menghantar semula.");
+      uncertain.category = "proxy_transport";
+      uncertain.outcomeUnknown = true;
+      uncertain.retryable = false;
+      throw uncertain;
+    }
+    throw error;
+  });
 
   if (!requestKey) return request;
   inFlightApiPostsPerf01.set(requestKey, {
@@ -4316,6 +4390,24 @@ async function parseApiResponse(response, action) {
       finalHostname,
       retryable: isTransientHttpStatusV19(status)
     });
+  }
+
+  const proxyCodes = ["UPSTREAM_TIMEOUT", "UPSTREAM_DELIVERY_FAILED", "UPSTREAM_INVALID_RESPONSE",
+    "METHOD_NOT_ALLOWED", "ORIGIN_NOT_ALLOWED", "ACTION_NOT_ALLOWED", "REQUEST_TOO_LARGE",
+    "RATE_LIMITED", "PATH_NOT_ALLOWED", "HEADERS_NOT_ALLOWED", "INVALID_REQUEST"];
+  if (!response.ok && result && result.ok === false && proxyCodes.includes(result.code)) {
+    const outcomeUnknown = result.outcome_unknown === true;
+    const proxyError = createLiveApiErrorV19(outcomeUnknown
+      ? "Status tindakan belum dapat dipastikan. Semak rekod terkini sebelum menghantar semula."
+      : result.code === "RATE_LIMITED"
+        ? "Terlalu banyak permintaan. Tunggu sebentar sebelum cuba semula."
+        : LIVE_API_UNSTABLE_MESSAGE, {
+      category: "proxy_transport", status, finalHostname,
+      retryable: !outcomeUnknown && [502, 503, 504].includes(status) && result.code.startsWith("UPSTREAM_")
+    });
+    proxyError.code = result.code;
+    proxyError.outcomeUnknown = outcomeUnknown;
+    throw proxyError;
   }
 
   if (!result || result.ok !== true) {
@@ -4874,6 +4966,19 @@ function normalizeStudentOutingTypesV200(rows) {
       type_code: String(row.type_code || "").trim().toUpperCase(),
       display_name: String(row.display_name || "").trim(),
       sort_order: Number(row.sort_order) || 0,
+	active: Number(row.active) === 1,
+	same_day_only: Number(row.same_day_only) === 1,
+	require_leave_date: Number(row.require_leave_date) === 1,
+	require_return_date: Number(row.require_return_date) === 1,
+	require_return_time: Number(row.require_return_time) === 1,
+	require_guardian_phone: Number(row.require_guardian_phone) === 1,
+	require_guardian_relation: Number(row.require_guardian_relation) === 1,
+	require_emergency_reason: Number(row.require_emergency_reason) === 1,
+	require_purpose: Number(row.require_purpose) === 1,
+	require_location: Number(row.require_location) === 1,
+	require_vehicle: Number(row.require_vehicle) === 1,
+	require_warden_approval: Number(row.require_warden_approval) === 1,
+	require_selfie: Number(row.require_selfie) === 1,
       application_open_date: normalizeStudentConfigDateV240(row.application_open_date),
       application_close_date: normalizeStudentConfigDateV240(row.application_close_date),
       application_open_time: normalizeTimeOnlyValue(row.application_open_time),
@@ -6467,12 +6572,19 @@ function populateStudents() {
 }
 
 function populateStaff() {
-  els.wardenSelect.innerHTML = wardens
-    .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
-    .join("");
-  els.guardSelect.innerHTML = guards
-    .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
-    .join("");
+  els.wardenSelect.innerHTML = wardens.length
+    ? wardens
+        .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+        .join("")
+    : '<option value="">Memuatkan senarai Warden / HEP...</option>';
+
+  els.guardSelect.innerHTML = guards.length
+    ? guards
+        .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+        .join("")
+    : '<option value="">Memuatkan senarai Guard...</option>';
+  els.wardenSelect.disabled = !wardens.length;
+  els.guardSelect.disabled = !guards.length;
 }
 
 function updateClock() {
