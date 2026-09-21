@@ -4692,7 +4692,7 @@ function updateDataModeIndicator() {
     ? "live"
     : (ALLOW_MOCK_MODE ? "mock" : (isLiveUnavailable ? "unstable" : "live"));
   els.dataModeIndicator.textContent = isLiveMode
-    ? "Live Mode: Google Sheets"
+    ? (USE_D1_STAGING_V300 ? "Staging Mode: Cloudflare D1" : "Live Mode: Google Sheets")
     : ALLOW_MOCK_MODE
       ? `Mock Mode: Demo Data${dataModeMessage ? ` - ${dataModeMessage}` : ""}`
     : isLiveUnavailable
