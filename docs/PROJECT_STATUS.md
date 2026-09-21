@@ -1,12 +1,41 @@
 # Project Status eOuting ITU
 
-Status repo semasa: **v2.4.0 — production verified**.
+Status setakat **21 September 2026**: production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets; **V3.0 Cloud Architecture** sedang dibangunkan dalam staging. Tiada production cutover ke Cloudflare.
 
-## eOuting v2.4 Production
+## V3.0 Cloud Architecture — 21 September 2026
+
+### Operational mirror D1 -> Google Sheets
+
+D1 ialah authoritative operational source untuk flow V3 yang telah dimigrasikan. Frontend localhost menggunakan Cloudflare Worker `eouting-api-proxy-staging` dan D1 `eouting_staging`; Google Sheets menerima operational mirror ke tab `OUTING_REQUESTS` dalam **eOuting ITU Database**.
+
+QA manual end-to-end D1 -> Google Sheets telah **LULUS** pada 21 September 2026 untuk semua mutation utama berikut, berdasarkan pengesahan QA manual pemilik projek:
+
+- `submitRequest`;
+- `cancelStudentRequest`;
+- `approveRequest`;
+- `rejectRequest`;
+- `confirmOut`;
+- `confirmIn`.
+
+GAS menyediakan private action `mirrorOutingRequestFromD1` yang dilindungi `D1_MIRROR_SECRET`. GAS deployment semasa yang menyokong mirror telah dikemas kini pada **21 September 2026**, dan Worker staging telah diarahkan kepada GAS deployment yang betul. Nilai secret tidak disimpan dalam dokumentasi.
+
+Git checkpoint ialah tag `v3-d1-sheets-mirror-qa`, menunjuk kepada `9dc258e`. Commit penting:
+
+- `04368d2 feat: add D1 outing request mirror endpoint`;
+- `2e17068 feat: mirror D1 outing requests to Sheets staging`;
+- `9dc258e fix: point staging worker to current GAS deployment`.
+
+**Known issue:** mirror ke Google Sheets masih synchronous. Jika GAS lambat atau unavailable, UI boleh mengalami latency atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown` walaupun perubahan D1 mungkin telah disimpan.
+
+**Next priority:** async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna. Pengesahan keluar tanpa Guard / remote checkout yang wujud dalam production masih perlu diteliti untuk feature parity kerana belum dipaparkan sepenuhnya dalam staging V3.
+
+V3 masih dalam pembangunan dan QA staging; ia **belum production-ready** dan full migration **belum selesai**. Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets, tanpa production cutover ke Cloudflare.
+
+## eOuting v2.4 Production — rekod close-out 27 Ogos 2026
 
 Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
 
-Verdict semasa pada **27 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 57, cache/asset `2.4.0-r21` dan service worker `eouting-cache-v2.4.0-r21`. Description deployment production ialah `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`; staging turut menggunakan Version 57 dan isolated Version 55 ialah rollback/control sahaja. Config-driven outing serta Dynamic Student Login aktif, Admin memaparkan `Config Active`, production smoke ialah **VERIFIED**, dan production beroperasi normal.
+Verdict close-out pada **27 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 57, cache/asset `2.4.0-r21` dan service worker `eouting-cache-v2.4.0-r21`. Description deployment production ialah `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`; staging turut menggunakan Version 57 dan isolated Version 55 ialah rollback/control sahaja. Config-driven outing serta Dynamic Student Login aktif, Admin memaparkan `Config Active`, production smoke ialah **VERIFIED**, dan production beroperasi normal.
 
 `Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX, Current Hostel Residents dan PERF-01 Phase 1 semuanya **COMPLETE / PRODUCTION VERIFIED**. Typography global, Public Monitoring KPI contrast dan conservative dark-surface brightness refinement juga lengkap. Normal Guard flow kekal primary/default. Full regression terakhir sebelum release lulus **744/744** dan pengguna production memerhatikan loading yang lebih pantas/lancar.
 
@@ -18,7 +47,7 @@ Batch regression UI production commit `996d9c0` (`fix: restore authenticated hea
 
 Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa; elemen `ruleNotice` serta eligibility/validation yang mendasarinya dikekalkan tetapi banner kuning itu disembunyikan secara visual pada Student authenticated. Behavior ticker desktop sengaja tidak diubah kerana mobile berfungsi dan isu desktop bukan production blocker.
 
-Production boundary semasa:
+Production boundary yang direkodkan pada close-out 27 Ogos 2026 (butiran versi/deployment di bawah ialah sejarah; kemas kini mirror 21 September dirujuk di atas):
 
 - frontend release aktif tunggal ialah `v2.4.0` di `itumelaka/eouting`; backend production ialah GAS **Version 57** dan staging juga Version 57;
 - isolated GAS Version 55 ialah rollback/control, bukan active production;

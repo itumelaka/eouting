@@ -1,12 +1,31 @@
 # Architecture eOuting ITU
 
-Versi repo semasa: **v2.4.0** dengan frontend/cache production `2.4.0-r21` dan service worker `eouting-cache-v2.4.0-r21`. Production serta staging menggunakan GAS Version 57; isolated Version 55 ialah rollback/control. Full Node suite terakhir sebelum rollout 27 Ogos 2026 ialah **744/744**.
+Production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets setakat **21 September 2026**. Tiada production cutover ke Cloudflare. Butiran frontend/cache `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21`, GAS Version 57 dan full Node suite **744/744** ialah rekod close-out 27 Ogos 2026, bukan keputusan QA V3 terkini.
+
+## V3.0 Cloud Architecture Staging — 21 September 2026
+
+```text
+Frontend localhost (flow V3 yang telah dimigrasikan)
+  -> Cloudflare Worker eouting-api-proxy-staging
+    -> D1 eouting_staging (authoritative operational source; commit mutation)
+    -> GAS private action mirrorOutingRequestFromD1 (D1_MIRROR_SECRET)
+      -> eOuting ITU Database / OUTING_REQUESTS (operational mirror)
+    -> response pengguna selepas synchronous mirror
+```
+
+Mirror ialah salinan operasi daripada D1; Google Sheets tidak mengambil alih authority flow V3 yang telah dimigrasikan. GAS deployment mirror dikemas kini pada 21 September 2026 dan Worker staging menunjuk kepada deployment yang betul. Frontend non-localhost production kekal menggunakan GAS. Fungsi konfigurasi/Admin yang belum dimigrasikan boleh kekal melalui GAS/Sheets sebagai hybrid control plane.
+
+QA manual end-to-end mirror telah lulus untuk `submitRequest`, `cancelStudentRequest`, `approveRequest`, `rejectRequest`, `confirmOut` dan `confirmIn`. Butiran QA dan checkpoint `v3-d1-sheets-mirror-qa` direkodkan dalam [Project Status](PROJECT_STATUS.md).
+
+Mirror masih synchronous: GAS yang lambat atau unavailable boleh menyebabkan latency UI atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown` selepas D1 mungkin telah commit. Keutamaan seterusnya ialah async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna; reka bentuk ini belum dilaksanakan.
+
+Feature parity pengesahan keluar tanpa Guard / remote checkout production masih perlu diteliti kerana belum dipaparkan sepenuhnya dalam staging V3. V3 belum production-ready dan full migration belum selesai. Bahagian berikut menerangkan baseline production V2 kecuali dinyatakan sebaliknya.
 
 ## Performance dan scalability
 
 GAS + Google Sheets masih sesuai untuk skala kecil/satu kampus ITU semasa. Bottleneck utama ialah row sejarah yang berulang kali diperlakukan sebagai current operational state: reconstruction current-hostel lama `O(S×R)`, departure audit projection lama `O(K×A)`, full historical request scans, contention `ScriptLock` global, polling tab tersembunyi dan Admin Students yang merender semua data/foto.
 
-Julat perancangan berikut bukan hard limit: bawah kira-kira 5k–10k request biasanya manageable; sekitar 10k–25k optimisasi perlu tersedia; sekitar 25k–50k current-hostel dan historical query tanpa cache menjadi high risk; sekitar 50k–100k dengan concurrency material memerlukan pemisahan active/archive serta summary/index. Strategi archive diperlukan kemudian. Migrasi database tidak diperlukan sekarang; laluan medium-term pilihan ialah GAS + Sheets yang dioptimumkan/diarchive, sementara Postgres/Supabase hanyalah pilihan skala besar masa hadapan.
+Julat perancangan berikut bukan hard limit: bawah kira-kira 5k–10k request biasanya manageable; sekitar 10k–25k optimisasi perlu tersedia; sekitar 25k–50k current-hostel dan historical query tanpa cache menjadi high risk; sekitar 50k–100k dengan concurrency material memerlukan pemisahan active/archive serta summary/index. Strategi archive diperlukan kemudian. Penilaian baseline V2 ketika itu mengutamakan GAS + Sheets yang dioptimumkan/diarchive. Setakat 21 September 2026, pembangunan V3 telah menggunakan Cloudflare Worker + D1 dalam staging seperti diterangkan di atas; production V2 belum dipindahkan.
 
 P0-1 yang telah diimplementasi dan diuji tetapi held from production menukar current-hostel kepada `O(S+R)` melalui Map latest-request-by-student satu laluan, mengekalkan hanya latest authoritative `KELUAR` sebagai outside. Snapshot presence `ScriptCache` dikongsi selama 20 saat dan invalidation dipusatkan; aggregate public, roster authenticated dan grouping kekal sama. P0-2 menukar departure audit kepada `O(K+A)` melalui Map mengikut `request_id`, mengekalkan action relevan serta row-order semantics dan menapis Student authenticated lebih awal apabila selamat. Warden/Guard dan schema tidak berubah.
 

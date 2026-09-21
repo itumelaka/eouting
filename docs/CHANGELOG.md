@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-21 — V3.0 Cloud Architecture / D1 -> Sheets mirror QA checkpoint
+
+- Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets; tiada production cutover ke Cloudflare. Frontend localhost menggunakan Worker `eouting-api-proxy-staging` dan D1 `eouting_staging` bagi flow V3 yang telah dimigrasikan, dengan D1 sebagai authoritative operational source.
+- QA manual end-to-end D1 -> Google Sheets telah lulus untuk `submitRequest`, `cancelStudentRequest`, `approveRequest`, `rejectRequest`, `confirmOut` dan `confirmIn`, berdasarkan pengesahan pemilik projek. Target mirror ialah tab `OUTING_REQUESTS` dalam eOuting ITU Database.
+- `04368d2 feat: add D1 outing request mirror endpoint` menambah private action GAS `mirrorOutingRequestFromD1` dengan `D1_MIRROR_SECRET`.
+- `2e17068 feat: mirror D1 outing requests to Sheets staging` menyambungkan operational mirror daripada D1.
+- GAS deployment yang menyokong mirror dikemas kini pada 21 September 2026. `9dc258e fix: point staging worker to current GAS deployment` mengarahkan Worker staging kepada deployment yang betul.
+- Git checkpoint `v3-d1-sheets-mirror-qa` menunjuk kepada `9dc258e`.
+- Known issue: mirror masih synchronous; GAS yang lambat atau unavailable boleh menyebabkan latency UI atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown`. Next priority ialah async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna.
+- Feature parity pengesahan keluar tanpa Guard / remote checkout production masih perlu diteliti kerana belum dipaparkan sepenuhnya dalam staging V3. V3 belum production-ready dan full migration belum selesai.
+
 ## 2026-08-27 — Version 57 production rollout close-out (v2.4.0)
 
 ### Production state

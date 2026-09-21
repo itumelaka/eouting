@@ -16,9 +16,9 @@ Versi production semasa: **v2.4.0 — operational, insiden delivery intermittent
 
 > **Status 21 September 2026:** production masih kekal GitHub Pages + Google Apps Script + Google Sheets dan belum dipindahkan ke Cloudflare. Migration Cloudflare sedang dibangunkan dan diuji secara berasingan menggunakan Worker staging `eouting-api-proxy-staging` dan D1 `eouting_staging`. Worker/D1 belum menjadi dependency production dan frontend production belum ditukar.
 
-### Cloudflare D1 Migration Staging — 21 September 2026
+### V3.0 Cloud Architecture Staging — 21 September 2026
 
-Migration staging kini telah membuktikan flow operasi utama menggunakan frontend local `http://localhost:8000` tanpa menukar production.
+Migration staging kini telah membuktikan flow operasi utama menggunakan frontend local `http://localhost:8000` melalui Cloudflare D1 staging tanpa menukar production. D1 ialah authoritative operational source untuk flow V3 yang telah dimigrasikan.
 
 Komponen yang telah diuji berjaya melalui D1 staging:
 
@@ -45,16 +45,43 @@ Flow `cancelStudentRequest` telah disahkan secara manual end-to-end melalui fron
 
 Production masih kekal GitHub Pages + Google Apps Script + Google Sheets. Frontend production belum ditukar kepada D1 dan Cloudflare Worker/D1 belum menjadi dependency production.
 
-Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk `getCurrentHostelRoster`, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh, mekanisme D1 -> Google Sheets mirror/reconciliation serta fungsi Admin tertentu.
+Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk `getCurrentHostelRoster`, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh, async/background mirror D1 -> Google Sheets, retry queue dan reconciliation serta fungsi Admin tertentu.
 
-Untuk V3.0, fungsi operasi utama Pelajar/Warden/Guard disasarkan D1-first. Fungsi konfigurasi dan Admin yang kompleks boleh kekal sementara pada GAS/Google Sheets sebagai hybrid control plane dan dipublish/sync ke D1 mengikut keperluan runtime.
+Untuk V3.0, flow operasi Pelajar/Warden/Guard yang telah dimigrasikan menggunakan D1 sebagai authoritative operational source. Fungsi konfigurasi dan Admin yang kompleks boleh kekal sementara pada GAS/Google Sheets sebagai hybrid control plane dan dipublish/sync ke D1 mengikut keperluan runtime.
+
+#### Operational mirror D1 -> Google Sheets
+
+D1 ialah authoritative operational source untuk flow V3 yang telah dimigrasikan. Frontend localhost menggunakan Cloudflare Worker `eouting-api-proxy-staging` dan D1 `eouting_staging`; Google Sheets menerima operational mirror ke tab `OUTING_REQUESTS` dalam **eOuting ITU Database**.
+
+QA manual end-to-end D1 -> Google Sheets telah **LULUS** pada 21 September 2026 untuk semua mutation utama berikut, berdasarkan pengesahan QA manual pemilik projek:
+
+- `submitRequest`;
+- `cancelStudentRequest`;
+- `approveRequest`;
+- `rejectRequest`;
+- `confirmOut`;
+- `confirmIn`.
+
+GAS menyediakan private action `mirrorOutingRequestFromD1` yang dilindungi `D1_MIRROR_SECRET`. GAS deployment semasa yang menyokong mirror telah dikemas kini pada **21 September 2026**, dan Worker staging telah diarahkan kepada GAS deployment yang betul. Nilai secret tidak disimpan dalam dokumentasi.
+
+Git checkpoint ialah tag `v3-d1-sheets-mirror-qa`, menunjuk kepada `9dc258e`. Commit penting:
+
+- `04368d2 feat: add D1 outing request mirror endpoint`;
+- `2e17068 feat: mirror D1 outing requests to Sheets staging`;
+- `9dc258e fix: point staging worker to current GAS deployment`.
+
+**Known issue:** mirror ke Google Sheets masih synchronous. Jika GAS lambat atau unavailable, UI boleh mengalami latency atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown` walaupun perubahan D1 mungkin telah disimpan.
+
+**Next priority:** async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna. Pengesahan keluar tanpa Guard / remote checkout yang wujud dalam production masih perlu diteliti untuk feature parity kerana belum dipaparkan sepenuhnya dalam staging V3.
+
+V3 masih dalam pembangunan dan QA staging; ia **belum production-ready** dan full migration **belum selesai**. Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets, tanpa production cutover ke Cloudflare.
 
 Production tidak boleh dianggap migrated sehingga baki flow selesai, mekanisme data/mirror dipastikan, regression test selesai dan frontend production ditukar secara terkawal.
 Frontend production v2.4.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
 Revision aset frontend production semasa ialah `2.4.0-r21` dan service worker menggunakan `eouting-cache-v2.4.0-r21`.
 
-Backend production semasa menggunakan GAS **Version 57** pada deployment sedia ada dengan description `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`. Deployment staging juga menggunakan Version 57. Deployment Version 55 yang diasingkan dikekalkan sebagai rollback/control dan bukan production aktif. Manifest Web App kanonik kekal `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING` dan `ANYONE_ANONYMOUS`; akses anonymous ialah transport API, bukan kuasa aplikasi tanpa authentication. `OUTING_CONFIG_V2_ENABLED=true` dan `STUDENT_GROUP_CONFIG_ENABLED=true`; `OUTING_TYPES` kekal authoritative bagi peraturan outing, manakala konfigurasi kumpulan Pelajar production aktif. `gas/Code.gs` ialah source GAS executable kanonik.
+Pada close-out **27 Ogos 2026**, backend production menggunakan GAS **Version 57** pada deployment sedia ada dengan description `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`. Deployment staging ketika close-out itu juga menggunakan Version 57; ini ialah rekod sejarah, bukan pengesahan versi GAS mirror pada 21 September 2026. Deployment Version 55 yang diasingkan dikekalkan sebagai rollback/control dan bukan production aktif. Manifest Web App kanonik kekal `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING` dan `ANYONE_ANONYMOUS`; akses anonymous ialah transport API, bukan kuasa aplikasi tanpa authentication. `OUTING_CONFIG_V2_ENABLED=true` dan `STUDENT_GROUP_CONFIG_ENABLED=true`; `OUTING_TYPES` kekal authoritative bagi peraturan outing, manakala konfigurasi kumpulan Pelajar production aktif. `gas/Code.gs` ialah source GAS executable kanonik.
 
 Rollout Version 57 selesai dan production verified pada **27 Ogos 2026** selepas smoke testing berjaya. Close-out ini merangkumi Fasa 1–6, Generic Application Date Window, Dynamic Student Login, Current Hostel Residents, PERF-01 Phase 1, config-readiness fix, typography/contrast global, Public Monitoring KPI contrast dan brightness refinement permukaan gelap. Full regression terakhir sebelum release lulus **744/744**.
 
