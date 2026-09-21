@@ -14,34 +14,42 @@ Versi production semasa: **v2.4.0 — operational, insiden delivery intermittent
 
 ## Status Production v2.4.0
 
-> **Status 18 September 2026:** production masih kekal GitHub Pages + Google Apps Script + Google Sheets dan belum dipindahkan ke Cloudflare. Migration Cloudflare sedang dibangunkan dan diuji secara berasingan menggunakan Worker staging `eouting-api-proxy-staging` dan D1 `eouting_staging`. Worker/D1 belum menjadi dependency production dan frontend production belum ditukar.
+> **Status 21 September 2026:** production masih kekal GitHub Pages + Google Apps Script + Google Sheets dan belum dipindahkan ke Cloudflare. Migration Cloudflare sedang dibangunkan dan diuji secara berasingan menggunakan Worker staging `eouting-api-proxy-staging` dan D1 `eouting_staging`. Worker/D1 belum menjadi dependency production dan frontend production belum ditukar.
 
-### Cloudflare D1 Migration Staging — 18 September 2026
+### Cloudflare D1 Migration Staging — 21 September 2026
 
-Migration staging kini telah membuktikan beberapa flow utama menggunakan frontend local `http://localhost:8000` tanpa menukar production.
+Migration staging kini telah membuktikan flow operasi utama menggunakan frontend local `http://localhost:8000` tanpa menukar production.
 
 Komponen yang telah diuji berjaya melalui D1 staging:
 
 - login Pelajar;
 - login Warden/HEP;
-- login Guard menggunakan `nama_guard + pin`;
+- login Guard;
 - directory login Pelajar;
 - konfigurasi `OUTING_TYPES`;
 - `getTodayRecords`;
-- paparan `Status Semasa` Pelajar termasuk lifecycle `KELUAR`;
-- borang permohonan Pelajar disembunyikan apabila request aktif wujud;
-- dashboard/checklist Warden menerima rekod operasi daripada D1;
-- dashboard Guard menerima rekod operasi daripada D1;
-- operational urgency asas mengikut threshold production;
-- role approval `HEP` / `WARDEN` diterbitkan daripada prefix `warden_id`;
-- profile-photo indicator dan departure-confirmation projection asas tersedia pada response operasi.
+- submission request Pelajar melalui `submitRequest`;
+- kelulusan Warden/HEP melalui `approveRequest`;
+- penolakan Warden/HEP melalui `rejectRequest`;
+- pengesahan keluar Guard melalui `confirmOut`;
+- pengesahan masuk Guard melalui `confirmIn`;
+- pembatalan Pelajar melalui `cancelStudentRequest`;
+- paparan `Status Semasa` Pelajar;
+- dashboard/checklist Warden dan Guard menggunakan rekod operasi D1;
+- audit lifecycle utama dalam `AUDIT_LOG`;
+- notifikasi Telegram bagi mutation yang telah diuji;
+- race protection asas bagi submission dan keputusan Warden;
+- timestamp operasi menggunakan `Asia/Kuala_Lumpur`.
 
-Pada 18 September 2026, 17 rekod `PULANG_BERMALAM` staging bagi tarikh tersebut telah diimport secara terkawal ke `OUTING_REQUESTS` D1 untuk validation dashboard. Import ini ialah data staging terkawal dan **bukan mekanisme sync production**. Selepas data tersebut tersedia dalam D1, paparan Pelajar, Warden dan Guard menunjukkan lifecycle semasa dengan betul.
+Flow `cancelStudentRequest` telah disahkan secara manual end-to-end melalui frontend local: UI Pelajar -> Cloudflare Worker -> D1 -> `AUDIT_LOG` -> Telegram -> refresh UI. Rekod kekal disimpan sebagai `DIBATALKAN_PELAJAR` bersama sebab, masa pembatalan dan `dibatalkan_oleh=PELAJAR`.
 
-Migration masih belum lengkap. Antara fungsi yang masih bergantung pada GAS atau belum mencapai parity penuh ialah `getCurrentHostelRoster`, submission request Pelajar, mutation approve/reject Warden, confirm keluar/masuk Guard secara production-parity penuh, pembatalan Pelajar, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh, notification/audit automation serta mekanisme migration/sync data lengkap.
+Production masih kekal GitHub Pages + Google Apps Script + Google Sheets. Frontend production belum ditukar kepada D1 dan Cloudflare Worker/D1 belum menjadi dependency production.
 
-Production tidak boleh dianggap migrated sehingga flow tersebut selesai, data D1 lengkap, regression test selesai dan frontend production ditukar secara terkawal.
+Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk `getCurrentHostelRoster`, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh, mekanisme D1 -> Google Sheets mirror/reconciliation serta fungsi Admin tertentu.
 
+Untuk V3.0, fungsi operasi utama Pelajar/Warden/Guard disasarkan D1-first. Fungsi konfigurasi dan Admin yang kompleks boleh kekal sementara pada GAS/Google Sheets sebagai hybrid control plane dan dipublish/sync ke D1 mengikut keperluan runtime.
+
+Production tidak boleh dianggap migrated sehingga baki flow selesai, mekanisme data/mirror dipastikan, regression test selesai dan frontend production ditukar secara terkawal.
 Frontend production v2.4.0 diterbitkan melalui GitHub Pages di [https://itumelaka.github.io/eouting/](https://itumelaka.github.io/eouting/) dan menggunakan endpoint GAS production sedia ada.
 
 Revision aset frontend production semasa ialah `2.4.0-r21` dan service worker menggunakan `eouting-cache-v2.4.0-r21`.
