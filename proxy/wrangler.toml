@@ -19,7 +19,7 @@ simple = { limit = 600, period = 60 }
 [env.staging]
 name = "eouting-api-proxy-staging"
 [env.staging.vars]
-GAS_UPSTREAM_URL = "https://script.google.com/macros/s/AKfycbzWWXEGfE4FadngGZ6CXntnxRqQoqFvNLHHnREMeN_W5J8j0QtwlWykIzJ-Xa04esKtYw/exec"
+GAS_UPSTREAM_URL = "https://script.google.com/macros/s/AKfycbzPkL1HvQG0XnEyjwfXdtZ05luKIsrkKKjmvO9miH5TLS3NwWywxRIYNZqnPBNkH7LGDg/exec"
 STAGING_ORIGIN = "http://localhost:8000"
 TELEGRAM_ENABLED = "1"
 [[env.staging.d1_databases]]
