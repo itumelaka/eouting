@@ -1,0 +1,2593 @@
+const stagingWardenDecisions = (() => {
+// Staging-only decision handlers. Keep production GAS rejection labels intentionally.
+const text = value => String(value ?? '').trim();
+const fault = (status, code, message) => Object.assign(new Error(message), { status, code });
+
+function malaysiaTimestamp(date) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(date);
+  const p = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+}
+
+function telegramDate(value) {
+  const match = text(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : text(value) || '-';
+}
+
+function telegramDateTime(value) {
+  if (!value) return '-';
+  const raw = text(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw) ? raw.replace(' ', 'T') + '+08:00' : raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  const stamp = malaysiaTimestamp(date);
+  return `${telegramDate(stamp)} ${stamp.slice(11, 16)}`;
+}
+
+async function decisionTelegram(record, action, env, fetchImpl) {
+  if (!['1','true','yes','ya','enabled','on'].includes(text(env.TELEGRAM_ENABLED).toLowerCase()) ||
+      !text(env.TELEGRAM_BOT_TOKEN) || !text(env.TELEGRAM_CHAT_ID)) return false;
+  try {
+    const type = record.jenis_permohonan;
+    const labels = { OUTING_BIASA: 'Outing Biasa', OUTING_HUJUNG_MINGGU: 'Outing Sabtu / Ahad',
+      KECEMASAN: 'Kecemasan', PULANG_BERMALAM: 'Pulang Bermalam', CUTI_SEMESTER: 'CUTI SEMESTER' };
+    let label = labels[type] || type || '-';
+    try {
+      const config = await env.DB.prepare('SELECT display_name FROM OUTING_TYPES WHERE type_code = ? LIMIT 1').bind(type).first();
+      label = text(config?.display_name) || label;
+    } catch { /* Production falls back to the built-in label. */ }
+    const prefix = type === 'PULANG_BERMALAM' ? 'Pulang Bermalam - ' : type === 'CUTI_SEMESTER' ? 'CUTI SEMESTER - ' : '';
+    const actor = record.warden_approve_role === 'HEP' ? 'HEP' : 'Warden';
+    const title = action === 'approveRequest' ? `✅ ${prefix}Permohonan Diluluskan ${actor}` : `❌ ${prefix}Permohonan Ditolak Warden`;
+    const lines = [title, '', `ID: ${record.request_id || '-'}`, `Nama: ${record.nama || '-'}`,
+      `No. Matrik: ${record.no_matrik || '-'}`, `Kelas: ${record.kelas || '-'}`, `Jenis: ${label}`,
+      `Status: ${record.status || '-'}`, `Tujuan: ${record.tujuan || '-'}`, `Lokasi: ${record.lokasi || '-'}`,
+      `Kenderaan: ${record.jenis_kenderaan || '-'}`];
+    if (record.butiran_kenderaan) lines.push(`Butiran: ${record.butiran_kenderaan}`);
+    if (type === 'KECEMASAN') lines.push(`Sebab Kecemasan: ${record.sebab_kecemasan || '-'}`,
+      `Telefon Waris: ${record.telefon_waris || '-'}`, `Hubungan Waris: ${record.hubungan_waris || '-'}`);
+    if (['OUTING_HUJUNG_MINGGU','PULANG_BERMALAM','CUTI_SEMESTER'].includes(type)) {
+      if (type === 'CUTI_SEMESTER') lines.push(`Tarikh Keluar: ${telegramDate(record.tarikh)}`);
+      const returnDate = telegramDate(record.tarikh_balik);
+      const returnTime = text(record.masa_balik_dijangka) || '-';
+      lines.push(`Tarikh Pulang Ke Asrama: ${returnDate}`, `Masa Dijangka Pulang Ke Asrama: ${returnTime}`,
+        `Pulang ke asrama dijangka: ${returnDate === '-' && returnTime === '-' ? '-' : `${returnDate} ${returnTime}`}`, `Telefon Waris: ${record.telefon_waris || '-'}`,
+        `Hubungan Waris: ${record.hubungan_waris || '-'}`);
+    }
+    if (record.warden_approve_by) lines.push(`${actor}: ${record.warden_approve_by}`);
+    if (record.guard_keluar_by) lines.push(`Guard Keluar: ${record.guard_keluar_by}`);
+    if (record.guard_masuk_by) lines.push(`Guard Masuk: ${record.guard_masuk_by}`);
+    if (record.lewat) lines.push(`Lewat: ${record.lewat}`);
+    lines.push('', `Masa Mohon: ${telegramDateTime(record.masa_mohon)}`,
+      `Masa Approve/Tolak: ${telegramDateTime(record.masa_approve)}`,
+      `Masa Keluar: ${telegramDateTime(record.masa_keluar)}`, `Masa Masuk: ${telegramDateTime(record.masa_masuk)}`);
+    const response = await fetchImpl(`https://api.telegram.org/bot${text(env.TELEGRAM_BOT_TOKEN)}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: text(env.TELEGRAM_CHAT_ID), text: lines.join('\n') })
+    });
+    return response.ok;
+  } catch { return false; }
+}
+
+async function handleWardenDecision(request, env, headers, action, options = {}) {
+  if (request.method === 'OPTIONS') {
+    headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== 'POST') throw fault(405, 'METHOD_NOT_ALLOWED', 'POST required');
+  if (!['approveRequest','rejectRequest'].includes(action)) throw fault(400, 'INVALID_REQUEST', 'Invalid decision action');
+  const payload = await request.json();
+  const requestId = text(payload.request_id);
+  const name = text(payload.warden_name || payload.nama_warden || payload.user_name);
+  const id = text(payload.warden_id);
+  const pin = text(payload.pin);
+  if (!requestId || (!name && !id) || !pin) throw fault(400, 'INVALID_REQUEST', 'request_id, nama warden dan PIN diperlukan.');
+  // JS normalization matches GAS for Unicode names, unlike SQLite's ASCII lower().
+  const directory = name
+    ? await env.DB.prepare('SELECT warden_id, nama, status, pin FROM WARDENS').all()
+    : await env.DB.prepare('SELECT warden_id, nama, status, pin FROM WARDENS WHERE warden_id = ?').bind(id).all();
+  const staff = directory.results.find(row => (!name || text(row.nama).toLowerCase() === name.toLowerCase()) &&
+    text(row.status).toLowerCase() === 'aktif' && text(row.pin) === pin);
+  if (!staff) throw fault(401, 'WARDEN_LOGIN_INVALID', 'Warden tidak dijumpai atau tidak aktif.');
+  const role = /^HEP-/i.test(text(staff.warden_id)) ? 'HEP' : 'WARDEN';
+  const readRecord = () => env.DB.prepare('SELECT * FROM OUTING_REQUESTS WHERE request_id = ? LIMIT 1').bind(requestId).first();
+  const approve = action === 'approveRequest';
+  const conflict = () => fault(409, 'INVALID_REQUEST_STATUS', `Hanya permohonan MENUNGGU_KELULUSAN boleh ${approve ? 'diluluskan' : 'ditolak'}.`);
+  const missing = () => fault(404, 'REQUEST_NOT_FOUND', 'Permohonan tidak dijumpai.');
+  const record = await readRecord();
+  if (!record) throw missing();
+  if (record.status !== 'MENUNGGU_KELULUSAN') throw conflict();
+  const timestamp = malaysiaTimestamp((options.now || (() => new Date()))());
+  const status = approve ? 'DILULUSKAN_WARDEN' : 'DITOLAK_WARDEN';
+  // Deliberately do not trim rejection notes: production uses truthy supplied value or stored note.
+  const note = payload.catatan || record.catatan || '';
+  const result = approve
+    ? await env.DB.prepare(`UPDATE OUTING_REQUESTS SET status = ?, warden_approve_by = ?, masa_approve = ?
+        WHERE request_id = ? AND status = 'MENUNGGU_KELULUSAN'`).bind(status, staff.nama, timestamp, requestId).run()
+    : await env.DB.prepare(`UPDATE OUTING_REQUESTS SET status = ?, warden_approve_by = ?, masa_approve = ?, catatan = ?
+        WHERE request_id = ? AND status = 'MENUNGGU_KELULUSAN'`).bind(status, staff.nama, timestamp, note, requestId).run();
+  if (result.meta?.changes !== 1) {
+    const authoritative = await readRecord();
+    if (!authoritative) throw missing();
+    throw conflict();
+  }
+  // Full transition snapshot, like GAS; subsequent workflows cannot change this response's actor.
+  const updated = { ...record, status, warden_approve_by: staff.nama, masa_approve: timestamp, warden_approve_role: role };
+  if (!approve) updated.catatan = note;
+  const details = { student_name: record.nama || '', no_matrik: record.no_matrik || '', jenis_permohonan: record.jenis_permohonan || '' };
+  if (!approve) details.catatan = payload.catatan || '';
+  try {
+    await env.DB.prepare(`INSERT INTO AUDIT_LOG (timestamp,action,request_id,user_role,user_name,details,entity_type,entity_id)
+      VALUES (?,?,?,?,?,?,?,?)`).bind(malaysiaTimestamp((options.now || (() => new Date()))()),
+      approve ? 'APPROVE_REQUEST' : 'REJECT_REQUEST', requestId, approve && role === 'HEP' ? 'HEP' : 'Warden',
+      staff.nama, JSON.stringify(details), '', '').run();
+  } catch { /* Best effort after successful persistence, matching GAS. */ }
+  await decisionTelegram(updated, action, env, options.fetchImpl || fetch);
+  return new Response(JSON.stringify({ ok: true, data: updated }), { status: 200, headers });
+}
+
+return { handleWardenDecision };
+})();
+
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// worker.js
+var GET_ACTIONS = /* @__PURE__ */ new Set([
+  "health",
+  "getStudentLoginDirectory",
+  "getWardens",
+  "getGuards",
+  "getTodayRecords",
+  "getCurrentHostelSummary",
+  "getOutingStats",
+  "getOutingTypes"
+]);
+var POST_ACTIONS = /* @__PURE__ */ new Set([
+  "loginStudent",
+  "loginWarden",
+  "loginGuard",
+  "loginAdmin",
+  "getTodayRecords",
+  "getCurrentHostelRoster",
+  "getGuardianContact",
+  "getStudentAnnualSummary",
+  "getAdminIndividualStats",
+  "getAdminMonitoring",
+  "searchAdminMasterRecords",
+  "getAdminStaff",
+  "createStaff",
+  "updateStaff",
+  "toggleStaffStatus",
+  "getAdminOutingTypes",
+  "getAnnouncementBannerAdmin",
+  "updateAnnouncementBanner",
+  "getNoGuardDepartureConfig",
+  "updateNoGuardDepartureConfig",
+  "getAnnouncementBanner",
+  "getOutingConfigReadiness",
+  "getStudentGroupConfigReadiness",
+  "setStudentGroupConfigEnabled",
+  "runStudentInstitutionMigration",
+  "getAdminStudentGroups",
+  "createStudentGroup",
+  "updateStudentGroup",
+  "toggleStudentGroupStatus",
+  "getAdminLiInstitutions",
+  "createLiInstitution",
+  "updateLiInstitution",
+  "toggleLiInstitutionStatus",
+  "createOutingType",
+  "updateOutingType",
+  "toggleOutingType",
+  "getAdminStudents",
+  "getStudentProfilePhotos",
+  "submitStudentProfilePhoto",
+  "removeStudentProfilePhoto",
+  "createStudent",
+  "updateStudent",
+  "toggleStudentStatus",
+  "submitRequest",
+  "cancelStudentRequest",
+  "requestDepartureConfirmation",
+  "approveRequest",
+  "rejectRequest",
+  "confirmWardenRemoteCheckout",
+  "confirmOut",
+  "confirmIn",
+  "submitReturnSelfie"
+]);
+var MAX_REQUEST_BYTES = 3 * 1024 * 1024;
+var MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+function fault(status, code, message) {
+  return Object.assign(new Error(message), { status, code });
+}
+__name(fault, "fault");
+async function readBounded(body, limit, tooLarge) {
+  if (!body) return new Uint8Array();
+  const reader = body.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel().catch(() => {
+        });
+        throw tooLarge;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+__name(readBounded, "readBounded");
+function trustedUrl(value, redirect = false) {
+  const url = new URL(value);
+  const validPath = redirect ? url.pathname === "/macros/echo" : /^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname);
+  if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash || url.hostname !== (redirect ? "script.googleusercontent.com" : "script.google.com") || !validPath || !redirect && url.search) throw new Error("Invalid upstream URL");
+  return url;
+}
+__name(trustedUrl, "trustedUrl");
+const stagingSubmitRequestV230 = (() => {
+const ACTIVE_STATUSES = [
+  "MENUNGGU_KELULUSAN",
+  "DILULUSKAN_WARDEN",
+  "KELUAR"
+];
+
+const REQUEST_COLUMNS = [
+  "request_id", "tarikh", "hari", "jenis_permohonan", "student_id",
+  "no_matrik", "nama", "student_email", "kelas", "tujuan", "lokasi",
+  "jenis_kenderaan", "butiran_kenderaan", "sebab_kecemasan",
+  "telefon_waris", "hubungan_waris", "catatan_kecemasan", "masa_mohon",
+  "status", "warden_approve_by", "masa_approve", "masa_keluar",
+  "guard_keluar_by", "masa_masuk", "guard_masuk_by", "lewat",
+  "selfie_whatsapp", "catatan", "tarikh_balik", "hari_balik",
+  "masa_balik_dijangka", "selfie_status", "selfie_file_id", "selfie_url",
+  "masa_selfie", "selfie_telegram_message_id", "sebab_batal_pelajar",
+  "masa_batal_pelajar", "dibatalkan_oleh"
+];
+
+const BOOLEAN_CONFIG_FIELDS = [
+  "active", "same_day_only", "require_leave_date", "require_return_date",
+  "require_return_time", "require_guardian_phone", "require_guardian_relation",
+  "require_emergency_reason", "require_purpose", "require_location",
+  "require_vehicle", "require_warden_approval", "require_selfie"
+];
+
+function fault(status, code, message) {
+  return Object.assign(new Error(message), { status, code });
+}
+
+function malaysiaParts(date) {
+  const dateKey = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(date);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", hour: "2-digit", minute: "2-digit",
+    second: "2-digit", hour12: false
+  }).format(date);
+  const day = new Intl.DateTimeFormat("ms-MY", {
+    timeZone: "Asia/Kuala_Lumpur", weekday: "long"
+  }).format(date).toUpperCase();
+  return { dateKey, time, day, timestamp: `${dateKey} ${time}` };
+}
+
+function strictBoolean(value, field) {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  const normalized = normalizeText(value).toLowerCase();
+  if (["true", "ya", "1"].includes(normalized)) return true;
+  if (["false", "tidak", "0"].includes(normalized)) return false;
+  throw new Error(`${field} mesti boolean true atau false.`);
+}
+
+function normalizeText(value) {
+  return String(value === undefined || value === null ? "" : value).trim();
+}
+
+const DAY_NAMES = ["AHAD", "ISNIN", "SELASA", "RABU", "KHAMIS", "JUMAAT", "SABTU"];
+
+function normalizeAllowedDays(value, required = true) {
+  const days = normalizeText(value).split(",").map((day) => day.trim().toUpperCase()).filter(Boolean);
+  if (required && !days.length) throw new Error("allowed_days mesti mengandungi sekurang-kurangnya satu hari.");
+  for (const day of days) {
+    if (!DAY_NAMES.includes(day)) throw new Error(`allowed_days mengandungi hari yang tidak sah: ${day}`);
+  }
+  return [...new Set(days)].join(",");
+}
+
+function normalizeOptionalTime(value, field) {
+  const text = normalizeText(value);
+  if (text && !/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) {
+    throw new Error(`${field} mesti menggunakan format HH:mm atau dikosongkan.`);
+  }
+  return text;
+}
+
+function normalizeOptionalDate(value, field) {
+  const text = normalizeText(value);
+  if (!text) return "";
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) throw new Error(`${field} mesti menggunakan format YYYY-MM-DD atau dikosongkan.`);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() + 1 !== month || parsed.getUTCDate() !== day) {
+    throw new Error(`${field} tidak sah.`);
+  }
+  return text;
+}
+
+function validateOutingType(row, requestedType) {
+  try {
+    const typeCode = normalizeText(row.type_code).toUpperCase();
+    if (!/^[A-Z][A-Z0-9_]{2,49}$/.test(typeCode) || typeCode !== requestedType) throw new Error("type_code");
+    const displayName = normalizeText(row.display_name);
+    const description = normalizeText(row.description);
+    if (!displayName || displayName.length > 100 || description.length > 500) throw new Error("text");
+    const sortOrder = Number(row.sort_order);
+    const configVersion = Number(row.config_version);
+    if (!Number.isInteger(sortOrder) || sortOrder < 1 || sortOrder > 9999) throw new Error("sort_order");
+    if (!Number.isInteger(configVersion) || configVersion < 1) throw new Error("config_version");
+
+    const config = { ...row, type_code: typeCode, display_name: displayName, description,
+      sort_order: sortOrder, config_version: configVersion };
+    config.allowed_days = normalizeAllowedDays(row.allowed_days);
+    config.departure_allowed_days = normalizeAllowedDays(row.departure_allowed_days, false);
+    for (const field of ["application_open_time", "application_close_time", "fixed_return_time", "earliest_departure_time"]) {
+      config[field] = normalizeOptionalTime(row[field], field);
+    }
+    for (const field of ["application_open_date", "application_close_date"]) {
+      config[field] = normalizeOptionalDate(row[field], field);
+    }
+    if (config.application_open_date && config.application_close_date &&
+        config.application_close_date < config.application_open_date) throw new Error("date range");
+    for (const field of BOOLEAN_CONFIG_FIELDS) config[field] = strictBoolean(row[field], field);
+    return config;
+  } catch {
+    throw fault(400, "INVALID_OUTING_CONFIG", "Konfigurasi jenis outing tidak sah. Sila hubungi pentadbir.");
+  }
+}
+
+function normalizeSubmissionDate(value, label, required) {
+  const text = normalizeText(value);
+  if (!text) {
+    if (required) throw fault(400, "INVALID_REQUEST", `${label} diperlukan.`);
+    return "";
+  }
+  try {
+    return normalizeOptionalDate(text, label);
+  } catch {
+    throw fault(400, "INVALID_REQUEST", `${label} tidak sah.`);
+  }
+}
+
+function normalizeSubmissionTime(value, label, required) {
+  const text = normalizeText(value);
+  if (!text) {
+    if (required) throw fault(400, "INVALID_REQUEST", `${label} diperlukan.`);
+    return "";
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) {
+    throw fault(400, "INVALID_REQUEST", `${label} tidak sah.`);
+  }
+  return text;
+}
+
+function formatMalayDate(dateKey) {
+  const months = ["Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober", "November", "Disember"];
+  const [year, month, day] = dateKey.split("-");
+  return `${Number(day)} ${months[Number(month) - 1]} ${year}`;
+}
+
+function formatMalayDays(days) {
+  const labels = { AHAD: "Ahad", ISNIN: "Isnin", SELASA: "Selasa", RABU: "Rabu", KHAMIS: "Khamis", JUMAAT: "Jumaat", SABTU: "Sabtu" };
+  const values = [...new Set(days.map((day) => labels[day]).filter(Boolean))];
+  if (values.length <= 1) return values[0] || "yang dikonfigurasi";
+  if (values.length === 2) return `${values[0]} atau ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")} atau ${values.at(-1)}`;
+}
+
+function withinApplicationWindow(current, open, close) {
+  if (open && close) return open <= close ? current >= open && current <= close : current >= open || current <= close;
+  if (open) return current >= open;
+  if (close) return current <= close;
+  return true;
+}
+
+function requiredText(payload, keys, label, required) {
+  const value = keys.reduce((found, key) => found || normalizeText(payload[key]), "");
+  if (required && !value) throw fault(400, "INVALID_REQUEST", `${label} diperlukan.`);
+  return value;
+}
+
+function validateSubmission(payload, config, parts) {
+  const submission = { ...payload };
+  const leaveDate = normalizeSubmissionDate(payload.tarikh, "Tarikh keluar", config.require_leave_date);
+  let returnDate = normalizeSubmissionDate(payload.tarikh_balik, "Tarikh pulang ke asrama", config.require_return_date);
+  const effectiveLeaveDate = leaveDate || parts.dateKey;
+
+  if (config.application_open_date && parts.dateKey < config.application_open_date) {
+    throw fault(400, "APPLICATION_NOT_OPEN", `Permohonan dibuka mulai ${formatMalayDate(config.application_open_date)}.`);
+  }
+  if (config.application_close_date && parts.dateKey > config.application_close_date) {
+    throw fault(400, "APPLICATION_CLOSED", `Tempoh permohonan telah ditutup pada ${formatMalayDate(config.application_close_date)}.`);
+  }
+  if (returnDate && returnDate < effectiveLeaveDate) {
+    throw fault(400, "INVALID_REQUEST", "Tarikh pulang ke asrama tidak boleh lebih awal daripada tarikh keluar.");
+  }
+  if (config.same_day_only) {
+    returnDate ||= effectiveLeaveDate;
+    if (returnDate !== effectiveLeaveDate) {
+      throw fault(400, "INVALID_REQUEST", "Jenis outing ini mesti keluar dan pulang pada hari yang sama.");
+    }
+  }
+  if (!config.allowed_days.split(",").includes(parts.day)) {
+    throw fault(400, "APPLICATION_DAY_NOT_ALLOWED", "Permohonan jenis outing ini tidak dibenarkan pada hari ini.");
+  }
+  const departureDays = config.departure_allowed_days ? config.departure_allowed_days.split(",") : [];
+  if (departureDays.length) {
+    if (!leaveDate) {
+      throw fault(400, "INVALID_REQUEST", "Tarikh keluar diperlukan untuk peraturan keluar jenis outing ini.");
+    }
+    if (!departureDays.includes(dayNameForDate(leaveDate))) {
+      throw fault(400, "DEPARTURE_DAY_NOT_ALLOWED", `${config.display_name} hanya dibenarkan keluar pada hari ${formatMalayDays(departureDays)}.`);
+    }
+  }
+  if (!withinApplicationWindow(parts.time.slice(0, 5), config.application_open_time, config.application_close_time)) {
+    throw fault(400, "APPLICATION_TIME_CLOSED", "Permohonan jenis outing ini belum dibuka atau telah ditutup.");
+  }
+
+  submission.masa_balik_dijangka = config.fixed_return_time || normalizeSubmissionTime(
+    payload.masa_balik_dijangka, "Masa dijangka pulang ke asrama", config.require_return_time
+  );
+  submission.telefon_waris = requiredText(payload, ["telefon_waris"], "Telefon waris", config.require_guardian_phone);
+  submission.hubungan_waris = requiredText(payload, ["hubungan_waris"], "Hubungan waris", config.require_guardian_relation);
+  submission.sebab_kecemasan = requiredText(payload, ["sebab_kecemasan"], "Sebab kecemasan", config.require_emergency_reason);
+  submission.tujuan = requiredText(payload, ["tujuan", "purpose"], "Tujuan", config.require_purpose);
+  submission.lokasi = requiredText(payload, ["lokasi", "location"], "Lokasi", config.require_location);
+  submission.jenis_kenderaan = requiredText(payload, ["jenis_kenderaan", "vehicle_type"], "Jenis kenderaan", config.require_vehicle);
+  submission.tarikh = effectiveLeaveDate;
+  submission.tarikh_balik = returnDate;
+  return submission;
+}
+
+function isActiveDuplicateError(error) {
+  const message = normalizeText(error && error.message).toLowerCase();
+  return message.includes("unique constraint") &&
+    (message.includes("outing_requests.student_id") || message.includes("outing_requests.no_matrik") ||
+     message.includes("uq_active_request_student") || message.includes("uq_active_request_matric"));
+}
+
+function activeDuplicateFault() {
+  return fault(409, "ACTIVE_REQUEST_EXISTS", "Anda masih mempunyai permohonan aktif. Sila selesaikan permohonan sedia ada dahulu.");
+}
+
+function dayNameForDate(dateKey) {
+  return new Intl.DateTimeFormat("ms-MY", {
+    timeZone: "Asia/Kuala_Lumpur", weekday: "long"
+  }).format(new Date(`${dateKey}T12:00:00+08:00`)).toUpperCase();
+}
+
+function randomFourDigits() {
+  const bytes = new Uint16Array(1);
+  crypto.getRandomValues(bytes);
+  return String(1000 + (bytes[0] % 9000));
+}
+
+function buildRequestId(parts) {
+  return `OUT-${parts.dateKey.replaceAll("-", "")}-${parts.time.replaceAll(":", "")}-${randomFourDigits()}`;
+}
+
+function telegramDate(value) {
+  const match = normalizeText(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : normalizeText(value) || "-";
+}
+
+function telegramTime(value) {
+  const match = normalizeText(value).match(/^([01]\d|2[0-3]):([0-5]\d)/);
+  return match ? `${match[1]}:${match[2]}` : "-";
+}
+
+function buildTelegramMessage(record, displayName) {
+  const titles = {
+    OUTING_HUJUNG_MINGGU: "📅 Permohonan Outing Sabtu / Ahad Baru",
+    KECEMASAN: "🚨 Permohonan Kecemasan Baru",
+    PULANG_BERMALAM: "🏠 Permohonan Pulang Bermalam Baru",
+    CUTI_SEMESTER: "🏫 Permohonan CUTI SEMESTER Baru"
+  };
+  const lines = [
+    titles[record.jenis_permohonan] || "📌 Permohonan Outing Baru", "",
+    `ID: ${record.request_id}`, `Nama: ${record.nama || "-"}`,
+    `No. Matrik: ${record.no_matrik || "-"}`, `Kelas: ${record.kelas || "-"}`,
+    `Jenis: ${displayName || record.jenis_permohonan || "-"}`,
+    `Status: ${record.status || "-"}`, `Tujuan: ${record.tujuan || "-"}`,
+    `Lokasi: ${record.lokasi || "-"}`, `Kenderaan: ${record.jenis_kenderaan || "-"}`
+  ];
+  if (record.butiran_kenderaan) lines.push(`Butiran: ${record.butiran_kenderaan}`);
+  if (record.jenis_permohonan === "KECEMASAN") {
+    lines.push(`Sebab Kecemasan: ${record.sebab_kecemasan || "-"}`,
+      `Telefon Waris: ${record.telefon_waris || "-"}`,
+      `Hubungan Waris: ${record.hubungan_waris || "-"}`);
+  }
+  if (["OUTING_HUJUNG_MINGGU", "PULANG_BERMALAM", "CUTI_SEMESTER"].includes(record.jenis_permohonan)) {
+    if (record.jenis_permohonan === "CUTI_SEMESTER") lines.push(`Tarikh Keluar: ${telegramDate(record.tarikh)}`);
+    const returnDate = telegramDate(record.tarikh_balik);
+    const returnTime = telegramTime(record.masa_balik_dijangka);
+    lines.push(`Tarikh Pulang Ke Asrama: ${returnDate}`,
+      `Masa Dijangka Pulang Ke Asrama: ${returnTime}`,
+      `Pulang ke asrama dijangka: ${returnDate === "-" && returnTime === "-" ? "-" : `${returnDate} ${returnTime}`}`,
+      `Telefon Waris: ${record.telefon_waris || "-"}`,
+      `Hubungan Waris: ${record.hubungan_waris || "-"}`);
+  }
+  if (record.warden_approve_by) lines.push(`Warden: ${record.warden_approve_by}`);
+  lines.push("", `Masa Mohon: ${record.masa_mohon || "-"}`,
+    `Masa Approve/Tolak: ${record.masa_approve || "-"}`, "Masa Keluar: -", "Masa Masuk: -",
+    "", "eOuting ITU: https://itumelaka.github.io/eouting/");
+  return lines.join("\n");
+}
+
+async function sendTelegram(env, record, displayName, fetchImpl) {
+  const enabled = ["1", "true", "yes", "ya", "enabled", "on"].includes(
+    normalizeText(env.TELEGRAM_ENABLED).toLowerCase()
+  );
+  if (!enabled || !env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return false;
+  try {
+    const response = await fetchImpl(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: env.TELEGRAM_CHAT_ID,
+        text: buildTelegramMessage(record, displayName),
+        disable_web_page_preview: true
+      })
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function auditStatement(env, values) {
+  return env.DB.prepare(`INSERT INTO AUDIT_LOG (
+    timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(...values);
+}
+
+async function handleSubmitRequest(request, env, headers, dependencies = {}) {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+
+  const payload = await request.json();
+  const studentId = normalizeText(payload.student_id);
+  const noMatrik = normalizeText(payload.no_matrik);
+  const requestType = normalizeText(payload.jenis_permohonan).toUpperCase();
+  if (!studentId || !noMatrik) throw fault(400, "INVALID_REQUEST", "student_id dan no_matrik diperlukan.");
+  if (!requestType) throw fault(400, "INVALID_REQUEST", "Jenis permohonan tidak sah.");
+
+  const student = await env.DB.prepare(`SELECT student_id, no_matrik, nama, email, kelas, status
+    FROM STUDENTS WHERE UPPER(TRIM(student_id)) = UPPER(TRIM(?))
+      AND UPPER(TRIM(no_matrik)) = UPPER(TRIM(?)) AND LOWER(TRIM(status)) = 'aktif' LIMIT 1`
+  ).bind(studentId, noMatrik).first();
+  if (!student) throw fault(401, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai atau tidak aktif.");
+
+  const outingType = await env.DB.prepare(`SELECT * FROM OUTING_TYPES
+    WHERE UPPER(TRIM(type_code)) = UPPER(TRIM(?)) LIMIT 1`
+  ).bind(requestType).first();
+  if (!outingType) throw fault(400, "OUTING_TYPE_NOT_AVAILABLE", "Jenis outing tidak tersedia.");
+  let active;
+  try {
+    active = strictBoolean(outingType.active, "active");
+  } catch {
+    throw fault(400, "INVALID_OUTING_CONFIG", "Konfigurasi jenis outing tidak sah. Sila hubungi pentadbir.");
+  }
+  if (!active) {
+    throw fault(400, "OUTING_TYPE_NOT_AVAILABLE", "Jenis outing tidak aktif dan tidak boleh dipohon.");
+  }
+  const config = validateOutingType(outingType, requestType);
+
+  const now = (dependencies.now || (() => new Date()))();
+  const parts = malaysiaParts(now);
+  const submission = validateSubmission(payload, config, parts);
+  const requiresWardenApproval = config.require_warden_approval;
+  const requireSelfie = config.require_selfie;
+  const status = requiresWardenApproval ? "MENUNGGU_KELULUSAN" : "DILULUSKAN_WARDEN";
+  const requestId = buildRequestId(parts);
+  const existing = await env.DB.prepare(`SELECT request_id FROM OUTING_REQUESTS
+    WHERE status IN ('MENUNGGU_KELULUSAN','DILULUSKAN_WARDEN','KELUAR')
+      AND (student_id = ? OR (TRIM(?) <> '' AND no_matrik = ?)) LIMIT 1`
+  ).bind(student.student_id, student.no_matrik, student.no_matrik).first();
+  if (existing) throw activeDuplicateFault();
+
+  const leaveDate = submission.tarikh;
+  const returnDate = submission.tarikh_balik;
+  const record = {
+    request_id: requestId, tarikh: leaveDate, hari: dayNameForDate(leaveDate),
+    jenis_permohonan: requestType, student_id: student.student_id,
+    no_matrik: student.no_matrik, nama: student.nama, student_email: student.email || "",
+    kelas: student.kelas || "", tujuan: submission.tujuan, lokasi: submission.lokasi,
+    jenis_kenderaan: submission.jenis_kenderaan,
+    butiran_kenderaan: normalizeText(payload.butiran_kenderaan || payload.vehicle_detail),
+    sebab_kecemasan: submission.sebab_kecemasan,
+    telefon_waris: submission.telefon_waris,
+    hubungan_waris: submission.hubungan_waris,
+    catatan_kecemasan: normalizeText(payload.catatan_kecemasan),
+    masa_mohon: parts.timestamp, status,
+    warden_approve_by: requiresWardenApproval ? "" : "AUTO_CONFIG_V2",
+    masa_approve: requiresWardenApproval ? "" : parts.timestamp,
+    masa_keluar: "", guard_keluar_by: "", masa_masuk: "", guard_masuk_by: "",
+    lewat: "", selfie_whatsapp: "", catatan: normalizeText(payload.catatan),
+    tarikh_balik: returnDate, hari_balik: returnDate ? dayNameForDate(returnDate) : "",
+    masa_balik_dijangka: submission.masa_balik_dijangka, selfie_status: requireSelfie ? "" : "TIDAK_DIPERLUKAN",
+    selfie_file_id: "", selfie_url: "", masa_selfie: "", selfie_telegram_message_id: "",
+    sebab_batal_pelajar: "", masa_batal_pelajar: "", dibatalkan_oleh: ""
+  };
+
+  const insert = env.DB.prepare(`INSERT INTO OUTING_REQUESTS (${REQUEST_COLUMNS.join(",")})
+    VALUES (${REQUEST_COLUMNS.map(() => "?").join(",")})`
+  ).bind(...REQUEST_COLUMNS.map((column) => record[column]));
+  const details = JSON.stringify({
+    student_name: student.nama || "", no_matrik: String(student.no_matrik || ""),
+    jenis_permohonan: requestType, config_version: config.config_version,
+    require_warden_approval: requiresWardenApproval, require_selfie: requireSelfie
+  });
+  const statements = [insert, auditStatement(env, [
+    parts.timestamp, "SUBMIT_REQUEST", requestId, "Student", student.nama, details,
+    "OUTING_REQUEST", requestId
+  ])];
+  if (!requiresWardenApproval) {
+    statements.push(auditStatement(env, [
+      parts.timestamp, "AUTO_APPROVE_REQUEST", requestId, "System", "AUTO_CONFIG_V2",
+      JSON.stringify({
+        student_name: student.nama || "", no_matrik: String(student.no_matrik || ""),
+        jenis_permohonan: requestType, config_version: config.config_version,
+        reason: "require_warden_approval=false"
+      }), "OUTING_REQUEST", requestId
+    ]));
+  }
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    if (isActiveDuplicateError(error)) throw activeDuplicateFault();
+    throw error;
+  }
+
+  await sendTelegram(env, record, config.display_name, dependencies.fetchImpl || fetch);
+  return new Response(JSON.stringify({ ok: true, data: record }), { status: 201, headers });
+}
+
+return { handleSubmitRequest };
+})();
+
+async function handleRequest(request, env = {}) {
+  const started = Date.now();
+  const requestId = crypto.randomUUID();
+  const origin = request.headers.get("Origin");
+  const localOrigin = env.STAGING_ORIGIN;
+  const allowedOrigin = origin === "https://itumelaka.github.io" || ["http://localhost:8000", "http://127.0.0.1:8000"].includes(localOrigin) && origin === localOrigin;
+  const headers = new Headers({
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json; charset=utf-8",
+    "Vary": "Origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Request-ID": requestId
+  });
+  if (allowedOrigin) headers.set("Access-Control-Allow-Origin", origin);
+  let action = "";
+  let sent = false;
+  let attempts = 0;
+  let finalStatus = 500;
+  let timer;
+  const finish = /* @__PURE__ */ __name((body, status) => {
+    finalStatus = status;
+    headers.set("X-Upstream-Attempts", String(attempts));
+    return new Response(body, { status, headers });
+  }, "finish");
+  try {
+  const url = new URL(request.url);
+
+  if (!allowedOrigin) {
+    throw fault(403, "ORIGIN_NOT_ALLOWED", "Origin not allowed");
+  }
+
+  if (url.pathname === "/api/d1/wardens") {
+    const result = await env.DB.prepare(
+      "SELECT warden_id, nama, nama AS nama_warden, status FROM WARDENS ORDER BY nama"
+    ).all();
+
+    return new Response(JSON.stringify({
+      ok: true,
+      data: result.results
+    }), {
+      status: 200,
+      headers
+    });
+  }
+
+  if (url.pathname === "/api/d1/guards") {
+  const result = await env.DB.prepare(
+    "SELECT guard_id, nama, nama AS nama_guard, status FROM GUARDS WHERE status = 'Aktif' ORDER BY nama"
+  ).all();
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: result.results
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/studentLoginDirectory") {
+  const result = await env.DB.prepare(
+    `SELECT student_id, nama, kelas
+     FROM STUDENTS
+     WHERE status = 'Aktif'
+     ORDER BY kelas, nama`
+  ).all();
+
+  const rows = result.results || [];
+  const groupMap = new Map();
+
+  for (const row of rows) {
+    const key = String(row.kelas || "").trim();
+    if (!key) continue;
+
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        key,
+        label: key,
+        students: []
+      });
+    }
+
+    groupMap.get(key).students.push({
+      student_id: row.student_id,
+      nama: row.nama
+    });
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      mode: "dynamic",
+      groups: Array.from(groupMap.values()),
+      fallback: false
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/outingTypes") {
+  const result = await env.DB.prepare(
+    `SELECT
+      type_code,
+      display_name,
+      description,
+      active,
+      sort_order,
+      allowed_days,
+      application_open_time,
+      application_close_time,
+      fixed_return_time,
+      same_day_only,
+      require_leave_date,
+      require_return_date,
+      require_return_time,
+      require_guardian_phone,
+      require_guardian_relation,
+      require_emergency_reason,
+      require_purpose,
+      require_location,
+      require_vehicle,
+      require_warden_approval,
+      require_selfie,
+      config_version,
+      departure_allowed_days,
+      earliest_departure_time,
+      application_open_date,
+      application_close_date
+     FROM OUTING_TYPES
+     WHERE active = 1
+     ORDER BY sort_order, display_name`
+  ).all();
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: result.results || []
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/loginStudent") {
+
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const studentId = String(payload.student_id || "").trim();
+  const noMatrik = String(payload.no_matrik || "").trim();
+
+  const row = await env.DB.prepare(
+    `SELECT student_id, no_matrik, nama, email, no_tel, kelas,
+            jantina, status, photo_file_id, photo_updated_at
+     FROM STUDENTS
+     WHERE student_id = ?
+       AND no_matrik = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(studentId, noMatrik).first();
+
+  if (!row) {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "STUDENT_LOGIN_INVALID"
+    }), {
+      status: 401,
+      headers
+    });
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      ...row,
+      has_profile_photo: Boolean(row.photo_file_id)
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/submitRequest" || url.pathname === "/api/d1/submitOutingRequest") {
+  return await stagingSubmitRequestV230.handleSubmitRequest(request, env, headers);
+}
+
+if (url.pathname === "/api/d1/wardenPendingRequests") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "GET") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "GET required");
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT
+      request_id,
+      tarikh,
+      hari,
+      jenis_permohonan,
+      student_id,
+      no_matrik,
+      nama,
+      student_email,
+      kelas,
+      tujuan,
+      lokasi,
+      jenis_kenderaan,
+      butiran_kenderaan,
+      sebab_kecemasan,
+      telefon_waris,
+      hubungan_waris,
+      catatan_kecemasan,
+      masa_mohon,
+      status,
+      tarikh_balik,
+      hari_balik,
+      masa_balik_dijangka,
+      catatan
+     FROM OUTING_REQUESTS
+     WHERE status = 'MENUNGGU_KELULUSAN'
+     ORDER BY masa_mohon ASC`
+  ).all();
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: result.results || []
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/approveRequest" || url.pathname === "/api/d1/rejectRequest") {
+  return await stagingWardenDecisions.handleWardenDecision(request, env, headers, url.pathname.endsWith("/approveRequest") ? "approveRequest" : "rejectRequest");
+}
+
+if (url.pathname === "/api/d1/loginWarden") {
+  if (request.method === "OPTIONS") {
+  headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+  return new Response(null, {
+    status: 204,
+    headers
+  });
+}
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+const wardenId = String(payload.warden_id || "").trim();
+const wardenName = String(payload.nama_warden || "").trim();
+const pin = String(payload.pin || "").trim();
+
+const row = await env.DB.prepare(
+  `SELECT warden_id, nama, nama AS nama_warden, status
+   FROM WARDENS
+   WHERE (warden_id = ? OR nama = ?)
+     AND pin = ?
+     AND status = 'Aktif'
+   LIMIT 1`
+).bind(wardenId, wardenName, pin).first();
+
+  if (!row) {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "WARDEN_LOGIN_INVALID"
+    }), {
+      status: 401,
+      headers
+    });
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: row
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/loginGuard") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+const guardId = String(payload.guard_id || "").trim();
+const guardName = String(payload.nama_guard || "").trim();
+const pin = String(payload.pin || "").trim();
+
+const row = await env.DB.prepare(
+  `SELECT guard_id, nama, nama AS nama_guard, status
+   FROM GUARDS
+   WHERE (guard_id = ? OR nama = ?)
+     AND pin = ?
+     AND status = 'Aktif'
+   LIMIT 1`
+).bind(guardId, guardName, pin).first();
+
+  if (!row) {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: "GUARD_LOGIN_INVALID"
+    }), {
+      status: 401,
+      headers
+    });
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: row
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/getTodayRecords") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const role = String(payload.role || "").trim().toLowerCase();
+
+  let authenticatedStudentId = "";
+
+  if (role === "student") {
+    const studentId = String(payload.student_id || payload.id || "").trim();
+    const noMatrik = String(payload.no_matrik || payload.matric || "").trim();
+
+    const student = await env.DB.prepare(
+      `SELECT student_id
+       FROM STUDENTS
+       WHERE student_id = ?
+         AND no_matrik = ?
+         AND status = 'Aktif'
+       LIMIT 1`
+    ).bind(studentId, noMatrik).first();
+
+    if (!student) {
+      throw fault(401, "STUDENT_SESSION_INVALID", "Akses sesi pelajar tidak sah");
+    }
+
+    authenticatedStudentId = student.student_id;
+  } else if (role === "warden") {
+    const name = String(
+      payload.nama_warden ||
+      payload.warden_name ||
+      payload.name ||
+      ""
+    ).trim();
+
+    const pin = String(payload.pin || "").trim();
+
+    const warden = await env.DB.prepare(
+      `SELECT warden_id
+       FROM WARDENS
+       WHERE nama = ?
+         AND pin = ?
+         AND status = 'Aktif'
+       LIMIT 1`
+    ).bind(name, pin).first();
+
+    if (!warden) {
+      throw fault(401, "WARDEN_SESSION_INVALID", "Akses sesi warden tidak sah");
+    }
+  } else if (role === "guard") {
+    const name = String(
+      payload.nama_guard ||
+      payload.guard_name ||
+      payload.name ||
+      ""
+    ).trim();
+
+    const pin = String(payload.pin || "").trim();
+
+    const guard = await env.DB.prepare(
+      `SELECT guard_id
+       FROM GUARDS
+       WHERE nama = ?
+         AND pin = ?
+         AND status = 'Aktif'
+       LIMIT 1`
+    ).bind(name, pin).first();
+
+    if (!guard) {
+      throw fault(401, "GUARD_SESSION_INVALID", "Akses sesi guard tidak sah");
+    }
+  } else {
+    throw fault(401, "SESSION_REQUIRED", "Akses sesi diperlukan");
+  }
+
+  const malaysiaDateKey = (value) => {
+    if (value === undefined || value === null || value === "") return "";
+
+    const text = String(value).trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      return text;
+    }
+
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+
+    const map = {};
+    for (const part of parts) {
+      map[part.type] = part.value;
+    }
+
+    return `${map.year}-${map.month}-${map.day}`;
+  };
+
+  const malaysiaTimestamp = (date) => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).formatToParts(date);
+
+    const map = {};
+    for (const part of parts) {
+      map[part.type] = part.value;
+    }
+
+    return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+08:00`;
+  };
+
+  const normalizeTime = (value) => {
+    const text = String(value || "").trim();
+
+    const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (!match) return "";
+
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return "";
+    }
+
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  };
+
+  const legacyDailyTypes = new Set([
+    "OUTING_BIASA",
+    "KECEMASAN",
+    "OUTING_HUJUNG_MINGGU"
+  ]);
+
+  const resolveExpectedReturnTarget = (row) => {
+    const typeCode = String(row.jenis_permohonan || "").trim().toUpperCase();
+    const legacyDaily = legacyDailyTypes.has(typeCode);
+
+    let returnDate = malaysiaDateKey(row.tarikh_balik);
+
+    if (!returnDate && legacyDaily) {
+      returnDate = malaysiaDateKey(row.tarikh);
+    }
+
+    if (!returnDate) {
+      return {
+        valid: false,
+        reason_code: "MISSING_EXPECTED_RETURN_DATE"
+      };
+    }
+
+    let returnTime = normalizeTime(row.masa_balik_dijangka);
+
+    if (!returnTime && legacyDaily) {
+      returnTime = "22:00";
+    }
+
+    if (!returnTime) {
+      return {
+        valid: false,
+        reason_code: "MISSING_EXPECTED_RETURN_TIME"
+      };
+    }
+
+    const expectedReturnAt = `${returnDate}T${returnTime}:00+08:00`;
+    const target = new Date(expectedReturnAt);
+
+    if (Number.isNaN(target.getTime())) {
+      return {
+        valid: false,
+        reason_code: "INVALID_EXPECTED_RETURN"
+      };
+    }
+
+    return {
+      valid: true,
+      expected_return_at: expectedReturnAt,
+      target_ms: target.getTime(),
+      reason_code: ""
+    };
+  };
+
+  const getOperationalUrgency = (row, now) => {
+    const evaluatedAt = malaysiaTimestamp(now);
+
+    if (String(row.status || "").trim() !== "KELUAR") {
+      return {
+        applicable: false,
+        state: null,
+        severity_rank: 0,
+        expected_return_at: null,
+        evaluated_at: evaluatedAt,
+        minutes_to_due: null,
+        minutes_late: null,
+        next_transition_at: null,
+        timing_valid: false,
+        reason_code: "NOT_APPLICABLE",
+        needs_review: false,
+        next_action_code: "NONE"
+      };
+    }
+
+    const target = resolveExpectedReturnTarget(row);
+
+    if (!target.valid) {
+      return {
+        applicable: true,
+        state: null,
+        severity_rank: 0,
+        expected_return_at: null,
+        evaluated_at: evaluatedAt,
+        minutes_to_due: null,
+        minutes_late: null,
+        next_transition_at: null,
+        timing_valid: false,
+        reason_code: target.reason_code || "INVALID_EXPECTED_RETURN",
+        needs_review: true,
+        next_action_code: "REVIEW_TIMING"
+      };
+    }
+
+    const differenceMs = target.target_ms - now.getTime();
+    const lateMs = Math.max(0, -differenceMs);
+
+    const minutesToDue = Math.max(0, differenceMs) / 60000;
+    const minutesLate = lateMs / 60000;
+
+    let state = "NORMAL";
+    let severityRank = 0;
+    let nextActionCode = "NONE";
+    let nextTransitionAt = new Date(target.target_ms - (30 * 60 * 1000));
+
+    if (differenceMs <= 30 * 60 * 1000 && differenceMs >= 0) {
+      state = "DUE_SOON";
+      severityRank = 1;
+      nextActionCode = "PREPARE_RETURN";
+      nextTransitionAt = new Date(target.target_ms);
+    } else if (lateMs > 0 && lateMs < 30 * 60 * 1000) {
+      state = "LATE";
+      severityRank = 2;
+      nextActionCode = "RETURN_NOW";
+      nextTransitionAt = new Date(target.target_ms + (30 * 60 * 1000));
+    } else if (
+      lateMs >= 30 * 60 * 1000 &&
+      lateMs < 60 * 60 * 1000
+    ) {
+      state = "CRITICAL";
+      severityRank = 3;
+      nextActionCode = "FOLLOW_UP";
+      nextTransitionAt = new Date(target.target_ms + (60 * 60 * 1000));
+    } else if (lateMs >= 60 * 60 * 1000) {
+      state = "ACTION_REQUIRED";
+      severityRank = 4;
+      nextActionCode = "ACTION_REQUIRED";
+      nextTransitionAt = null;
+    }
+
+    return {
+      applicable: true,
+      state,
+      severity_rank: severityRank,
+      expected_return_at: target.expected_return_at,
+      evaluated_at: evaluatedAt,
+      minutes_to_due: minutesToDue,
+      minutes_late: minutesLate,
+      next_transition_at: nextTransitionAt
+        ? malaysiaTimestamp(nextTransitionAt)
+        : null,
+      timing_valid: true,
+      reason_code: "",
+      needs_review: false,
+      next_action_code: nextActionCode
+    };
+  };
+
+  const todayKey = malaysiaDateKey(new Date());
+
+  const requestResult = await env.DB.prepare(
+    `SELECT *
+     FROM OUTING_REQUESTS
+     ORDER BY masa_mohon DESC`
+  ).all();
+
+  const studentResult = await env.DB.prepare(
+    `SELECT student_id, photo_file_id, photo_updated_at
+     FROM STUDENTS`
+  ).all();
+
+  const wardenResult = await env.DB.prepare(
+    `SELECT warden_id, nama
+     FROM WARDENS`
+  ).all();
+
+  const typeResult = await env.DB.prepare(
+    `SELECT type_code, earliest_departure_time
+     FROM OUTING_TYPES`
+  ).all();
+
+  const auditResult = await env.DB.prepare(
+    `SELECT timestamp, action, request_id
+     FROM AUDIT_LOG
+     WHERE action IN (
+       'DEPARTURE_CONFIRMATION_REQUESTED',
+       'WARDEN_REMOTE_CHECKOUT'
+     )
+     ORDER BY timestamp ASC`
+  ).all();
+
+  const photoByStudentId = new Map();
+  for (const student of studentResult.results || []) {
+    photoByStudentId.set(
+      String(student.student_id || "").trim(),
+      {
+        has_profile_photo: Boolean(String(student.photo_file_id || "").trim()),
+        photo_updated_at: student.photo_updated_at || ""
+      }
+    );
+  }
+
+  const wardenRoleByName = new Map();
+  for (const warden of wardenResult.results || []) {
+    const roleValue = /^HEP-/i.test(String(warden.warden_id || "").trim())
+      ? "HEP"
+      : "WARDEN";
+
+    wardenRoleByName.set(
+      String(warden.nama || "").trim().toUpperCase(),
+      roleValue
+    );
+  }
+
+  const departureTimeByType = new Map();
+  for (const type of typeResult.results || []) {
+    departureTimeByType.set(
+      String(type.type_code || "").trim().toUpperCase(),
+      normalizeTime(type.earliest_departure_time)
+    );
+  }
+
+  const auditStateByRequest = new Map();
+
+  for (const audit of auditResult.results || []) {
+    const requestId = String(audit.request_id || "").trim();
+    if (!requestId) continue;
+
+    let state = auditStateByRequest.get(requestId);
+
+    if (!state) {
+      state = {
+        requested: false,
+        requested_at: "",
+        completed: false
+      };
+
+      auditStateByRequest.set(requestId, state);
+    }
+
+    if (
+      audit.action === "DEPARTURE_CONFIRMATION_REQUESTED" &&
+      !state.requested
+    ) {
+      state.requested = true;
+      state.requested_at = audit.timestamp || "";
+    }
+
+    if (audit.action === "WARDEN_REMOTE_CHECKOUT") {
+      state.completed = true;
+    }
+  }
+
+  const activeStatuses = new Set([
+    "MENUNGGU_KELULUSAN",
+    "DILULUSKAN_WARDEN",
+    "KELUAR"
+  ]);
+
+  const hostelTypes = new Set([
+    "OUTING_HUJUNG_MINGGU",
+    "PULANG_BERMALAM",
+    "CUTI_SEMESTER"
+  ]);
+
+  const closedHostelStatuses = new Set([
+    "SELESAI",
+    "DITOLAK_WARDEN",
+    "DIBATALKAN_PELAJAR"
+  ]);
+
+  const now = new Date();
+
+  let rows = (requestResult.results || []).filter((row) => {
+    const rowDateKey =
+      malaysiaDateKey(row.tarikh) ||
+      malaysiaDateKey(row.masa_mohon);
+
+    const returnDateKey = malaysiaDateKey(row.tarikh_balik);
+
+    const isTodayActivity =
+      rowDateKey === todayKey ||
+      returnDateKey === todayKey ||
+      malaysiaDateKey(row.masa_mohon) === todayKey ||
+      malaysiaDateKey(row.masa_approve) === todayKey ||
+      malaysiaDateKey(row.masa_keluar) === todayKey ||
+      malaysiaDateKey(row.masa_masuk) === todayKey ||
+      malaysiaDateKey(row.masa_batal_pelajar) === todayKey;
+
+    const activeRecord = activeStatuses.has(String(row.status || "").trim());
+
+    const typeCode = String(row.jenis_permohonan || "").trim().toUpperCase();
+
+    const hostelReturnOpen =
+      hostelTypes.has(typeCode) &&
+      !closedHostelStatuses.has(String(row.status || "").trim());
+
+    return isTodayActivity || activeRecord || hostelReturnOpen;
+  });
+
+  if (authenticatedStudentId) {
+    rows = rows.filter(
+      (row) => String(row.student_id || "").trim() === authenticatedStudentId
+    );
+  }
+
+  rows = rows.map((row) => {
+    const projected = { ...row };
+
+    const photo =
+      photoByStudentId.get(String(row.student_id || "").trim()) || {};
+
+    projected.has_profile_photo = Boolean(photo.has_profile_photo);
+    projected.photo_updated_at = photo.photo_updated_at || "";
+
+    const approverName = String(row.warden_approve_by || "")
+      .trim()
+      .toUpperCase();
+
+    projected.warden_approve_role =
+      wardenRoleByName.get(approverName) === "HEP"
+        ? "HEP"
+        : "WARDEN";
+
+    projected.operational_urgency = getOperationalUrgency(row, now);
+
+    if (role === "warden") {
+      const typeCode = String(row.jenis_permohonan || "")
+        .trim()
+        .toUpperCase();
+
+      projected.earliest_departure_time =
+        normalizeTime(row.earliest_departure_time) ||
+        departureTimeByType.get(typeCode) ||
+        "";
+    }
+
+    if (role === "warden" || role === "student") {
+      const auditState =
+        auditStateByRequest.get(String(row.request_id || "").trim()) || {
+          requested: false,
+          requested_at: "",
+          completed: false
+        };
+
+      projected.departure_confirmation_pending =
+        String(row.status || "").trim() === "DILULUSKAN_WARDEN" &&
+        auditState.requested &&
+        !auditState.completed;
+
+      projected.departure_confirmation_requested_at =
+        projected.departure_confirmation_pending
+          ? auditState.requested_at
+          : "";
+
+      projected.no_guard_departure_enabled = false;
+    }
+
+    if (role === "warden") {
+      const urgencyState = String(
+        projected.operational_urgency &&
+        projected.operational_urgency.state ||
+        ""
+      ).toUpperCase();
+
+      const requestType = String(row.jenis_permohonan || "")
+        .trim()
+        .toUpperCase();
+
+      const status = String(row.status || "").trim();
+
+      projected.guardian_contact_available =
+        (
+          requestType === "KECEMASAN" &&
+          (
+            status === "MENUNGGU_KELULUSAN" ||
+            status === "DILULUSKAN_WARDEN"
+          )
+        ) ||
+        (
+          status === "KELUAR" &&
+          (
+            urgencyState === "CRITICAL" ||
+            urgencyState === "ACTION_REQUIRED"
+          )
+        );
+
+      projected.guardian_contact_available =
+        projected.guardian_contact_available &&
+        Boolean(String(row.telefon_waris || "").trim());
+    }
+
+    delete projected.telefon_waris;
+    delete projected.hubungan_waris;
+
+    return projected;
+  });
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: rows
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/confirmOut") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+const requestId = String(payload.request_id || "").trim();
+const guardId = String(payload.guard_id || "").trim();
+const guardName = String(
+  payload.guard_name ||
+  payload.nama_guard ||
+  payload.user_name ||
+  ""
+).trim();
+const pin = String(payload.pin || "").trim();
+
+if (!requestId || (!guardId && !guardName) || !pin) {
+  throw fault(
+    400,
+    "INVALID_REQUEST",
+    "request_id, guard identity and pin are required"
+  );
+}
+
+const guard = await env.DB.prepare(
+  `SELECT guard_id, nama, status
+   FROM GUARDS
+   WHERE (guard_id = ? OR nama = ?)
+     AND pin = ?
+     AND status = 'Aktif'
+   LIMIT 1`
+).bind(guardId, guardName, pin).first();
+
+  if (!guard) {
+    throw fault(
+      401,
+      "GUARD_LOGIN_INVALID",
+      "Guard tidak dijumpai atau tidak aktif"
+    );
+  }
+
+  const requestRow = await env.DB.prepare(
+    `SELECT *
+     FROM OUTING_REQUESTS
+     WHERE request_id = ?
+     LIMIT 1`
+  ).bind(requestId).first();
+
+  if (!requestRow) {
+    throw fault(
+      404,
+      "REQUEST_NOT_FOUND",
+      "Permohonan tidak dijumpai"
+    );
+  }
+
+  if (requestRow.masa_keluar) {
+    return new Response(JSON.stringify({
+      ok: true,
+      data: {
+        request_id: requestId,
+        status: requestRow.status,
+        masa_keluar: requestRow.masa_keluar,
+        message: "Rekod sudah disahkan keluar"
+      }
+    }), {
+      status: 200,
+      headers
+    });
+  }
+
+  if (requestRow.status !== "DILULUSKAN_WARDEN") {
+    throw fault(
+      409,
+      "INVALID_REQUEST_STATUS",
+      "Guard hanya boleh sahkan keluar selepas warden meluluskan permohonan"
+    );
+  }
+
+  const outingType = await env.DB.prepare(
+    `SELECT
+      display_name,
+      departure_allowed_days,
+      earliest_departure_time
+     FROM OUTING_TYPES
+     WHERE type_code = ?
+       AND active = 1
+     LIMIT 1`
+  ).bind(String(requestRow.jenis_permohonan || "").trim()).first();
+
+  const now = new Date();
+  const departureAt = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).format(now).replace(" ", "T") + "+08:00";
+
+  const todayKey = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(now);
+
+  const approvedDateKey = String(requestRow.tarikh || "").trim();
+
+  if (approvedDateKey && todayKey < approvedDateKey) {
+    throw fault(
+      409,
+      "DEPARTURE_DATE_TOO_EARLY",
+      "Sahkan Keluar hanya boleh dibuat pada tarikh keluar yang diluluskan"
+    );
+  }
+
+  if (outingType && outingType.departure_allowed_days) {
+    const allowedDays = String(outingType.departure_allowed_days)
+      .split(",")
+      .map((day) => String(day || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    const dayName = new Intl.DateTimeFormat("ms-MY", {
+      timeZone: "Asia/Kuala_Lumpur",
+      weekday: "long"
+    }).format(now).toUpperCase();
+
+    if (allowedDays.length && !allowedDays.includes(dayName)) {
+      throw fault(
+        409,
+        "DEPARTURE_DAY_NOT_ALLOWED",
+        "Hari keluar tidak dibenarkan untuk jenis outing ini"
+      );
+    }
+  }
+
+  if (outingType && outingType.earliest_departure_time) {
+    const currentTime = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(now);
+
+    const earliestTime = String(
+      outingType.earliest_departure_time || ""
+    ).trim();
+
+    if (currentTime < earliestTime) {
+      throw fault(
+        409,
+        "DEPARTURE_TOO_EARLY",
+        "Waktu keluar paling awal belum tiba"
+      );
+    }
+  }
+
+  const updateResult = await env.DB.prepare(
+    `UPDATE OUTING_REQUESTS
+     SET status = 'KELUAR',
+         masa_keluar = ?,
+         guard_keluar_by = ?
+     WHERE request_id = ?
+       AND status = 'DILULUSKAN_WARDEN'
+       AND (masa_keluar IS NULL OR TRIM(masa_keluar) = '')`
+  ).bind(
+    departureAt,
+    guard.nama,
+    requestId
+  ).run();
+
+  if (!updateResult.meta || Number(updateResult.meta.changes || 0) !== 1) {
+    const latestRow = await env.DB.prepare(
+      `SELECT status, masa_keluar, guard_keluar_by
+       FROM OUTING_REQUESTS
+       WHERE request_id = ?
+       LIMIT 1`
+    ).bind(requestId).first();
+
+    if (latestRow && latestRow.masa_keluar) {
+      return new Response(JSON.stringify({
+        ok: true,
+        data: {
+          request_id: requestId,
+          status: latestRow.status,
+          masa_keluar: latestRow.masa_keluar,
+          guard_keluar_by: latestRow.guard_keluar_by,
+          message: "Rekod sudah disahkan keluar"
+        }
+      }), {
+        status: 200,
+        headers
+      });
+    }
+
+    throw fault(
+      409,
+      "CONFIRM_OUT_CONFLICT",
+      "Rekod berubah semasa pengesahan keluar. Sila refresh dan cuba semula"
+    );
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+      timestamp,
+      action,
+      request_id,
+      user_role,
+      user_name,
+      details,
+      entity_type,
+      entity_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    departureAt,
+    "CONFIRM_OUT",
+    requestId,
+    "Guard",
+    guard.nama,
+    JSON.stringify({
+      student_name: requestRow.nama || "",
+      no_matrik: requestRow.no_matrik || "",
+      jenis_permohonan: requestRow.jenis_permohonan || ""
+    }),
+    "OUTING_REQUEST",
+    requestId
+  ).run();
+
+  let approvalActorLabel = "Warden";
+
+  if (requestRow.warden_approve_by) {
+    const approver = await env.DB.prepare(
+      `SELECT warden_id
+       FROM WARDENS
+       WHERE UPPER(TRIM(nama)) = UPPER(TRIM(?))
+       LIMIT 1`
+    ).bind(String(requestRow.warden_approve_by || "").trim()).first();
+
+    if (approver && /^HEP-/i.test(String(approver.warden_id || "").trim())) {
+      approvalActorLabel = "HEP";
+    }
+  }
+
+  const updatedRecord = {
+    ...requestRow,
+    status: "KELUAR",
+    masa_keluar: departureAt,
+    guard_keluar_by: guard.nama
+  };
+
+  const requestTypeLabel =
+    String(outingType && outingType.display_name || "").trim() ||
+    String(updatedRecord.jenis_permohonan || "-");
+
+  const formatTelegramDate = (value) => {
+    const text = String(value || "").trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      return text || "-";
+    }
+
+    const [year, month, day] = text.split("-");
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatTelegramTime = (value) => {
+    const text = String(value || "").trim();
+    const match = text.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+
+    return match
+      ? `${match[1]}:${match[2]}`
+      : "-";
+  };
+
+  const formatTelegramDateTime = (value) => {
+    if (!value) {
+      return "-";
+    }
+
+    const text = String(value).trim();
+    const normalizedText = text.replace(
+      /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/,
+      "$1T$2+08:00"
+    );
+
+    const date = new Date(normalizedText);
+
+    if (isNaN(date.getTime())) {
+      return text;
+    }
+
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(date).replace(",", "");
+  };
+
+  const telegramPrefix =
+    updatedRecord.jenis_permohonan === "PULANG_BERMALAM"
+      ? "Pulang Bermalam - "
+      : updatedRecord.jenis_permohonan === "CUTI_SEMESTER"
+        ? "CUTI SEMESTER - "
+        : "";
+
+  const telegramLines = [
+    `🚪 ${telegramPrefix}Pelajar Disahkan Keluar`,
+    "",
+    `ID: ${updatedRecord.request_id || "-"}`,
+    `Nama: ${updatedRecord.nama || "-"}`,
+    `No. Matrik: ${updatedRecord.no_matrik || "-"}`,
+    `Kelas: ${updatedRecord.kelas || "-"}`,
+    `Jenis: ${requestTypeLabel}`,
+    `Status: ${updatedRecord.status || "-"}`,
+    `Tujuan: ${updatedRecord.tujuan || "-"}`,
+    `Lokasi: ${updatedRecord.lokasi || "-"}`,
+    `Kenderaan: ${updatedRecord.jenis_kenderaan || "-"}`
+  ];
+
+  if (updatedRecord.butiran_kenderaan) {
+    telegramLines.push(`Butiran: ${updatedRecord.butiran_kenderaan}`);
+  }
+
+  if (updatedRecord.jenis_permohonan === "KECEMASAN") {
+    telegramLines.push(
+      `Sebab Kecemasan: ${updatedRecord.sebab_kecemasan || "-"}`,
+      `Telefon Waris: ${updatedRecord.telefon_waris || "-"}`,
+      `Hubungan Waris: ${updatedRecord.hubungan_waris || "-"}`
+    );
+  }
+
+  if (
+    updatedRecord.jenis_permohonan === "OUTING_HUJUNG_MINGGU" ||
+    updatedRecord.jenis_permohonan === "PULANG_BERMALAM" ||
+    updatedRecord.jenis_permohonan === "CUTI_SEMESTER"
+  ) {
+    if (updatedRecord.jenis_permohonan === "CUTI_SEMESTER") {
+      telegramLines.push(
+        `Tarikh Keluar: ${formatTelegramDate(updatedRecord.tarikh)}`
+      );
+    }
+
+    const returnDate = formatTelegramDate(updatedRecord.tarikh_balik);
+    const returnTime = formatTelegramTime(updatedRecord.masa_balik_dijangka);
+
+    telegramLines.push(
+      `Tarikh Pulang Ke Asrama: ${returnDate}`,
+      `Masa Dijangka Pulang Ke Asrama: ${returnTime}`,
+      `Pulang ke asrama dijangka: ${
+        returnDate === "-" && returnTime === "-"
+          ? "-"
+          : `${returnDate} ${returnTime}`
+      }`,
+      `Telefon Waris: ${updatedRecord.telefon_waris || "-"}`,
+      `Hubungan Waris: ${updatedRecord.hubungan_waris || "-"}`
+    );
+  }
+
+  if (updatedRecord.warden_approve_by) {
+    telegramLines.push(
+      `${approvalActorLabel}: ${updatedRecord.warden_approve_by}`
+    );
+  }
+
+  if (updatedRecord.guard_keluar_by) {
+    telegramLines.push(`Guard Keluar: ${updatedRecord.guard_keluar_by}`);
+  }
+
+  telegramLines.push(
+    "",
+    `Masa Mohon: ${formatTelegramDateTime(updatedRecord.masa_mohon)}`,
+    `Masa Approve/Tolak: ${formatTelegramDateTime(updatedRecord.masa_approve)}`,
+    `Masa Keluar: ${formatTelegramDateTime(updatedRecord.masa_keluar)}`,
+    `Masa Masuk: ${formatTelegramDateTime(updatedRecord.masa_masuk)}`
+  );
+
+  const telegramEnabled = ["1", "true", "yes", "ya", "enabled", "on"].includes(
+    String(env.TELEGRAM_ENABLED || "").trim().toLowerCase()
+  );
+
+  if (
+    telegramEnabled &&
+    env.TELEGRAM_BOT_TOKEN &&
+    env.TELEGRAM_CHAT_ID
+  ) {
+    try {
+      await fetch(
+        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            chat_id: env.TELEGRAM_CHAT_ID,
+            text: telegramLines.join("\n"),
+            disable_web_page_preview: true
+          })
+        }
+      );
+    } catch (error) {
+      // Telegram failure must not roll back confirmOut lifecycle.
+    }
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      request_id: requestId,
+      status: "KELUAR",
+      masa_keluar: departureAt,
+      guard_keluar_by: guard.nama
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+if (url.pathname === "/api/d1/confirmIn") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+const requestId = String(payload.request_id || "").trim();
+const guardId = String(payload.guard_id || "").trim();
+const guardName = String(
+  payload.guard_name ||
+  payload.nama_guard ||
+  payload.user_name ||
+  ""
+).trim();
+const pin = String(payload.pin || "").trim();
+const guardReturnNote = String(
+  payload.catatan || payload.catatan_masuk || ""
+).trim();
+
+if (!requestId || (!guardId && !guardName) || !pin) {
+  throw fault(
+    400,
+    "INVALID_REQUEST",
+    "request_id, guard identity and pin are required"
+  );
+}
+
+const guard = await env.DB.prepare(
+  `SELECT guard_id, nama, status
+   FROM GUARDS
+   WHERE (guard_id = ? OR nama = ?)
+     AND pin = ?
+     AND status = 'Aktif'
+   LIMIT 1`
+).bind(guardId, guardName, pin).first();
+
+  if (!guard) {
+    throw fault(
+      401,
+      "GUARD_LOGIN_INVALID",
+      "Guard tidak dijumpai atau tidak aktif"
+    );
+  }
+
+const requestRow = await env.DB.prepare(
+  `SELECT *
+   FROM OUTING_REQUESTS
+   WHERE request_id = ?
+   LIMIT 1`
+).bind(requestId).first();
+
+  if (!requestRow) {
+    throw fault(
+      404,
+      "REQUEST_NOT_FOUND",
+      "Permohonan tidak dijumpai"
+    );
+  }
+
+  if (requestRow.masa_masuk) {
+    return new Response(JSON.stringify({
+      ok: true,
+      data: {
+        request_id: requestId,
+        status: requestRow.status,
+        masa_masuk: requestRow.masa_masuk,
+        lewat: requestRow.lewat,
+        selfie_status: requestRow.selfie_status,
+        message: "Rekod sudah disahkan masuk"
+      }
+    }), {
+      status: 200,
+      headers
+    });
+  }
+
+  if (requestRow.status !== "KELUAR") {
+    throw fault(
+      409,
+      "INVALID_REQUEST_STATUS",
+      "Hanya permohonan status KELUAR boleh disahkan masuk"
+    );
+  }
+
+  const actualReturn = new Date();
+
+  const legacyDailyTypes = [
+    "OUTING_BIASA",
+    "KECEMASAN",
+    "OUTING_HUJUNG_MINGGU"
+  ];
+
+  const isLegacyDaily = legacyDailyTypes.includes(
+    String(requestRow.jenis_permohonan || "").trim()
+  );
+
+  let returnDate = String(requestRow.tarikh_balik || "").trim();
+  let returnTime = String(requestRow.masa_balik_dijangka || "").trim();
+
+  const isValidDateKey = (value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return false;
+    }
+
+    const date = new Date(value + "T00:00:00+08:00");
+
+    if (Number.isNaN(date.getTime())) {
+      return false;
+    }
+
+    const formatted = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(date);
+
+    return formatted === value;
+  };
+
+  const normalizeTime = (value) => {
+    const match = String(value || "").trim().match(
+      /^([01]\d|2[0-3]):([0-5]\d)$/
+    );
+
+    return match ? `${match[1]}:${match[2]}` : "";
+  };
+
+  let targetValid = true;
+
+  if (returnDate) {
+    if (!isValidDateKey(returnDate)) {
+      targetValid = false;
+    }
+  } else if (isLegacyDaily) {
+    returnDate = String(requestRow.tarikh || "").trim();
+
+    if (!isValidDateKey(returnDate)) {
+      targetValid = false;
+    }
+  } else {
+    targetValid = false;
+  }
+
+  if (targetValid) {
+    if (returnTime) {
+      returnTime = normalizeTime(returnTime);
+
+      if (!returnTime) {
+        targetValid = false;
+      }
+    } else if (isLegacyDaily) {
+      returnTime = "22:00";
+    } else {
+      targetValid = false;
+    }
+  }
+
+  let late = "Ya";
+
+  if (targetValid) {
+    const expectedReturn = new Date(
+      `${returnDate}T${returnTime}:00+08:00`
+    );
+
+    if (!Number.isNaN(expectedReturn.getTime())) {
+      late = actualReturn.getTime() > expectedReturn.getTime()
+        ? "Ya"
+        : "Tidak";
+    }
+  }
+
+  const currentSelfieStatus = String(
+    requestRow.selfie_status || ""
+  ).trim().toUpperCase();
+
+  const requiresReturnSelfie =
+    currentSelfieStatus !== "TIDAK_DIPERLUKAN";
+
+  const returnSelfieStatus = requiresReturnSelfie
+    ? "BELUM_HANTAR"
+    : "TIDAK_DIPERLUKAN";
+
+  const returnNote =
+    guardReturnNote || String(requestRow.catatan || "");
+
+  const returnedAt = actualReturn.toISOString();
+
+  await env.DB.prepare(
+    `UPDATE OUTING_REQUESTS
+     SET status = 'SELESAI',
+         masa_masuk = ?,
+         guard_masuk_by = ?,
+         lewat = ?,
+         selfie_status = ?,
+         catatan = ?
+     WHERE request_id = ?
+       AND status = 'KELUAR'`
+  ).bind(
+    returnedAt,
+    guard.nama,
+    late,
+    returnSelfieStatus,
+    returnNote,
+    requestId
+  ).run();
+
+  await env.DB.prepare(
+  `INSERT INTO AUDIT_LOG (
+    timestamp,
+    action,
+    request_id,
+    user_role,
+    user_name,
+    details,
+    entity_type,
+    entity_id
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+).bind(
+  returnedAt,
+  "CONFIRM_IN",
+  requestId,
+  "Guard",
+  guard.nama,
+  JSON.stringify({
+    student_name: requestRow.nama || "",
+    no_matrik: requestRow.no_matrik || "",
+    jenis_permohonan: requestRow.jenis_permohonan || "",
+    lewat: late,
+    catatan_masuk: guardReturnNote
+  }),
+  "OUTING_REQUEST",
+  requestId
+).run();
+
+const updatedRecord = {
+  ...requestRow,
+  status: "SELESAI",
+  masa_masuk: returnedAt,
+  guard_masuk_by: guard.nama,
+  lewat: late,
+  selfie_status: returnSelfieStatus,
+  catatan: returnNote
+};
+
+const requestTypeLabel =
+  String(updatedRecord.jenis_permohonan || "-");
+
+const formatTelegramDate = (value) => {
+  const text = String(value || "").trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text || "-";
+  }
+
+  const [year, month, day] = text.split("-");
+  return `${day}/${month}/${year}`;
+};
+
+const formatTelegramTime = (value) => {
+  const text = String(value || "").trim();
+  const match = text.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+
+  return match
+    ? `${match[1]}:${match[2]}`
+    : "-";
+};
+
+const formatTelegramDateTime = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  const text = String(value).trim();
+  const normalizedText = text.replace(
+    /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/,
+    "$1T$2+08:00"
+  );
+
+  const date = new Date(normalizedText);
+
+  if (isNaN(date.getTime())) {
+    return text;
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date).replace(",", "");
+};
+
+const telegramTitle =
+  late === "Ya"
+    ? "⚠️ Pelajar Masuk Lewat"
+    : "✅ Pelajar Selesai Outing";
+
+const telegramLines = [
+  telegramTitle,
+  "",
+  `ID: ${updatedRecord.request_id || "-"}`,
+  `Nama: ${updatedRecord.nama || "-"}`,
+  `No. Matrik: ${updatedRecord.no_matrik || "-"}`,
+  `Kelas: ${updatedRecord.kelas || "-"}`,
+  `Jenis: ${requestTypeLabel}`,
+  `Status: ${updatedRecord.status || "-"}`,
+  `Tujuan: ${updatedRecord.tujuan || "-"}`,
+  `Lokasi: ${updatedRecord.lokasi || "-"}`,
+  `Kenderaan: ${updatedRecord.jenis_kenderaan || "-"}`
+];
+
+if (updatedRecord.butiran_kenderaan) {
+  telegramLines.push(`Butiran: ${updatedRecord.butiran_kenderaan}`);
+}
+
+if (updatedRecord.lewat) {
+  telegramLines.push(`Lewat: ${updatedRecord.lewat}`);
+}
+
+if (updatedRecord.guard_masuk_by) {
+  telegramLines.push(`Guard Masuk: ${updatedRecord.guard_masuk_by}`);
+}
+
+telegramLines.push(
+  "",
+  `Masa Mohon: ${formatTelegramDateTime(updatedRecord.masa_mohon)}`,
+  `Masa Approve/Tolak: ${formatTelegramDateTime(updatedRecord.masa_approve)}`,
+  `Masa Keluar: ${formatTelegramDateTime(updatedRecord.masa_keluar)}`,
+  `Masa Masuk: ${formatTelegramDateTime(updatedRecord.masa_masuk)}`
+);
+
+const telegramEnabled = ["1", "true", "yes", "ya", "enabled", "on"].includes(
+  String(env.TELEGRAM_ENABLED || "").trim().toLowerCase()
+);
+
+if (
+  telegramEnabled &&
+  env.TELEGRAM_BOT_TOKEN &&
+  env.TELEGRAM_CHAT_ID
+) {
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: env.TELEGRAM_CHAT_ID,
+          text: telegramLines.join("\n"),
+          disable_web_page_preview: true
+        })
+      }
+    );
+  } catch (error) {
+    // Telegram failure must not roll back confirmIn lifecycle.
+  }
+}
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      request_id: requestId,
+      status: "SELESAI",
+      masa_masuk: returnedAt,
+      guard_masuk_by: guard.nama,
+      lewat: late,
+      selfie_status: returnSelfieStatus,
+      catatan: returnNote
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+
+  if (url.pathname !== "/api/gas") {
+    throw fault(404, "PATH_NOT_ALLOWED", "API path not found");
+  }
+
+  if (!["GET", "POST", "OPTIONS"].includes(request.method)) {
+      headers.set("Allow", "GET, POST, OPTIONS");
+      throw fault(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+    }
+    if (request.method === "OPTIONS") {
+      const method = request.headers.get("Access-Control-Request-Method");
+      const requestedHeaders = (request.headers.get("Access-Control-Request-Headers") || "").split(",").map((v) => v.trim().toLowerCase()).filter(Boolean);
+      if (!["GET", "POST"].includes(method)) throw fault(405, "METHOD_NOT_ALLOWED", "Preflight method not allowed");
+      if (requestedHeaders.some((v) => v !== "content-type")) throw fault(400, "HEADERS_NOT_ALLOWED", "Preflight headers not allowed");
+      headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      headers.set("Access-Control-Allow-Headers", "Content-Type");
+      headers.set("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
+      return finish(null, 204);
+    }
+    let upstream;
+    try {
+      upstream = trustedUrl(env.GAS_UPSTREAM_URL);
+    } catch {
+      throw fault(503, "UPSTREAM_DELIVERY_FAILED", "Upstream configuration unavailable");
+    }
+    let body;
+    const upstreamHeaders = { Accept: "application/json", "Cache-Control": "no-store" };
+    if (request.method === "GET") {
+      const candidate = url.searchParams.get("action");
+      if (!GET_ACTIONS.has(candidate)) throw fault(400, "ACTION_NOT_ALLOWED", "Action not allowed");
+      action = candidate;
+      const allowedParams = /* @__PURE__ */ new Set(["action", "_ts", ...action === "getOutingStats" ? ["month", "year", "kelas"] : []]);
+      for (const [key, value] of url.searchParams) {
+        if (!allowedParams.has(key) || url.searchParams.getAll(key).length !== 1 || value.length > 256) {
+          throw fault(400, "ACTION_NOT_ALLOWED", "Query parameters not allowed");
+        }
+        upstream.searchParams.set(key, value);
+      }
+    } else {
+      if (url.search) throw fault(400, "ACTION_NOT_ALLOWED", "POST query not allowed");
+      const type = request.headers.get("Content-Type") || "";
+      if (!/^text\/plain\s*;\s*charset=utf-8\s*$/i.test(type)) {
+        throw fault(415, "INVALID_REQUEST", "Expected text/plain;charset=utf-8");
+      }
+      body = await readBounded(
+        request.body,
+        MAX_REQUEST_BYTES,
+        fault(413, "REQUEST_TOO_LARGE", "Request too large")
+      );
+      let payload;
+      try {
+        payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
+      } catch {
+        throw fault(400, "INVALID_REQUEST", "Invalid JSON request");
+      }
+      if (!payload || typeof payload !== "object" || Array.isArray(payload) || !POST_ACTIONS.has(payload.action)) {
+        throw fault(400, "ACTION_NOT_ALLOWED", "Action not allowed");
+      }
+      action = payload.action;
+      upstreamHeaders["Content-Type"] = type;
+    }
+    if (env.API_RATE_LIMITER) {
+      const result = await env.API_RATE_LIMITER.limit({
+        key: request.headers.get("CF-Connecting-IP") || "unknown"
+      });
+      if (!result.success) {
+        headers.set("Retry-After", "60");
+        throw fault(429, "RATE_LIMITED", "Too many requests; try again later");
+      }
+    }
+    const maxAttempts = request.method === "GET" && ["http://localhost:8000", "http://127.0.0.1:8000"].includes(env.STAGING_ORIGIN) ? 2 : 1;
+    for (attempts = 1; attempts <= maxAttempts; attempts += 1) {
+      const controller = new AbortController();
+      const timeoutMs = request.method === "POST" ? 12e4 : 6e4;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(Object.assign(fault(504, "UPSTREAM_TIMEOUT", "Upstream timed out"), { retryable: true }));
+          controller.abort();
+        }, timeoutMs);
+      });
+      const fetchOnce = /* @__PURE__ */ __name(async (url2, options) => {
+        try {
+          return await fetch(url2, options);
+        } catch {
+          throw Object.assign(fault(502, "UPSTREAM_DELIVERY_FAILED", "Upstream unavailable"), { retryable: true });
+        }
+      }, "fetchOnce");
+      const delivery = /* @__PURE__ */ __name(async () => {
+        sent = true;
+        let response = await fetchOnce(upstream.href, {
+          method: request.method,
+          body,
+          headers: upstreamHeaders,
+          redirect: "manual",
+          signal: controller.signal
+        });
+        let followedRedirect = false;
+        if (response.status === 302 || response.status === 303) {
+          let destination;
+          try {
+            destination = trustedUrl(response.headers.get("Location"), true);
+          } catch {
+            await response.body?.cancel();
+            throw fault(502, "UPSTREAM_DELIVERY_FAILED", "Upstream redirect rejected");
+          }
+          await response.body?.cancel();
+          followedRedirect = true;
+          response = await fetchOnce(destination.href, {
+            method: "GET",
+            headers: { Accept: "application/json", "Cache-Control": "no-store" },
+            redirect: "manual",
+            signal: controller.signal
+          });
+        }
+        if (!response.ok) {
+          let applicationError = false;
+          if (response.status >= 500) {
+            const errorBytes = await readBounded(
+              response.body,
+              MAX_RESPONSE_BYTES,
+              fault(502, "UPSTREAM_INVALID_RESPONSE", "Upstream response too large")
+            );
+            try {
+              const errorBody = JSON.parse(new TextDecoder().decode(errorBytes));
+              applicationError = errorBody && errorBody.ok === false;
+            } catch {
+            }
+          }
+          await response.body?.cancel();
+          const temporary = !applicationError && response.status >= 500 || followedRedirect && response.status === 404 && /^text\/html(?:;|$)/i.test(response.headers.get("Content-Type") || "");
+          throw Object.assign(fault(502, "UPSTREAM_DELIVERY_FAILED", "Upstream unavailable"), { retryable: temporary });
+        }
+        const bytes = await readBounded(
+          response.body,
+          MAX_RESPONSE_BYTES,
+          fault(502, "UPSTREAM_INVALID_RESPONSE", "Upstream response too large")
+        );
+        let result;
+        try {
+          result = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+        } catch {
+          throw fault(502, "UPSTREAM_INVALID_RESPONSE", "Invalid upstream response");
+        }
+        if (!result || Array.isArray(result) || typeof result.ok !== "boolean") {
+          throw fault(502, "UPSTREAM_INVALID_RESPONSE", "Invalid upstream response");
+        }
+        return bytes;
+      }, "delivery");
+      try {
+        return finish(await Promise.race([delivery(), timeout]), 200);
+      } catch (error) {
+        if (attempts >= maxAttempts || error.retryable !== true || !["UPSTREAM_TIMEOUT", "UPSTREAM_DELIVERY_FAILED"].includes(error.code)) throw error;
+      } finally {
+        clearTimeout(timer);
+        controller.abort();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    } catch (error) {
+
+  const known = error && error.code && Number.isInteger(error.status);
+    return finish(JSON.stringify({
+      ok: false,
+      error: known ? error.message : "Upstream unavailable",
+      code: known ? error.code : "UPSTREAM_DELIVERY_FAILED",
+      request_id: requestId,
+      outcome_unknown: request.method === "POST" && sent
+    }), known ? error.status : 502);
+  } finally {
+    clearTimeout(timer);
+    console.info(JSON.stringify({
+      request_id: requestId,
+      action,
+      method: request.method,
+      status: finalStatus,
+      duration_ms: Date.now() - started
+    }));
+  }
+}
+__name(handleRequest, "handleRequest");
+var worker_default = { fetch: handleRequest };
+export {
+  worker_default as default,
+  handleRequest
+};

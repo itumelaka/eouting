@@ -1,0 +1,32 @@
+name = "eouting-api-proxy"
+main = "staging-worker.js"
+compatibility_date = "2026-09-15"
+workers_dev = true
+
+# Candidate only: verify its deployed source and permissions before staging.
+# No credentials or Telegram tokens belong here or in frontend code.
+[vars]
+GAS_UPSTREAM_URL = "https://script.google.com/macros/s/AKfycbzWWXEGfE4FadngGZ6CXntnxRqQoqFvNLHHnREMeN_W5J8j0QtwlWykIzJ-Xa04esKtYw/exec"
+
+# Coarse IP protection; tune against shared campus/mobile IP traffic in staging.
+[[ratelimits]]
+name = "API_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 600, period = 60 }
+
+# No production frontend cutover. Local frontend: http://localhost:8000.
+# Wrangler environment vars/bindings are intentionally repeated explicitly.
+[env.staging]
+name = "eouting-api-proxy-staging"
+[env.staging.vars]
+GAS_UPSTREAM_URL = "https://script.google.com/macros/s/AKfycbzWWXEGfE4FadngGZ6CXntnxRqQoqFvNLHHnREMeN_W5J8j0QtwlWykIzJ-Xa04esKtYw/exec"
+STAGING_ORIGIN = "http://localhost:8000"
+TELEGRAM_ENABLED = "1"
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "eouting_staging"
+database_id = "56dc1420-126a-4855-ba12-f8a1c2422446"
+[[env.staging.ratelimits]]
+name = "API_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 600, period = 60 }
