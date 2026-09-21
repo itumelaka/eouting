@@ -547,7 +547,7 @@ function doPost(e) {
     if (action === "confirmOut") return jsonResponse(confirmOut(payload));
     if (action === "confirmIn") return jsonResponse(confirmIn(payload));
     if (action === "submitReturnSelfie") return jsonResponse(submitReturnSelfie(payload));
-
+    if (action === "mirrorOutingRequestFromD1") return jsonResponse(mirrorOutingRequestFromD1(payload));
     return errorResponse("Unknown action.");
   } catch (error) {
     return errorResponse(error.message || "Server error.");
@@ -2687,6 +2687,68 @@ function cancelStudentRequest(payload) {
   return transition.record;
 }
 
+function mirrorOutingRequestFromD1(payload) {
+  const data = payload || {};
+  const providedSecret = String(data.mirror_secret || "");
+  const expectedSecret = String(
+    PropertiesService.getScriptProperties().getProperty("D1_MIRROR_SECRET") || ""
+  );
+
+  if (!expectedSecret || !providedSecret || providedSecret !== expectedSecret) {
+    throw new Error("Unauthorized mirror request.");
+  }
+
+  const source = data.record;
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    throw new Error("Mirror record tidak sah.");
+  }
+
+  const requestId = String(source.request_id || "").trim();
+  if (!requestId) {
+    throw new Error("request_id diperlukan untuk mirror.");
+  }
+
+  const missingFields = HEADERS.OUTING_REQUESTS.filter(function (field) {
+    return !Object.prototype.hasOwnProperty.call(source, field);
+  });
+
+  if (missingFields.length) {
+    throw new Error(
+      "Snapshot D1 tidak lengkap: " + missingFields.join(", ")
+    );
+  }
+
+  const snapshot = {};
+  HEADERS.OUTING_REQUESTS.forEach(function (field) {
+    snapshot[field] = source[field] === null || source[field] === undefined
+      ? ""
+      : source[field];
+  });
+
+  return withScriptLock_(function () {
+    const sheet = getSheet_(SHEETS.requests);
+    ensureHeaders_(sheet, HEADERS.OUTING_REQUESTS);
+
+    const existing = findRowByRequestId_(requestId);
+    let mode = "insert";
+
+    if (existing) {
+      updateRowByHeaders_(existing.sheet, existing.rowNumber, snapshot);
+      mode = "update";
+    } else {
+      appendObjectRow_(sheet, HEADERS.OUTING_REQUESTS, snapshot);
+    }
+
+    SpreadsheetApp.flush();
+    invalidateOperationalRecordsCache_();
+
+    return {
+      mirrored: true,
+      request_id: requestId,
+      mode: mode
+    };
+  });
+}
 function getDepartureConfirmationAuditState_(requestId, auditRows) {
   return getDepartureConfirmationAuditStateFromMap_(
     requestId,
