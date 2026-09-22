@@ -6980,10 +6980,19 @@ function studentStatusInfo(record) {
   }
 
   if (status === "KELUAR") {
+    const guardCheckout = Boolean(record.guard_keluar_by || record.guardOutBy);
+    const wardenRemoteCheckout =
+      !guardCheckout &&
+      Boolean(record.departure_confirmation_requested_at);
+
     return {
       badge: "Sedang Outing",
       badgeClass: "badge-out",
-      message: "Anda telah disahkan keluar oleh Guard."
+      message: guardCheckout
+        ? "Anda telah disahkan keluar oleh Guard."
+        : wardenRemoteCheckout
+          ? "Anda telah disahkan keluar oleh Warden."
+          : "Anda telah disahkan keluar."
     };
   }
 

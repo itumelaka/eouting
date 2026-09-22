@@ -2683,7 +2683,7 @@ if (url.pathname === "/api/d1/getTodayRecords") {
         !auditState.completed;
 
       projected.departure_confirmation_requested_at =
-        projected.departure_confirmation_pending
+        auditState.requested
           ? auditState.requested_at
           : "";
 
