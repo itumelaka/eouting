@@ -1,4 +1,4 @@
-import { mirrorOutingRequestToSheets } from "./staging-worker-base.js";
+import { mirrorOutingRequestToSheets, enqueueMirrorRetry } from "./staging-worker-base.js";
 
 const text = value => String(value ?? "").trim();
 const normalized = value => text(value).toLowerCase();
@@ -170,13 +170,29 @@ export async function handleStudentCancellation(request, env, headers, options =
   env,
   updated,
   options.fetchImpl || fetch
-).catch((mirrorError) => {
+).catch(async (mirrorError) => {
   console.error(JSON.stringify({
     action: "cancelStudentRequest",
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+
+  try {
+    await enqueueMirrorRetry(
+      env,
+      requestId,
+      mirrorError,
+      { now: options.now }
+    );
+  } catch (queueError) {
+    console.error(JSON.stringify({
+      action: "cancelStudentRequest",
+      request_id: requestId,
+      event: "OUTING_REQUEST_MIRROR_RETRY_QUEUE_FAILED",
+      error: String(queueError && queueError.message || queueError)
+    }));
+  }
 });
 
 if (options.context && typeof options.context.waitUntil === "function") {

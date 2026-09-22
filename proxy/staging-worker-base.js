@@ -129,13 +129,29 @@ const mirrorTask = mirrorOutingRequestToSheets(
   env,
   updated,
   options.fetchImpl || fetch
-).catch((mirrorError) => {
+).catch(async (mirrorError) => {
   console.error(JSON.stringify({
     action: action,
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+
+  try {
+    await enqueueMirrorRetry(
+      env,
+      requestId,
+      mirrorError,
+      { now: options.now }
+    );
+  } catch (queueError) {
+    console.error(JSON.stringify({
+      action: action,
+      request_id: requestId,
+      event: "OUTING_REQUEST_MIRROR_RETRY_QUEUE_FAILED",
+      error: String(queueError && queueError.message || queueError)
+    }));
+  }
 });
 
 if (options.context && typeof options.context.waitUntil === "function") {
@@ -355,6 +371,73 @@ async function mirrorOutingRequestToSheets(env, record, fetchImpl = fetch) {
   } finally {
     clearTimeout(timer);
   }
+}
+function mirrorRetryTimestamp(date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts.map(part => [part.type, part.value])
+  );
+
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
+}
+
+async function enqueueMirrorRetry(env, requestId, error, options = {}) {
+  if (!env || !env.DB) {
+    throw new Error("D1 mirror retry queue unavailable");
+  }
+
+  const normalizedRequestId = String(requestId || "").trim();
+
+  if (!normalizedRequestId) {
+    throw new Error("D1 mirror retry request id invalid");
+  }
+
+  const now = (options.now || (() => new Date()))();
+  const attemptedAt = mirrorRetryTimestamp(now);
+  const nextAttemptAt = mirrorRetryTimestamp(
+    new Date(now.getTime() + 60 * 1000)
+  );
+  const errorMessage = String(
+    error && error.message ? error.message : error || "Unknown mirror failure"
+  );
+
+  await env.DB.prepare(`
+    INSERT INTO MIRROR_RETRY_QUEUE (
+      request_id,
+      attempts,
+      first_failed_at,
+      last_attempt_at,
+      next_attempt_at,
+      last_error,
+      updated_at
+    )
+    VALUES (?, 1, ?, ?, ?, ?, ?)
+    ON CONFLICT(request_id) DO UPDATE SET
+      attempts = MIRROR_RETRY_QUEUE.attempts + 1,
+      last_attempt_at = excluded.last_attempt_at,
+      next_attempt_at = excluded.next_attempt_at,
+      last_error = excluded.last_error,
+      updated_at = excluded.updated_at
+  `).bind(
+    normalizedRequestId,
+    attemptedAt,
+    attemptedAt,
+    nextAttemptAt,
+    errorMessage,
+    attemptedAt
+  ).run();
+
+  return true;
 }
 const stagingSubmitRequestV230 = (() => {
 const ACTIVE_STATUSES = [
@@ -792,13 +875,29 @@ const mirrorTask = mirrorOutingRequestToSheets(
   env,
   record,
   dependencies.fetchImpl || fetch
-).catch((mirrorError) => {
+).catch(async (mirrorError) => {
   console.error(JSON.stringify({
     action: "submitRequest",
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+
+  try {
+    await enqueueMirrorRetry(
+      env,
+      requestId,
+      mirrorError,
+      { now: dependencies.now }
+    );
+  } catch (queueError) {
+    console.error(JSON.stringify({
+      action: "submitRequest",
+      request_id: requestId,
+      event: "OUTING_REQUEST_MIRROR_RETRY_QUEUE_FAILED",
+      error: String(queueError && queueError.message || queueError)
+    }));
+  }
 });
 
 if (dependencies.context && typeof dependencies.context.waitUntil === "function") {
@@ -2290,13 +2389,28 @@ const mirrorTask = mirrorOutingRequestToSheets(
   env,
   updatedRecord,
   fetch
-).catch((mirrorError) => {
+).catch(async (mirrorError) => {
   console.error(JSON.stringify({
     action: "confirmOut",
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+
+  try {
+    await enqueueMirrorRetry(
+      env,
+      requestId,
+      mirrorError
+    );
+  } catch (queueError) {
+    console.error(JSON.stringify({
+      action: "confirmOut",
+      request_id: requestId,
+      event: "OUTING_REQUEST_MIRROR_RETRY_QUEUE_FAILED",
+      error: String(queueError && queueError.message || queueError)
+    }));
+  }
 });
 
 if (context && typeof context.waitUntil === "function") {
@@ -2697,13 +2811,28 @@ const mirrorTask = mirrorOutingRequestToSheets(
   env,
   updatedRecord,
   fetch
-).catch((mirrorError) => {
+).catch(async (mirrorError) => {
   console.error(JSON.stringify({
     action: "confirmIn",
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+
+  try {
+    await enqueueMirrorRetry(
+      env,
+      requestId,
+      mirrorError
+    );
+  } catch (queueError) {
+    console.error(JSON.stringify({
+      action: "confirmIn",
+      request_id: requestId,
+      event: "OUTING_REQUEST_MIRROR_RETRY_QUEUE_FAILED",
+      error: String(queueError && queueError.message || queueError)
+    }));
+  }
 });
 
 if (context && typeof context.waitUntil === "function") {
@@ -2931,5 +3060,6 @@ var worker_default = { fetch: handleRequest };
 export {
   worker_default as default,
   handleRequest,
-  mirrorOutingRequestToSheets
+  mirrorOutingRequestToSheets,
+  enqueueMirrorRetry
 };
