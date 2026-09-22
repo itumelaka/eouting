@@ -21,6 +21,7 @@ const D1_POST_ENDPOINTS = {
   confirmIn: "confirmIn",
   submitRequest: "submitRequest",
   requestDepartureConfirmation: "requestDepartureConfirmation",
+  confirmWardenRemoteCheckout: "confirmWardenRemoteCheckout",
   approveRequest: "approveRequest",
   rejectRequest: "rejectRequest",
   cancelStudentRequest: "cancelStudentRequest"

@@ -1341,6 +1341,364 @@ async function handleD1DepartureConfirmationRequest(request, env, headers, optio
     headers
   });
 }
+async function handleD1WardenRemoteCheckout(request, env, headers, options = {}) {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  let payload;
+
+  try {
+    payload = await request.json();
+  } catch {
+    throw fault(400, "INVALID_REQUEST", "Invalid JSON request");
+  }
+
+  const requestId = String(payload?.request_id || "").trim();
+  const wardenName = String(
+    payload?.warden_name ||
+    payload?.nama_warden ||
+    payload?.user_name ||
+    ""
+  ).trim();
+  const pin = String(
+    payload?.pin === undefined || payload?.pin === null
+      ? ""
+      : payload.pin
+  ).trim();
+
+  if (!requestId || !wardenName || !pin) {
+    throw fault(
+      400,
+      "INVALID_REQUEST",
+      "request_id, nama warden dan PIN diperlukan."
+    );
+  }
+
+  const wardenDirectory = await env.DB.prepare(
+    `SELECT warden_id, nama, status, pin
+     FROM WARDENS`
+  ).all();
+
+  const warden = (wardenDirectory.results || []).find((row) =>
+    String(row.nama || "").trim().toLowerCase() === wardenName.toLowerCase() &&
+    String(row.status || "").trim().toLowerCase() === "aktif" &&
+    String(row.pin === undefined || row.pin === null ? "" : row.pin).trim() === pin
+  );
+
+  if (!warden) {
+    throw fault(
+      401,
+      "WARDEN_LOGIN_INVALID",
+      "Warden tidak dijumpai atau tidak aktif."
+    );
+  }
+
+  if (String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim() !== "true") {
+    throw fault(
+      403,
+      "NO_GUARD_DEPARTURE_DISABLED",
+      "Fallback pengesahan keluar tanpa Guard dinyahaktifkan oleh Admin."
+    );
+  }
+
+  const wardenRole = /^HEP-/i.test(
+    String(warden.warden_id || "").trim()
+  ) ? "HEP" : "WARDEN";
+
+  const readRecord = () => env.DB.prepare(
+    `SELECT *
+     FROM OUTING_REQUESTS
+     WHERE request_id = ?
+     LIMIT 1`
+  ).bind(requestId).first();
+
+  const readAuditState = async () => {
+    const result = await env.DB.prepare(
+      `SELECT timestamp, action
+       FROM AUDIT_LOG
+       WHERE request_id = ?
+         AND action IN (
+           'DEPARTURE_CONFIRMATION_REQUESTED',
+           'WARDEN_REMOTE_CHECKOUT'
+         )
+       ORDER BY timestamp ASC`
+    ).bind(requestId).all();
+
+    const state = {
+      requested: false,
+      requested_at: "",
+      completed: false
+    };
+
+    for (const audit of result.results || []) {
+      if (
+        audit.action === "DEPARTURE_CONFIRMATION_REQUESTED" &&
+        !state.requested
+      ) {
+        state.requested = true;
+        state.requested_at = audit.timestamp || "";
+      }
+
+      if (audit.action === "WARDEN_REMOTE_CHECKOUT") {
+        state.completed = true;
+      }
+    }
+
+    return state;
+  };
+
+  const record = await readRecord();
+
+  if (!record) {
+    throw fault(
+      404,
+      "REQUEST_NOT_FOUND",
+      "Permohonan tidak dijumpai."
+    );
+  }
+
+  const auditState = await readAuditState();
+
+  if (
+    auditState.completed &&
+    String(record.status || "").trim() === "KELUAR"
+  ) {
+    return new Response(JSON.stringify({
+      ok: true,
+      data: {
+        ...record,
+        message: "Rekod sudah disahkan keluar oleh Warden."
+      }
+    }), {
+      status: 200,
+      headers
+    });
+  }
+
+  if (String(record.status || "").trim() !== "DILULUSKAN_WARDEN") {
+    throw fault(
+      409,
+      "INVALID_REQUEST_STATUS",
+      "Permohonan ini sudah tidak menunggu pengesahan keluar Warden."
+    );
+  }
+
+  if (!auditState.requested || auditState.completed) {
+    throw fault(
+      409,
+      "DEPARTURE_CONFIRMATION_NOT_PENDING",
+      "Tiada permohonan pengesahan keluar yang belum selesai."
+    );
+  }
+
+  const checkoutAt = mirrorRetryTimestamp(
+    (options.now || (() => new Date()))()
+  );
+
+  const updateResult = await env.DB.prepare(
+    `UPDATE OUTING_REQUESTS
+     SET status = 'KELUAR',
+         masa_keluar = ?
+     WHERE request_id = ?
+       AND status = 'DILULUSKAN_WARDEN'
+       AND (masa_keluar IS NULL OR TRIM(masa_keluar) = '')`
+  ).bind(
+    checkoutAt,
+    requestId
+  ).run();
+
+  if (
+    !updateResult.meta ||
+    Number(updateResult.meta.changes || 0) !== 1
+  ) {
+    const latestRecord = await readRecord();
+    const latestAuditState = await readAuditState();
+
+    if (
+      latestRecord &&
+      String(latestRecord.status || "").trim() === "KELUAR" &&
+      latestAuditState.completed
+    ) {
+      return new Response(JSON.stringify({
+        ok: true,
+        data: {
+          ...latestRecord,
+          message: "Rekod sudah disahkan keluar oleh Warden."
+        }
+      }), {
+        status: 200,
+        headers
+      });
+    }
+
+    throw fault(
+      409,
+      "WARDEN_REMOTE_CHECKOUT_CONFLICT",
+      "Rekod berubah semasa pengesahan keluar. Sila refresh dan cuba semula."
+    );
+  }
+
+  const details = JSON.stringify({
+    student_name: record.nama || "",
+    no_matrik: record.no_matrik || "",
+    jenis_permohonan: record.jenis_permohonan || "",
+    actor_role: wardenRole,
+    mode: "REMOTE_NO_GUARD",
+    masa_keluar: checkoutAt
+  });
+
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+      timestamp,
+      action,
+      request_id,
+      user_role,
+      user_name,
+      details,
+      entity_type,
+      entity_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    checkoutAt,
+    "WARDEN_REMOTE_CHECKOUT",
+    requestId,
+    wardenRole === "HEP" ? "HEP" : "Warden",
+    warden.nama,
+    details,
+    "OUTING_REQUEST",
+    requestId
+  ).run();
+
+  const updatedRecord = {
+    ...record,
+    status: "KELUAR",
+    masa_keluar: checkoutAt
+  };
+
+  const telegramEnabled = ["1", "true", "yes", "ya", "enabled", "on"].includes(
+    String(env.TELEGRAM_ENABLED || "").trim().toLowerCase()
+  );
+
+  if (
+    telegramEnabled &&
+    env.TELEGRAM_BOT_TOKEN &&
+    env.TELEGRAM_CHAT_ID
+  ) {
+    try {
+      const typeLabels = {
+        OUTING_BIASA: "Outing Biasa",
+        OUTING_HUJUNG_MINGGU: "Outing Sabtu / Ahad",
+        KECEMASAN: "Kecemasan",
+        PULANG_BERMALAM: "Pulang Bermalam",
+        CUTI_SEMESTER: "CUTI SEMESTER"
+      };
+
+      const typeCode = String(updatedRecord.jenis_permohonan || "").trim();
+      const typeLabel = typeLabels[typeCode] || typeCode || "-";
+
+      const checkoutDate = new Date(
+        String(updatedRecord.masa_keluar || "").replace(
+          /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/,
+          "$1T$2+08:00"
+        )
+      );
+
+      const checkoutDisplay = Number.isNaN(checkoutDate.getTime())
+        ? String(updatedRecord.masa_keluar || "-")
+        : new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Asia/Kuala_Lumpur",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false
+          }).format(checkoutDate).replace(",", "");
+
+      const telegramMessage = [
+        "✅ PENGESAHAN KELUAR OLEH WARDEN",
+        "",
+        `Pelajar: ${updatedRecord.nama || "-"}`,
+        `Jenis: ${typeLabel}`,
+        `Lokasi: ${updatedRecord.lokasi || "-"}`,
+        `Disahkan Oleh: ${warden.nama || "-"}`,
+        `Masa Keluar: ${checkoutDisplay}`,
+        "",
+        "Status pelajar kini: KELUAR",
+        "",
+        "🔗 Buka eOuting Warden/HEP:",
+        "https://itumelaka.github.io/eouting/"
+      ].join("\n");
+
+      await (options.fetchImpl || fetch)(
+        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            chat_id: env.TELEGRAM_CHAT_ID,
+            text: telegramMessage,
+            disable_web_page_preview: true
+          })
+        }
+      );
+    } catch (telegramError) {
+      console.warn("WARDEN_REMOTE_CHECKOUT Telegram notification failed.");
+    }
+  }
+
+  const mirrorTask = mirrorOutingRequestToSheets(
+    env,
+    updatedRecord,
+    options.fetchImpl || fetch
+  ).catch(async (mirrorError) => {
+    console.error(JSON.stringify({
+      action: "confirmWardenRemoteCheckout",
+      request_id: requestId,
+      event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
+      error: String(mirrorError && mirrorError.message || mirrorError)
+    }));
+
+    try {
+      await enqueueMirrorRetry(
+        env,
+        requestId,
+        mirrorError,
+        { now: options.now }
+      );
+    } catch (queueError) {
+      console.error(JSON.stringify({
+        action: "confirmWardenRemoteCheckout",
+        request_id: requestId,
+        event: "OUTING_REQUEST_MIRROR_RETRY_QUEUE_FAILED",
+        error: String(queueError && queueError.message || queueError)
+      }));
+    }
+  });
+
+  if (options.context && typeof options.context.waitUntil === "function") {
+    options.context.waitUntil(mirrorTask);
+  } else {
+    await mirrorTask;
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: updatedRecord
+  }), {
+    status: 200,
+    headers
+  });
+}
 async function handleRequest(request, env = {}, context = {}) {
   const started = Date.now();
   const requestId = crypto.randomUUID();
@@ -1543,6 +1901,14 @@ if (url.pathname === "/api/d1/submitRequest" || url.pathname === "/api/d1/submit
 
 if (url.pathname === "/api/d1/requestDepartureConfirmation") {
   return await handleD1DepartureConfirmationRequest(
+    request,
+    env,
+    headers,
+    { context }
+  );
+}
+if (url.pathname === "/api/d1/confirmWardenRemoteCheckout") {
+  return await handleD1WardenRemoteCheckout(
     request,
     env,
     headers,
