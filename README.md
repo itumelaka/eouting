@@ -45,7 +45,7 @@ Flow `cancelStudentRequest` telah disahkan secara manual end-to-end melalui fron
 
 Production masih kekal GitHub Pages + Google Apps Script + Google Sheets. Frontend production belum ditukar kepada D1 dan Cloudflare Worker/D1 belum menjadi dependency production.
 
-Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk `getCurrentHostelRoster`, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh serta fungsi Admin tertentu. Durable retry queue dan reconciliation bagi operational mirror D1 -> Google Sheets telah dilaksanakan dan diuji pada staging.
+Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk `getCurrentHostelRoster`, Guardian Contact, profile-photo storage, return-selfie serta fungsi Admin tertentu. No-Guard Departure D1 staging telah mencapai parity operasi utama dan lulus QA end-to-end. Durable retry queue dan reconciliation bagi operational mirror D1 -> Google Sheets telah dilaksanakan dan diuji pada staging.
 
 Untuk V3.0, flow operasi Pelajar/Warden/Guard yang telah dimigrasikan menggunakan D1 sebagai authoritative operational source. Fungsi konfigurasi dan Admin yang kompleks boleh kekal sementara pada GAS/Google Sheets sebagai hybrid control plane dan dipublish/sync ke D1 mengikut keperluan runtime.
 
@@ -72,7 +72,7 @@ Git checkpoint sebelumnya ialah tag `v3-d1-sheets-mirror-qa`, menunjuk kepada `9
 
 **Current state — 22 September 2026:** operational mirror D1 -> Google Sheets berjalan secara async/background selepas D1 commit bagi `submitRequest`, `cancelStudentRequest`, `approveRequest`, `rejectRequest`, `confirmOut` dan `confirmIn`. Kegagalan mirror tidak menggagalkan mutation utama; `request_id` yang gagal dimasukkan ke `MIRROR_RETRY_QUEUE` dalam D1. Worker staging menjalankan reconciliation berjadual setiap 5 minit, membaca state terkini daripada `OUTING_REQUESTS`, retry mirror ke Google Sheets dan membuang queue row selepas berjaya. QA live scheduler menggunakan orphan queue row sementara telah lulus dan queue kembali kosong selepas cron memprosesnya.
 
-**Next priority:** teruskan feature parity V3 bagi baki flow yang masih bergantung pada GAS/Google Sheets, khususnya pengesahan keluar tanpa Guard / remote checkout, `getCurrentHostelRoster`, Guardian Contact, profile-photo, return-selfie dan fungsi Admin tertentu. Durable retry/reconciliation operational mirror kini telah tersedia pada staging; production cutover masih belum dibenarkan sehingga baki flow, regression dan rollback plan disahkan.
+**Next priority:** teruskan feature parity V3 bagi baki flow yang masih bergantung pada GAS/Google Sheets, khususnya `getCurrentHostelRoster`, Guardian Contact, profile-photo, return-selfie dan fungsi Admin tertentu. No-Guard Departure / remote checkout telah lulus QA end-to-end pada D1 staging. Durable retry/reconciliation operational mirror kini telah tersedia pada staging; production cutover masih belum dibenarkan sehingga baki flow, regression dan rollback plan disahkan.
 
 V3 masih dalam pembangunan dan QA staging; ia **belum production-ready** dan full migration **belum selesai**. Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets, tanpa production cutover ke Cloudflare.
 
@@ -105,6 +105,16 @@ Kerja performance yang masih deferred dan **belum dianggap selesai** ialah laten
 - Kumpulan atau institusi masa hadapan boleh diwujudkan melalui Admin tanpa perubahan source code biasa. Control `Kembali ke Login Legacy` menyediakan rollback terkawal.
 - Apabila permohonan aktif authoritative wujud, borang permohonan baharu disembunyikan sebagai UX; perlindungan duplicate backend kekal authoritative.
 - `Penghuni Semasa Asrama` dikira daripada Pelajar aktif tolak lifecycle semasa `KELUAR`. Public menerima kiraan agregat sahaja; Admin, Warden/HEP dan Guard authenticated menerima roster minimum nama yang dikumpulkan secara dinamik.
+
+### V3 No-Guard staging QA — 22 September 2026
+
+Flow No-Guard Departure telah dimigrasikan dan disahkan end-to-end pada Cloudflare Worker staging + D1 `eouting_staging`, tanpa menukar production. Feature gate staging `NO_GUARD_DEPARTURE_ENABLED=true`.
+
+QA staging yang lulus merangkumi: Student `requestDepartureConfirmation`, audit `DEPARTURE_CONFIRMATION_REQUESTED`, dedup request dan Telegram, queue Warden `Menunggu Pengesahan Keluar`, `confirmWardenRemoteCheckout`, transition `DILULUSKAN_WARDEN -> KELUAR`, `guard_keluar_by` kekal kosong, audit `WARDEN_REMOTE_CHECKOUT`, Telegram completion Warden, idempotency confirmation, durable D1 -> Google Sheets mirror serta UI Student yang membezakan checkout Guard dan Warden.
+
+Checkpoint Git ialah tag `v3-no-guard-staging-qa`. Commit penting selepas checkpoint tersebut termasuk `22833e2` untuk guidance Student No-Guard dan `d6cee79` untuk mengekalkan context remote checkout pada UI Student. Worker staging yang disahkan selepas fix UI/context ialah Version ID `e46e05c8-2a2a-4642-a5a4-d99ef979c167`.
+
+Production masih kekal pada flow GAS/Google Sheets sedia ada dan tidak menggunakan D1 staging sebagai dependency.
 
 ## No-Guard Departure — sambungan operasi selepas Fasa 5
 
