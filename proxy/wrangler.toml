@@ -30,3 +30,6 @@ database_id = "56dc1420-126a-4855-ba12-f8a1c2422446"
 name = "API_RATE_LIMITER"
 namespace_id = "1002"
 simple = { limit = 600, period = 60 }
+
+[env.staging.triggers]
+crons = [ "*/5 * * * *" ]

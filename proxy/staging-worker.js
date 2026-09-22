@@ -1,4 +1,4 @@
-import authoritativeStagingWorker from "./staging-worker-base.js";
+import authoritativeStagingWorker, { reconcileMirrorRetryQueue } from "./staging-worker-base.js";
 import { handleStudentCancellation } from "./staging-student-cancellation.js";
 
 function errorResponse(error, requestId, headers) {
@@ -56,5 +56,27 @@ export default {
         duration_ms: Date.now() - started
       }));
     }
+  },
+
+  async scheduled(controller, env, context) {
+    const task = reconcileMirrorRetryQueue(env)
+      .then((result) => {
+        console.info(JSON.stringify({
+          event: "OUTING_REQUEST_MIRROR_RECONCILIATION_COMPLETED",
+          cron: controller.cron,
+          processed: result.processed,
+          succeeded: result.succeeded,
+          failed: result.failed
+        }));
+      })
+      .catch((error) => {
+        console.error(JSON.stringify({
+          event: "OUTING_REQUEST_MIRROR_RECONCILIATION_FAILED",
+          cron: controller.cron,
+          error: String(error && error.message || error)
+        }));
+      });
+
+    context.waitUntil(task);
   }
 };

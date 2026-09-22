@@ -439,6 +439,90 @@ async function enqueueMirrorRetry(env, requestId, error, options = {}) {
 
   return true;
 }
+async function reconcileMirrorRetryQueue(env, options = {}) {
+  if (!env || !env.DB) {
+    throw new Error("D1 mirror retry queue unavailable");
+  }
+
+  const now = (options.now || (() => new Date()))();
+  const nowStamp = mirrorRetryTimestamp(now);
+  const mirror = options.mirror || mirrorOutingRequestToSheets;
+  const limit = Number.isInteger(options.limit) && options.limit > 0
+    ? Math.min(options.limit, 100)
+    : 25;
+
+  const dueResult = await env.DB.prepare(`
+    SELECT request_id
+    FROM MIRROR_RETRY_QUEUE
+    WHERE next_attempt_at <= ?
+    ORDER BY next_attempt_at ASC
+    LIMIT ?
+  `).bind(
+    nowStamp,
+    limit
+  ).all();
+
+  const dueRows = Array.isArray(dueResult?.results)
+    ? dueResult.results
+    : [];
+
+  let processed = 0;
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const queued of dueRows) {
+    const requestId = String(queued?.request_id || "").trim();
+
+    if (!requestId) {
+      continue;
+    }
+
+    processed += 1;
+
+    const latest = await env.DB.prepare(`
+      SELECT *
+      FROM OUTING_REQUESTS
+      WHERE request_id = ?
+      LIMIT 1
+    `).bind(requestId).first();
+
+    if (!latest) {
+      await env.DB.prepare(`
+        DELETE FROM MIRROR_RETRY_QUEUE
+        WHERE request_id = ?
+      `).bind(requestId).run();
+
+      succeeded += 1;
+      continue;
+    }
+
+    try {
+      await mirror(env, latest);
+
+      await env.DB.prepare(`
+        DELETE FROM MIRROR_RETRY_QUEUE
+        WHERE request_id = ?
+      `).bind(requestId).run();
+
+      succeeded += 1;
+    } catch (mirrorError) {
+      failed += 1;
+
+      await enqueueMirrorRetry(
+        env,
+        requestId,
+        mirrorError,
+        { now: () => now }
+      );
+    }
+  }
+
+  return {
+    processed,
+    succeeded,
+    failed
+  };
+}
 const stagingSubmitRequestV230 = (() => {
 const ACTIVE_STATUSES = [
   "MENUNGGU_KELULUSAN",
@@ -3061,5 +3145,6 @@ export {
   worker_default as default,
   handleRequest,
   mirrorOutingRequestToSheets,
-  enqueueMirrorRetry
+  enqueueMirrorRetry,
+  reconcileMirrorRetryQueue
 };
