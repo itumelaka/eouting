@@ -45,7 +45,7 @@ Flow `cancelStudentRequest` telah disahkan secara manual end-to-end melalui fron
 
 Production masih kekal GitHub Pages + Google Apps Script + Google Sheets. Frontend production belum ditukar kepada D1 dan Cloudflare Worker/D1 belum menjadi dependency production.
 
-Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk `getCurrentHostelRoster`, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh, retry queue dan reconciliation durable serta fungsi Admin tertentu.
+Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk `getCurrentHostelRoster`, Guardian Contact, profile-photo storage, return-selfie, No-Guard Departure penuh serta fungsi Admin tertentu. Durable retry queue dan reconciliation bagi operational mirror D1 -> Google Sheets telah dilaksanakan dan diuji pada staging.
 
 Untuk V3.0, flow operasi Pelajar/Warden/Guard yang telah dimigrasikan menggunakan D1 sebagai authoritative operational source. Fungsi konfigurasi dan Admin yang kompleks boleh kekal sementara pada GAS/Google Sheets sebagai hybrid control plane dan dipublish/sync ke D1 mengikut keperluan runtime.
 
@@ -70,9 +70,9 @@ Git checkpoint sebelumnya ialah tag `v3-d1-sheets-mirror-qa`, menunjuk kepada `9
 - `2e17068 feat: mirror D1 outing requests to Sheets staging`;
 - `9dc258e fix: point staging worker to current GAS deployment`.
 
-**Current state:** operational mirror D1 -> Google Sheets kini berjalan secara async/background selepas D1 commit bagi flow utama yang telah dimigrasikan. QA manual end-to-end telah lulus untuk `submitRequest`, `cancelStudentRequest`, `approveRequest`, `rejectRequest`, `confirmOut` dan `confirmIn`, dan kegagalan mirror tidak lagi sepatutnya melambatkan response utama pengguna. Mekanisme retry/reconciliation durable masih menjadi follow-up seterusnya bagi memulihkan mirror failure secara automatik dan memastikan consistency jangka panjang.
+**Current state — 22 September 2026:** operational mirror D1 -> Google Sheets berjalan secara async/background selepas D1 commit bagi `submitRequest`, `cancelStudentRequest`, `approveRequest`, `rejectRequest`, `confirmOut` dan `confirmIn`. Kegagalan mirror tidak menggagalkan mutation utama; `request_id` yang gagal dimasukkan ke `MIRROR_RETRY_QUEUE` dalam D1. Worker staging menjalankan reconciliation berjadual setiap 5 minit, membaca state terkini daripada `OUTING_REQUESTS`, retry mirror ke Google Sheets dan membuang queue row selepas berjaya. QA live scheduler menggunakan orphan queue row sementara telah lulus dan queue kembali kosong selepas cron memprosesnya.
 
-**Next priority:** bina retry queue dan reconciliation yang durable supaya kegagalan mirror ke Google Sheets boleh dipulihkan secara automatik tanpa mengganggu response utama pengguna. Selain itu, pengesahan keluar tanpa Guard / remote checkout yang wujud dalam production masih perlu diteliti untuk feature parity kerana belum dipaparkan sepenuhnya dalam staging V3.
+**Next priority:** teruskan feature parity V3 bagi baki flow yang masih bergantung pada GAS/Google Sheets, khususnya pengesahan keluar tanpa Guard / remote checkout, `getCurrentHostelRoster`, Guardian Contact, profile-photo, return-selfie dan fungsi Admin tertentu. Durable retry/reconciliation operational mirror kini telah tersedia pada staging; production cutover masih belum dibenarkan sehingga baki flow, regression dan rollback plan disahkan.
 
 V3 masih dalam pembangunan dan QA staging; ia **belum production-ready** dan full migration **belum selesai**. Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets, tanpa production cutover ke Cloudflare.
 
