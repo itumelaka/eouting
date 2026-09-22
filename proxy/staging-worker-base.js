@@ -1327,6 +1327,80 @@ async function handleD1DepartureConfirmationRequest(request, env, headers, optio
     }
   }
 
+  const telegramEnabled = ["1", "true", "yes", "ya", "enabled", "on"].includes(
+    String(env.TELEGRAM_ENABLED || "").trim().toLowerCase()
+  );
+
+  if (
+    inserted &&
+    telegramEnabled &&
+    env.TELEGRAM_BOT_TOKEN &&
+    env.TELEGRAM_CHAT_ID
+  ) {
+    try {
+      const typeLabels = {
+        OUTING_BIASA: "Outing Biasa",
+        OUTING_HUJUNG_MINGGU: "Outing Sabtu / Ahad",
+        KECEMASAN: "Kecemasan",
+        PULANG_BERMALAM: "Pulang Bermalam",
+        CUTI_SEMESTER: "CUTI SEMESTER"
+      };
+
+      const typeCode = String(record.jenis_permohonan || "").trim();
+      const typeLabel = typeLabels[typeCode] || typeCode || "-";
+
+      const requestedDate = new Date(
+        String(auditState.requested_at || "").replace(
+          /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/,
+          "$1T$2+08:00"
+        )
+      );
+
+      const requestedDisplay = Number.isNaN(requestedDate.getTime())
+        ? String(auditState.requested_at || "-")
+        : new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Asia/Kuala_Lumpur",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false
+          }).format(requestedDate).replace(",", "");
+
+      const telegramMessage = [
+        "🚪 PENGESAHAN KELUAR TANPA GUARD",
+        "",
+        `Pelajar: ${record.nama || "-"}`,
+        `Jenis: ${typeLabel}`,
+        `Lokasi: ${record.lokasi || "-"}`,
+        `Masa Mohon: ${requestedDisplay}`,
+        "",
+        "Pelajar sedang menunggu pengesahan keluar oleh Warden.",
+        "",
+        "🔗 Buka eOuting Warden/HEP:",
+        "https://itumelaka.github.io/eouting/"
+      ].join("\n");
+
+      await (options.fetchImpl || fetch)(
+        `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            chat_id: env.TELEGRAM_CHAT_ID,
+            text: telegramMessage,
+            disable_web_page_preview: true
+          })
+        }
+      );
+    } catch (telegramError) {
+      console.warn("DEPARTURE_CONFIRMATION_REQUESTED Telegram notification failed.");
+    }
+  }
+
   return new Response(JSON.stringify({
     ok: true,
     data: {
