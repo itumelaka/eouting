@@ -1,25 +1,27 @@
 # Architecture eOuting ITU
 
-Production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets setakat **21 September 2026**. Tiada production cutover ke Cloudflare. Butiran frontend/cache `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21`, GAS Version 57 dan full Node suite **744/744** ialah rekod close-out 27 Ogos 2026, bukan keputusan QA V3 terkini.
+Production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets setakat **22 September 2026**. Tiada production cutover ke Cloudflare. Butiran frontend/cache `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21`, GAS Version 57 dan full Node suite **744/744** ialah rekod close-out 27 Ogos 2026, bukan keputusan QA V3 terkini.
 
-## V3.0 Cloud Architecture Staging — 21 September 2026
+## V3.0 Cloud Architecture Staging — 22 September 2026
 
 ```text
-Frontend localhost (flow V3 yang telah dimigrasikan)
-  -> Cloudflare Worker eouting-api-proxy-staging
-    -> D1 eouting_staging (authoritative operational source; commit mutation)
-    -> GAS private action mirrorOutingRequestFromD1 (D1_MIRROR_SECRET)
-      -> eOuting ITU Database / OUTING_REQUESTS (operational mirror)
-    -> response pengguna selepas synchronous mirror
+Frontend staging / localhost
+  -> Warden/Guard hostel roster -> Worker staging -> D1 eouting_staging
+  -> Admin hostel roster -> GAS (Admin authentication belum dimigrasi)
+  -> flow V3 yang telah dimigrasikan -> Worker staging -> D1 commit
+    -> response pengguna; operational mirror D1 -> Sheets secara background
+    -> kegagalan mirror -> MIRROR_RETRY_QUEUE -> reconciliation setiap 5 minit
 ```
 
-Mirror ialah salinan operasi daripada D1; Google Sheets tidak mengambil alih authority flow V3 yang telah dimigrasikan. GAS deployment mirror dikemas kini pada 21 September 2026 dan Worker staging menunjuk kepada deployment yang betul. Frontend non-localhost production kekal menggunakan GAS. Fungsi konfigurasi/Admin yang belum dimigrasikan boleh kekal melalui GAS/Sheets sebagai hybrid control plane.
+D1 ialah authoritative operational source bagi flow V3 yang telah dimigrasikan. GAS private action `mirrorOutingRequestFromD1` dengan `D1_MIRROR_SECRET` menghantar operational mirror ke eOuting ITU Database / `OUTING_REQUESTS`; Google Sheets tidak mengambil alih authority flow tersebut. Fungsi konfigurasi/Admin yang belum dimigrasikan kekal melalui GAS/Sheets sebagai hybrid control plane.
 
-QA manual end-to-end mirror telah lulus untuk `submitRequest`, `cancelStudentRequest`, `approveRequest`, `rejectRequest`, `confirmOut` dan `confirmIn`. Butiran QA dan checkpoint `v3-d1-sheets-mirror-qa` direkodkan dalam [Project Status](PROJECT_STATUS.md).
+Dynamic grouping menggunakan `STUDENT_GROUPS` dan `LI_INSTITUTIONS`, ditambah melalui `proxy/d1/002_student_group_config.sql` dan `proxy/d1/003_student_group_config_seed.sql`. Config production A2, A3, LI, TEST, UNISZA telah dimirror ke staging; UNISZA aktif, UMK/UPM inactive, dan dua pelajar LI UNISZA telah dimasukkan. `studentLoginDirectory` staging parity: `GROUP:A2`, `GROUP:A3`, `GROUP:TEST` → `Test Sahaja`, `GROUP:UNISZA:UNISZA` → `LI UNISZA`.
 
-Mirror masih synchronous: GAS yang lambat atau unavailable boleh menyebabkan latency UI atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown` selepas D1 mungkin telah commit. Keutamaan seterusnya ialah async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna; reka bentuk ini belum dilaksanakan.
+`getCurrentHostelRoster` D1 staging mengesahkan Warden/Guard; frontend route Admin roster ke GAS kerana Admin D1 auth belum tersedia. Semua pelajar aktif dikira di hostel kecuali latest authoritative request mereka `KELUAR`; grouping fallback `Belum Dikonfigurasi`, projection pelajar hanya `nama`. QA checkpoint: 33 aktif, 2 di luar, 31 di hostel; A2 11, A3 18, Test Sahaja 0, LI UNISZA 2.
 
-Feature parity pengesahan keluar tanpa Guard / remote checkout production masih perlu diteliti kerana belum dipaparkan sepenuhnya dalam staging V3. V3 belum production-ready dan full migration belum selesai. Bahagian berikut menerangkan baseline production V2 kecuali dinyatakan sebaliknya.
+Async mirror/retry/reconciliation dan No-Guard staging end-to-end QA sudah lengkap. Baki utama ialah Admin D1 authentication/parity, pengurangan dependency GAS secara berperingkat, reproducible D1 data/config sync dan sambungan V3 migration. V3 masih staging, belum production-ready dan full migration belum selesai.
+
+Checkpoint `e30a0fb`; staging Worker `3c5856b5-3515-4098-a578-d3fadb60344c`. Production frontend kekal V2/GAS, production Worker kekal versi asal `a483bda0-77db-4189-8d29-1984e2f4f758` selepas rollback. Butiran checkpoint ada dalam [Project Status](PROJECT_STATUS.md), incident dan explicit staging deploy ada dalam [Deployment](DEPLOYMENT.md). Bahagian berikut menerangkan baseline production V2 kecuali dinyatakan sebaliknya.
 
 ## Performance dan scalability
 

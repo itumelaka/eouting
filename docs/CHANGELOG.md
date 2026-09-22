@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-09-22 — V3 staging: dynamic student groups dan D1 hostel roster
+
+- Checkpoint: `e30a0fb feat: add D1 hostel roster parity and dynamic student groups`, branch `wip/eouting_v3_recovery_20260921`. Branch sudah pushed dan working tree bersih pada checkpoint sebelum kemas kini dokumentasi ini; butiran dalam [Project Status](PROJECT_STATUS.md).
+- V3 masih **staging**; production frontend kekal **V2/GAS/Google Sheets**. Staging D1 ialah `eouting_staging`, staging Worker selepas roster deploy ialah `3c5856b5-3515-4098-a578-d3fadb60344c`.
+- Dynamic grouping menggunakan `STUDENT_GROUPS` / `LI_INSTITUTIONS`; migration baharu `proxy/d1/002_student_group_config.sql` dan `proxy/d1/003_student_group_config_seed.sql`. Kumpulan production yang dimirror: A2, A3, LI, TEST, UNISZA. UNISZA aktif; UMK/UPM inactive. Dua pelajar LI UNISZA dimasukkan ke D1 staging.
+- Directory staging parity: `GROUP:A2`, `GROUP:A3`, `GROUP:TEST` → `Test Sahaja`, `GROUP:UNISZA:UNISZA` → `LI UNISZA`.
+- `getCurrentHostelRoster` D1 staging implemented bagi Warden/Guard; frontend staging route Warden/Guard ke D1 dan Admin ke GAS kerana Admin auth belum dimigrasi. Semua pelajar aktif di hostel kecuali latest authoritative request `KELUAR`; fallback `Belum Dikonfigurasi`; projection pelajar hanya nama.
+- QA staging lulus menurut checkpoint pemilik projek: 33 aktif, 2 out now, 31 in hostel; A2 11, A3 18, Test Sahaja 0, LI UNISZA 2.
+- Milestone staging sebelumnya juga telah melengkapkan async/background D1 -> Sheets mirror, durable retry/reconciliation serta No-Guard end-to-end QA; catatan gap 21 September di bawah ialah sejarah.
+- Baki utama: Admin D1 authentication/parity, pengurangan dependency GAS secara berperingkat, reproducible D1 data/config sync dan sambungan V3 migration.
+
+### Incident deployment Worker dan rollback
+
+Worker sempat tersalah deploy ke production kerana `wrangler deploy` dijalankan tanpa `--env staging`. Production segera rollback ke versi asal `a483bda0-77db-4189-8d29-1984e2f4f758` dan kekal pada versi tersebut. Ini bukan production V3 cutover. Setakat semakan checkpoint ini, tiada bukti berlaku production data corruption; production Worker telah dipulihkan semula ke versi asal.
+
+Selepas incident ini, semua staging deployment mesti menggunakan explicit `npx wrangler deploy --env staging` dari direktori `proxy`. Tiada deployment dijalankan dalam kemas kini dokumentasi ini.
+
 ## 2026-09-21 — V3.0 Cloud Architecture / D1 -> Sheets mirror QA checkpoint
 
 - Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets; tiada production cutover ke Cloudflare. Frontend localhost menggunakan Worker `eouting-api-proxy-staging` dan D1 `eouting_staging` bagi flow V3 yang telah dimigrasikan, dengan D1 sebagai authoritative operational source.

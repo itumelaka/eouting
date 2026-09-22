@@ -1,8 +1,63 @@
 # Project Status eOuting ITU
 
-Status setakat **21 September 2026**: production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets; **V3.0 Cloud Architecture** sedang dibangunkan dalam staging. Tiada production cutover ke Cloudflare.
+Status setakat **22 September 2026**: production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets; **V3.0 Cloud Architecture** sedang dibangunkan dalam staging. Tiada production cutover ke Cloudflare.
 
-## V3.0 Cloud Architecture — 21 September 2026
+## Current Status — checkpoint 22 September 2026
+
+- **V3 masih staging** pada Worker `eouting-api-proxy-staging` dan D1 `eouting_staging`. Frontend production kekal **V2 / GAS / Google Sheets**; tiada production cutover V3.
+- Production Worker kekal pada versi asal selepas rollback: `a483bda0-77db-4189-8d29-1984e2f4f758`.
+- Staging Worker selepas hostel roster deploy: `3c5856b5-3515-4098-a578-d3fadb60344c`.
+- Branch checkpoint: `wip/eouting_v3_recovery_20260921`; commit `e30a0fb feat: add D1 hostel roster parity and dynamic student groups`.
+- Branch telah dipush dan working tree bersih pada checkpoint sebelum kemas kini dokumentasi ini. Semakan mengesahkan HEAD `e30a0fb` sepadan dengan remote-tracking branch tempatan (0 ahead / 0 behind). Perubahan dokumentasi ini belum dicommit atau dipush.
+
+### Completed — D1 staging
+
+- Dynamic student grouping menggunakan `STUDENT_GROUPS` dan `LI_INSTITUTIONS`, dengan migration `proxy/d1/002_student_group_config.sql` dan `proxy/d1/003_student_group_config_seed.sql`.
+- Konfigurasi kumpulan production yang telah dimirror ke staging: **A2, A3, LI, TEST, UNISZA**. Institution config aktif termasuk **UNISZA**; **UMK dan UPM inactive**. Dua pelajar LI UNISZA telah dimasukkan ke D1 staging.
+- `studentLoginDirectory` D1 staging kini parity dengan production dynamic directory:
+
+  | Directory key | Label |
+  |---|---|
+  | `GROUP:A2` | A2 |
+  | `GROUP:A3` | A3 |
+  | `GROUP:TEST` | Test Sahaja |
+  | `GROUP:UNISZA:UNISZA` | LI UNISZA |
+
+- `getCurrentHostelRoster` telah implemented dalam D1 staging untuk **Warden/Guard**. Frontend staging menggunakan routing mengikut role: Warden/Guard roster ke **D1**, Admin roster ke **GAS** kerana Admin authentication belum dimigrasi ke D1.
+- Semua pelajar aktif dikira berada di hostel kecuali latest authoritative request mereka berstatus `KELUAR`. Fallback group ialah `Belum Dikonfigurasi`; projection pelajar dalam roster hanya expose `nama`.
+- Async/background operational mirror selepas D1 commit, durable `MIRROR_RETRY_QUEUE` dan reconciliation berjadual setiap 5 minit telah tersedia pada staging. No-Guard Departure telah lulus QA end-to-end staging; butiran milestone sebelumnya ada dalam [README](../README.md).
+
+### QA staging terkini — lulus
+
+Keputusan checkpoint yang dibekalkan pemilik projek (bukan ujian live yang dijalankan semula semasa kemas kini dokumentasi):
+
+| Metrik | Jumlah |
+|---|---:|
+| Total active students | 33 |
+| Total out now | 2 |
+| Total in hostel | 31 |
+| In hostel — A2 | 11 |
+| In hostel — A3 | 18 |
+| In hostel — Test Sahaja | 0 |
+| In hostel — LI UNISZA | 2 |
+
+### Known Gaps / Technical Debt
+
+- Admin D1 authentication/parity belum lengkap; Admin hostel roster masih menggunakan GAS.
+- Dependency GAS masih wujud bagi flow/config yang belum dimigrasikan dan operational mirror. Parity roster Warden/Guard tidak bermaksud keseluruhan V3 sudah production-ready.
+- Migration schema/seed telah direkod, tetapi proses sync data/config D1 yang reproducible masih perlu dilengkapkan.
+- Baki V3 termasuk Guardian Contact, profile-photo storage, return-selfie serta fungsi Admin lain yang belum mencapai parity.
+
+### Next Steps
+
+- Lengkapkan Admin D1 authentication/parity.
+- Kurangkan dependency GAS secara berperingkat mengikut parity dan QA setiap flow.
+- Sediakan proses sync data/config D1 yang reproducible.
+- Sambung V3 migration, regression QA dan perancangan cutover/rollback terkawal; V3 kekal staging sehingga disahkan untuk release.
+
+Incident tersalah deploy Worker dan rollback direkodkan dalam [Changelog](CHANGELOG.md) dan [Deployment](DEPLOYMENT.md). Semua staging deployment mesti menggunakan explicit `npx wrangler deploy --env staging` dari direktori `proxy`.
+
+## V3.0 Cloud Architecture — sejarah checkpoint mirror 21 September 2026
 
 ### Operational mirror D1 -> Google Sheets
 
@@ -25,9 +80,9 @@ Git checkpoint ialah tag `v3-d1-sheets-mirror-qa`, menunjuk kepada `9dc258e`. Co
 - `2e17068 feat: mirror D1 outing requests to Sheets staging`;
 - `9dc258e fix: point staging worker to current GAS deployment`.
 
-**Known issue:** mirror ke Google Sheets masih synchronous. Jika GAS lambat atau unavailable, UI boleh mengalami latency atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown` walaupun perubahan D1 mungkin telah disimpan.
+**Known issue ketika checkpoint 21 September (telah ditangani pada staging 22 September):** mirror ke Google Sheets ketika itu masih synchronous. Jika GAS lambat atau unavailable, UI boleh mengalami latency atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown` walaupun perubahan D1 mungkin telah disimpan.
 
-**Next priority:** async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna. Pengesahan keluar tanpa Guard / remote checkout yang wujud dalam production masih perlu diteliti untuk feature parity kerana belum dipaparkan sepenuhnya dalam staging V3.
+**Keutamaan ketika checkpoint 21 September (kini selesai pada staging, termasuk No-Guard QA):** async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna. Pengesahan keluar tanpa Guard / remote checkout yang wujud dalam production masih perlu diteliti untuk feature parity kerana belum dipaparkan sepenuhnya dalam staging V3.
 
 V3 masih dalam pembangunan dan QA staging; ia **belum production-ready** dan full migration **belum selesai**. Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets, tanpa production cutover ke Cloudflare.
 
@@ -164,7 +219,7 @@ Kerja seterusnya kekal deferred dan **belum selesai**: latency Telegram synchron
 - Foundation `STUDENT_GROUPS`, `LI_INSTITUTIONS` dan `STUDENTS.institution_code`, Admin management, readiness, migration, activation dan rollback telah production verified.
 - Migration menulis 19 rekod LI dengan **0 unmatched** dan **0 conflict**. `institution_code` authoritative; prefix ID ialah migration-only.
 - Login directory dibina backend dengan projection minimum `student_id` + `nama`. Login authentication kekal `student_id` + `no_matrik`, kelas kanonik LI kekal `LI`.
-- Kumpulan production tersusun A2, A3, LI UMK dan LI UPM. Kumpulan/institusi masa hadapan diurus melalui Admin tanpa ordinary source-code change.
+- Pada close-out 22 Ogos, kumpulan production tersusun A2, A3, LI UMK dan LI UPM. Konfigurasi semasa 22 September dirujuk dalam Current Status di atas; UMK/UPM kini inactive dan UNISZA aktif. Kumpulan/institusi masa hadapan diurus melalui Admin tanpa ordinary source-code change.
 - Rollback terkawal: `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
 
 ## Active-request Application-form UX — COMPLETE / PRODUCTION VERIFIED

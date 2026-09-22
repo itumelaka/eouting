@@ -2,6 +2,16 @@
 
 Google Sheets ialah database dan source of truth eOuting ITU v2.4.0. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
+## D1 staging — dynamic student groups, 22 September 2026
+
+V3 menggunakan D1 `eouting_staging` bagi flow yang telah dimigrasikan; production frontend kekal V2/GAS/Google Sheets. Schema grouping ditambah melalui `proxy/d1/002_student_group_config.sql` dan seed config melalui `proxy/d1/003_student_group_config_seed.sql`.
+
+`STUDENT_GROUPS` dan `LI_INSTITUTIONS` menentukan grouping secara dinamik. Config production yang dimirror ke staging mengandungi A2, A3, LI, TEST dan UNISZA. Institution config aktif termasuk UNISZA (seed turut mengekalkan TESTTING); UMK dan UPM inactive. Dua pelajar LI UNISZA telah dimasukkan ke D1 staging sebagai data pelajar; migration config bukan pengganti proses sync `STUDENTS`.
+
+Directory staging parity dengan production: `GROUP:A2`, `GROUP:A3`, `GROUP:TEST` → `Test Sahaja`, `GROUP:UNISZA:UNISZA` → `LI UNISZA`. Roster Warden/Guard membaca D1; Admin roster kekal GAS sehingga Admin auth dimigrasi. Semua pelajar aktif berada di hostel kecuali latest authoritative request `KELUAR`, dengan fallback group `Belum Dikonfigurasi` dan projection pelajar hanya `nama`.
+
+QA checkpoint: 33 aktif, 2 di luar, 31 di hostel (A2 11, A3 18, Test Sahaja 0, LI UNISZA 2). Reproducible D1 data/config sync masih baki kerja. Bahagian Google Sheets di bawah menerangkan baseline V2; hasil QA penuh ada dalam [Project Status](PROJECT_STATUS.md).
+
 ## `STUDENTS`
 
 ```text

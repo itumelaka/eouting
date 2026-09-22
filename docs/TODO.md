@@ -1,8 +1,20 @@
 # TODO eOuting ITU
 
-Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 57 / cache `2.4.0-r21`** selepas rollout production verified pada 27 Ogos 2026. Frontend aktif tunggal ialah `itumelaka/eouting`; `eoutingV2` telah retired/archived. Production dan staging menggunakan Version 57, manakala isolated Version 55 ialah rollback/control. Full regression terakhir sebelum release ialah **744/744**.
+## Current Status — 22 September 2026
 
-## Active / Deferred performance work
+V3 masih staging pada Worker `eouting-api-proxy-staging` + D1 `eouting_staging`; production frontend kekal V2/GAS. Production Worker telah rollback ke versi asal. Checkpoint terkini `e30a0fb`; versi Worker, hasil QA dan keadaan Git diperincikan dalam [Project Status](PROJECT_STATUS.md).
+
+## Known Gaps / Technical Debt dan Next Steps — V3
+
+- [ ] Lengkapkan Admin D1 authentication/parity; Admin hostel roster masih GAS.
+- [ ] Kurangkan dependency GAS secara berperingkat dengan parity dan QA setiap flow.
+- [ ] Lengkapkan reproducible D1 data/config sync; migration schema/seed sedia ada belum menyelesaikan keseluruhan proses sync.
+- [ ] Sambung V3 migration, termasuk Guardian Contact, profile-photo storage, return-selfie dan fungsi Admin yang berbaki.
+- [ ] Selesaikan regression serta rancangan cutover/rollback sebelum release V3; belum production-ready.
+
+Baseline production 27 Ogos 2026 ialah v2.4.0 / GAS Version 57 / cache `2.4.0-r21`, dengan full regression 744/744. Rekod Version 57 staging dan isolated Version 55 di bawah merujuk milestone GAS ketika itu, bukan versi Worker staging terkini.
+
+## Active / Deferred performance work — baseline GAS/V2
 
 - [ ] Kurangkan latency write path daripada panggilan Telegram synchronous tanpa mengubah delivery/lifecycle semantics; asynchronous outbox belum diimplementasi.
 - [ ] Semak semula timeout/retry GET supaya transient failure kekal resilient tanpa menguatkan latency berulang.
@@ -12,6 +24,15 @@ Senarai kerja semasa bagi repo **v2.4.0 / GAS Version 57 / cache `2.4.0-r21`** s
 - [ ] Tambah resilience POST berstruktur kemudian: Announcement Banner authenticated POST belum mempunyai timeout setara GET dan failure kini menyembunyikan banner secara senyap.
 
 ## Done / Completed
+
+### V3 D1 staging — 22 September 2026
+
+- [x] Dynamic `STUDENT_GROUPS` / `LI_INSTITUTIONS` dengan migration `002_student_group_config.sql` dan `003_student_group_config_seed.sql` dalam `proxy/d1`.
+- [x] Mirror config production A2, A3, LI, TEST, UNISZA; UNISZA aktif, UMK/UPM inactive; dua pelajar LI UNISZA dimasukkan ke staging.
+- [x] Parity `studentLoginDirectory`: A2, A3, Test Sahaja dan LI UNISZA.
+- [x] D1 `getCurrentHostelRoster` Warden/Guard dan routing mengikut role; Admin roster kekal GAS.
+- [x] QA roster staging: 33 aktif, 2 di luar, 31 di hostel (A2 11, A3 18, Test Sahaja 0, LI UNISZA 2); latest authoritative `KELUAR` sahaja dikecualikan, fallback `Belum Dikonfigurasi`, projection nama sahaja.
+- [x] Async operational mirror, durable retry/reconciliation dan No-Guard end-to-end staging QA pada milestone sebelumnya.
 
 ### Production Version 57 close-out — 27 Ogos 2026
 

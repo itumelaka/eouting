@@ -1,6 +1,20 @@
 # Deployment eOuting ITU
 
-Versi aplikasi production semasa: **v2.4.0**, cache/asset `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21` dan GAS **Version 57**. Full regression terakhir sebelum release ialah **744/744**.
+Baseline release production pada close-out 27 Ogos 2026: **v2.4.0**, cache/asset `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21` dan GAS **Version 57**. Full regression terakhir sebelum release ialah **744/744**.
+
+## Current Status — Worker staging dan rollback 22 September 2026
+
+V3 masih **staging**, production frontend masih **V2/GAS**. D1 staging ialah `eouting_staging`. Checkpoint `e30a0fb` pada branch `wip/eouting_v3_recovery_20260921` telah melengkapkan dynamic groups dan hostel roster D1 bagi Warden/Guard; Admin auth/roster kekal GAS. Staging Worker selepas deploy roster: `3c5856b5-3515-4098-a578-d3fadb60344c`.
+
+Worker sempat tersalah deploy ke production melalui `wrangler deploy` tanpa `--env staging`. Production segera rollback dan kekal pada versi asal `a483bda0-77db-4189-8d29-1984e2f4f758`. Ini bukan production V3 cutover. Setakat semakan checkpoint ini, tiada bukti berlaku production data corruption; production Worker telah dipulihkan semula ke versi asal.
+
+Semua staging deployment selepas incident mesti menggunakan environment explicit. Dari direktori `proxy`:
+
+```sh
+npx wrangler deploy --env staging
+```
+
+Jangan gunakan bare `wrangler deploy` bagi tujuan staging. Migration berkaitan ialah `proxy/d1/002_student_group_config.sql` dan `proxy/d1/003_student_group_config_seed.sql`; deployment Worker dan sync data/config D1 ialah langkah berasingan. Butiran QA serta baki kerja ada dalam [Project Status](PROJECT_STATUS.md). Kemas kini dokumentasi ini tidak menjalankan deploy atau migration.
 
 ## Production Version 57 — verified 27 Ogos 2026
 
