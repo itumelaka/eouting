@@ -13,7 +13,11 @@ function runtime(fetchImpl, options = {}) {
   const calls = [], logs = [];
   const context = vm.createContext({
     URL, Headers, Response, TextDecoder, Uint8Array, AbortController,
-    crypto: webcrypto, console: { info: (value) => logs.push(value) },
+    crypto: webcrypto,
+console: {
+  info: (value) => logs.push(value),
+  error: (value) => logs.push(value)
+},
     setTimeout: options.setTimeout || setTimeout,
     clearTimeout: options.clearTimeout || clearTimeout,
     fetch: async (url, init) => {
@@ -27,7 +31,12 @@ function runtime(fetchImpl, options = {}) {
   );
   return {
     calls, logs,
-    run: (request, env = {}) => context.handle(request, { GAS_UPSTREAM_URL: upstream, ...env })
+    run: (request, env = {}, executionContext) =>
+  context.handle(
+    request,
+    { GAS_UPSTREAM_URL: upstream, ...env },
+    executionContext
+  )
   };
 }
 function req(method = "GET", options = {}) {
@@ -322,4 +331,127 @@ test("production has no retry; validation reports zero upstream attempts",async(
     assert.equal((await rt.run(request,staging)).headers.get("X-Upstream-Attempts"),"0");
   }
   assert.equal(rt.calls.length,1);
+});
+
+test("staging D1 submit returns before Sheets mirror finishes via waitUntil", async () => {
+  const pendingTasks = [];
+
+  const statement = (sql) => ({
+    bind(...values) {
+      this.values = values;
+      return this;
+    },
+    async first() {
+      if (sql.includes("FROM STUDENTS")) {
+        return {
+          student_id: "STU-001",
+          no_matrik: "M001",
+          nama: "Nama Test",
+          email: "test@example.test",
+          kelas: "TEST",
+          status: "Aktif"
+        };
+      }
+
+      if (sql.includes("FROM OUTING_TYPES")) {
+        return {
+          type_code: "OUTING_BIASA",
+          display_name: "Outing Biasa",
+          description: "",
+          active: 1,
+          sort_order: 1,
+          allowed_days: "SELASA",
+          application_open_time: "",
+          application_close_time: "",
+          fixed_return_time: "22:00",
+          same_day_only: 1,
+          require_leave_date: 0,
+          require_return_date: 0,
+          require_return_time: 0,
+          require_guardian_phone: 0,
+          require_guardian_relation: 0,
+          require_emergency_reason: 0,
+          require_purpose: 1,
+          require_location: 1,
+          require_vehicle: 1,
+          require_warden_approval: 1,
+          require_selfie: 0,
+          config_version: 1,
+          departure_allowed_days: "",
+          earliest_departure_time: "",
+          application_open_date: "",
+          application_close_date: ""
+        };
+      }
+
+      if (sql.includes("SELECT request_id FROM OUTING_REQUESTS")) {
+        return null;
+      }
+
+      return null;
+    },
+    async run() {
+      return { success: true };
+    }
+  });
+
+  const DB = {
+    prepare(sql) {
+      return statement(sql);
+    },
+    async batch() {
+      return [{ success: true }, { success: true }];
+    }
+  };
+
+  const rt = runtime(
+  (_url, init) => new Promise((_, reject) => {
+    init.signal.addEventListener("abort", () => reject(new Error("aborted")));
+  }),
+  {
+    setTimeout: (fn, ms) => {
+      if (ms === 20000) {
+        queueMicrotask(fn);
+        return 1;
+      }
+      return setTimeout(fn, ms);
+    },
+    clearTimeout: () => {}
+  }
+);
+
+  const executionContext = {
+    waitUntil(promise) {
+      pendingTasks.push(promise);
+    }
+  };
+
+  const response = await rt.run(
+    req("POST", {
+      url: "https://proxy.test/api/d1/submitRequest",
+      body: JSON.stringify({
+        action: "submitRequest",
+        student_id: "STU-001",
+        no_matrik: "M001",
+        jenis_permohonan: "OUTING_BIASA",
+        tujuan: "Test async mirror",
+        lokasi: "ITU",
+        jenis_kenderaan: "Jalan kaki"
+      })
+    }),
+    {
+      ...staging,
+      DB,
+      D1_MIRROR_SECRET: "TEST_SECRET",
+      TELEGRAM_ENABLED: "0"
+    },
+    executionContext
+  );
+
+  assert.equal(response.status, 201);
+  assert.equal(pendingTasks.length, 1);
+
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.data.status, "MENUNGGU_KELULUSAN");
 });

@@ -166,19 +166,23 @@ export async function handleStudentCancellation(request, env, headers, options =
   } catch { /* Persistence already succeeded; do not make the client replay the mutation. */ }
 
   await sendCancellationTelegram(updated, previousStatus, env, options.fetchImpl || fetch);
-  try {
-  await mirrorOutingRequestToSheets(
-    env,
-    updated,
-    options.fetchImpl || fetch
-  );
-} catch (mirrorError) {
+  const mirrorTask = mirrorOutingRequestToSheets(
+  env,
+  updated,
+  options.fetchImpl || fetch
+).catch((mirrorError) => {
   console.error(JSON.stringify({
     action: "cancelStudentRequest",
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+});
+
+if (options.context && typeof options.context.waitUntil === "function") {
+  options.context.waitUntil(mirrorTask);
+} else {
+  await mirrorTask;
 }
   return new Response(JSON.stringify({ ok: true, data: updated }), { status: 200, headers });
 }

@@ -40,7 +40,7 @@ export default {
       if (!allowedOrigin) {
         throw Object.assign(new Error("Origin not allowed"), { status: 403, code: "ORIGIN_NOT_ALLOWED" });
       }
-      const response = await handleStudentCancellation(request, env, headers);
+      const response = await handleStudentCancellation(request, env, headers, { context });
       status = response.status;
       return response;
     } catch (error) {

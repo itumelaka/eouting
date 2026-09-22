@@ -125,23 +125,23 @@ async function handleWardenDecision(request, env, headers, action, options = {})
       approve ? 'APPROVE_REQUEST' : 'REJECT_REQUEST', requestId, approve && role === 'HEP' ? 'HEP' : 'Warden',
       staff.nama, JSON.stringify(details), '', '').run();
   } catch { /* Best effort after successful persistence, matching GAS. */ }
-let mirrorWarning = "";
-
-try {
-  await mirrorOutingRequestToSheets(
-    env,
-    updated,
-    options.fetchImpl || fetch
-  );
-} catch (mirrorError) {
-  mirrorWarning = "OUTING_REQUEST_SHEETS_MIRROR_FAILED";
-
+const mirrorTask = mirrorOutingRequestToSheets(
+  env,
+  updated,
+  options.fetchImpl || fetch
+).catch((mirrorError) => {
   console.error(JSON.stringify({
     action: action,
     request_id: requestId,
-    event: mirrorWarning,
+    event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+});
+
+if (options.context && typeof options.context.waitUntil === "function") {
+  options.context.waitUntil(mirrorTask);
+} else {
+  await mirrorTask;
 }
 
 await decisionTelegram(updated, action, env, options.fetchImpl || fetch);
@@ -150,10 +150,6 @@ const responseData = {
   ok: true,
   data: updated
 };
-
-if (mirrorWarning) {
-  responseData.warning = mirrorWarning;
-}
 
 return new Response(JSON.stringify(responseData), {
   status: 200,
@@ -792,32 +788,29 @@ async function handleSubmitRequest(request, env, headers, dependencies = {}) {
 
   await sendTelegram(env, record, config.display_name, dependencies.fetchImpl || fetch);
 
-let mirrorWarning = "";
-try {
-  await mirrorOutingRequestToSheets(
-    env,
-    record,
-    dependencies.fetchImpl || fetch
-  );
-} catch (mirrorError) {
-  mirrorWarning = "OUTING_REQUEST_SHEETS_MIRROR_FAILED";
-
+const mirrorTask = mirrorOutingRequestToSheets(
+  env,
+  record,
+  dependencies.fetchImpl || fetch
+).catch((mirrorError) => {
   console.error(JSON.stringify({
     action: "submitRequest",
     request_id: requestId,
-    event: mirrorWarning,
+    event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+});
+
+if (dependencies.context && typeof dependencies.context.waitUntil === "function") {
+  dependencies.context.waitUntil(mirrorTask);
+} else {
+  await mirrorTask;
 }
 
 const responseData = {
   ok: true,
   data: record
 };
-
-if (mirrorWarning) {
-  responseData.warning = mirrorWarning;
-}
 
 return new Response(JSON.stringify(responseData), {
   status: 201,
@@ -920,7 +913,7 @@ return { handleSubmitRequest, mirrorOutingTypeToD1 };
 
 })();
 
-async function handleRequest(request, env = {}) {
+async function handleRequest(request, env = {}, context = {}) {
   const started = Date.now();
   const requestId = crypto.randomUUID();
   const origin = request.headers.get("Origin");
@@ -1117,7 +1110,7 @@ if (url.pathname === "/api/d1/loginStudent") {
 }
 
 if (url.pathname === "/api/d1/submitRequest" || url.pathname === "/api/d1/submitOutingRequest") {
-  return await stagingSubmitRequestV230.handleSubmitRequest(request, env, headers);
+  return await stagingSubmitRequestV230.handleSubmitRequest(request, env, headers, { context });
 }
 
 if (url.pathname === "/api/d1/wardenPendingRequests") {
@@ -1175,7 +1168,13 @@ if (url.pathname === "/api/d1/wardenPendingRequests") {
 }
 
 if (url.pathname === "/api/d1/approveRequest" || url.pathname === "/api/d1/rejectRequest") {
-  return await stagingWardenDecisions.handleWardenDecision(request, env, headers, url.pathname.endsWith("/approveRequest") ? "approveRequest" : "rejectRequest");
+  return await stagingWardenDecisions.handleWardenDecision(
+  request,
+  env,
+  headers,
+  url.pathname.endsWith("/approveRequest") ? "approveRequest" : "rejectRequest",
+  { context }
+);
 }
 
 if (url.pathname === "/api/d1/loginWarden") {
@@ -2287,15 +2286,23 @@ const guard = await env.DB.prepare(
     }
   }
 
-try {
-  await mirrorOutingRequestToSheets(env, updatedRecord, fetch);
-} catch (mirrorError) {
+const mirrorTask = mirrorOutingRequestToSheets(
+  env,
+  updatedRecord,
+  fetch
+).catch((mirrorError) => {
   console.error(JSON.stringify({
     action: "confirmOut",
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+});
+
+if (context && typeof context.waitUntil === "function") {
+  context.waitUntil(mirrorTask);
+} else {
+  await mirrorTask;
 }
 
   return new Response(JSON.stringify({
@@ -2686,15 +2693,23 @@ if (
   }
 }
 
-try {
-  await mirrorOutingRequestToSheets(env, updatedRecord, fetch);
-} catch (mirrorError) {
+const mirrorTask = mirrorOutingRequestToSheets(
+  env,
+  updatedRecord,
+  fetch
+).catch((mirrorError) => {
   console.error(JSON.stringify({
     action: "confirmIn",
     request_id: requestId,
     event: "OUTING_REQUEST_SHEETS_MIRROR_FAILED",
     error: String(mirrorError && mirrorError.message || mirrorError)
   }));
+});
+
+if (context && typeof context.waitUntil === "function") {
+  context.waitUntil(mirrorTask);
+} else {
+  await mirrorTask;
 }
 
   return new Response(JSON.stringify({
