@@ -1096,6 +1096,251 @@ return { handleSubmitRequest, mirrorOutingTypeToD1 };
 
 })();
 
+async function handleD1DepartureConfirmationRequest(request, env, headers, options = {}) {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  let payload;
+
+  try {
+    payload = await request.json();
+  } catch {
+    throw fault(400, "INVALID_REQUEST", "Invalid JSON request");
+  }
+
+  const requestId = String(payload?.request_id || "").trim();
+  const studentId = String(payload?.student_id || payload?.id || "").trim();
+  const noMatrik = String(payload?.no_matrik || payload?.matric || "").trim();
+
+  if (!requestId || !studentId || !noMatrik) {
+    throw fault(
+      400,
+      "INVALID_REQUEST",
+      "request_id, student_id dan no_matrik diperlukan."
+    );
+  }
+
+  const featureEnabled =
+    String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim() === "true";
+
+  if (!featureEnabled) {
+    throw fault(
+      403,
+      "NO_GUARD_DEPARTURE_DISABLED",
+      "Fallback pengesahan keluar tanpa Guard dinyahaktifkan oleh Admin."
+    );
+  }
+
+  const students = await env.DB.prepare(
+    `SELECT student_id, no_matrik, nama, status
+     FROM STUDENTS
+     WHERE student_id = ? COLLATE NOCASE
+     LIMIT 1`
+  ).bind(studentId).all();
+
+  const student = (students.results || []).find((row) =>
+    String(row.student_id || "").trim().toLowerCase() === studentId.toLowerCase() &&
+    String(row.no_matrik || "").trim().toLowerCase() === noMatrik.toLowerCase() &&
+    String(row.status || "").trim().toLowerCase() === "aktif"
+  );
+
+  if (!student) {
+    throw fault(
+      401,
+      "STUDENT_SESSION_INVALID",
+      "Akses sesi pelajar tidak sah."
+    );
+  }
+
+  const record = await env.DB.prepare(
+    `SELECT *
+     FROM OUTING_REQUESTS
+     WHERE request_id = ?
+     LIMIT 1`
+  ).bind(requestId).first();
+
+  if (!record) {
+    throw fault(
+      404,
+      "REQUEST_NOT_FOUND",
+      "Permohonan tidak dijumpai."
+    );
+  }
+
+  const ownsRequest =
+    String(record.student_id || "").trim().toLowerCase() ===
+      String(student.student_id || "").trim().toLowerCase() &&
+    String(record.no_matrik || "").trim().toLowerCase() ===
+      String(student.no_matrik || "").trim().toLowerCase();
+
+  if (!ownsRequest) {
+    throw fault(
+      403,
+      "REQUEST_NOT_OWNED",
+      "Anda tidak dibenarkan memohon pengesahan untuk pelajar lain."
+    );
+  }
+
+  if (String(record.status || "").trim() !== "DILULUSKAN_WARDEN") {
+    throw fault(
+      409,
+      "INVALID_REQUEST_STATUS",
+      "Hanya permohonan yang telah diluluskan Warden boleh memohon pengesahan keluar."
+    );
+  }
+
+  const auditRows = await env.DB.prepare(
+    `SELECT timestamp, action
+     FROM AUDIT_LOG
+     WHERE request_id = ?
+       AND action IN (
+         'DEPARTURE_CONFIRMATION_REQUESTED',
+         'WARDEN_REMOTE_CHECKOUT'
+       )
+     ORDER BY timestamp ASC`
+  ).bind(requestId).all();
+
+  const auditState = {
+    requested: false,
+    requested_at: "",
+    completed: false
+  };
+
+  for (const audit of auditRows.results || []) {
+    if (
+      audit.action === "DEPARTURE_CONFIRMATION_REQUESTED" &&
+      !auditState.requested
+    ) {
+      auditState.requested = true;
+      auditState.requested_at = audit.timestamp || "";
+    }
+
+    if (audit.action === "WARDEN_REMOTE_CHECKOUT") {
+      auditState.completed = true;
+    }
+  }
+
+  if (auditState.completed) {
+    throw fault(
+      409,
+      "DEPARTURE_CONFIRMATION_COMPLETED",
+      "Pengesahan keluar Warden telah selesai."
+    );
+  }
+
+  let inserted = false;
+
+  if (!auditState.requested) {
+    const requestedAt = mirrorRetryTimestamp(
+      (options.now || (() => new Date()))()
+    );
+
+    const details = JSON.stringify({
+      student_name: student.nama || "",
+      no_matrik: student.no_matrik || "",
+      jenis_permohonan: record.jenis_permohonan || "",
+      mode: "REMOTE_NO_GUARD"
+    });
+
+    const insertResult = await env.DB.prepare(
+      `INSERT INTO AUDIT_LOG (
+        timestamp,
+        action,
+        request_id,
+        user_role,
+        user_name,
+        details,
+        entity_type,
+        entity_id
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM AUDIT_LOG
+        WHERE request_id = ?
+          AND action IN (
+            'DEPARTURE_CONFIRMATION_REQUESTED',
+            'WARDEN_REMOTE_CHECKOUT'
+          )
+      )`
+    ).bind(
+      requestedAt,
+      "DEPARTURE_CONFIRMATION_REQUESTED",
+      requestId,
+      "Student",
+      student.nama || "",
+      details,
+      "OUTING_REQUEST",
+      requestId,
+      requestId
+    ).run();
+
+    inserted = Number(insertResult.meta?.changes || 0) === 1;
+
+    if (inserted) {
+      auditState.requested = true;
+      auditState.requested_at = requestedAt;
+    } else {
+      const latestAudit = await env.DB.prepare(
+        `SELECT timestamp, action
+         FROM AUDIT_LOG
+         WHERE request_id = ?
+           AND action IN (
+             'DEPARTURE_CONFIRMATION_REQUESTED',
+             'WARDEN_REMOTE_CHECKOUT'
+           )
+         ORDER BY timestamp ASC`
+      ).bind(requestId).all();
+
+      auditState.requested = false;
+      auditState.requested_at = "";
+      auditState.completed = false;
+
+      for (const audit of latestAudit.results || []) {
+        if (
+          audit.action === "DEPARTURE_CONFIRMATION_REQUESTED" &&
+          !auditState.requested
+        ) {
+          auditState.requested = true;
+          auditState.requested_at = audit.timestamp || "";
+        }
+
+        if (audit.action === "WARDEN_REMOTE_CHECKOUT") {
+          auditState.completed = true;
+        }
+      }
+
+      if (auditState.completed) {
+        throw fault(
+          409,
+          "DEPARTURE_CONFIRMATION_COMPLETED",
+          "Pengesahan keluar Warden telah selesai."
+        );
+      }
+    }
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      ...record,
+      departure_confirmation_pending: true,
+      departure_confirmation_requested_at: auditState.requested_at,
+      no_guard_departure_enabled: true,
+      departure_confirmation_created: inserted
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
 async function handleRequest(request, env = {}, context = {}) {
   const started = Date.now();
   const requestId = crypto.randomUUID();
@@ -1296,6 +1541,14 @@ if (url.pathname === "/api/d1/submitRequest" || url.pathname === "/api/d1/submit
   return await stagingSubmitRequestV230.handleSubmitRequest(request, env, headers, { context });
 }
 
+if (url.pathname === "/api/d1/requestDepartureConfirmation") {
+  return await handleD1DepartureConfirmationRequest(
+    request,
+    env,
+    headers,
+    { context }
+  );
+}
 if (url.pathname === "/api/d1/wardenPendingRequests") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -1994,7 +2247,7 @@ if (url.pathname === "/api/d1/getTodayRecords") {
           ? auditState.requested_at
           : "";
 
-      projected.no_guard_departure_enabled = false;
+      projected.no_guard_departure_enabled = String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim() === "true";
     }
 
     if (role === "warden") {

@@ -20,6 +20,7 @@ const D1_POST_ENDPOINTS = {
   confirmOut: "confirmOut",
   confirmIn: "confirmIn",
   submitRequest: "submitRequest",
+  requestDepartureConfirmation: "requestDepartureConfirmation",
   approveRequest: "approveRequest",
   rejectRequest: "rejectRequest",
   cancelStudentRequest: "cancelStudentRequest"

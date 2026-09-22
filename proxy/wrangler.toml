@@ -22,6 +22,7 @@ name = "eouting-api-proxy-staging"
 GAS_UPSTREAM_URL = "https://script.google.com/macros/s/AKfycbzPkL1HvQG0XnEyjwfXdtZ05luKIsrkKKjmvO9miH5TLS3NwWywxRIYNZqnPBNkH7LGDg/exec"
 STAGING_ORIGIN = "http://localhost:8000"
 TELEGRAM_ENABLED = "1"
+NO_GUARD_DEPARTURE_ENABLED = "true"
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "eouting_staging"
