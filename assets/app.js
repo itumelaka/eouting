@@ -6957,10 +6957,17 @@ function studentStatusInfo(record) {
   }
 
   if (status === "DILULUSKAN_WARDEN") {
+    const noGuardEnabled = isNoGuardDepartureEnabledForRecord(record);
+    const departurePending = record.departure_confirmation_pending === true;
+
     return {
       badge: approvalStatusLabel(record),
       badgeClass: "badge-approved",
-      message: "Anda sudah dibenarkan keluar. Sila lapor kepada Guard untuk pengesahan keluar."
+      message: departurePending
+        ? "Permohonan pengesahan keluar tanpa Guard sedang menunggu tindakan Warden."
+        : noGuardEnabled
+          ? "Anda sudah dibenarkan keluar. Sila lapor kepada Guard untuk pengesahan keluar. Jika Guard tiada, gunakan Mohon Pengesahan Keluar untuk pengesahan Warden."
+          : "Anda sudah dibenarkan keluar. Sila lapor kepada Guard untuk pengesahan keluar."
     };
   }
 
