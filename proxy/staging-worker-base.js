@@ -1833,40 +1833,88 @@ async function handleRequest(request, env = {}, context = {}) {
 }
 
 if (url.pathname === "/api/d1/studentLoginDirectory") {
-  const result = await env.DB.prepare(
-    `SELECT student_id, nama, kelas
-     FROM STUDENTS
-     WHERE status = 'Aktif'
-     ORDER BY kelas, nama`
-  ).all();
+  const [groupResult, institutionResult, studentResult] = await Promise.all([
+    env.DB.prepare(
+      `SELECT group_code, display_name, institution_required
+       FROM STUDENT_GROUPS
+       WHERE active = 1
+       ORDER BY sort_order, group_code`
+    ).all(),
+    env.DB.prepare(
+      `SELECT institution_code, display_name
+       FROM LI_INSTITUTIONS
+       WHERE active = 1
+       ORDER BY sort_order, institution_code`
+    ).all(),
+    env.DB.prepare(
+      `SELECT student_id, nama, kelas, institution_code
+       FROM STUDENTS
+       WHERE status = 'Aktif'`
+    ).all()
+  ]);
 
-  const rows = result.results || [];
-  const groupMap = new Map();
+  const groupRows = groupResult.results || [];
+  const institutionRows = institutionResult.results || [];
+  const students = studentResult.results || [];
+  const groups = [];
 
-  for (const row of rows) {
-    const key = String(row.kelas || "").trim();
-    if (!key) continue;
+  const sortStudents = (items) => items
+    .filter((student) => student.student_id && student.nama)
+    .sort((left, right) => {
+      const nameDifference = String(left.nama).localeCompare(String(right.nama));
+      return nameDifference !== 0
+        ? nameDifference
+        : String(left.student_id).localeCompare(String(right.student_id));
+    })
+    .map((student) => ({
+      student_id: String(student.student_id || "").trim(),
+      nama: String(student.nama || "").trim()
+    }));
 
-    if (!groupMap.has(key)) {
-      groupMap.set(key, {
-        key,
-        label: key,
-        students: []
-      });
+  for (const group of groupRows) {
+    const groupCode = String(group.group_code || "").trim().toUpperCase();
+    const groupStudents = students.filter(
+      (student) => String(student.kelas || "").trim().toUpperCase() === groupCode
+    );
+
+    if (Number(group.institution_required || 0) !== 1) {
+      if (groupStudents.length) {
+        groups.push({
+          key: `GROUP:${groupCode}`,
+          label: String(group.display_name || "").trim(),
+          students: sortStudents(groupStudents)
+        });
+      }
+      continue;
     }
 
-    groupMap.get(key).students.push({
-      student_id: row.student_id,
-      nama: row.nama
-    });
+    for (const institution of institutionRows) {
+      const institutionCode = String(institution.institution_code || "")
+        .trim()
+        .toUpperCase();
+
+      const institutionStudents = groupStudents.filter(
+        (student) =>
+          String(student.institution_code || "").trim().toUpperCase() === institutionCode
+      );
+
+      if (!institutionStudents.length) continue;
+
+      groups.push({
+        key: `GROUP:${groupCode}:${institutionCode}`,
+        label: `${String(group.display_name || "").trim()} ${String(
+          institution.display_name || ""
+        ).trim()}`.trim(),
+        students: sortStudents(institutionStudents)
+      });
+    }
   }
 
   return new Response(JSON.stringify({
     ok: true,
     data: {
       mode: "dynamic",
-      groups: Array.from(groupMap.values()),
-      fallback: false
+      groups
     }
   }), {
     status: 200,
@@ -2739,6 +2787,312 @@ if (url.pathname === "/api/d1/getTodayRecords") {
   });
 }
 
+if (url.pathname === "/api/d1/getCurrentHostelRoster") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const role = String(payload.role || "").trim().toLowerCase();
+
+  if (role === "warden") {
+    const name = String(
+      payload.nama_warden ||
+      payload.warden_name ||
+      payload.name ||
+      ""
+    ).trim();
+
+    const pin = String(payload.pin || "").trim();
+
+    const warden = await env.DB.prepare(
+      `SELECT warden_id
+       FROM WARDENS
+       WHERE nama = ?
+         AND pin = ?
+         AND status = 'Aktif'
+       LIMIT 1`
+    ).bind(name, pin).first();
+
+    if (!warden) {
+      throw fault(401, "WARDEN_SESSION_INVALID", "Akses sesi warden tidak sah");
+    }
+  } else if (role === "guard") {
+    const name = String(
+      payload.nama_guard ||
+      payload.guard_name ||
+      payload.name ||
+      ""
+    ).trim();
+
+    const pin = String(payload.pin || "").trim();
+
+    const guard = await env.DB.prepare(
+      `SELECT guard_id
+       FROM GUARDS
+       WHERE nama = ?
+         AND pin = ?
+         AND status = 'Aktif'
+       LIMIT 1`
+    ).bind(name, pin).first();
+
+    if (!guard) {
+      throw fault(401, "GUARD_SESSION_INVALID", "Akses sesi guard tidak sah");
+    }
+  } else {
+    throw fault(401, "SESSION_REQUIRED", "Akses staff diperlukan");
+  }
+
+  const [
+    studentResult,
+    requestResult,
+    groupResult,
+    institutionResult
+  ] = await Promise.all([
+    env.DB.prepare(
+      `SELECT student_id, no_matrik, nama, kelas, institution_code
+       FROM STUDENTS
+       WHERE status = 'Aktif'`
+    ).all(),
+
+    env.DB.prepare(
+      `SELECT rowid AS source_rowid,
+              student_id,
+              no_matrik,
+              masa_mohon,
+              status
+       FROM OUTING_REQUESTS`
+    ).all(),
+
+    env.DB.prepare(
+      `SELECT group_code, display_name, institution_required
+       FROM STUDENT_GROUPS
+       WHERE active = 1
+       ORDER BY sort_order, group_code`
+    ).all(),
+
+    env.DB.prepare(
+      `SELECT institution_code, display_name
+       FROM LI_INSTITUTIONS
+       WHERE active = 1
+       ORDER BY sort_order, institution_code`
+    ).all()
+  ]);
+
+  const students = studentResult.results || [];
+  const requests = requestResult.results || [];
+  const groupRows = groupResult.results || [];
+  const institutionRows = institutionResult.results || [];
+
+  const normalize = (value) => String(value || "").trim();
+
+  const identityKey = (studentId, noMatrik) => {
+    const sid = normalize(studentId);
+    const matric = normalize(noMatrik);
+
+    if (sid && matric) {
+      return `BOTH:${JSON.stringify([sid, matric])}`;
+    }
+
+    if (sid) return `STUDENT:${sid}`;
+    if (matric) return `MATRIC:${matric}`;
+
+    return "";
+  };
+
+  const requestCandidateIsLater = (candidate, selected) => {
+    if (!selected) return true;
+
+    const candidateTime = normalize(candidate.masa_mohon);
+    const selectedTime = normalize(selected.masa_mohon);
+
+    if (candidateTime > selectedTime) return true;
+    if (candidateTime < selectedTime) return false;
+
+    return Number(candidate.source_rowid || 0) >=
+      Number(selected.source_rowid || 0);
+  };
+
+  const latestRequestByIdentity = new Map();
+
+  for (const row of requests) {
+    const key = identityKey(row.student_id, row.no_matrik);
+    if (!key) continue;
+
+    const selected = latestRequestByIdentity.get(key);
+
+    if (requestCandidateIsLater(row, selected)) {
+      latestRequestByIdentity.set(key, row);
+    }
+  }
+
+  const selectCurrentRequest = (student) => {
+    const studentId = normalize(student.student_id);
+    const noMatrik = normalize(student.no_matrik);
+
+    const keys = [
+      identityKey(studentId, noMatrik),
+      identityKey(studentId, ""),
+      identityKey("", noMatrik)
+    ];
+
+    let selected = null;
+
+    for (const key of keys) {
+      if (!key) continue;
+
+      const candidate = latestRequestByIdentity.get(key);
+
+      if (candidate && requestCandidateIsLater(candidate, selected)) {
+        selected = candidate;
+      }
+    }
+
+    return selected;
+  };
+
+  const configuredGroups = [];
+  const groupByStudentId = new Map();
+
+  for (const group of groupRows) {
+    const groupCode = normalize(group.group_code).toUpperCase();
+
+    const groupStudents = students.filter(
+      (student) =>
+        normalize(student.kelas).toUpperCase() === groupCode
+    );
+
+    if (Number(group.institution_required || 0) !== 1) {
+      if (!groupStudents.length) continue;
+
+      configuredGroups.push({
+        label: normalize(group.display_name) || "Kumpulan Pelajar",
+        students: groupStudents
+      });
+
+      continue;
+    }
+
+    for (const institution of institutionRows) {
+      const institutionCode =
+        normalize(institution.institution_code).toUpperCase();
+
+      const institutionStudents = groupStudents.filter(
+        (student) =>
+          normalize(student.institution_code).toUpperCase() ===
+          institutionCode
+      );
+
+      if (!institutionStudents.length) continue;
+
+      configuredGroups.push({
+        label: `${normalize(group.display_name)} ${normalize(
+          institution.display_name
+        )}`.trim() || "Kumpulan Pelajar",
+        students: institutionStudents
+      });
+    }
+  }
+
+  const groups = configuredGroups.map((group, index) => {
+    const projected = {
+      key: `resident-group-${index + 1}`,
+      label: group.label,
+      count: 0,
+      students: []
+    };
+
+    for (const student of group.students) {
+      const studentId = normalize(student.student_id);
+      if (studentId) {
+        groupByStudentId.set(studentId, projected);
+      }
+    }
+
+    return projected;
+  });
+
+  let fallbackGroup = null;
+  let totalOutNow = 0;
+
+  for (const student of students) {
+    const currentRequest = selectCurrentRequest(student);
+
+    const currentlyOut =
+      normalize(currentRequest && currentRequest.status).toUpperCase() ===
+      "KELUAR";
+
+    if (currentlyOut) {
+      totalOutNow += 1;
+      continue;
+    }
+
+    let group = groupByStudentId.get(normalize(student.student_id));
+
+    if (!group) {
+      if (!fallbackGroup) {
+        fallbackGroup = {
+          key: "resident-group-unconfigured",
+          label: "Belum Dikonfigurasi",
+          count: 0,
+          students: []
+        };
+
+        groups.push(fallbackGroup);
+      }
+
+      group = fallbackGroup;
+    }
+
+    group.count += 1;
+    group.students.push({
+      nama: normalize(student.nama) || "Pelajar"
+    });
+  }
+
+  for (const group of groups) {
+    group.students.sort((left, right) =>
+      left.nama.localeCompare(right.nama, "ms", {
+        sensitivity: "base"
+      })
+    );
+  }
+
+  const generatedAt = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).format(new Date()).replace(" ", "T") + "+08:00";
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      generated_at: generatedAt,
+      total: students.length - totalOutNow,
+      total_active_students: students.length,
+      total_out_now: totalOutNow,
+      groups
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
 if (url.pathname === "/api/d1/confirmOut") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");

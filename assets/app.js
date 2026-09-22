@@ -16,6 +16,7 @@ const D1_POST_ENDPOINTS = {
   loginWarden: "loginWarden",
   loginGuard: "loginGuard",
   getTodayRecords: "getTodayRecords",
+  getCurrentHostelRoster: "getCurrentHostelRoster",
   getStudentAnnualSummary: "getStudentAnnualSummary",
   confirmOut: "confirmOut",
   confirmIn: "confirmIn",
@@ -4329,7 +4330,13 @@ async function apiPost(action, payload) {
   }
 
   const requestPayload = { action, ...payload };
-  const d1Endpoint = USE_D1_STAGING_V300 ? D1_POST_ENDPOINTS[action] : null;
+  const useGasForAdminHostelRoster =
+    action === "getCurrentHostelRoster" &&
+    String(payload?.role || "").trim().toLowerCase() === "admin";
+  const d1Endpoint =
+    USE_D1_STAGING_V300 && !useGasForAdminHostelRoster
+      ? D1_POST_ENDPOINTS[action]
+      : null;
   const postUrl = d1Endpoint
     ? `${D1_API_BASE_URL}/${d1Endpoint}`
     : getGasWebAppUrlV200();
