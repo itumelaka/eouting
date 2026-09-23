@@ -14,7 +14,7 @@ Versi production semasa: **v2.4.0 — operational, insiden delivery intermittent
 
 ## Status Production v2.4.0
 
-> **Status 22 September 2026:** production masih kekal GitHub Pages + Google Apps Script + Google Sheets dan belum dipindahkan ke Cloudflare. Migration Cloudflare sedang dibangunkan dan diuji secara berasingan menggunakan Worker staging `eouting-api-proxy-staging` dan D1 `eouting_staging`. Worker/D1 belum menjadi dependency production dan frontend production belum ditukar.
+> **Status 23 September 2026:** production masih kekal GitHub Pages + Google Apps Script + Google Sheets dan belum dipindahkan ke Cloudflare. Migration Cloudflare sedang dibangunkan dan diuji secara berasingan menggunakan Worker staging `eouting-api-proxy-staging` dan D1 `eouting_staging`. Worker/D1 belum menjadi dependency production dan frontend production belum ditukar.
 
 ### V3.0 Cloud Architecture Staging — 22 September 2026
 
@@ -46,9 +46,22 @@ Flow `cancelStudentRequest` telah disahkan secara manual end-to-end melalui fron
 
 Production masih kekal GitHub Pages + Google Apps Script + Google Sheets. Frontend production belum ditukar kepada D1 dan Cloudflare Worker/D1 belum menjadi dependency production.
 
-Migration masih belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk Admin D1 authentication/parity, Guardian Contact, profile-photo storage, return-selfie serta fungsi Admin tertentu. Baki kerja turut merangkumi pengurangan dependency GAS secara berperingkat, sync data/config D1 yang reproducible dan sambungan V3 migration. No-Guard Departure D1 staging telah mencapai parity operasi utama dan lulus QA end-to-end. Durable retry queue dan reconciliation bagi operational mirror D1 -> Google Sheets telah dilaksanakan dan diuji pada staging.
+Migration masih belum lengkap. Admin login dan beberapa action Admin kini mempunyai route D1 staging dalam kod; parity Admin keseluruhan belum lengkap. Fungsi yang masih memerlukan migration atau reka bentuk lanjut termasuk action Admin selebihnya, Guardian Contact, profile-photo storage dan return-selfie. Baki kerja turut merangkumi pengurangan dependency GAS secara berperingkat, sync data/config D1 yang reproducible dan sambungan V3 migration. No-Guard Departure D1 staging telah mencapai parity operasi utama dan lulus QA end-to-end. Durable retry queue dan reconciliation bagi operational mirror D1 -> Google Sheets telah dilaksanakan dan diuji pada staging.
 
 Untuk V3.0, flow operasi Pelajar/Warden/Guard yang telah dimigrasikan menggunakan D1 sebagai authoritative operational source. Fungsi konfigurasi dan Admin yang kompleks boleh kekal sementara pada GAS/Google Sheets sebagai hybrid control plane dan dipublish/sync ke D1 mengikut keperluan runtime.
+
+#### Kemajuan Admin D1 staging — status kod 23 September 2026
+
+Pada branch `wip/eouting_v3_recovery_20260921`, commit terkini sebelum perubahan setempat ialah `98f2d11 feat: add staging toggleLiInstitutionStatus`. Kod frontend dan Worker staging kini mempunyai pemetaan/route D1 bagi `loginAdmin`, `getAdminStaff`, `getAdminStudents`, `getAdminStudentGroups`, `getAdminLiInstitutions`, `getAdminMonitoring`, `getOutingConfigReadiness`, operasi kumpulan/institusi pelajar, serta `createStudent`, `updateStudent` dan `toggleStudentStatus`. Ini ialah status kod, bukan pengesahan QA atau deployment bagi setiap route.
+
+`createStaff` mengesahkan Admin, memilih jadual D1 `WARDENS` atau `GUARDS` mengikut role, menyemak ID/nama pendua dalam role yang sama, menyimpan rekod dan audit `CREATE_STAFF`, serta memulangkan bentuk staff selamat tanpa nilai PIN. Statusnya dibezakan seperti berikut:
+
+- **Source setempat:** perubahan `createStaff` masih belum dicommit atau dipush.
+- **Staging deployed:** `createStaff` telah dideploy ke Worker staging versi `20a462a5-3fbb-438f-8ed7-3827de6e63b2`. Skema D1 staging `WARDENS` telah ditambah kolum nullable `TEXT` bagi `email`, `no_tel` dan `catatan`; bilangan row `WARDENS` sedia ada kekal **6** selepas peluasan skema.
+- **QA manual API:** lulus WARDEN happy path, persistence D1, audit `CREATE_STAFF`, pendua `staff_id`, pendua nama staff, role tidak sah, PIN tidak sah, PIN tiada dan status tidak sah. PASS terakhir mengesahkan mesej tepat: `status staff mesti Aktif atau Tidak Aktif.`
+- **Production:** tidak disentuh; masih menggunakan V2/GAS/Google Sheets.
+
+`updateStaff` dan `toggleStaffStatus` belum mempunyai route D1. Status deployment dan QA di atas khusus untuk `createStaff`; route lain dalam source perlu dinilai mengikut checkpoint masing-masing.
 
 #### Operational mirror D1 -> Google Sheets
 
@@ -73,7 +86,7 @@ Git checkpoint sebelumnya ialah tag `v3-d1-sheets-mirror-qa`, menunjuk kepada `9
 
 **Current state — 22 September 2026:** operational mirror D1 -> Google Sheets berjalan secara async/background selepas D1 commit bagi `submitRequest`, `cancelStudentRequest`, `approveRequest`, `rejectRequest`, `confirmOut` dan `confirmIn`. Kegagalan mirror tidak menggagalkan mutation utama; `request_id` yang gagal dimasukkan ke `MIRROR_RETRY_QUEUE` dalam D1. Worker staging menjalankan reconciliation berjadual setiap 5 minit, membaca state terkini daripada `OUTING_REQUESTS`, retry mirror ke Google Sheets dan membuang queue row selepas berjaya. QA live scheduler menggunakan orphan queue row sementara telah lulus dan queue kembali kosong selepas cron memprosesnya.
 
-**Next priority:** teruskan feature parity V3 bagi baki flow yang masih bergantung pada GAS/Google Sheets, khususnya Admin D1 authentication/parity, Guardian Contact, profile-photo, return-selfie dan fungsi Admin tertentu. No-Guard Departure / remote checkout telah lulus QA end-to-end pada D1 staging. Durable retry/reconciliation operational mirror kini telah tersedia pada staging; production cutover masih belum dibenarkan sehingga baki flow, regression dan rollback plan disahkan.
+**Next priority:** teruskan feature parity V3 bagi baki flow yang masih bergantung pada GAS/Google Sheets, khususnya action Admin yang belum dimigrasi, Guardian Contact, profile-photo dan return-selfie. No-Guard Departure / remote checkout telah lulus QA end-to-end pada D1 staging. Durable retry/reconciliation operational mirror kini telah tersedia pada staging; production cutover masih belum dibenarkan sehingga baki flow, regression dan rollback plan disahkan.
 
 V3 masih dalam pembangunan dan QA staging; ia **belum production-ready** dan full migration **belum selesai**. Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets, tanpa production cutover ke Cloudflare.
 
@@ -109,11 +122,11 @@ Kerja performance yang masih deferred dan **belum dianggap selesai** ialah laten
 
 ### Checkpoint dynamic groups dan hostel roster — 22 September 2026
 
-`e30a0fb feat: add D1 hostel roster parity and dynamic student groups` pada branch `wip/eouting_v3_recovery_20260921` ialah checkpoint terkini. Staging Worker: `3c5856b5-3515-4098-a578-d3fadb60344c`; D1: `eouting_staging`. Production frontend masih V2/GAS; production Worker kekal versi asal `a483bda0-77db-4189-8d29-1984e2f4f758` selepas rollback.
+`e30a0fb feat: add D1 hostel roster parity and dynamic student groups` pada branch `wip/eouting_v3_recovery_20260921` ialah checkpoint milestone ini. Staging Worker: `3c5856b5-3515-4098-a578-d3fadb60344c`; D1: `eouting_staging`. Production frontend masih V2/GAS; production Worker kekal versi asal `a483bda0-77db-4189-8d29-1984e2f4f758` selepas rollback.
 
 Migration `proxy/d1/002_student_group_config.sql` dan `proxy/d1/003_student_group_config_seed.sql` menyediakan dynamic config. Dua pelajar LI UNISZA telah dimasukkan ke staging. `studentLoginDirectory` staging parity dengan production: `GROUP:A2`, `GROUP:A3`, `GROUP:TEST` → `Test Sahaja`, dan `GROUP:UNISZA:UNISZA` → `LI UNISZA`.
 
-Frontend staging menghantar hostel roster Warden/Guard ke D1 dan Admin ke GAS kerana Admin auth belum dimigrasi. Semua pelajar aktif dianggap di hostel kecuali latest authoritative request berstatus `KELUAR`; fallback group `Belum Dikonfigurasi`, dan projection pelajar hanya `nama`.
+Pada checkpoint ini, frontend staging menghantar hostel roster Warden/Guard ke D1 dan Admin ke GAS kerana Admin auth belum dimigrasi ketika itu. Semua pelajar aktif dianggap di hostel kecuali latest authoritative request berstatus `KELUAR`; fallback group `Belum Dikonfigurasi`, dan projection pelajar hanya `nama`.
 
 QA checkpoint lulus: **33 aktif, 2 di luar, 31 di hostel**; breakdown penghuni **A2 11, A3 18, Test Sahaja 0, LI UNISZA 2**. Butiran Completed, Known Gaps, Next Steps dan keadaan Git ada dalam [Project Status](docs/PROJECT_STATUS.md); incident deployment ada dalam [Changelog](docs/CHANGELOG.md). Semua staging deploy mesti explicit `npx wrangler deploy --env staging` dari `proxy`.
 
