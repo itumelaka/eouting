@@ -2168,6 +2168,164 @@ const row = await env.DB.prepare(
   });
 }
 
+if (url.pathname === "/api/d1/submitReturnSelfie") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  action = "submitReturnSelfie";
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+  const selfieRequestId = String(payload.request_id || "").trim();
+  const studentId = String(payload.student_id || "").trim();
+  const noMatrik = String(payload.no_matrik || "").trim();
+  const imageBase64 = String(payload.image_base64 || "").trim();
+  const mimeType = String(payload.mime_type || "").trim().toLowerCase();
+  if (!selfieRequestId) throw fault(400, "INVALID_REQUEST", "request_id diperlukan.");
+  if (!studentId || !noMatrik) throw fault(400, "INVALID_REQUEST", "student_id dan no_matrik diperlukan.");
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+    throw fault(400, "SELFIE_INVALID_MIME", "Format gambar tidak disokong.");
+  }
+  if (!imageBase64 || imageBase64.length > 2 * 1024 * 1024 ||
+      imageBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
+    throw fault(400, "SELFIE_INVALID_IMAGE", "Gambar tidak sah atau terlalu besar.");
+  }
+  const decodedLength = imageBase64.length / 4 * 3 - (imageBase64.endsWith("==") ? 2 : imageBase64.endsWith("=") ? 1 : 0);
+  if (!decodedLength || decodedLength > 1500 * 1024) {
+    throw fault(400, "SELFIE_INVALID_IMAGE", "Gambar tidak sah atau terlalu besar.");
+  }
+  const student = await env.DB.prepare(
+    "SELECT student_id, no_matrik FROM STUDENTS WHERE student_id = ? AND no_matrik = ? AND status = 'Aktif' LIMIT 1"
+  ).bind(studentId, noMatrik).first();
+  if (!student) throw fault(401, "STUDENT_SESSION_INVALID", "Akses sesi pelajar tidak sah.");
+  const readRecord = () => env.DB.prepare(
+    "SELECT * FROM OUTING_REQUESTS WHERE request_id = ? LIMIT 1"
+  ).bind(selfieRequestId).first();
+  const record = await readRecord();
+  if (!record) throw fault(404, "REQUEST_NOT_FOUND", "Permohonan tidak dijumpai.");
+  if (record.student_id !== student.student_id || record.no_matrik !== student.no_matrik) {
+    throw fault(403, "REQUEST_NOT_OWNED", "Anda tidak dibenarkan menghantar bukti untuk rekod ini.");
+  }
+  if (record.status !== "SELESAI" || !String(record.masa_masuk || "").trim()) {
+    throw fault(409, "INVALID_REQUEST_STATUS", "Bukti selfie hanya boleh dihantar selepas Guard mengesahkan masuk.");
+  }
+  const selfieStatus = String(record.selfie_status || "").trim().toUpperCase();
+  if (selfieStatus === "TIDAK_DIPERLUKAN") {
+    throw fault(409, "SELFIE_NOT_REQUIRED", "Bukti selfie tidak diperlukan untuk jenis outing ini.");
+  }
+  if (selfieStatus === "SUDAH_HANTAR" || String(record.selfie_file_id || "").trim() || String(record.masa_selfie || "").trim()) {
+    throw fault(409, "SELFIE_ALREADY_SUBMITTED", "Bukti selfie telah dihantar sebelum ini.");
+  }
+  if (selfieStatus && selfieStatus !== "BELUM_HANTAR") {
+    throw fault(409, "SELFIE_INVALID_STATUS", "Status bukti selfie tidak membenarkan penghantaran.");
+  }
+  let upstream;
+  try {
+    upstream = trustedUrl(env.GAS_UPSTREAM_URL);
+  } catch {
+    throw fault(500, "UPSTREAM_NOT_CONFIGURED", "Perkhidmatan bukti selfie belum disediakan.");
+  }
+  const controller = new AbortController();
+  let upstreamResult;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(fault(504, "UPSTREAM_TIMEOUT", "Penghantaran bukti selfie mengambil masa terlalu lama."));
+      controller.abort();
+    }, 120000);
+  });
+  const delivery = async () => {
+    sent = true;
+    attempts = 1;
+    let response = await fetch(upstream.href, {
+      method: "POST", redirect: "manual", signal: controller.signal,
+      headers: { Accept: "application/json", "Cache-Control": "no-store", "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, request_id: selfieRequestId, student_id: studentId,
+        no_matrik: noMatrik, image_base64: imageBase64, mime_type: mimeType })
+    });
+    if (response.status === 302 || response.status === 303) {
+      let destination;
+      try {
+        destination = trustedUrl(response.headers.get("Location"), true);
+      } catch {
+        await response.body?.cancel();
+        throw fault(502, "UPSTREAM_DELIVERY_FAILED", "Upstream redirect rejected");
+      }
+      await response.body?.cancel();
+      response = await fetch(destination.href, {
+        method: "GET", redirect: "manual", signal: controller.signal,
+        headers: { Accept: "application/json", "Cache-Control": "no-store" }
+      });
+    }
+    const bytes = await readBounded(response.body, MAX_RESPONSE_BYTES,
+      fault(502, "UPSTREAM_INVALID_RESPONSE", "Respons perkhidmatan bukti selfie tidak sah."));
+    let result;
+    try {
+      result = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    } catch {
+      throw fault(502, "UPSTREAM_INVALID_RESPONSE", "Respons perkhidmatan bukti selfie tidak sah.");
+    }
+    if (result && result.ok === false) {
+      throw fault(502, "SELFIE_UPSTREAM_REJECTED",
+        typeof result.error === "string" && result.error.trim() ? result.error : "Bukti selfie gagal dihantar.");
+    }
+    if (!response.ok || !result || result.ok !== true || !result.data ||
+        result.data.request_id !== selfieRequestId || result.data.selfie_status !== "SUDAH_HANTAR" ||
+        typeof result.data.masa_selfie !== "string" || !result.data.masa_selfie.trim()) {
+      throw fault(502, "UPSTREAM_INVALID_RESPONSE", "Respons perkhidmatan bukti selfie tidak sah.");
+    }
+    return result.data;
+  };
+  try {
+    upstreamResult = await Promise.race([delivery(), timeout]);
+  } catch (error) {
+    if (error && error.code && Number.isInteger(error.status)) throw error;
+    throw fault(502, "UPSTREAM_DELIVERY_FAILED", "Perkhidmatan bukti selfie tidak dapat dihubungi.");
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+  }
+  const syncError = () => fault(500, "SELFIE_D1_SYNC_FAILED",
+    "Bukti selfie telah diterima oleh perkhidmatan, tetapi penyegerakan D1 gagal. Hubungi pentadbir; jangan hantar semula gambar.");
+  let updated;
+  try {
+    [updated] = await env.DB.batch([
+      env.DB.prepare(`UPDATE OUTING_REQUESTS SET selfie_status = ?, masa_selfie = ?
+        WHERE request_id = ? AND student_id = ? AND no_matrik = ? AND status = 'SELESAI'
+        AND (selfie_status IS NULL OR TRIM(selfie_status) = '' OR UPPER(TRIM(selfie_status)) = 'BELUM_HANTAR')
+        AND (masa_selfie IS NULL OR TRIM(masa_selfie) = '')`).bind(
+          upstreamResult.selfie_status, upstreamResult.masa_selfie, selfieRequestId, student.student_id, student.no_matrik),
+      // changes() refers to the preceding UPDATE in this atomic batch, so a losing writer cannot audit.
+      env.DB.prepare(`INSERT INTO AUDIT_LOG (timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`).bind(
+          upstreamResult.masa_selfie, "SUBMIT_RETURN_SELFIE", selfieRequestId, "Student", record.nama,
+          JSON.stringify({ no_matrik: record.no_matrik, jenis_permohonan: record.jenis_permohonan }),
+          "OUTING_REQUEST", selfieRequestId)
+    ]);
+  } catch {
+    throw syncError();
+  }
+  let current = upstreamResult;
+  if (updated?.meta?.changes !== 1) {
+    try { current = await readRecord(); } catch { throw syncError(); }
+    if (!current || current.student_id !== student.student_id || current.no_matrik !== student.no_matrik ||
+        !(String(current.selfie_status || "").trim().toUpperCase() === "SUDAH_HANTAR" || String(current.masa_selfie || "").trim())) {
+      throw syncError();
+    }
+  }
+  return finish(JSON.stringify({ ok: true, data: {
+    request_id: selfieRequestId, selfie_status: current.selfie_status, masa_selfie: current.masa_selfie
+  } }), 200);
+}
+
 if (url.pathname === "/api/d1/getGuardianContact") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");

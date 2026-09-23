@@ -47,6 +47,7 @@ const D1_POST_ENDPOINTS = {
   confirmOut: "confirmOut",
   confirmIn: "confirmIn",
   submitRequest: "submitRequest",
+  submitReturnSelfie: "submitReturnSelfie",
   requestDepartureConfirmation: "requestDepartureConfirmation",
   confirmWardenRemoteCheckout: "confirmWardenRemoteCheckout",
   approveRequest: "approveRequest",

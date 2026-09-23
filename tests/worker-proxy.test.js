@@ -360,7 +360,7 @@ test("staging D1 submit returns before Sheets mirror finishes via waitUntil", as
           description: "",
           active: 1,
           sort_order: 1,
-          allowed_days: "SELASA",
+          allowed_days: "ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU,AHAD",
           application_open_time: "",
           application_close_time: "",
           fixed_return_time: "22:00",
@@ -454,4 +454,82 @@ test("staging D1 submit returns before Sheets mirror finishes via waitUntil", as
   const body = await response.json();
   assert.equal(body.ok, true);
   assert.equal(body.data.status, "MENUNGGU_KELULUSAN");
+});
+
+test("staging submitReturnSelfie authenticates eligible student, syncs D1 after one GAS call and returns only selfie state", async () => {
+  const payload = {
+    request_id: "TEST-SELFIE-001", student_id: "STU-001", no_matrik: "M001",
+    image_base64: "YQ==", mime_type: "image/jpeg"
+  };
+  const selfieTime = "2026-09-23 12:01:00";
+  const events = [];
+  const batches = [];
+  const statement = (sql, values = []) => ({
+    sql, values,
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      if (sql.includes("FROM STUDENTS")) {
+        assert.match(sql, /student_id = \? AND no_matrik = \? AND status = 'Aktif'/);
+        assert.deepEqual(values, ["STU-001", "M001"]);
+        events.push("authenticate");
+        return { student_id: "STU-001", no_matrik: "M001", status: "Aktif" };
+      }
+      if (sql.includes("FROM OUTING_REQUESTS")) {
+        assert.deepEqual(values, ["TEST-SELFIE-001"]);
+        events.push("read-request");
+        return {
+          request_id: "TEST-SELFIE-001", student_id: "STU-001", no_matrik: "M001",
+          nama: "Test Student", jenis_permohonan: "OUTING_BIASA", status: "SELESAI",
+          masa_masuk: "2026-09-23 12:00:00", selfie_status: "BELUM_HANTAR",
+          selfie_file_id: "", masa_selfie: ""
+        };
+      }
+      throw new Error("Unexpected query: " + sql);
+    }
+  });
+  const DB = {
+    prepare: (sql) => statement(sql),
+    async batch(statements) {
+      events.push("batch");
+      batches.push(statements);
+      return [{ success: true, meta: { changes: 1 } }, { success: true, meta: { changes: 1 } }];
+    }
+  };
+  const rt = runtime(() => {
+    events.push("upstream");
+    return json(JSON.stringify({ ok: true, data: {
+      request_id: "TEST-SELFIE-001", selfie_status: "SUDAH_HANTAR", masa_selfie: selfieTime,
+      selfie_file_id: "PRIVATE_FILE", selfie_url: "https://drive.google.com/private",
+      selfie_telegram_message_id: "PRIVATE_MESSAGE"
+    } }));
+  });
+  const response = await rt.run(req("POST", {
+    url: "https://proxy.test/api/d1/submitReturnSelfie",
+    headers: { Origin: staging.STAGING_ORIGIN }, body: JSON.stringify(payload)
+  }), { ...staging, DB });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, data: {
+    request_id: "TEST-SELFIE-001", selfie_status: "SUDAH_HANTAR", masa_selfie: selfieTime
+  } });
+  assert.deepEqual(events, ["authenticate", "read-request", "upstream", "batch"]);
+  assert.equal(rt.calls.length, 1);
+  assert.equal(rt.calls[0].url, upstream);
+  assert.equal(rt.calls[0].init.method, "POST");
+  assert.equal(rt.calls[0].init.redirect, "manual");
+  assert.equal(rt.calls[0].init.headers["Content-Type"], "text/plain;charset=utf-8");
+  assert.deepEqual(JSON.parse(rt.calls[0].init.body), { action: "submitReturnSelfie", ...payload });
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0].length, 2);
+  const [update, audit] = batches[0];
+  assert.match(update.sql, /UPDATE OUTING_REQUESTS SET selfie_status = \?, masa_selfie = \?/);
+  assert.match(update.sql, /status = 'SELESAI'/);
+  assert.match(update.sql, /BELUM_HANTAR/);
+  assert.deepEqual(update.values, ["SUDAH_HANTAR", selfieTime, "TEST-SELFIE-001", "STU-001", "M001"]);
+  assert.match(audit.sql, /INSERT INTO AUDIT_LOG/);
+  assert.match(audit.sql, /WHERE changes\(\) = 1/);
+  assert.deepEqual(audit.values, [selfieTime, "SUBMIT_RETURN_SELFIE", "TEST-SELFIE-001",
+    "Student", "Test Student", JSON.stringify({ no_matrik: "M001", jenis_permohonan: "OUTING_BIASA" }),
+    "OUTING_REQUEST", "TEST-SELFIE-001"]);
+  assert.doesNotMatch(rt.logs.join(""), /YQ==|image_base64|PRIVATE_FILE|PRIVATE_MESSAGE|drive\.google/);
 });
