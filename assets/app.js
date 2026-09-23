@@ -32,6 +32,7 @@ const D1_POST_ENDPOINTS = {
   getAdminStudentGroups: "getAdminStudentGroups",
   createStudentGroup: "createStudentGroup",
   updateStudentGroup: "updateStudentGroup",
+  toggleStudentGroupStatus: "toggleStudentGroupStatus",
   getAdminLiInstitutions: "getAdminLiInstitutions",
   getTodayRecords: "getTodayRecords",
   getCurrentHostelRoster: "getCurrentHostelRoster",
