@@ -2089,8 +2089,6 @@ if (url.pathname === "/api/d1/wardenPendingRequests") {
       jenis_kenderaan,
       butiran_kenderaan,
       sebab_kecemasan,
-      telefon_waris,
-      hubungan_waris,
       catatan_kecemasan,
       masa_mohon,
       status,
@@ -2170,6 +2168,126 @@ const row = await env.DB.prepare(
   });
 }
 
+if (url.pathname === "/api/d1/getGuardianContact") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json() || {};
+  const wardenId = String(payload.warden_id || "").trim();
+  const name = String(payload.nama_warden || payload.warden_name || payload.name || "").trim();
+  const pin = String(payload.pin || "").trim();
+  const warden = await env.DB.prepare(
+    `SELECT warden_id, nama FROM WARDENS
+     WHERE (warden_id = ? OR nama = ?)
+       AND pin = ? AND status = 'Aktif'
+     LIMIT 1`
+  ).bind(wardenId, name, pin).first();
+  if (!warden) {
+    throw fault(401, "WARDEN_SESSION_INVALID", "Akses sesi warden tidak sah.");
+  }
+
+  const requestId = String(payload.request_id || "").trim();
+  if (!requestId) throw fault(400, "REQUEST_ID_REQUIRED", "ID permohonan diperlukan.");
+  const record = await env.DB.prepare(
+    `SELECT request_id, jenis_permohonan, status, tarikh, tarikh_balik,
+            masa_balik_dijangka, telefon_waris, hubungan_waris
+     FROM OUTING_REQUESTS WHERE request_id = ? LIMIT 1`
+  ).bind(requestId).first();
+  if (!record) throw fault(404, "REQUEST_NOT_FOUND", "Permohonan tidak ditemui.");
+
+  const status = String(record.status || "").trim();
+  const emergency = String(record.jenis_permohonan || "").trim().toUpperCase() === "KECEMASAN" &&
+    (status === "MENUNGGU_KELULUSAN" || status === "DILULUSKAN_WARDEN");
+  let urgencyState = "";
+  if (status === "KELUAR") {
+    const dateKey = value => {
+      if (value === undefined || value === null || value === "") return "";
+      const raw = String(value).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return "";
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit"
+      }).formatToParts(date);
+      const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
+      return `${map.year}-${map.month}-${map.day}`;
+    };
+    const normalizeTime = value => {
+      const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+      if (!match) return "";
+      const hour = Number(match[1]);
+      const minute = Number(match[2]);
+      return hour <= 23 && minute <= 59
+        ? `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+        : "";
+    };
+    const type = String(record.jenis_permohonan || "").trim().toUpperCase();
+    const legacyDaily = ["OUTING_BIASA", "KECEMASAN", "OUTING_HUJUNG_MINGGU"].includes(type);
+    const returnDate = dateKey(record.tarikh_balik) || (legacyDaily ? dateKey(record.tarikh) : "");
+    const returnTime = normalizeTime(record.masa_balik_dijangka) || (legacyDaily ? "22:00" : "");
+    if (returnDate && returnTime) {
+      const target = new Date(`${returnDate}T${returnTime}:00+08:00`);
+      if (!Number.isNaN(target.getTime())) {
+        const lateMs = Math.max(0, Date.now() - target.getTime());
+        if (lateMs >= 60 * 60 * 1000) urgencyState = "ACTION_REQUIRED";
+        else if (lateMs >= 30 * 60 * 1000) urgencyState = "CRITICAL";
+      }
+    }
+  }
+  if (!emergency && !(status === "KELUAR" &&
+      (urgencyState === "CRITICAL" || urgencyState === "ACTION_REQUIRED"))) {
+    throw fault(403, "GUARDIAN_CONTACT_NOT_ELIGIBLE",
+      "Akses maklumat penjaga tidak lagi tersedia untuk permohonan ini.");
+  }
+
+  const phone = String(record.telefon_waris ?? "").trim();
+  const plusMatches = phone.match(/\+/g) || [];
+  const dialable = phone && /^[+\d\s().-]+$/.test(phone) &&
+    plusMatches.length <= 1 && (plusMatches.length === 0 || phone[0] === "+")
+    ? phone.replace(/[\s().-]/g, "")
+    : "";
+  if (!/^\+?\d{7,15}$/.test(dialable)) {
+    return new Response(JSON.stringify({ ok: true, data: { available: false } }),
+      { status: 200, headers });
+  }
+
+  const actorRole = /^HEP-/i.test(String(warden.warden_id || "").trim()) ? "HEP" : "Warden";
+  const auditContext = emergency ? "EMERGENCY_REQUEST"
+    : urgencyState === "ACTION_REQUIRED" ? "ACTION_REQUIRED_RETURN" : "CRITICAL_RETURN";
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+    }).formatToParts(new Date());
+    const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
+    await env.DB.prepare(`INSERT INTO AUDIT_LOG (
+      timestamp, action, request_id, user_role, user_name,
+      details, entity_type, entity_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      timestamp, "GUARDIAN_CONTACT_ACCESSED", requestId,
+      actorRole, String(warden.nama || "").trim(), JSON.stringify({ context: auditContext }),
+      "OUTING_REQUEST", requestId
+    ).run();
+  } catch (error) {
+    throw fault(500, "GUARDIAN_CONTACT_AUDIT_FAILED",
+      "Akses maklumat penjaga gagal diaudit. Sila cuba lagi.");
+  }
+
+  return new Response(JSON.stringify({ ok: true, data: {
+    available: true,
+    guardian_name: "",
+    guardian_relation: String(record.hubungan_waris || "").trim(),
+    guardian_phone: phone,
+    call_uri: `tel:${dialable}`
+  } }), { status: 200, headers });
+}
 if (url.pathname === "/api/d1/loginGuard") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");

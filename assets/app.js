@@ -14,6 +14,7 @@ const D1_GET_ENDPOINTS = {
 const D1_POST_ENDPOINTS = {
   loginStudent: "loginStudent",
   loginWarden: "loginWarden",
+  getGuardianContact: "getGuardianContact",
   loginGuard: "loginGuard",
   loginAdmin: "loginAdmin",
   getNoGuardDepartureConfig: "getNoGuardDepartureConfig",
