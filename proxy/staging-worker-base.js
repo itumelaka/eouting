@@ -3478,6 +3478,104 @@ if (url.pathname === "/api/d1/getAdminStudentGroups") {
     headers
   });
 }
+if (url.pathname === "/api/d1/createLiInstitution") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const input = payload.li_institution && typeof payload.li_institution === "object"
+    ? payload.li_institution : payload;
+  const invalid = message => fault(400, "INVALID_REQUEST", message);
+  const institution_code = String((input.institution_code || payload.institution_code) ?? "")
+    .trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(institution_code)) {
+    throw invalid("institution_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
+  }
+  const existing = await env.DB.prepare(
+    `SELECT institution_code FROM LI_INSTITUTIONS
+     WHERE LOWER(TRIM(institution_code)) = LOWER(?) LIMIT 1`
+  ).bind(institution_code).first();
+  if (existing) {
+    throw fault(400, "LI_INSTITUTION_EXISTS", "institution_code telah wujud.");
+  }
+
+  const display_name = String(input.display_name ?? "").trim();
+  if (!display_name || display_name.length > 100 ||
+      /[\u0000-\u001F\u007F]/.test(display_name)) {
+    throw invalid("display_name mesti teks selamat antara 1 hingga 100 aksara.");
+  }
+  const strictBoolean = (value, field) => {
+    if (value === true || value === false) return value;
+    const text = String(value || "").trim().toLowerCase();
+    if (["true", "ya", "1"].includes(text)) return true;
+    if (["false", "tidak", "0"].includes(text)) return false;
+    throw invalid(`${field} mesti boolean true atau false.`);
+  };
+  const active = strictBoolean(input.active, "active");
+  const sort_order = Number(input.sort_order);
+  if (!Number.isInteger(sort_order) || sort_order < 1) {
+    throw invalid("sort_order mesti nombor bulat positif.");
+  }
+  const config_version = 1;
+  const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  }).formatToParts(new Date());
+  const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
+  const record = {
+    institution_code, display_name, active, sort_order, config_version,
+    created_at: timestamp, created_by: actor, updated_at: timestamp, updated_by: actor
+  };
+
+  const inserted = await env.DB.prepare(
+    `INSERT INTO LI_INSTITUTIONS (
+       institution_code, display_name, active, sort_order, config_version,
+       created_at, created_by, updated_at, updated_by
+     ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+     WHERE NOT EXISTS (
+       SELECT 1 FROM LI_INSTITUTIONS WHERE LOWER(TRIM(institution_code)) = LOWER(?)
+     )`
+  ).bind(institution_code, display_name, Number(active), sort_order, config_version,
+    timestamp, actor, timestamp, actor, institution_code).run();
+  if (inserted.meta?.changes !== 1) {
+    throw fault(400, "LI_INSTITUTION_EXISTS", "institution_code telah wujud.");
+  }
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(timestamp, "CREATE_LI_INSTITUTION", "", "Admin", actor,
+    JSON.stringify({ active, sort_order, config_version }),
+    "LI_INSTITUTION", institution_code).run();
+
+  return new Response(JSON.stringify({ ok: true, data: record }), {
+    status: 200,
+    headers
+  });
+}
 if (url.pathname === "/api/d1/getAdminLiInstitutions") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
