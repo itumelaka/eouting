@@ -2412,6 +2412,242 @@ if (url.pathname === "/api/d1/getAdminStaff") {
     headers
   });
 }
+if (url.pathname === "/api/d1/updateStudent") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const studentId = String(payload.student_id || "").trim();
+  const input = payload.student && typeof payload.student === "object"
+    ? payload.student : payload;
+  const invalid = message => fault(400, "INVALID_STUDENT", message);
+  if (!studentId) throw invalid("student_id diperlukan.");
+  if (input.student_id &&
+      String(input.student_id || "").trim().toLowerCase() !== studentId.toLowerCase()) {
+    throw invalid("student_id tidak boleh diubah selepas dicipta.");
+  }
+
+  const row = await env.DB.prepare(
+    `SELECT student_id, no_matrik, nama, email, no_tel, kelas, jantina,
+            status, catatan, institution_code, photo_file_id, photo_updated_at
+     FROM STUDENTS WHERE LOWER(TRIM(student_id)) = LOWER(?) LIMIT 1`
+  ).bind(studentId).first();
+  if (!row) throw fault(404, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai.");
+  const current = {
+    student_id: String(row.student_id || "").trim(),
+    no_matrik: String(row.no_matrik ?? "").trim(),
+    nama: String(row.nama || "").trim(),
+    email: String(row.email || "").trim(),
+    no_tel: String(row.no_tel ?? "").trim(),
+    kelas: String(row.kelas || "").trim().toUpperCase(),
+    jantina: String(row.jantina || "").trim(),
+    status: String(row.status || "").trim().toUpperCase(),
+    catatan: String(row.catatan || "").trim(),
+    institution_code: String(row.institution_code || "").trim().toUpperCase(),
+    has_profile_photo: row.photo_file_id !== null && row.photo_file_id !== undefined &&
+      String(row.photo_file_id).trim() !== "",
+    photo_updated_at: String(row.photo_updated_at ?? "").trim()
+  };
+  const merged = { ...current };
+  for (const field of [
+    "no_matrik", "nama", "email", "no_tel", "kelas", "institution_code",
+    "jantina", "status", "catatan"
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(input, field)) merged[field] = input[field];
+  }
+
+  const no_matrik = String(merged.no_matrik ?? "").trim();
+  const nama = String(merged.nama || "").trim();
+  const email = String(merged.email || "").trim();
+  const no_tel = String(merged.no_tel ?? "").trim();
+  const kelas = String(merged.kelas || "").trim().toUpperCase();
+  const jantina = String(merged.jantina || "").trim();
+  const catatan = String(merged.catatan || "").trim();
+  const status = String(merged.status ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  if (!current.student_id) throw invalid("student_id diperlukan.");
+  if (current.student_id.length > 100 || /[\u0000-\u001F\u007F]/.test(current.student_id)) {
+    throw invalid("student_id tidak sah.");
+  }
+  if (!no_matrik) throw invalid("no_matrik diperlukan.");
+  if (no_matrik.length > 100 || /[\u0000-\u001F\u007F]/.test(no_matrik)) {
+    throw invalid("no_matrik tidak sah.");
+  }
+  if (!nama) throw invalid("nama pelajar diperlukan.");
+  if (nama.length > 200) throw invalid("nama pelajar terlalu panjang.");
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw invalid("email pelajar tidak sah.");
+  }
+  if (email.length > 200) throw invalid("email pelajar terlalu panjang.");
+  if (no_tel.length > 50) throw invalid("no_tel pelajar terlalu panjang.");
+  if (jantina.length > 50) throw invalid("jantina pelajar terlalu panjang.");
+  if (catatan.length > 500) throw invalid("catatan pelajar terlalu panjang.");
+  if (status !== "AKTIF" && status !== "TIDAK AKTIF") {
+    throw invalid("status pelajar mesti AKTIF atau TIDAK AKTIF.");
+  }
+
+  let assignmentConfig = null;
+  try {
+    const [groupResult, institutionResult] = await Promise.all([
+      env.DB.prepare(
+        `SELECT group_code, display_name, institution_required, active,
+                sort_order, config_version FROM STUDENT_GROUPS`
+      ).all(),
+      env.DB.prepare(
+        `SELECT institution_code, display_name, active,
+                sort_order, config_version FROM LI_INSTITUTIONS`
+      ).all()
+    ]);
+    const strictBoolean = value => {
+      const text = String(value ?? "").trim().toLowerCase();
+      if (["true", "ya", "1"].includes(text)) return true;
+      if (["false", "tidak", "0"].includes(text)) return false;
+      throw new Error("Invalid configuration boolean");
+    };
+    const normalizeConfig = (configRow, codeField, hasInstitutionRequired) => {
+      const code = String(configRow[codeField] ?? "").trim().toUpperCase();
+      const displayName = String(configRow.display_name ?? "").trim();
+      const sortOrder = Number(configRow.sort_order);
+      const version = Number(configRow.config_version);
+      if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(code) ||
+          !displayName || displayName.length > 100 ||
+          /[\u0000-\u001F\u007F]/.test(displayName) ||
+          !Number.isInteger(sortOrder) || sortOrder < 1 ||
+          !Number.isInteger(version) || version < 1) {
+        throw new Error("Invalid assignment configuration");
+      }
+      const active = strictBoolean(configRow.active);
+      const institution_required = hasInstitutionRequired
+        ? strictBoolean(configRow.institution_required) : false;
+      return { code, active, institution_required };
+    };
+    const groups = (groupResult.results || []).map(configRow =>
+      normalizeConfig(configRow, "group_code", true)
+    );
+    const institutions = (institutionResult.results || []).map(configRow =>
+      normalizeConfig(configRow, "institution_code", false)
+    );
+    if (groups.length &&
+        new Set(groups.map(group => group.code)).size === groups.length &&
+        new Set(institutions.map(institution => institution.code)).size === institutions.length) {
+      assignmentConfig = { groups, institutions };
+    }
+  } catch (error) {
+    assignmentConfig = null;
+  }
+
+  const validated = {
+    student_id: current.student_id, no_matrik, nama, email, no_tel,
+    kelas, jantina, status, catatan
+  };
+  if (assignmentConfig) {
+    const group = assignmentConfig.groups.find(item => item.code === kelas);
+    if (!group) throw invalid("Kumpulan pelajar tidak dijumpai.");
+    const groupChanged = current.kelas !== kelas;
+    if (!group.active && groupChanged) {
+      throw invalid("Kumpulan tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
+    }
+    const submittedCode = String(merged.institution_code || "").trim().toUpperCase();
+    if (!group.institution_required) {
+      if (!groupChanged && current.institution_code && !submittedCode) {
+        throw invalid("Rekod mempunyai institution_code yang tidak sepadan. Betulkan penugasan secara eksplisit sebelum menyimpan perubahan lain.");
+      }
+      if (submittedCode) throw invalid("institution_code mesti kosong untuk kumpulan ini.");
+      validated.institution_code = "";
+    } else {
+      if (!submittedCode) throw invalid("Institusi diperlukan untuk kumpulan ini.");
+      if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(submittedCode)) {
+        throw invalid("institution_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
+      }
+      const institution = assignmentConfig.institutions.find(item => item.code === submittedCode);
+      if (!institution) throw invalid("Institusi LI tidak dijumpai.");
+      const institutionChanged = groupChanged || current.institution_code !== submittedCode;
+      if (!institution.active && institutionChanged) {
+        throw invalid("Institusi LI tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
+      }
+      validated.institution_code = submittedCode;
+    }
+  } else if (!["A2", "A3", "LI"].includes(kelas)) {
+    throw invalid("kelas pelajar mesti A2, A3 atau LI.");
+  }
+
+  const duplicateMatric = await env.DB.prepare(
+    `SELECT student_id FROM STUDENTS
+     WHERE LOWER(TRIM(no_matrik)) = LOWER(?)
+       AND LOWER(TRIM(student_id)) <> LOWER(?)
+     LIMIT 1`
+  ).bind(no_matrik, current.student_id).first();
+  if (duplicateMatric) {
+    throw fault(400, "STUDENT_MATRIC_EXISTS", "no_matrik telah wujud.");
+  }
+  const changeFields = [
+    "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"
+  ];
+  if (assignmentConfig) changeFields.push("institution_code");
+  const changed_fields = changeFields.filter(field =>
+    String(current[field] || "") !== String(validated[field] || "")
+  );
+  if (!changed_fields.length) throw invalid("Tiada perubahan pelajar untuk disimpan.");
+
+  const update = assignmentConfig
+    ? env.DB.prepare(
+      `UPDATE STUDENTS SET no_matrik = ?, nama = ?, email = ?, no_tel = ?,
+         kelas = ?, jantina = ?, status = ?, catatan = ?, institution_code = ?
+       WHERE student_id = ?`
+    ).bind(no_matrik, nama, email, no_tel, kelas, jantina, status, catatan,
+      validated.institution_code, row.student_id)
+    : env.DB.prepare(
+      `UPDATE STUDENTS SET no_matrik = ?, nama = ?, email = ?, no_tel = ?,
+         kelas = ?, jantina = ?, status = ?, catatan = ?
+       WHERE student_id = ?`
+    ).bind(no_matrik, nama, email, no_tel, kelas, jantina, status, catatan,
+      row.student_id);
+  const result = await update.run();
+  if (result.meta?.changes !== 1) {
+    throw fault(404, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai.");
+  }
+
+  const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  }).formatToParts(new Date());
+  const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(timestamp, "UPDATE_STUDENT", "", "Admin", actor,
+    JSON.stringify({ changed_fields }), "STUDENT", current.student_id).run();
+
+  return new Response(JSON.stringify({ ok: true, data: {
+    ...validated,
+    institution_code: validated.institution_code || "",
+    has_profile_photo: false,
+    photo_updated_at: ""
+  } }), { status: 200, headers });
+}
 if (url.pathname === "/api/d1/createStudent") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
