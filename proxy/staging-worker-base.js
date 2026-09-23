@@ -3019,6 +3019,104 @@ if (url.pathname === "/api/d1/getAdminStudents") {
     headers
   });
 }
+if (url.pathname === "/api/d1/createStudentGroup") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const input = payload.student_group && typeof payload.student_group === "object"
+    ? payload.student_group : payload;
+  const invalid = message => fault(400, "INVALID_REQUEST", message);
+  const group_code = String((input.group_code || payload.group_code) ?? "").trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(group_code)) {
+    throw invalid("group_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
+  }
+  const existing = await env.DB.prepare(
+    `SELECT group_code FROM STUDENT_GROUPS
+     WHERE LOWER(TRIM(group_code)) = LOWER(?) LIMIT 1`
+  ).bind(group_code).first();
+  if (existing) {
+    throw fault(400, "STUDENT_GROUP_EXISTS", "group_code telah wujud.");
+  }
+
+  const display_name = String(input.display_name ?? "").trim();
+  if (!display_name || display_name.length > 100 ||
+      /[\u0000-\u001F\u007F]/.test(display_name)) {
+    throw invalid("display_name mesti teks selamat antara 1 hingga 100 aksara.");
+  }
+  const strictBoolean = (value, field) => {
+    if (value === true || value === false) return value;
+    const text = String(value || "").trim().toLowerCase();
+    if (["true", "ya", "1"].includes(text)) return true;
+    if (["false", "tidak", "0"].includes(text)) return false;
+    throw invalid(`${field} mesti boolean true atau false.`);
+  };
+  const institution_required = strictBoolean(input.institution_required, "institution_required");
+  const active = strictBoolean(input.active, "active");
+  const sort_order = Number(input.sort_order);
+  if (!Number.isInteger(sort_order) || sort_order < 1) {
+    throw invalid("sort_order mesti nombor bulat positif.");
+  }
+  const config_version = 1;
+  const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  }).formatToParts(new Date());
+  const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
+  const record = {
+    group_code, display_name, institution_required, active, sort_order, config_version,
+    created_at: timestamp, created_by: actor, updated_at: timestamp, updated_by: actor
+  };
+
+  const inserted = await env.DB.prepare(
+    `INSERT INTO STUDENT_GROUPS (
+       group_code, display_name, institution_required, active, sort_order,
+       config_version, created_at, created_by, updated_at, updated_by
+     ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+     WHERE NOT EXISTS (
+       SELECT 1 FROM STUDENT_GROUPS WHERE LOWER(TRIM(group_code)) = LOWER(?)
+     )`
+  ).bind(group_code, display_name, Number(institution_required), Number(active),
+    sort_order, config_version, timestamp, actor, timestamp, actor, group_code).run();
+  if (inserted.meta?.changes !== 1) {
+    throw fault(400, "STUDENT_GROUP_EXISTS", "group_code telah wujud.");
+  }
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(timestamp, "CREATE_STUDENT_GROUP", "", "Admin", actor,
+    JSON.stringify({ active, institution_required, sort_order, config_version }),
+    "STUDENT_GROUP", group_code).run();
+
+  return new Response(JSON.stringify({ ok: true, data: record }), {
+    status: 200,
+    headers
+  });
+}
 if (url.pathname === "/api/d1/getAdminStudentGroups") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
