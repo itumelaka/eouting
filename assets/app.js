@@ -35,6 +35,7 @@ const D1_POST_ENDPOINTS = {
   toggleStudentGroupStatus: "toggleStudentGroupStatus",
   getAdminLiInstitutions: "getAdminLiInstitutions",
   createLiInstitution: "createLiInstitution",
+  updateLiInstitution: "updateLiInstitution",
   getTodayRecords: "getTodayRecords",
   getCurrentHostelRoster: "getCurrentHostelRoster",
   getStudentAnnualSummary: "getStudentAnnualSummary",
