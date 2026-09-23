@@ -2412,6 +2412,111 @@ if (url.pathname === "/api/d1/getAdminStaff") {
     headers
   });
 }
+if (url.pathname === "/api/d1/getAdminStudents") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT student_id, no_matrik, nama, email, no_tel, kelas, jantina,
+            status, catatan, institution_code, photo_file_id, photo_updated_at
+     FROM STUDENTS`
+  ).all();
+  const students = (result.results || []).map(row => ({
+    student_id: String(row.student_id || "").trim(),
+    no_matrik: String(row.no_matrik ?? "").trim(),
+    nama: String(row.nama || "").trim(),
+    email: String(row.email || "").trim(),
+    no_tel: String(row.no_tel ?? "").trim(),
+    kelas: String(row.kelas || "").trim().toUpperCase(),
+    jantina: String(row.jantina || "").trim(),
+    status: String(row.status || "").trim().toUpperCase(),
+    catatan: String(row.catatan || "").trim(),
+    institution_code: String(row.institution_code || "").trim().toUpperCase(),
+    has_profile_photo: row.photo_file_id !== null && row.photo_file_id !== undefined &&
+      String(row.photo_file_id).trim() !== "",
+    photo_updated_at: String(row.photo_updated_at ?? "").trim()
+  }));
+
+  let groupOrder = null;
+  try {
+    const groupResult = await env.DB.prepare(
+      `SELECT group_code, display_name, institution_required, active,
+              sort_order, config_version
+       FROM STUDENT_GROUPS`
+    ).all();
+    const strictBoolean = (value) => {
+      const normalized = String(value === null || value === undefined ? "" : value)
+        .trim().toLowerCase();
+      if (["true", "ya", "1"].includes(normalized)) return true;
+      if (["false", "tidak", "0"].includes(normalized)) return false;
+      throw new Error("Invalid group boolean");
+    };
+    const groups = (groupResult.results || []).map(row => {
+      const group_code = String(row.group_code ?? "").trim().toUpperCase();
+      const display_name = String(row.display_name ?? "").trim();
+      const sort_order = Number(row.sort_order);
+      const config_version = Number(row.config_version);
+      if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(group_code) ||
+          !display_name || display_name.length > 100 ||
+          /[\u0000-\u001F\u007F]/.test(display_name) ||
+          !Number.isInteger(sort_order) || sort_order < 1 ||
+          !Number.isInteger(config_version) || config_version < 1) {
+        throw new Error("Invalid group configuration");
+      }
+      strictBoolean(row.institution_required);
+      strictBoolean(row.active);
+      return { group_code, display_name, sort_order };
+    });
+    if (groups.length) {
+      const codes = new Set(groups.map(group => group.group_code));
+      if (codes.size !== groups.length) throw new Error("Duplicate group code");
+      groups.sort((left, right) =>
+        left.sort_order - right.sort_order ||
+        left.display_name.localeCompare(right.display_name) ||
+        left.group_code.localeCompare(right.group_code)
+      );
+      groupOrder = new Map(groups.map((group, index) => [group.group_code, index + 1]));
+    }
+  } catch (error) {
+    groupOrder = null;
+  }
+
+  const legacyOrder = { A2: 1, A3: 2, LI: 3 };
+  students.sort((left, right) => {
+    const leftOrder = groupOrder ? (groupOrder.get(left.kelas) || 999) : (legacyOrder[left.kelas] || 99);
+    const rightOrder = groupOrder ? (groupOrder.get(right.kelas) || 999) : (legacyOrder[right.kelas] || 99);
+    return leftOrder - rightOrder ||
+      String(left.nama || left.student_id || "").localeCompare(
+        String(right.nama || right.student_id || "")
+      );
+  });
+  return new Response(JSON.stringify({ ok: true, data: students }), {
+    status: 200,
+    headers
+  });
+}
 if (url.pathname === "/api/d1/getAdminStudentGroups") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
