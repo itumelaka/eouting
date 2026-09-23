@@ -2412,6 +2412,80 @@ if (url.pathname === "/api/d1/getAdminStaff") {
     headers
   });
 }
+if (url.pathname === "/api/d1/getAdminLiInstitutions") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT institution_code, display_name, active, sort_order, config_version,
+            created_at, created_by, updated_at, updated_by
+     FROM LI_INSTITUTIONS`
+  ).all();
+  const institutions = (result.results || []).map(row => {
+    const institution_code = String(row.institution_code ?? "").trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(institution_code)) {
+      throw new Error("institution_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
+    }
+    const display_name = String(row.display_name ?? "").trim();
+    if (!display_name || display_name.length > 100 || /[\u0000-\u001F\u007F]/.test(display_name)) {
+      throw new Error("display_name mesti teks selamat antara 1 hingga 100 aksara.");
+    }
+    const activeValue = String(row.active === null || row.active === undefined ? "" : row.active)
+      .trim().toLowerCase();
+    if (!["true", "ya", "1", "false", "tidak", "0"].includes(activeValue)) {
+      throw new Error("active mesti boolean true atau false.");
+    }
+    const sort_order = Number(row.sort_order);
+    if (!Number.isInteger(sort_order) || sort_order < 1) {
+      throw new Error("sort_order mesti nombor bulat positif.");
+    }
+    const config_version = Number(row.config_version);
+    if (!Number.isInteger(config_version) || config_version < 1) {
+      throw new Error("config_version mesti nombor bulat positif.");
+    }
+    return {
+      institution_code,
+      display_name,
+      active: ["true", "ya", "1"].includes(activeValue),
+      sort_order,
+      config_version,
+      created_at: row.created_at || "",
+      created_by: row.created_by || "",
+      updated_at: row.updated_at || "",
+      updated_by: row.updated_by || ""
+    };
+  }).sort((left, right) =>
+    left.sort_order - right.sort_order ||
+    left.display_name.localeCompare(right.display_name) ||
+    left.institution_code.localeCompare(right.institution_code)
+  );
+  return new Response(JSON.stringify({ ok: true, data: institutions }), {
+    status: 200,
+    headers
+  });
+}
 if (url.pathname === "/api/d1/getAdminOutingTypes") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
