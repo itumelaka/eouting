@@ -2427,10 +2427,10 @@ if (url.pathname === "/api/d1/createStaff") {
     throw fault(400, "STAFF_NAME_EXISTS", "Nama staff telah wujud untuk role ini.");
   }
 
-  await env.DB.prepare(
+  const staffInsert = env.DB.prepare(
     `INSERT INTO ${table} (${idField}, nama, email, no_tel, pin, status, catatan)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(staff_id, nama, email, no_tel, staffPin, status, catatan).run();
+  ).bind(staff_id, nama, email, no_tel, staffPin, status, catatan);
   const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
@@ -2438,12 +2438,13 @@ if (url.pathname === "/api/d1/createStaff") {
   }).formatToParts(new Date());
   const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
   const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
-  await env.DB.prepare(
+  const auditInsert = env.DB.prepare(
     `INSERT INTO AUDIT_LOG (
        timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(timestamp, "CREATE_STAFF", "", "Admin", actor,
-    JSON.stringify({ role, status }), "STAFF", `${role}:${staff_id}`).run();
+    JSON.stringify({ role, status }), "STAFF", `${role}:${staff_id}`);
+  await env.DB.batch([staffInsert, auditInsert]);
 
   return new Response(JSON.stringify({ ok: true, data: {
     staff_id, nama, role, status, email, no_tel, catatan,
@@ -2528,12 +2529,12 @@ if (url.pathname === "/api/d1/updateStaff") {
 
   const updates = { email, no_tel, status, catatan, nama };
   if (staffPin) updates.pin = staffPin;
-  await env.DB.prepare(
+  const staffUpdate = env.DB.prepare(
     `UPDATE ${table}
      SET nama = ?, email = ?, no_tel = ?, status = ?, catatan = ?${staffPin ? ", pin = ?" : ""}
      WHERE ${idField} = ?`
   ).bind(nama, email, no_tel, status, catatan,
-    ...(staffPin ? [staffPin] : []), found[idField]).run();
+    ...(staffPin ? [staffPin] : []), found[idField]);
 
   const changedFields = ["email", "no_tel", "status", "catatan", "nama"]
     .filter(field => String(found[field] || "") !== String(updates[field] || ""))
@@ -2550,9 +2551,10 @@ if (url.pathname === "/api/d1/updateStaff") {
        timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(timestamp, action, "", "Admin", actor, JSON.stringify(details),
-    "STAFF", `${role}:${staffId}`).run();
-  await audit("UPDATE_STAFF", { role, changed_fields: changedFields });
-  if (staffPin) await audit("RESET_STAFF_PIN", { role });
+    "STAFF", `${role}:${staffId}`);
+  const statements = [staffUpdate, audit("UPDATE_STAFF", { role, changed_fields: changedFields })];
+  if (staffPin) statements.push(audit("RESET_STAFF_PIN", { role }));
+  await env.DB.batch(statements);
 
   return new Response(JSON.stringify({ ok: true, data: {
     staff_id: String(found[idField] || "").trim(), nama, role, status,
@@ -2607,12 +2609,9 @@ if (url.pathname === "/api/d1/toggleStaffStatus") {
     throw invalid(payload.active ? "Staff sudah aktif." : "Staff sudah tidak aktif.");
   }
   const status = payload.active ? "Aktif" : "Tidak Aktif";
-  const updated = await env.DB.prepare(
+  const staffUpdate = env.DB.prepare(
     `UPDATE ${table} SET status = ? WHERE ${idField} = ?`
-  ).bind(status, row[idField]).run();
-  if (updated.meta?.changes !== 1) {
-    throw fault(404, "STAFF_NOT_FOUND", "Staff tidak dijumpai.");
-  }
+  ).bind(status, row[idField]);
 
   const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -2621,13 +2620,17 @@ if (url.pathname === "/api/d1/toggleStaffStatus") {
   }).formatToParts(new Date());
   const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
   const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
-  await env.DB.prepare(
+  const auditInsert = env.DB.prepare(
     `INSERT INTO AUDIT_LOG (
        timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(timestamp, payload.active ? "ACTIVATE_STAFF" : "DEACTIVATE_STAFF",
     "", "Admin", actor, JSON.stringify({ role, from_status: fromStatus, status }),
-    "STAFF", `${role}:${staffId}`).run();
+    "STAFF", `${role}:${staffId}`);
+  const [updated] = await env.DB.batch([staffUpdate, auditInsert]);
+  if (updated.meta?.changes !== 1) {
+    throw fault(404, "STAFF_NOT_FOUND", "Staff tidak dijumpai.");
+  }
 
   return new Response(JSON.stringify({ ok: true, data: {
     staff_id: String(row[idField] || "").trim(), nama: String(row.nama || "").trim(),
