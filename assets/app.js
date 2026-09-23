@@ -26,6 +26,7 @@ const D1_POST_ENDPOINTS = {
   getOutingConfigReadiness: "getOutingConfigReadiness",
   getAdminStaff: "getAdminStaff",
   createStaff: "createStaff",
+  updateStaff: "updateStaff",
   createStudent: "createStudent",
   updateStudent: "updateStudent",
   toggleStudentStatus: "toggleStudentStatus",

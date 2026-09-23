@@ -2450,6 +2450,115 @@ if (url.pathname === "/api/d1/createStaff") {
     pin_configured: Boolean(staffPin)
   } }), { status: 200, headers });
 }
+if (url.pathname === "/api/d1/updateStaff") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json() || {};
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const input = payload.staff && typeof payload.staff === "object" ? payload.staff : payload;
+  const invalid = message => fault(400, "INVALID_STAFF", message);
+  const role = String(payload.role || input.role || "").trim().toUpperCase();
+  if (role !== "WARDEN" && role !== "GUARD") {
+    throw invalid("role staff mesti WARDEN atau GUARD.");
+  }
+  const table = role === "WARDEN" ? "WARDENS" : "GUARDS";
+  const idField = role === "WARDEN" ? "warden_id" : "guard_id";
+  const nameField = role === "WARDEN" ? "nama_warden" : "nama_guard";
+  const staffId = String(payload.staff_id || input.staff_id || "").trim();
+  if (!staffId) throw invalid("staff_id diperlukan.");
+
+  const existing = await env.DB.prepare(`SELECT * FROM ${table}`).all();
+  const normalize = value => String(value || "").trim().toLowerCase();
+  const rows = existing.results || [];
+  const found = rows.find(row => normalize(row[idField]) === normalize(staffId));
+  if (!found) throw fault(404, "STAFF_NOT_FOUND", "Staff tidak dijumpai.");
+  const currentStatus = String(found.status ?? "").trim().toUpperCase().replace(/_/g, " ");
+  if (currentStatus && currentStatus !== "AKTIF" && currentStatus !== "TIDAK AKTIF") {
+    throw invalid("status staff mesti Aktif atau Tidak Aktif.");
+  }
+  const current = {
+    nama: String(found.nama || "").trim(),
+    email: String(found.email || "").trim(),
+    no_tel: String(found.no_tel || "").trim(),
+    status: currentStatus === "TIDAK AKTIF" ? "Tidak Aktif" : "Aktif",
+    catatan: String(found.catatan || "").trim()
+  };
+  const source = { ...current, ...input };
+  const nama = String(source.nama || source[nameField] || "").trim();
+  const staffPin = String(input.pin || "").trim();
+  if (staffId.length > 100) throw invalid("staff_id diperlukan dan mesti sah.");
+  if (!nama || nama.length > 200) throw invalid("nama staff diperlukan dan mesti sah.");
+  if (staffPin && !/^\d{4,12}$/.test(staffPin)) {
+    throw invalid("PIN staff mesti 4 hingga 12 digit.");
+  }
+  const email = String(source.email || "").trim();
+  const no_tel = String(source.no_tel || "").trim();
+  const catatan = String(source.catatan || "").trim();
+  const rawStatus = String(input.status || current.status).trim().toUpperCase().replace(/_/g, " ");
+  if (rawStatus !== "AKTIF" && rawStatus !== "TIDAK AKTIF") {
+    throw invalid("status staff mesti Aktif atau Tidak Aktif.");
+  }
+  const status = rawStatus === "TIDAK AKTIF" ? "Tidak Aktif" : "Aktif";
+  if (rows.some(row =>
+    normalize(row[idField]) !== normalize(staffId) && normalize(row.nama) === normalize(nama)
+  )) {
+    throw fault(400, "STAFF_NAME_EXISTS", "Nama staff telah wujud untuk role ini.");
+  }
+
+  const updates = { email, no_tel, status, catatan, nama };
+  if (staffPin) updates.pin = staffPin;
+  await env.DB.prepare(
+    `UPDATE ${table}
+     SET nama = ?, email = ?, no_tel = ?, status = ?, catatan = ?${staffPin ? ", pin = ?" : ""}
+     WHERE ${idField} = ?`
+  ).bind(nama, email, no_tel, status, catatan,
+    ...(staffPin ? [staffPin] : []), found[idField]).run();
+
+  const changedFields = ["email", "no_tel", "status", "catatan", "nama"]
+    .filter(field => String(found[field] || "") !== String(updates[field] || ""))
+    .map(field => field === "nama" ? nameField : field);
+  const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  }).formatToParts(new Date());
+  const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
+  const audit = (action, details) => env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(timestamp, action, "", "Admin", actor, JSON.stringify(details),
+    "STAFF", `${role}:${staffId}`).run();
+  await audit("UPDATE_STAFF", { role, changed_fields: changedFields });
+  if (staffPin) await audit("RESET_STAFF_PIN", { role });
+
+  return new Response(JSON.stringify({ ok: true, data: {
+    staff_id: String(found[idField] || "").trim(), nama, role, status,
+    email, no_tel, catatan, pin_configured: Boolean(staffPin || String(found.pin ?? "").trim())
+  } }), { status: 200, headers });
+}
 if (url.pathname === "/api/d1/getAdminStaff") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
