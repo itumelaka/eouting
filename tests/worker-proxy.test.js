@@ -9,6 +9,227 @@ const origin = "https://itumelaka.github.io";
 const upstream = "https://script.google.com/macros/s/TEST_DEPLOYMENT/exec";
 const destination = "https://script.googleusercontent.com/macros/echo?user_content_key=SECRET&lib=TEST";
 
+function profilePhotoFixture(options = {}) {
+  const student = { student_id: "STU-001", no_matrik: "M001", nama: "Test Student",
+    status: "Aktif", photo_file_id: "", photo_updated_at: "", ...options.student };
+  const queries = [], batches = [], events = [];
+  const statement = (sql, values = []) => ({
+    sql, values,
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, values });
+      if (options.invalidAuth) return null;
+      if (sql.includes("FROM STUDENTS")) return student;
+      if (/FROM (WARDENS|GUARDS)/.test(sql)) return { warden_id: "W-TEST", guard_id: "G-TEST" };
+      if (sql.includes("FROM ADMIN_USERS")) return { admin_id: "ADMIN-TEST", nama_admin: "Test Admin" };
+      throw new Error("Unexpected query");
+    },
+    async all() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM OUTING_REQUESTS")) return { results: options.records || [] };
+      if (sql.includes("FROM STUDENTS")) return { results: options.photos || [] };
+      throw new Error("Unexpected query");
+    }
+  });
+  const DB = { prepare: sql => statement(sql), async batch(statements) {
+    events.push("sync"); batches.push(statements);
+    if (options.syncThrows) throw new Error("PRIVATE_FILE YQ== GAS_MANAGED:PROFILE_PHOTO");
+    return [{ success: true, meta: { changes: options.changes ?? 1 } },
+      { success: true, meta: { changes: options.changes ?? 1 } }];
+  } };
+  const rt = runtime((url, init, count) => {
+    events.push("GAS");
+    if (options.fetch) return options.fetch(url, init, count);
+    return json(JSON.stringify(options.upstream || { ok: true, data: {
+      student_id: "STU-001", has_profile_photo: true, photo_updated_at: "2026-09-23 13:00:00",
+      photo_file_id: "PRIVATE_FILE"
+    } }));
+  });
+  const run = (action, payload, method = "POST") => rt.run(req(method, {
+    url: `https://proxy.test/api/d1/${action}`, headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify(payload)
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB });
+  return { ...rt, run, queries, batches, events };
+}
+
+const profileStudent = { student_id: "STU-001", no_matrik: "M001" };
+const profileUpload = { ...profileStudent, mime_type: "image/jpeg", image_base64: "YQ==" };
+const profileAdmin = { admin_id: "ADMIN-TEST", nama_admin: "Test Admin", pin: "TEST_PIN" };
+
+test("profile photos: student cannot fetch another student's photo", async () => {
+  const f = profilePhotoFixture();
+  const response = await f.run("getStudentProfilePhotos", {
+    ...profileStudent, role: "student", student_ids: ["STU-OTHER"]
+  });
+  assert.equal(response.status, 403);
+  assert.equal(f.calls.length, 0);
+  assert.match(f.queries[0].sql, /student_id = \? AND no_matrik = \? AND status = 'Aktif'/);
+  assert.deepEqual(f.queries[0].values, ["STU-001", "M001"]);
+});
+
+for (const role of ["warden", "guard"]) {
+  test(`profile photos: ${role} cannot fetch outside current operational scope`, async () => {
+    const f = profilePhotoFixture({ records: [{ student_id: "STU-OTHER", status: "SELESAI",
+      tarikh: "2000-01-01", jenis_permohonan: "OUTING_BIASA" }] });
+    const response = await f.run("getStudentProfilePhotos", {
+      role, name: "Test Staff", pin: "TEST_PIN", student_ids: ["STU-OTHER"]
+    });
+    assert.equal(response.status, 403);
+    assert.equal(f.calls.length, 0);
+    assert.match(f.queries[0].sql, /nama = \? AND pin = \? AND status = 'Aktif'/);
+    assert.deepEqual(f.queries[0].values, ["Test Staff", "TEST_PIN"]);
+  });
+}
+
+test("profile photos: operational scope includes active, today's activity and open hostel returns only", async () => {
+  const f = profilePhotoFixture({ records: [
+    { student_id: "ACTIVE", status: "KELUAR", tarikh: "2000-01-01" },
+    { student_id: "TODAY", status: "SELESAI", masa_masuk: new Date().toISOString() },
+    { student_id: "HOSTEL", status: "OTHER", jenis_permohonan: "PULANG_BERMALAM" }
+  ], photos: [{ student_id: "ACTIVE", photo_file_id: "GAS_MANAGED:PROFILE_PHOTO" }],
+  upstream: { ok: true, data: { photos: [{ student_id: "ACTIVE", photo_data_uri: "data:image/jpeg;base64,YQ==",
+    photo_updated_at: "2026-09-23 13:00:00", photo_file_id: "PRIVATE_FILE" }] } } });
+  const response = await f.run("getStudentProfilePhotos", {
+    role: "guard", name: "Test Staff", pin: "TEST_PIN", student_ids: ["ACTIVE", "TODAY", "HOSTEL"], photo_variant: "thumbnail"
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, data: { photos: [{ student_id: "ACTIVE",
+    photo_data_uri: "data:image/jpeg;base64,YQ==", photo_updated_at: "2026-09-23 13:00:00" }] } });
+  assert.equal(f.calls.length, 1);
+  assert.deepEqual(JSON.parse(f.calls[0].init.body).student_ids, ["ACTIVE"]);
+  assert.doesNotMatch(f.calls[0].init.body, /GAS_MANAGED|photo_file_id/);
+  assert.doesNotMatch(f.logs.join(""), /YQ==|PRIVATE_FILE|GAS_MANAGED|TEST_PIN/);
+});
+
+for (const existing of ["", "PRIVATE_EXISTING_FILE"]) {
+  test(`profile photos: submit calls GAS once then ${existing ? "replaces existing file ID with sentinel" : "sets sentinel"} without leaking metadata`, async () => {
+    const f = profilePhotoFixture({ student: { photo_file_id: existing } });
+    const response = await f.run("submitStudentProfilePhoto", { ...profileUpload, photo_file_id: "UNTRUSTED_FILE" });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, data: { student_id: "STU-001",
+      has_profile_photo: true, photo_updated_at: "2026-09-23 13:00:00" } });
+    assert.deepEqual(f.events, ["GAS", "sync"]);
+    assert.equal(f.calls.length, 1);
+    assert.deepEqual(JSON.parse(f.calls[0].init.body), { action: "submitStudentProfilePhoto", ...profileUpload });
+    const [update, audit] = f.batches[0];
+    assert.match(update.sql, /UPDATE STUDENTS SET photo_file_id = \?, photo_updated_at = \?/);
+    assert.deepEqual(update.values.slice(0, 3), ["GAS_MANAGED:PROFILE_PHOTO", "2026-09-23 13:00:00", "STU-001"]);
+    assert.match(audit.sql, /WHERE changes\(\) = 1/);
+    assert.equal(audit.values[1], "UPDATE_STUDENT_PROFILE_PHOTO");
+    assert.doesNotMatch(JSON.stringify(audit) + f.logs.join(""), /YQ==|PRIVATE_|GAS_MANAGED|photo_file_id|image_base64/);
+  });
+}
+
+test("profile photos: admin removal calls GAS once then clears D1 and audits without file IDs", async () => {
+  const f = profilePhotoFixture({ student: { photo_file_id: "GAS_MANAGED:PROFILE_PHOTO" },
+    upstream: { ok: true, data: { student_id: "STU-001", has_profile_photo: false, photo_updated_at: "" } } });
+  const response = await f.run("removeStudentProfilePhoto", { ...profileAdmin, student_id: "STU-001" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, data: {
+    student_id: "STU-001", has_profile_photo: false, photo_updated_at: "" } });
+  assert.deepEqual(f.events, ["GAS", "sync"]);
+  assert.equal(f.calls.length, 1);
+  assert.deepEqual(JSON.parse(f.calls[0].init.body), { action: "removeStudentProfilePhoto", ...profileAdmin, student_id: "STU-001" });
+  const [update, audit] = f.batches[0];
+  assert.deepEqual(update.values.slice(0, 3), ["", "", "STU-001"]);
+  assert.equal(audit.values[1], "REMOVE_STUDENT_PROFILE_PHOTO");
+  assert.match(audit.sql, /WHERE changes\(\) = 1/);
+  assert.doesNotMatch(f.calls[0].init.body + JSON.stringify(audit) + f.logs.join(""), /GAS_MANAGED|photo_file_id|YQ==/);
+});
+
+for (const action of ["submitStudentProfilePhoto", "removeStudentProfilePhoto"]) {
+  for (const failure of [{ syncThrows: true }, { changes: 0 }]) {
+    test(`profile photos: ${action} sync failure ${JSON.stringify(failure)} never retries or exposes internals`, async () => {
+      const f = profilePhotoFixture({ ...failure, upstream: { ok: true, data: { student_id: "STU-001",
+        has_profile_photo: action === "submitStudentProfilePhoto", photo_updated_at: action === "submitStudentProfilePhoto" ? "2026-09-23 13:00:00" : "" } } });
+      const response = await f.run(action, action === "submitStudentProfilePhoto" ? profileUpload : { ...profileAdmin, student_id: "STU-001" });
+      assert.equal(response.status, 500);
+      const body = await response.json();
+      assert.equal(body.code, "PROFILE_PHOTO_D1_SYNC_FAILED");
+      assert.match(body.error, /jangan.*semula/i);
+      assert.equal(f.calls.length, 1);
+      assert.doesNotMatch(JSON.stringify(body) + f.logs.join(""), /PRIVATE_FILE|YQ==|GAS_MANAGED/);
+    });
+  }
+}
+
+test("profile photos: invalid auth and invalid images never reach GAS", async () => {
+  const denied = profilePhotoFixture({ invalidAuth: true });
+  assert.equal((await denied.run("submitStudentProfilePhoto", profileUpload)).status, 401);
+  assert.equal(denied.calls.length, 0);
+  for (const invalid of [{ mime_type: "text/plain" }, { image_base64: "bad" }, { image_base64: "A".repeat(1100 * 1024 + 4) }]) {
+    const f = profilePhotoFixture();
+    assert.equal((await f.run("submitStudentProfilePhoto", { ...profileUpload, ...invalid })).status, 400);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test("profile photos: rejected or malformed GAS result never syncs D1", async () => {
+  for (const result of [{ ok: false, error: "Rejected" }, { ok: true, data: { student_id: "OTHER", has_profile_photo: true, photo_updated_at: "now" } }]) {
+    const f = profilePhotoFixture({ upstream: result });
+    assert.equal((await f.run("submitStudentProfilePhoto", profileUpload)).status, 502);
+    assert.equal(f.batches.length, 0);
+    assert.equal(f.calls.length, 1);
+  }
+});
+
+test("profile photos: trusted redirect uses one POST and one bodyless GET", async () => {
+  const f = profilePhotoFixture({ fetch: (url, init, count) => count === 1
+    ? new Response(null, { status: 302, headers: { Location: destination } })
+    : json(JSON.stringify({ ok: true, data: { student_id: "STU-001", has_profile_photo: true, photo_updated_at: "2026-09-23 13:00:00" } })) });
+  assert.equal((await f.run("submitStudentProfilePhoto", profileUpload)).status, 200);
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls[0].init.method, "POST");
+  assert.equal(f.calls[1].init.method, "GET");
+  assert.equal(f.calls[1].init.body, undefined);
+  assert.equal(f.calls[1].url, destination);
+});
+
+test("profile photos: getter filters absent D1 photo presence and validates limits before GAS", async () => {
+  const f = profilePhotoFixture();
+  const response = await f.run("getStudentProfilePhotos", { ...profileAdmin, role: "admin", student_ids: ["NO-PHOTO", "MISSING"] });
+  assert.deepEqual(await response.json(), { ok: true, data: { photos: [] } });
+  assert.equal(f.calls.length, 0);
+  const query = f.queries.find(query => query.sql.includes("FROM STUDENTS"));
+  assert.match(query.sql, /photo_file_id IS NOT NULL AND TRIM\(photo_file_id\) <> ''/);
+  assert.deepEqual(query.values, ["no-photo", "missing"]);
+  for (const invalid of [{ student_ids: Array(101).fill("STU-001") }, { photo_variant: "original" }]) {
+    const bad = profilePhotoFixture();
+    assert.equal((await bad.run("getStudentProfilePhotos", { ...profileStudent, role: "student", ...invalid })).status, 400);
+    assert.equal(bad.calls.length, 0);
+  }
+});
+
+test("profile photos: unauthorized GAS photos and malformed removal responses fail closed", async () => {
+  const f = profilePhotoFixture({ photos: [{ student_id: "STU-001" }], upstream: { ok: true, data: { photos: [
+    { student_id: "OTHER", photo_data_uri: "data:image/jpeg;base64,YQ==", photo_updated_at: "now" }
+  ] } } });
+  const response = await f.run("getStudentProfilePhotos", { ...profileStudent, role: "student" });
+  assert.equal(response.status, 502);
+  assert.doesNotMatch(await response.text(), /YQ==|OTHER/);
+  for (const data of [
+    { student_id: "OTHER", has_profile_photo: false, photo_updated_at: "" },
+    { student_id: "STU-001", has_profile_photo: true, photo_updated_at: "" },
+    { student_id: "STU-001", has_profile_photo: false, photo_updated_at: "old" }
+  ]) {
+    const bad = profilePhotoFixture({ upstream: { ok: true, data } });
+    assert.equal((await bad.run("removeStudentProfilePhoto", { ...profileAdmin, student_id: "STU-001" })).status, 502);
+    assert.equal(bad.batches.length, 0);
+    assert.equal(bad.calls.length, 1);
+  }
+});
+
+test("profile photos: all routes support OPTIONS, reject GET and reject unauthenticated callers", async () => {
+  for (const action of ["getStudentProfilePhotos", "submitStudentProfilePhoto", "removeStudentProfilePhoto"]) {
+    const f = profilePhotoFixture({ invalidAuth: true });
+    assert.equal((await f.run(action, {}, "OPTIONS")).status, 204);
+    assert.equal((await f.run(action, {}, "GET")).status, 405);
+    assert.equal((await f.run(action, { ...profileUpload, ...profileAdmin, role: "student" })).status, 401);
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.batches.length, 0);
+  }
+});
+
 function runtime(fetchImpl, options = {}) {
   const calls = [], logs = [];
   const context = vm.createContext({

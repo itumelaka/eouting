@@ -2168,6 +2168,219 @@ const row = await env.DB.prepare(
   });
 }
 
+if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/api/d1/removeStudentProfilePhoto"].includes(url.pathname)) {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  action = url.pathname.split("/").pop();
+  // Keep all photo-route dependency errors out of the outer diagnostic: they may contain photo metadata.
+  try {
+    let payload;
+    try { payload = await request.json(); } catch {
+      throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+    }
+    const viewing = action === "getStudentProfilePhotos";
+    const uploading = action === "submitStudentProfilePhoto";
+    const role = viewing ? String(payload.role || "").trim().toLowerCase() : uploading ? "student" : "admin";
+    const studentId = String(payload.student_id || payload.id || "").trim();
+    const noMatrik = String(payload.no_matrik || payload.matric || "").trim();
+    let student, admin, credentials;
+    if (role === "student") {
+      student = await env.DB.prepare(
+        "SELECT student_id, no_matrik, nama, photo_file_id, photo_updated_at FROM STUDENTS WHERE student_id = ? AND no_matrik = ? AND status = 'Aktif' LIMIT 1"
+      ).bind(studentId, noMatrik).first();
+      if (!student || !studentId || !noMatrik) throw fault(401, "STUDENT_SESSION_INVALID", "Akses sesi pelajar tidak sah.");
+      credentials = { student_id: student.student_id, no_matrik: student.no_matrik };
+    } else if (role === "warden" || role === "guard") {
+      const name = String((role === "warden" ? payload.nama_warden || payload.warden_name : payload.nama_guard || payload.guard_name) || payload.name || "").trim();
+      const pin = String(payload.pin || "").trim();
+      const staff = await env.DB.prepare(role === "warden"
+        ? "SELECT warden_id FROM WARDENS WHERE nama = ? AND pin = ? AND status = 'Aktif' LIMIT 1"
+        : "SELECT guard_id FROM GUARDS WHERE nama = ? AND pin = ? AND status = 'Aktif' LIMIT 1"
+      ).bind(name, pin).first();
+      if (!staff || !name || !pin) throw fault(401, role === "warden" ? "WARDEN_SESSION_INVALID" : "GUARD_SESSION_INVALID",
+        role === "warden" ? "Akses sesi warden tidak sah." : "Akses sesi guard tidak sah.");
+      credentials = { [role === "warden" ? "nama_warden" : "nama_guard"]: name, pin };
+    } else if (role === "admin") {
+      const adminId = String(payload.admin_id || "").trim();
+      const adminName = String(payload.nama_admin || payload.admin_name || payload.name || "").trim();
+      const pin = String(payload.pin || "").trim();
+      admin = await env.DB.prepare(`SELECT admin_id, nama_admin FROM ADMIN_USERS
+        WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+        AND pin = ? AND LOWER(status) = 'aktif' LIMIT 1`).bind(adminId, adminName, pin).first();
+      if (!admin || !(adminId || adminName) || !pin) throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah.");
+      credentials = { admin_id: adminId, nama_admin: adminName, pin };
+    } else {
+      throw fault(401, "SESSION_REQUIRED", "Akses sesi diperlukan.");
+    }
+
+    let upstreamPayload, allowedIds, variant;
+    if (viewing) {
+      variant = String(payload.photo_variant || "full").trim().toLowerCase();
+      if (!["thumbnail", "full"].includes(variant)) throw fault(400, "PROFILE_PHOTO_INVALID_VARIANT", "Varian foto profil tidak sah.");
+      let ids = Array.isArray(payload.student_ids) ? payload.student_ids.map(id => String(id || "").trim()).filter(Boolean) : [];
+      if (ids.length > 100) throw fault(400, "PROFILE_PHOTO_LIMIT", "Terlalu banyak foto diminta dalam satu permintaan.");
+      const key = value => String(value || "").trim().toLowerCase();
+      if (role === "student") {
+        if (ids.some(id => key(id) !== key(student.student_id))) {
+          throw fault(403, "PROFILE_PHOTO_FORBIDDEN", "Pelajar hanya boleh mengakses foto profil sendiri.");
+        }
+        ids = [student.student_id];
+      } else if (role === "warden" || role === "guard") {
+        // Match getTodayRecords' Malaysia date, active-status and open-hostel predicates.
+        const dateKey = value => {
+          if (value === undefined || value === null || value === "") return "";
+          const text = String(value).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+          const date = new Date(text);
+          if (Number.isNaN(date.getTime())) return "";
+          const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur",
+            year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+          const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
+          return `${map.year}-${map.month}-${map.day}`;
+        };
+        const today = dateKey(new Date());
+        const records = await env.DB.prepare(`SELECT student_id, status, jenis_permohonan, tarikh, tarikh_balik,
+          masa_mohon, masa_approve, masa_keluar, masa_masuk, masa_batal_pelajar FROM OUTING_REQUESTS`).all();
+        const inScope = new Set((records.results || []).filter(row => {
+          const status = String(row.status || "").trim();
+          const todayActivity = [dateKey(row.tarikh) || dateKey(row.masa_mohon), dateKey(row.tarikh_balik),
+            ...["masa_mohon", "masa_approve", "masa_keluar", "masa_masuk", "masa_batal_pelajar"].map(field => dateKey(row[field]))].includes(today);
+          const active = ["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "KELUAR"].includes(status);
+          const openHostel = ["OUTING_HUJUNG_MINGGU", "PULANG_BERMALAM", "CUTI_SEMESTER"].includes(String(row.jenis_permohonan || "").trim().toUpperCase()) &&
+            !["SELESAI", "DITOLAK_WARDEN", "DIBATALKAN_PELAJAR"].includes(status);
+          return todayActivity || active || openHostel;
+        }).map(row => key(row.student_id)));
+        if (ids.some(id => !inScope.has(key(id)))) throw fault(403, "PROFILE_PHOTO_FORBIDDEN", "Foto hanya boleh diakses untuk rekod operasi semasa.");
+      }
+      ids = [...new Set(ids.map(key))];
+      if (!ids.length) return finish(JSON.stringify({ ok: true, data: { photos: [] } }), 200);
+      const existing = await env.DB.prepare(`SELECT student_id FROM STUDENTS
+        WHERE LOWER(TRIM(student_id)) IN (${ids.map(() => "?").join(",")})
+        AND photo_file_id IS NOT NULL AND TRIM(photo_file_id) <> ''`).bind(...ids).all();
+      const requested = new Set(ids);
+      const eligibleIds = (existing.results || []).map(row => String(row.student_id).trim()).filter(id => requested.has(key(id)));
+      if (!eligibleIds.length) return finish(JSON.stringify({ ok: true, data: { photos: [] } }), 200);
+      allowedIds = new Set(eligibleIds);
+      upstreamPayload = { action, role, ...credentials, student_ids: eligibleIds, photo_variant: variant };
+    } else if (uploading) {
+      const mimeType = String(payload.mime_type || "").trim().toLowerCase();
+      const imageBase64 = String(payload.image_base64 || "").trim();
+      if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) throw fault(400, "PROFILE_PHOTO_INVALID_MIME", "Format foto profil tidak disokong.");
+      if (!imageBase64 || imageBase64.length > 1100 * 1024 || imageBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
+        throw fault(400, "PROFILE_PHOTO_INVALID_IMAGE", "Foto profil tidak sah atau terlalu besar.");
+      }
+      const bytes = imageBase64.length / 4 * 3 - (imageBase64.endsWith("==") ? 2 : imageBase64.endsWith("=") ? 1 : 0);
+      if (!bytes || bytes > 800 * 1024) throw fault(400, "PROFILE_PHOTO_INVALID_IMAGE", "Foto profil tidak sah atau terlalu besar.");
+      upstreamPayload = { action, ...credentials, image_base64: imageBase64, mime_type: mimeType };
+    } else {
+      if (!studentId) throw fault(400, "INVALID_REQUEST", "student_id diperlukan.");
+      student = await env.DB.prepare(`SELECT student_id, nama, photo_file_id, photo_updated_at
+        FROM STUDENTS WHERE LOWER(TRIM(student_id)) = LOWER(?) LIMIT 1`).bind(studentId).first();
+      if (!student) throw fault(404, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai.");
+      upstreamPayload = { action, ...credentials, student_id: student.student_id };
+    }
+
+    // One GAS POST only; a trusted Apps Script redirect retrieves its result with a bodyless GET.
+    let upstream;
+    try { upstream = trustedUrl(env.GAS_UPSTREAM_URL); } catch {
+      throw fault(500, "UPSTREAM_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
+    }
+    const invalidResponse = () => fault(502, "PROFILE_PHOTO_UPSTREAM_INVALID", "Respons perkhidmatan foto profil tidak sah.");
+    const controller = new AbortController();
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(fault(504, "UPSTREAM_TIMEOUT", "Perkhidmatan foto profil mengambil masa terlalu lama."));
+        controller.abort();
+      }, 120000);
+    });
+    const delivery = async () => {
+      sent = true;
+      attempts = 1;
+      let response = await fetch(upstream.href, {
+        method: "POST", redirect: "manual", signal: controller.signal,
+        headers: { Accept: "application/json", "Cache-Control": "no-store", "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(upstreamPayload)
+      });
+      if (response.status === 302 || response.status === 303) {
+        let destination;
+        try { destination = trustedUrl(response.headers.get("Location"), true); } catch {
+          await response.body?.cancel();
+          throw invalidResponse();
+        }
+        await response.body?.cancel();
+        response = await fetch(destination.href, { method: "GET", redirect: "manual", signal: controller.signal,
+          headers: { Accept: "application/json", "Cache-Control": "no-store" } });
+      }
+      const bytes = await readBounded(response.body, MAX_RESPONSE_BYTES, invalidResponse());
+      let result;
+      try { result = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { throw invalidResponse(); }
+      if (result && result.ok === false) {
+        // Never echo untrusted upstream text: Drive exceptions can include file IDs or URLs.
+        throw fault(502, "PROFILE_PHOTO_UPSTREAM_REJECTED", "Permintaan foto profil ditolak oleh perkhidmatan.");
+      }
+      if (!response.ok || !result || result.ok !== true || !result.data || typeof result.data !== "object" || Array.isArray(result.data)) throw invalidResponse();
+      return result.data;
+    };
+    let result;
+    try { result = await Promise.race([delivery(), timeout]); } catch (error) {
+      if (error && error.code && Number.isInteger(error.status)) throw error;
+      throw fault(502, "UPSTREAM_DELIVERY_FAILED", "Perkhidmatan foto profil tidak dapat dihubungi.");
+    } finally {
+      clearTimeout(timer);
+      controller.abort();
+    }
+    if (viewing) {
+      if (!Array.isArray(result.photos) || result.photos.length > allowedIds.size) throw invalidResponse();
+      const seen = new Set();
+      const photos = result.photos.map(photo => {
+        if (!photo || !allowedIds.has(photo.student_id) || seen.has(photo.student_id) ||
+            typeof photo.photo_updated_at !== "string" || typeof photo.photo_data_uri !== "string") throw invalidResponse();
+        const match = photo.photo_data_uri.match(/^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+        if (!match || match[1].length % 4 !== 0 || match[1].length > Math.ceil((variant === "thumbnail" ? 256 : 800) * 1024 / 3) * 4) throw invalidResponse();
+        seen.add(photo.student_id);
+        return { student_id: photo.student_id, photo_data_uri: photo.photo_data_uri, photo_updated_at: photo.photo_updated_at };
+      });
+      return finish(JSON.stringify({ ok: true, data: { photos } }), 200);
+    }
+    if (result.student_id !== student.student_id || result.has_profile_photo !== uploading ||
+        typeof result.photo_updated_at !== "string" || (uploading ? !result.photo_updated_at.trim() : result.photo_updated_at !== "")) throw invalidResponse();
+
+    const syncError = () => fault(500, "PROFILE_PHOTO_D1_SYNC_FAILED",
+      "Perubahan foto profil telah diterima oleh perkhidmatan, tetapi penyegerakan D1 gagal. Hubungi pentadbir; jangan hantar semula permintaan.");
+    // Presence only, never a Drive ID. Forwarded payloads, responses and audits are explicitly allowlisted.
+    const presence = uploading ? "GAS_MANAGED:PROFILE_PHOTO" : "";
+    const timestamp = uploading ? result.photo_updated_at : new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+    }).format(new Date());
+    try {
+      const [updated, audited] = await env.DB.batch([
+        env.DB.prepare(`UPDATE STUDENTS SET photo_file_id = ?, photo_updated_at = ? WHERE student_id = ?
+          AND COALESCE(photo_file_id, '') = ? AND COALESCE(photo_updated_at, '') = ?`).bind(
+            presence, result.photo_updated_at, student.student_id, student.photo_file_id ?? "", student.photo_updated_at ?? ""),
+        env.DB.prepare(`INSERT INTO AUDIT_LOG (timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE changes() = 1`).bind(timestamp,
+            uploading ? "UPDATE_STUDENT_PROFILE_PHOTO" : "REMOVE_STUDENT_PROFILE_PHOTO", "",
+            uploading ? "Student" : "Admin", uploading ? student.nama || "" : admin.admin_id || admin.nama_admin || "ADMIN",
+            "", "STUDENT", student.student_id)
+      ]);
+      if (updated?.meta?.changes !== 1 || audited?.meta?.changes !== 1) throw syncError();
+    } catch { throw syncError(); }
+    return finish(JSON.stringify({ ok: true, data: { student_id: student.student_id,
+      has_profile_photo: uploading, photo_updated_at: result.photo_updated_at } }), 200);
+  } catch (error) {
+    if (error && error.code && Number.isInteger(error.status)) throw error;
+    throw fault(500, "PROFILE_PHOTO_FAILED", "Permintaan foto profil tidak dapat diproses.");
+  }
+}
+
 if (url.pathname === "/api/d1/submitReturnSelfie") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
