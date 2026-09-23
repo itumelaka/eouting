@@ -3478,6 +3478,164 @@ if (url.pathname === "/api/d1/getAdminStudentGroups") {
     headers
   });
 }
+if (url.pathname === "/api/d1/toggleLiInstitutionStatus") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const invalid = message => fault(400, "INVALID_REQUEST", message);
+  const normalizeCode = value => {
+    const code = String(value ?? "").trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(code)) {
+      throw invalid("institution_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
+    }
+    return code;
+  };
+  const institution_code = normalizeCode(payload.institution_code);
+  const expectedVersion = Number(payload.expected_config_version);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    throw invalid("expected_config_version mesti nombor bulat positif.");
+  }
+  const active = payload.active;
+  if (active !== true && active !== false) {
+    throw invalid("active mesti boolean true atau false.");
+  }
+
+  const row = await env.DB.prepare(
+    `SELECT institution_code, display_name, active, sort_order, config_version,
+            created_at, created_by, updated_at, updated_by
+     FROM LI_INSTITUTIONS WHERE LOWER(TRIM(institution_code)) = LOWER(?) LIMIT 1`
+  ).bind(institution_code).first();
+  if (!row) throw fault(404, "LI_INSTITUTION_NOT_FOUND", "Institusi LI tidak dijumpai.");
+  const strictBoolean = (value, field) => {
+    if (value === true || value === false) return value;
+    const text = String(value || "").trim().toLowerCase();
+    if (["true", "ya", "1"].includes(text)) return true;
+    if (["false", "tidak", "0"].includes(text)) return false;
+    throw invalid(`${field} mesti boolean true atau false.`);
+  };
+  const normalizeName = value => {
+    const name = String(value ?? "").trim();
+    if (!name || name.length > 100 || /[\u0000-\u001F\u007F]/.test(name)) {
+      throw invalid("display_name mesti teks selamat antara 1 hingga 100 aksara.");
+    }
+    return name;
+  };
+  const normalizePositive = (value, field) => {
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < 1) {
+      throw invalid(`${field} mesti nombor bulat positif.`);
+    }
+    return number;
+  };
+  const current = {
+    institution_code: normalizeCode(row.institution_code),
+    display_name: normalizeName(row.display_name),
+    active: strictBoolean(String(row.active ?? ""), "active"),
+    sort_order: normalizePositive(row.sort_order, "sort_order"),
+    config_version: normalizePositive(row.config_version, "config_version"),
+    created_at: row.created_at || "",
+    created_by: row.created_by || "",
+    updated_at: row.updated_at || "",
+    updated_by: row.updated_by || ""
+  };
+  const conflict = () => fault(409, "CONFIG_VERSION_CONFLICT",
+    "CONFIG_VERSION_CONFLICT: konfigurasi telah berubah. Muat semula sebelum menyimpan.");
+  if (current.config_version !== expectedVersion) throw conflict();
+  if (current.active === active) {
+    throw invalid(active ? "Institusi sudah aktif." : "Institusi sudah tidak aktif.");
+  }
+  if (!active) {
+    const groups = await env.DB.prepare(
+      `SELECT group_code, display_name, institution_required, active, sort_order, config_version
+       FROM STUDENT_GROUPS`
+    ).all();
+    const requiredGroups = new Set();
+    if (!(groups.results || []).length) {
+      requiredGroups.add("LI");
+    } else {
+      for (const group of groups.results) {
+        try {
+          const groupCode = String(group.group_code ?? "").trim().toUpperCase();
+          if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(groupCode)) continue;
+          normalizeName(group.display_name);
+          const required = strictBoolean(String(group.institution_required ?? ""), "institution_required");
+          strictBoolean(String(group.active ?? ""), "active");
+          normalizePositive(group.sort_order, "sort_order");
+          normalizePositive(group.config_version, "config_version");
+          if (required) requiredGroups.add(groupCode);
+        } catch (error) {
+          // Invalid group configuration cannot authorize deactivation.
+        }
+      }
+    }
+    const students = await env.DB.prepare(
+      "SELECT status, kelas, institution_code FROM STUDENTS"
+    ).all();
+    const referenceCount = (students.results || []).filter(student =>
+      String(student.status || "").trim().toLowerCase() === "aktif" &&
+      requiredGroups.has(String(student.kelas || "").trim().toUpperCase()) &&
+      String(student.institution_code || "").trim().toUpperCase() === institution_code
+    ).length;
+    if (referenceCount > 0) {
+      throw invalid(`Institusi LI tidak boleh dinyahaktif kerana masih dirujuk oleh ${referenceCount} pelajar aktif dalam kumpulan yang memerlukan institusi.`);
+    }
+  }
+
+  const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  }).formatToParts(new Date());
+  const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
+  const nextVersion = current.config_version + 1;
+  const updated = await env.DB.prepare(
+    `UPDATE LI_INSTITUTIONS
+     SET active = ?, config_version = ?, updated_at = ?, updated_by = ?
+     WHERE institution_code = ? AND config_version = ?`
+  ).bind(Number(active), nextVersion, timestamp, actor, row.institution_code, expectedVersion).run();
+  if (updated.meta?.changes !== 1) throw conflict();
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(timestamp, active ? "ACTIVATE_LI_INSTITUTION" : "DEACTIVATE_LI_INSTITUTION",
+    "", "Admin", actor, JSON.stringify({
+      active: { from: current.active, to: active },
+      previous_config_version: current.config_version,
+      config_version: nextVersion
+    }), "LI_INSTITUTION", institution_code).run();
+
+  return new Response(JSON.stringify({ ok: true, data: {
+    ...current,
+    active,
+    config_version: nextVersion,
+    updated_at: timestamp,
+    updated_by: actor
+  } }), { status: 200, headers });
+}
 if (url.pathname === "/api/d1/updateLiInstitution") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
