@@ -2412,6 +2412,100 @@ if (url.pathname === "/api/d1/getAdminStaff") {
     headers
   });
 }
+if (url.pathname === "/api/d1/toggleStudentStatus") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json() || {};
+  const hasActive = Object.prototype.hasOwnProperty.call(payload, "active");
+  const invalid = message => fault(400, "INVALID_STUDENT", message);
+  if (hasActive && payload.active !== true && payload.active !== false) {
+    throw invalid("active mesti boolean true atau false.");
+  }
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const studentId = String(payload.student_id || "").trim();
+  const requestedStatus = hasActive
+    ? (payload.active ? "AKTIF" : "TIDAK AKTIF")
+    : String(payload.status ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  if (requestedStatus !== "AKTIF" && requestedStatus !== "TIDAK AKTIF") {
+    throw invalid("status pelajar mesti AKTIF atau TIDAK AKTIF.");
+  }
+  if (!studentId) throw invalid("student_id diperlukan.");
+
+  const row = await env.DB.prepare(
+    `SELECT student_id, no_matrik, nama, email, no_tel, kelas, jantina,
+            status, catatan, institution_code, photo_file_id, photo_updated_at
+     FROM STUDENTS WHERE LOWER(TRIM(student_id)) = LOWER(?) LIMIT 1`
+  ).bind(studentId).first();
+  if (!row) throw fault(404, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai.");
+  const current = {
+    student_id: String(row.student_id || "").trim(),
+    no_matrik: String(row.no_matrik ?? "").trim(),
+    nama: String(row.nama || "").trim(),
+    email: String(row.email || "").trim(),
+    no_tel: String(row.no_tel ?? "").trim(),
+    kelas: String(row.kelas || "").trim().toUpperCase(),
+    jantina: String(row.jantina || "").trim(),
+    status: String(row.status || "").trim().toUpperCase(),
+    catatan: String(row.catatan || "").trim(),
+    institution_code: String(row.institution_code || "").trim().toUpperCase(),
+    has_profile_photo: row.photo_file_id !== null && row.photo_file_id !== undefined &&
+      String(row.photo_file_id).trim() !== "",
+    photo_updated_at: String(row.photo_updated_at ?? "").trim()
+  };
+  if (current.status === requestedStatus) {
+    throw invalid(requestedStatus === "AKTIF"
+      ? "Pelajar sudah aktif." : "Pelajar sudah tidak aktif.");
+  }
+
+  const updated = await env.DB.prepare(
+    `UPDATE STUDENTS SET status = ? WHERE student_id = ?`
+  ).bind(requestedStatus, row.student_id).run();
+  if (updated.meta?.changes !== 1) {
+    throw fault(404, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai.");
+  }
+  const actor = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  }).formatToParts(new Date());
+  const time = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const timestamp = `${time.year}-${time.month}-${time.day} ${time.hour}:${time.minute}:${time.second}`;
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(timestamp, requestedStatus === "AKTIF" ? "ACTIVATE_STUDENT" : "DEACTIVATE_STUDENT",
+    "", "Admin", actor,
+    JSON.stringify({ status: { from: current.status, to: requestedStatus } }),
+    "STUDENT", current.student_id).run();
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: { ...current, status: requestedStatus }
+  }), { status: 200, headers });
+}
 if (url.pathname === "/api/d1/updateStudent") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
