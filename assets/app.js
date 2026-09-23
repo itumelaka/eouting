@@ -15,6 +15,16 @@ const D1_POST_ENDPOINTS = {
   loginStudent: "loginStudent",
   loginWarden: "loginWarden",
   loginGuard: "loginGuard",
+  loginAdmin: "loginAdmin",
+  getNoGuardDepartureConfig: "getNoGuardDepartureConfig",
+  updateNoGuardDepartureConfig: "updateNoGuardDepartureConfig",
+  getAdminOutingTypes: "getAdminOutingTypes",
+  createOutingType: "createOutingType",
+  updateOutingType: "updateOutingType",
+  toggleOutingType: "toggleOutingType",
+  getAdminMonitoring: "getAdminMonitoring",
+  getOutingConfigReadiness: "getOutingConfigReadiness",
+  getAdminStaff: "getAdminStaff",
   getTodayRecords: "getTodayRecords",
   getCurrentHostelRoster: "getCurrentHostelRoster",
   getStudentAnnualSummary: "getStudentAnnualSummary",
@@ -4330,11 +4340,8 @@ async function apiPost(action, payload) {
   }
 
   const requestPayload = { action, ...payload };
-  const useGasForAdminHostelRoster =
-    action === "getCurrentHostelRoster" &&
-    String(payload?.role || "").trim().toLowerCase() === "admin";
   const d1Endpoint =
-    USE_D1_STAGING_V300 && !useGasForAdminHostelRoster
+    USE_D1_STAGING_V300
       ? D1_POST_ENDPOINTS[action]
       : null;
   const postUrl = d1Endpoint

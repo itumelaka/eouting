@@ -1092,10 +1092,31 @@ async function mirrorOutingTypeToD1(env, row) {
   ).run();
 }
 
-return { handleSubmitRequest, mirrorOutingTypeToD1 };
+return { handleSubmitRequest, mirrorOutingTypeToD1, validateOutingType };
 
 })();
 
+async function readNoGuardDepartureEnabled(env) {
+  const config = await env.DB.prepare(
+    `SELECT config_value
+     FROM SYSTEM_CONFIG
+     WHERE config_key = ?
+     LIMIT 1`
+  ).bind("NO_GUARD_DEPARTURE_ENABLED").first();
+
+  const rawValue = config
+    ? String(config.config_value || "").trim().toLowerCase()
+    : String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim().toLowerCase();
+
+  return [
+    "1",
+    "true",
+    "yes",
+    "ya",
+    "enabled",
+    "on"
+  ].includes(rawValue);
+}
 async function handleD1DepartureConfirmationRequest(request, env, headers, options = {}) {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -1128,7 +1149,7 @@ async function handleD1DepartureConfirmationRequest(request, env, headers, optio
   }
 
   const featureEnabled =
-    String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim() === "true";
+    await readNoGuardDepartureEnabled(env);
 
   if (!featureEnabled) {
     throw fault(
@@ -1474,7 +1495,7 @@ async function handleD1WardenRemoteCheckout(request, env, headers, options = {})
     );
   }
 
-  if (String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim() !== "true") {
+  if (!(await readNoGuardDepartureEnabled(env))) {
     throw fault(
       403,
       "NO_GUARD_DEPARTURE_DISABLED",
@@ -2198,6 +2219,2003 @@ const row = await env.DB.prepare(
   });
 }
 
+if (url.pathname === "/api/d1/loginAdmin") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  if ((!adminId && !adminName) || !pin) {
+    throw fault(
+      400,
+      "ADMIN_LOGIN_REQUIRED",
+      "ID atau nama Admin dan PIN diperlukan."
+    );
+  }
+
+  const row = await env.DB.prepare(
+    `SELECT admin_id,
+            nama_admin,
+            status,
+            catatan,
+            created_at,
+            updated_at
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!row) {
+    throw fault(
+      401,
+      "ADMIN_LOGIN_INVALID",
+      "Admin tidak dijumpai, tidak aktif atau PIN tidak sah."
+    );
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: row
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/getNoGuardDepartureConfig") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const config = await env.DB.prepare(
+    `SELECT config_value
+     FROM SYSTEM_CONFIG
+     WHERE config_key = ?
+     LIMIT 1`
+  ).bind("NO_GUARD_DEPARTURE_ENABLED").first();
+
+  const rawValue = config
+    ? String(config.config_value || "").trim().toLowerCase()
+    : String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim().toLowerCase();
+
+  const enabled = ["1", "true", "yes", "ya", "enabled", "on"].includes(rawValue);
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: { enabled }
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/getAdminStaff") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const [wardenResult, guardResult] = await Promise.all([
+    env.DB.prepare("SELECT * FROM WARDENS").all(),
+    env.DB.prepare("SELECT * FROM GUARDS").all()
+  ]);
+  const toSafeStaff = (row, role, idField) => {
+    const status = String(row.status === undefined || row.status === null ? "" : row.status)
+      .trim().toUpperCase().replace(/_/g, " ");
+    if (status && status !== "AKTIF" && status !== "TIDAK AKTIF") {
+      throw new Error("status staff mesti Aktif atau Tidak Aktif.");
+    }
+    return {
+      staff_id: String(row[idField] || "").trim(),
+      nama: String(row.nama || "").trim(),
+      role,
+      status: status === "TIDAK AKTIF" ? "Tidak Aktif" : "Aktif",
+      email: String(row.email || "").trim(),
+      no_tel: String(row.no_tel || "").trim(),
+      catatan: String(row.catatan || "").trim(),
+      pin_configured: Boolean(String(row.pin ?? "").trim())
+    };
+  };
+  const staff = [
+    ...(wardenResult.results || []).map(row => toSafeStaff(row, "WARDEN", "warden_id")),
+    ...(guardResult.results || []).map(row => toSafeStaff(row, "GUARD", "guard_id"))
+  ].sort((left, right) =>
+    left.role.localeCompare(right.role) ||
+    left.nama.localeCompare(right.nama, "ms", { sensitivity: "base" })
+  );
+  return new Response(JSON.stringify({ ok: true, data: staff }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/getAdminOutingTypes") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT
+       type_code,
+       display_name,
+       description,
+       active,
+       sort_order,
+       allowed_days,
+       application_open_time,
+       application_close_time,
+       fixed_return_time,
+       same_day_only,
+       require_leave_date,
+       require_return_date,
+       require_return_time,
+       require_guardian_phone,
+       require_guardian_relation,
+       require_emergency_reason,
+       require_purpose,
+       require_location,
+       require_vehicle,
+       require_warden_approval,
+       require_selfie,
+       config_version,
+       created_at,
+       created_by,
+       updated_at,
+       updated_by,
+       departure_allowed_days,
+       earliest_departure_time,
+       application_open_date,
+       application_close_date
+     FROM OUTING_TYPES
+     ORDER BY sort_order ASC, display_name ASC, type_code ASC`
+  ).all();
+
+  const booleanFields = [
+    "active",
+    "same_day_only",
+    "require_leave_date",
+    "require_return_date",
+    "require_return_time",
+    "require_guardian_phone",
+    "require_guardian_relation",
+    "require_emergency_reason",
+    "require_purpose",
+    "require_location",
+    "require_vehicle",
+    "require_warden_approval",
+    "require_selfie"
+  ];
+
+  const rows = (result.results || []).map((row) => {
+    const projected = { ...row };
+
+    for (const field of booleanFields) {
+      projected[field] = Number(projected[field] || 0) === 1;
+    }
+
+    projected.sort_order = Number(projected.sort_order || 0);
+    projected.config_version = Number(projected.config_version || 1);
+
+    return projected;
+  });
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: rows
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/createOutingType") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const input =
+    payload.outing_type &&
+    typeof payload.outing_type === "object"
+      ? { ...payload.outing_type }
+      : {};
+
+  const typeCode = String(
+    input.type_code || payload.type_code || ""
+  ).trim().toUpperCase();
+
+  if (!typeCode) {
+    throw fault(400, "INVALID_REQUEST", "type_code diperlukan.");
+  }
+
+  const existing = await env.DB.prepare(
+    `SELECT type_code
+     FROM OUTING_TYPES
+     WHERE type_code = ?
+     LIMIT 1`
+  ).bind(typeCode).first();
+
+  if (existing) {
+    throw fault(400, "OUTING_TYPE_EXISTS", "type_code telah wujud.");
+  }
+
+  const actor =
+    String(admin.admin_id || admin.nama_admin || "ADMIN")
+      .trim()
+      .slice(0, 100);
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(new Date());
+
+  const map = {};
+  for (const part of parts) {
+    map[part.type] = part.value;
+  }
+
+  const timestamp =
+    `${map.year}-${map.month}-${map.day} ` +
+    `${map.hour}:${map.minute}:${map.second}`;
+
+  const row = {
+    ...input,
+    type_code: typeCode,
+    config_version: 1,
+    created_at: timestamp,
+    created_by: actor,
+    updated_at: timestamp,
+    updated_by: actor
+  };
+
+  const validated =
+    stagingSubmitRequestV230.validateOutingType(
+      row,
+      typeCode
+    );
+
+  await stagingSubmitRequestV230.mirrorOutingTypeToD1(
+    env,
+    {
+      ...validated,
+      created_at: timestamp,
+      created_by: actor,
+      updated_at: timestamp,
+      updated_by: actor
+    }
+  );
+
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp,
+       action,
+       request_id,
+       user_role,
+       user_name,
+       details,
+       entity_type,
+       entity_id
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    timestamp,
+    "CREATE_OUTING_TYPE",
+    "",
+    "Admin",
+    actor,
+    JSON.stringify({
+      display_name: validated.display_name,
+      active: validated.active,
+      sort_order: validated.sort_order,
+      config_version: validated.config_version
+    }),
+    "OUTING_TYPE",
+    typeCode
+  ).run();
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: validated
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/updateOutingType") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const typeCode =
+    String(payload.type_code || "").trim().toUpperCase();
+
+  if (!typeCode) {
+    throw fault(400, "INVALID_REQUEST", "type_code diperlukan.");
+  }
+
+  const expectedVersion = Number(payload.expected_config_version);
+
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    throw fault(
+      400,
+      "INVALID_REQUEST",
+      "expected_config_version mesti nombor bulat positif."
+    );
+  }
+
+  const input =
+    payload.outing_type &&
+    typeof payload.outing_type === "object"
+      ? { ...payload.outing_type }
+      : {};
+
+  if (Object.prototype.hasOwnProperty.call(input, "type_code")) {
+    const requestedTypeCode =
+      String(input.type_code || "").trim().toUpperCase();
+
+    if (requestedTypeCode && requestedTypeCode !== typeCode) {
+      throw fault(
+        400,
+        "IMMUTABLE_TYPE_CODE",
+        "type_code tidak boleh diubah."
+      );
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "active")) {
+    throw fault(
+      400,
+      "ACTIVE_REQUIRES_TOGGLE",
+      "Status active hanya boleh diubah melalui toggleOutingType."
+    );
+  }
+
+  const currentRaw = await env.DB.prepare(
+    `SELECT *
+     FROM OUTING_TYPES
+     WHERE type_code = ?
+     LIMIT 1`
+  ).bind(typeCode).first();
+
+  if (!currentRaw) {
+    throw fault(
+      404,
+      "OUTING_TYPE_NOT_FOUND",
+      "Jenis outing tidak dijumpai."
+    );
+  }
+
+  const currentVersion = Number(currentRaw.config_version);
+
+  if (currentVersion !== expectedVersion) {
+    throw fault(
+      409,
+      "CONFIG_VERSION_CONFLICT",
+      "CONFIG_VERSION_CONFLICT: konfigurasi telah berubah. Muat semula sebelum menyimpan."
+    );
+  }
+
+  const current =
+    stagingSubmitRequestV230.validateOutingType(
+      currentRaw,
+      typeCode
+    );
+
+  const editableFields = [
+    "display_name",
+    "description",
+    "sort_order",
+    "allowed_days",
+    "application_open_date",
+    "application_close_date",
+    "application_open_time",
+    "application_close_time",
+    "departure_allowed_days",
+    "earliest_departure_time",
+    "fixed_return_time",
+    "same_day_only",
+    "require_leave_date",
+    "require_return_date",
+    "require_return_time",
+    "require_guardian_phone",
+    "require_guardian_relation",
+    "require_emergency_reason",
+    "require_purpose",
+    "require_location",
+    "require_vehicle",
+    "require_warden_approval",
+    "require_selfie"
+  ];
+
+  const merged = { ...current };
+
+  for (const field of editableFields) {
+    if (Object.prototype.hasOwnProperty.call(input, field)) {
+      merged[field] = input[field];
+    }
+  }
+
+  merged.type_code = typeCode;
+  merged.active = current.active;
+  merged.config_version = currentVersion + 1;
+
+  const validated =
+    stagingSubmitRequestV230.validateOutingType(
+      merged,
+      typeCode
+    );
+
+  const changes = {};
+
+  for (const field of editableFields) {
+    if (String(current[field] ?? "") !== String(validated[field] ?? "")) {
+      changes[field] = {
+        from: current[field],
+        to: validated[field]
+      };
+    }
+  }
+
+  if (Object.keys(changes).length === 0) {
+    throw fault(
+      400,
+      "NO_CONFIG_CHANGES",
+      "Tiada perubahan konfigurasi untuk disimpan."
+    );
+  }
+
+  const actor =
+    String(admin.admin_id || admin.nama_admin || "ADMIN")
+      .trim()
+      .slice(0, 100);
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(new Date());
+
+  const map = {};
+  for (const part of parts) {
+    map[part.type] = part.value;
+  }
+
+  const timestamp =
+    `${map.year}-${map.month}-${map.day} ` +
+    `${map.hour}:${map.minute}:${map.second}`;
+
+  const bool = (field) => validated[field] ? 1 : 0;
+
+  const updateStatement = env.DB.prepare(
+    `UPDATE OUTING_TYPES SET
+       display_name = ?,
+       description = ?,
+       sort_order = ?,
+       allowed_days = ?,
+       application_open_date = ?,
+       application_close_date = ?,
+       application_open_time = ?,
+       application_close_time = ?,
+       departure_allowed_days = ?,
+       earliest_departure_time = ?,
+       fixed_return_time = ?,
+       same_day_only = ?,
+       require_leave_date = ?,
+       require_return_date = ?,
+       require_return_time = ?,
+       require_guardian_phone = ?,
+       require_guardian_relation = ?,
+       require_emergency_reason = ?,
+       require_purpose = ?,
+       require_location = ?,
+       require_vehicle = ?,
+       require_warden_approval = ?,
+       require_selfie = ?,
+       config_version = ?,
+       updated_at = ?,
+       updated_by = ?
+     WHERE type_code = ?
+       AND config_version = ?`
+  ).bind(
+    validated.display_name,
+    validated.description,
+    validated.sort_order,
+    validated.allowed_days,
+    validated.application_open_date,
+    validated.application_close_date,
+    validated.application_open_time,
+    validated.application_close_time,
+    validated.departure_allowed_days,
+    validated.earliest_departure_time,
+    validated.fixed_return_time,
+    bool("same_day_only"),
+    bool("require_leave_date"),
+    bool("require_return_date"),
+    bool("require_return_time"),
+    bool("require_guardian_phone"),
+    bool("require_guardian_relation"),
+    bool("require_emergency_reason"),
+    bool("require_purpose"),
+    bool("require_location"),
+    bool("require_vehicle"),
+    bool("require_warden_approval"),
+    bool("require_selfie"),
+    validated.config_version,
+    timestamp,
+    actor,
+    typeCode,
+    expectedVersion
+  );
+
+  const updateResult = await updateStatement.run();
+
+  if (Number(updateResult?.meta?.changes || 0) !== 1) {
+    throw fault(
+      409,
+      "CONFIG_VERSION_CONFLICT",
+      "CONFIG_VERSION_CONFLICT: konfigurasi telah berubah. Muat semula sebelum menyimpan."
+    );
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp,
+       action,
+       request_id,
+       user_role,
+       user_name,
+       details,
+       entity_type,
+       entity_id
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    timestamp,
+    "UPDATE_OUTING_TYPE",
+    "",
+    "Admin",
+    actor,
+    JSON.stringify({
+      changes,
+      previous_config_version: currentVersion,
+      config_version: validated.config_version
+    }),
+    "OUTING_TYPE",
+    typeCode
+  ).run();
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      ...validated,
+      created_at: currentRaw.created_at || "",
+      created_by: currentRaw.created_by || "",
+      updated_at: timestamp,
+      updated_by: actor
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/toggleOutingType") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const typeCode =
+    String(payload.type_code || "").trim().toUpperCase();
+
+  if (!typeCode) {
+    throw fault(400, "INVALID_REQUEST", "type_code diperlukan.");
+  }
+
+  const expectedVersion = Number(payload.expected_config_version);
+
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    throw fault(
+      400,
+      "INVALID_REQUEST",
+      "expected_config_version mesti nombor bulat positif."
+    );
+  }
+
+  if (payload.active !== true && payload.active !== false) {
+    throw fault(
+      400,
+      "INVALID_REQUEST",
+      "active mesti boolean true atau false."
+    );
+  }
+
+  const currentRaw = await env.DB.prepare(
+    `SELECT *
+     FROM OUTING_TYPES
+     WHERE type_code = ?
+     LIMIT 1`
+  ).bind(typeCode).first();
+
+  if (!currentRaw) {
+    throw fault(
+      404,
+      "OUTING_TYPE_NOT_FOUND",
+      "Jenis outing tidak dijumpai."
+    );
+  }
+
+  const currentVersion = Number(currentRaw.config_version);
+
+  if (currentVersion !== expectedVersion) {
+    throw fault(
+      409,
+      "CONFIG_VERSION_CONFLICT",
+      "CONFIG_VERSION_CONFLICT: konfigurasi telah berubah. Muat semula sebelum menyimpan."
+    );
+  }
+
+  const current =
+    stagingSubmitRequestV230.validateOutingType(
+      currentRaw,
+      typeCode
+    );
+
+  const requestedActive = payload.active === true;
+
+  if (current.active === requestedActive) {
+    throw fault(
+      400,
+      "OUTING_TYPE_STATUS_UNCHANGED",
+      requestedActive
+        ? "Jenis outing sudah aktif."
+        : "Jenis outing sudah tidak aktif."
+    );
+  }
+
+  const actor =
+    String(admin.admin_id || admin.nama_admin || "ADMIN")
+      .trim()
+      .slice(0, 100);
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(new Date());
+
+  const map = {};
+  for (const part of parts) {
+    map[part.type] = part.value;
+  }
+
+  const timestamp =
+    `${map.year}-${map.month}-${map.day} ` +
+    `${map.hour}:${map.minute}:${map.second}`;
+
+  const nextVersion = currentVersion + 1;
+
+  const updateResult = await env.DB.prepare(
+    `UPDATE OUTING_TYPES
+     SET active = ?,
+         config_version = ?,
+         updated_at = ?,
+         updated_by = ?
+     WHERE type_code = ?
+       AND config_version = ?`
+  ).bind(
+    requestedActive ? 1 : 0,
+    nextVersion,
+    timestamp,
+    actor,
+    typeCode,
+    expectedVersion
+  ).run();
+
+  if (Number(updateResult?.meta?.changes || 0) !== 1) {
+    throw fault(
+      409,
+      "CONFIG_VERSION_CONFLICT",
+      "CONFIG_VERSION_CONFLICT: konfigurasi telah berubah. Muat semula sebelum menyimpan."
+    );
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO AUDIT_LOG (
+       timestamp,
+       action,
+       request_id,
+       user_role,
+       user_name,
+       details,
+       entity_type,
+       entity_id
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    timestamp,
+    requestedActive
+      ? "ACTIVATE_OUTING_TYPE"
+      : "DEACTIVATE_OUTING_TYPE",
+    "",
+    "Admin",
+    actor,
+    JSON.stringify({
+      active: {
+        from: current.active,
+        to: requestedActive
+      },
+      previous_config_version: currentVersion,
+      config_version: nextVersion
+    }),
+    "OUTING_TYPE",
+    typeCode
+  ).run();
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      ...current,
+      active: requestedActive,
+      config_version: nextVersion,
+      created_at: currentRaw.created_at || "",
+      created_by: currentRaw.created_by || "",
+      updated_at: timestamp,
+      updated_by: actor
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/getAdminMonitoring") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const [requestResult, wardenResult] = await Promise.all([
+    env.DB.prepare(
+      `SELECT *
+       FROM OUTING_REQUESTS
+       WHERE status IN (
+         'MENUNGGU_KELULUSAN',
+         'DILULUSKAN_WARDEN',
+         'KELUAR'
+       )`
+    ).all(),
+
+    env.DB.prepare(
+      `SELECT warden_id, nama
+       FROM WARDENS`
+    ).all()
+  ]);
+
+  const wardenRoleByName = new Map();
+
+  for (const warden of wardenResult.results || []) {
+    wardenRoleByName.set(
+      String(warden.nama || "").trim().toUpperCase(),
+      /^HEP-/i.test(String(warden.warden_id || "").trim())
+        ? "HEP"
+        : "WARDEN"
+    );
+  }
+
+  const normalizeTime = (value) => {
+    const text = String(value || "").trim();
+    const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+
+    if (!match) return "";
+
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return "";
+    }
+
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  };
+
+  const normalizeDateKey = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+
+    const direct = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (direct) return direct[1];
+
+    const date = new Date(text.replace(" ", "T"));
+    if (Number.isNaN(date.getTime())) return "";
+
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+
+    const map = {};
+    for (const part of parts) {
+      map[part.type] = part.value;
+    }
+
+    return `${map.year}-${map.month}-${map.day}`;
+  };
+
+  const malaysiaTimestamp = (date) => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).formatToParts(date);
+
+    const map = {};
+    for (const part of parts) {
+      map[part.type] = part.value;
+    }
+
+    return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+08:00`;
+  };
+
+  const legacyDailyTypes = new Set([
+    "OUTING_BIASA",
+    "KECEMASAN",
+    "OUTING_HUJUNG_MINGGU"
+  ]);
+
+  const resolveExpectedReturnTarget = (row) => {
+    const typeCode = String(row.jenis_permohonan || "")
+      .trim()
+      .toUpperCase();
+
+    const legacyDaily = legacyDailyTypes.has(typeCode);
+
+    let returnDate = normalizeDateKey(row.tarikh_balik);
+
+    if (!returnDate && legacyDaily) {
+      returnDate = normalizeDateKey(row.tarikh);
+    }
+
+    if (!returnDate) {
+      return {
+        valid: false,
+        reason_code: "MISSING_EXPECTED_RETURN_DATE"
+      };
+    }
+
+    let returnTime = normalizeTime(row.masa_balik_dijangka);
+
+    if (!returnTime && legacyDaily) {
+      returnTime = "22:00";
+    }
+
+    if (!returnTime) {
+      return {
+        valid: false,
+        reason_code: "MISSING_EXPECTED_RETURN_TIME"
+      };
+    }
+
+    const expectedReturnAt =
+      `${returnDate}T${returnTime}:00+08:00`;
+
+    const target = new Date(expectedReturnAt);
+
+    if (Number.isNaN(target.getTime())) {
+      return {
+        valid: false,
+        reason_code: "INVALID_EXPECTED_RETURN"
+      };
+    }
+
+    return {
+      valid: true,
+      expected_return_at: expectedReturnAt,
+      target_ms: target.getTime(),
+      reason_code: ""
+    };
+  };
+
+  const getOperationalUrgency = (row, now) => {
+    const evaluatedAt = malaysiaTimestamp(now);
+
+    if (String(row.status || "").trim() !== "KELUAR") {
+      return {
+        applicable: false,
+        state: null,
+        severity_rank: 0,
+        expected_return_at: null,
+        evaluated_at: evaluatedAt,
+        minutes_to_due: null,
+        minutes_late: null,
+        next_transition_at: null,
+        timing_valid: false,
+        reason_code: "NOT_APPLICABLE",
+        needs_review: false,
+        next_action_code: "NONE"
+      };
+    }
+
+    const target = resolveExpectedReturnTarget(row);
+
+    if (!target.valid) {
+      return {
+        applicable: true,
+        state: null,
+        severity_rank: 0,
+        expected_return_at: null,
+        evaluated_at: evaluatedAt,
+        minutes_to_due: null,
+        minutes_late: null,
+        next_transition_at: null,
+        timing_valid: false,
+        reason_code:
+          target.reason_code || "INVALID_EXPECTED_RETURN",
+        needs_review: true,
+        next_action_code: "REVIEW_TIMING"
+      };
+    }
+
+    const differenceMs = target.target_ms - now.getTime();
+    const lateMs = Math.max(0, -differenceMs);
+
+    const minutesToDue =
+      Math.max(0, differenceMs) / 60000;
+
+    const minutesLate =
+      lateMs / 60000;
+
+    let state = "NORMAL";
+    let severityRank = 0;
+    let nextActionCode = "NONE";
+    let nextTransitionAt =
+      new Date(target.target_ms - 30 * 60 * 1000);
+
+    if (
+      differenceMs <= 30 * 60 * 1000 &&
+      differenceMs >= 0
+    ) {
+      state = "DUE_SOON";
+      severityRank = 1;
+      nextActionCode = "PREPARE_RETURN";
+      nextTransitionAt = new Date(target.target_ms);
+    } else if (
+      lateMs > 0 &&
+      lateMs < 30 * 60 * 1000
+    ) {
+      state = "LATE";
+      severityRank = 2;
+      nextActionCode = "RETURN_NOW";
+      nextTransitionAt =
+        new Date(target.target_ms + 30 * 60 * 1000);
+    } else if (
+      lateMs >= 30 * 60 * 1000 &&
+      lateMs < 60 * 60 * 1000
+    ) {
+      state = "CRITICAL";
+      severityRank = 3;
+      nextActionCode = "FOLLOW_UP";
+      nextTransitionAt =
+        new Date(target.target_ms + 60 * 60 * 1000);
+    } else if (lateMs >= 60 * 60 * 1000) {
+      state = "ACTION_REQUIRED";
+      severityRank = 4;
+      nextActionCode = "ACTION_REQUIRED";
+      nextTransitionAt = null;
+    }
+
+    return {
+      applicable: true,
+      state,
+      severity_rank: severityRank,
+      expected_return_at: target.expected_return_at,
+      evaluated_at: evaluatedAt,
+      minutes_to_due: minutesToDue,
+      minutes_late: minutesLate,
+      next_transition_at: nextTransitionAt
+        ? malaysiaTimestamp(nextTransitionAt)
+        : null,
+      timing_valid: true,
+      reason_code: "",
+      needs_review: false,
+      next_action_code: nextActionCode
+    };
+  };
+
+  const parseDateForSort = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return null;
+
+    const parsed = new Date(text.replace(" ", "T"));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const calculateDurationMinutes = (row) => {
+    const keluar = parseDateForSort(row.masa_keluar);
+    const masuk = parseDateForSort(row.masa_masuk);
+
+    if (
+      !keluar ||
+      !masuk ||
+      masuk.getTime() <= keluar.getTime()
+    ) {
+      return 0;
+    }
+
+    return Math.floor(
+      (masuk.getTime() - keluar.getTime()) / 60000
+    );
+  };
+
+  const formatDuration = (totalMinutes) => {
+    const safeMinutes =
+      Math.max(0, Math.floor(Number(totalMinutes) || 0));
+
+    const days = Math.floor(safeMinutes / 1440);
+    const hours = Math.floor((safeMinutes % 1440) / 60);
+    const minutes = safeMinutes % 60;
+
+    const parts = [];
+
+    if (days) parts.push(`${days} hari`);
+    if (hours) parts.push(`${hours} jam`);
+    if (minutes || !parts.length) {
+      parts.push(`${minutes} minit`);
+    }
+
+    return parts.join(" ");
+  };
+
+  const now = new Date();
+
+  const records = (requestResult.results || [])
+    .map((row) => {
+      const urgency = getOperationalUrgency(row, now);
+
+      const overdue =
+        String(row.lewat || "").trim().toLowerCase() === "ya" ||
+        (
+          urgency &&
+          urgency.timing_valid &&
+          Number(urgency.severity_rank || 0) >= 2
+        );
+
+      const returnDate = normalizeDateKey(row.tarikh_balik);
+      const returnTime = normalizeTime(row.masa_balik_dijangka);
+
+      const approverName =
+        String(row.warden_approve_by || "")
+          .trim()
+          .toUpperCase();
+
+      const durationMinutes =
+        calculateDurationMinutes(row);
+
+      return {
+        request_id: row.request_id || "",
+        student_id: row.student_id || "",
+        no_matrik: row.no_matrik || "",
+        nama: row.nama || "",
+        kelas: row.kelas || "",
+        jenis_permohonan: row.jenis_permohonan || "",
+        status: row.status || "",
+        tarikh: row.tarikh || "",
+        masa_mohon: row.masa_mohon || "",
+        masa_keluar: row.masa_keluar || "",
+        masa_masuk: row.masa_masuk || "",
+        tarikh_balik: returnDate,
+        masa_balik_dijangka: returnTime,
+        expected_return_at:
+          returnDate && returnTime
+            ? `${returnDate} ${returnTime}:00`
+            : "",
+        lewat: overdue,
+        tujuan: row.tujuan || "",
+        lokasi: row.lokasi || "",
+        jenis_kenderaan: row.jenis_kenderaan || "",
+        butiran_kenderaan: row.butiran_kenderaan || "",
+        warden_approve_by: row.warden_approve_by || "",
+        warden_approve_role:
+          wardenRoleByName.get(approverName) === "HEP"
+            ? "HEP"
+            : "WARDEN",
+        masa_approve: row.masa_approve || "",
+        guard_keluar_by: row.guard_keluar_by || "",
+        guard_masuk_by: row.guard_masuk_by || "",
+        sebab_batal_pelajar:
+          row.sebab_batal_pelajar || "",
+        masa_batal_pelajar:
+          row.masa_batal_pelajar || "",
+        dibatalkan_oleh:
+          row.dibatalkan_oleh || "",
+        duration_minutes: durationMinutes,
+        duration:
+          durationMinutes > 0
+            ? formatDuration(durationMinutes)
+            : "",
+        operational_urgency: urgency
+      };
+    })
+    .sort((left, right) => {
+      const rightDate =
+        parseDateForSort(right.masa_mohon || right.tarikh) ||
+        new Date(0);
+
+      const leftDate =
+        parseDateForSort(left.masa_mohon || left.tarikh) ||
+        new Date(0);
+
+      return rightDate.getTime() - leftDate.getTime();
+    });
+
+  const kpis = {
+    pending:
+      records.filter(
+        (row) => row.status === "MENUNGGU_KELULUSAN"
+      ).length,
+
+    approved:
+      records.filter(
+        (row) => row.status === "DILULUSKAN_WARDEN"
+      ).length,
+
+    out:
+      records.filter(
+        (row) => row.status === "KELUAR"
+      ).length,
+
+    not_returned:
+      records.filter(
+        (row) => row.status === "KELUAR"
+      ).length,
+
+    late:
+      records.filter(
+        (row) => row.lewat === true
+      ).length,
+
+    emergency:
+      records.filter(
+        (row) =>
+          String(row.jenis_permohonan || "")
+            .trim()
+            .toUpperCase() === "KECEMASAN"
+      ).length
+  };
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      generated_at: malaysiaTimestamp(now),
+      kpis,
+      records
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/getOutingConfigReadiness") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const result = await env.DB.prepare(
+    `SELECT *
+     FROM OUTING_TYPES
+     ORDER BY sort_order ASC, type_code ASC`
+  ).all();
+
+  const rows = result.results || [];
+  const reasons = [];
+  let activeTypeCount = 0;
+
+  const booleanFields = [
+    "active",
+    "same_day_only",
+    "require_leave_date",
+    "require_return_date",
+    "require_return_time",
+    "require_guardian_phone",
+    "require_guardian_relation",
+    "require_emergency_reason",
+    "require_purpose",
+    "require_location",
+    "require_vehicle",
+    "require_warden_approval",
+    "require_selfie"
+  ];
+
+  const timeFields = [
+    "application_open_time",
+    "application_close_time",
+    "fixed_return_time",
+    "earliest_departure_time"
+  ];
+
+  const dateFields = [
+    "application_open_date",
+    "application_close_date"
+  ];
+
+  const allowedDayNames = new Set([
+    "AHAD",
+    "ISNIN",
+    "SELASA",
+    "RABU",
+    "KHAMIS",
+    "JUMAAT",
+    "SABTU"
+  ]);
+
+  const normalizeStoredBooleanStrict = (value, fieldName) => {
+    if (value === true || value === false) {
+      return value;
+    }
+
+    const normalized = String(value ?? "")
+      .trim()
+      .toLowerCase();
+
+    if (
+      normalized === "true" ||
+      normalized === "ya" ||
+      normalized === "1"
+    ) {
+      return true;
+    }
+
+    if (
+      normalized === "false" ||
+      normalized === "tidak" ||
+      normalized === "0"
+    ) {
+      return false;
+    }
+
+    throw new Error(
+      `${fieldName || "boolean"} mesti boolean true atau false.`
+    );
+  };
+
+  const validateTypeCode = (value) => {
+    const typeCode = String(value || "").trim().toUpperCase();
+
+    if (!/^[A-Z][A-Z0-9_]{2,49}$/.test(typeCode)) {
+      throw new Error(
+        "type_code mesti uppercase, bermula dengan huruf dan hanya mengandungi A-Z, 0-9 atau underscore."
+      );
+    }
+
+    return typeCode;
+  };
+
+  const validateAllowedDays = (value, required) => {
+    const rawDays = String(value ?? "")
+      .split(",")
+      .map((day) => String(day || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    if (required && rawDays.length === 0) {
+      throw new Error(
+        "allowed_days mesti mengandungi sekurang-kurangnya satu hari."
+      );
+    }
+
+    for (const day of rawDays) {
+      if (!allowedDayNames.has(day)) {
+        throw new Error(
+          `allowed_days mengandungi hari yang tidak sah: ${day}`
+        );
+      }
+    }
+
+    return rawDays.join(",");
+  };
+
+  const validateTime = (value, fieldName) => {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+
+    const match =
+      text.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+
+    if (!match) {
+      throw new Error(
+        `${fieldName} mesti menggunakan format HH:mm atau dikosongkan.`
+      );
+    }
+
+    return `${match[1]}:${match[2]}`;
+  };
+
+  const validateDate = (value, fieldName) => {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (!match) {
+      throw new Error(
+        `${fieldName} mesti menggunakan format YYYY-MM-DD atau dikosongkan.`
+      );
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() + 1 !== month ||
+      parsed.getUTCDate() !== day
+    ) {
+      throw new Error(`${fieldName} tidak sah.`);
+    }
+
+    return text;
+  };
+
+  const seenTypeCodes = new Set();
+
+  rows.forEach((row, rowIndex) => {
+    const rawTypeCode = String(row.type_code || "")
+      .trim()
+      .toUpperCase();
+
+    const typeLabel = rawTypeCode || `baris ${rowIndex + 2}`;
+
+    if (rawTypeCode) {
+      if (seenTypeCodes.has(rawTypeCode)) {
+        reasons.push(`Kod jenis pendua: ${rawTypeCode}.`);
+      } else {
+        seenTypeCodes.add(rawTypeCode);
+      }
+    }
+
+    let active;
+
+    try {
+      active = normalizeStoredBooleanStrict(
+        row.active,
+        "active"
+      );
+    } catch (error) {
+      reasons.push(`${typeLabel}: ${error.message}`);
+      return;
+    }
+
+    if (!active) {
+      return;
+    }
+
+    activeTypeCount += 1;
+
+    try {
+      const typeCode = validateTypeCode(row.type_code);
+
+      const displayName = String(row.display_name || "").trim();
+      const description = String(row.description || "").trim();
+
+      if (!displayName) {
+        throw new Error("display_name diperlukan.");
+      }
+
+      if (displayName.length > 100) {
+        throw new Error("display_name terlalu panjang.");
+      }
+
+      if (description.length > 500) {
+        throw new Error("description terlalu panjang.");
+      }
+
+      const sortOrder = Number(row.sort_order);
+
+      if (
+        !Number.isInteger(sortOrder) ||
+        sortOrder < 1 ||
+        sortOrder > 9999
+      ) {
+        throw new Error(
+          "sort_order mesti nombor bulat antara 1 dan 9999."
+        );
+      }
+
+      validateAllowedDays(row.allowed_days, true);
+
+      const departureAllowedDays =
+        validateAllowedDays(
+          row.departure_allowed_days,
+          false
+        );
+
+      const normalizedTimes = {};
+
+      for (const field of timeFields) {
+        normalizedTimes[field] =
+          validateTime(row[field], field);
+      }
+
+      const normalizedDates = {};
+
+      for (const field of dateFields) {
+        normalizedDates[field] =
+          validateDate(row[field], field);
+      }
+
+      if (
+        normalizedDates.application_open_date &&
+        normalizedDates.application_close_date &&
+        normalizedDates.application_close_date <
+          normalizedDates.application_open_date
+      ) {
+        throw new Error(
+          "Tarikh Permohonan Ditutup tidak boleh lebih awal daripada Tarikh Permohonan Dibuka."
+        );
+      }
+
+      const normalizedBooleans = {};
+
+      for (const field of booleanFields) {
+        normalizedBooleans[field] =
+          normalizeStoredBooleanStrict(row[field], field);
+      }
+
+      const configVersion = Number(row.config_version);
+
+      if (
+        !Number.isInteger(configVersion) ||
+        configVersion < 1
+      ) {
+        throw new Error(
+          "config_version mesti nombor bulat positif."
+        );
+      }
+
+      if (
+        departureAllowedDays &&
+        !normalizedBooleans.same_day_only &&
+        !normalizedBooleans.require_leave_date
+      ) {
+        throw new Error(
+          "departure_allowed_days memerlukan require_leave_date=true."
+        );
+      }
+
+      void typeCode;
+      void normalizedTimes;
+    } catch (error) {
+      reasons.push(
+        `${typeLabel}: ${error.message || "konfigurasi tidak sah."}`
+      );
+    }
+  });
+
+  if (activeTypeCount === 0) {
+    reasons.push(
+      "Sekurang-kurangnya satu jenis outing aktif diperlukan."
+    );
+  }
+
+  const uniqueReasons = [...new Set(reasons)];
+
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(now);
+
+  const map = {};
+  for (const part of parts) {
+    map[part.type] = part.value;
+  }
+
+  const checkedAt =
+    `${map.year}-${map.month}-${map.day}` +
+    `T${map.hour}:${map.minute}:${map.second}+08:00`;
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      config_mode: "CONFIG_DRIVEN",
+      config_mode_label: "Config-driven (Active)",
+      ready: uniqueReasons.length === 0,
+      readiness_label:
+        uniqueReasons.length === 0 ? "Ready" : "Not Ready",
+      active_type_count: activeTypeCount,
+      reasons: uniqueReasons,
+      checked_at: checkedAt
+    }
+  }), {
+    status: 200,
+    headers
+  });
+}
+if (url.pathname === "/api/d1/updateNoGuardDepartureConfig") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin ||
+    payload.admin_name ||
+    payload.name ||
+    ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+
+  if (payload.enabled !== true && payload.enabled !== false) {
+    throw fault(
+      400,
+      "INVALID_REQUEST",
+      "enabled mesti boolean true atau false."
+    );
+  }
+
+  const admin = await env.DB.prepare(
+    `SELECT admin_id, nama_admin
+     FROM ADMIN_USERS
+     WHERE (
+       LOWER(admin_id) = LOWER(?)
+       OR LOWER(nama_admin) = LOWER(?)
+     )
+       AND pin = ?
+       AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+
+  if (!admin) {
+    throw fault(
+      401,
+      "ADMIN_SESSION_INVALID",
+      "Akses sesi admin tidak sah"
+    );
+  }
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(new Date());
+
+  const map = {};
+  for (const part of parts) {
+    map[part.type] = part.value;
+  }
+
+  const timestamp =
+    `${map.year}-${map.month}-${map.day} ` +
+    `${map.hour}:${map.minute}:${map.second}`;
+
+  const enabled = payload.enabled === true;
+  const configValue = enabled ? "true" : "false";
+  const actorName =
+    String(admin.nama_admin || admin.admin_id || "").trim();
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO SYSTEM_CONFIG (
+         config_key,
+         config_value,
+         updated_at,
+         updated_by
+       )
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(config_key) DO UPDATE SET
+         config_value = excluded.config_value,
+         updated_at = excluded.updated_at,
+         updated_by = excluded.updated_by`
+    ).bind(
+      "NO_GUARD_DEPARTURE_ENABLED",
+      configValue,
+      timestamp,
+      actorName
+    ),
+
+    env.DB.prepare(
+      `INSERT INTO AUDIT_LOG (
+         timestamp,
+         action,
+         request_id,
+         user_role,
+         user_name,
+         details,
+         entity_type,
+         entity_id
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      timestamp,
+      "UPDATE_NO_GUARD_DEPARTURE_CONFIG",
+      "",
+      "Admin",
+      actorName,
+      JSON.stringify({ enabled }),
+      "SYSTEM_CONFIG",
+      "NO_GUARD_DEPARTURE_ENABLED"
+    )
+  ]);
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: { enabled }
+  }), {
+    status: 200,
+    headers
+  });
+}
 if (url.pathname === "/api/d1/getStudentAnnualSummary") {
   action = "getStudentAnnualSummary";
   if (request.method === "OPTIONS") {
@@ -2686,6 +4704,11 @@ if (url.pathname === "/api/d1/getTodayRecords") {
     );
   }
 
+  const noGuardDepartureEnabled =
+    role === "warden" || role === "student"
+      ? await readNoGuardDepartureEnabled(env)
+      : false;
+
   rows = rows.map((row) => {
     const projected = { ...row };
 
@@ -2735,7 +4758,7 @@ if (url.pathname === "/api/d1/getTodayRecords") {
           ? auditState.requested_at
           : "";
 
-      projected.no_guard_departure_enabled = String(env.NO_GUARD_DEPARTURE_ENABLED || "").trim() === "true";
+      projected.no_guard_departure_enabled = noGuardDepartureEnabled;
     }
 
     if (role === "warden") {
@@ -2848,6 +4871,32 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster") {
 
     if (!guard) {
       throw fault(401, "GUARD_SESSION_INVALID", "Akses sesi guard tidak sah");
+    }
+  } else if (role === "admin") {
+    const adminId = String(payload.admin_id || "").trim();
+    const adminName = String(
+      payload.nama_admin ||
+      payload.admin_name ||
+      payload.name ||
+      ""
+    ).trim();
+
+    const pin = String(payload.pin || "").trim();
+
+    const admin = await env.DB.prepare(
+      `SELECT admin_id
+       FROM ADMIN_USERS
+       WHERE (
+         LOWER(admin_id) = LOWER(?)
+         OR LOWER(nama_admin) = LOWER(?)
+       )
+         AND pin = ?
+         AND LOWER(status) = 'aktif'
+       LIMIT 1`
+    ).bind(adminId, adminName, pin).first();
+
+    if (!admin) {
+      throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
     }
   } else {
     throw fault(401, "SESSION_REQUIRED", "Akses staff diperlukan");
