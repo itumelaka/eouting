@@ -8897,18 +8897,27 @@ const requestRow = await env.DB.prepare(
   const returnNote =
     guardReturnNote || String(requestRow.catatan || "");
 
-  const returnedAt = actualReturn.toISOString();
+  const returnedAt = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).format(actualReturn);
 
-  await env.DB.prepare(
-    `UPDATE OUTING_REQUESTS
-     SET status = 'SELESAI',
+  const updateResult = await env.DB.prepare(`UPDATE OUTING_REQUESTS
+       SET status = 'SELESAI',
          masa_masuk = ?,
          guard_masuk_by = ?,
          lewat = ?,
          selfie_status = ?,
          catatan = ?
      WHERE request_id = ?
-       AND status = 'KELUAR'`
+       AND status = 'KELUAR'
+         AND (masa_masuk IS NULL OR TRIM(masa_masuk) = '')`
   ).bind(
     returnedAt,
     guard.nama,
@@ -8918,6 +8927,39 @@ const requestRow = await env.DB.prepare(
     requestId
   ).run();
 
+  if (!updateResult.meta || Number(updateResult.meta.changes || 0) !== 1) {
+    const latestRow = await env.DB.prepare(
+      `SELECT status, masa_masuk, guard_masuk_by, lewat, selfie_status, catatan
+       FROM OUTING_REQUESTS
+       WHERE request_id = ?
+       LIMIT 1`
+    ).bind(requestId).first();
+
+    if (latestRow && latestRow.masa_masuk) {
+      return new Response(JSON.stringify({
+        ok: true,
+        data: {
+          request_id: requestId,
+          status: latestRow.status,
+          masa_masuk: latestRow.masa_masuk,
+          guard_masuk_by: latestRow.guard_masuk_by,
+          lewat: latestRow.lewat,
+          selfie_status: latestRow.selfie_status,
+          catatan: latestRow.catatan,
+          message: "Rekod sudah disahkan masuk"
+        }
+      }), {
+        status: 200,
+        headers
+      });
+    }
+
+    throw fault(
+      409,
+      "CONFIRM_IN_CONFLICT",
+      "Rekod berubah semasa pengesahan masuk. Sila refresh dan cuba semula"
+    );
+  }
   await env.DB.prepare(
   `INSERT INTO AUDIT_LOG (
     timestamp,

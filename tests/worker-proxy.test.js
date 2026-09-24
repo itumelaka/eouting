@@ -1496,3 +1496,112 @@ test("staging submitReturnSelfie authenticates eligible student, syncs D1 after 
     "OUTING_REQUEST", "TEST-SELFIE-001"]);
   assert.doesNotMatch(rt.logs.join(""), /YQ==|image_base64|PRIVATE_FILE|PRIVATE_MESSAGE|drive\.google/);
 });
+
+function confirmInFixture(options = {}) {
+  const runs = [];
+  const audits = [];
+  const pendingTasks = [];
+  const requestRow = {
+    request_id: "REQ-IN-001",
+    student_id: "STU-001",
+    no_matrik: "M001",
+    nama: "Test Student",
+    kelas: "A1",
+    jenis_permohonan: "OUTING_BIASA",
+    status: "KELUAR",
+    tarikh: "2026-09-24",
+    tarikh_balik: "2099-12-31",
+    masa_balik_dijangka: "22:00",
+    masa_keluar: "2026-09-24 08:00:00",
+    masa_masuk: "",
+    guard_keluar_by: "Guard Lama",
+    selfie_status: "TIDAK_DIPERLUKAN",
+    catatan: ""
+  };
+
+  const statement = (sql, values = []) => ({
+    sql,
+    values,
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      if (sql.includes("FROM GUARDS")) {
+        return { guard_id: "G-001", nama: "Guard Test", status: "Aktif" };
+      }
+      if (sql.includes("FROM OUTING_REQUESTS")) {
+        return requestRow;
+      }
+      throw new Error("Unexpected first query: " + sql);
+    },
+    async run() {
+      runs.push({ sql, values });
+
+      if (sql.includes("UPDATE OUTING_REQUESTS")) {
+        return { success: true, meta: { changes: options.updateChanges ?? 1 } };
+      }
+
+      if (sql.includes("INSERT INTO AUDIT_LOG")) {
+        audits.push({ sql, values });
+        return { success: true, meta: { changes: 1 } };
+      }
+
+      throw new Error("Unexpected run query: " + sql);
+    }
+  });
+
+  const DB = {
+    prepare(sql) {
+      return statement(sql);
+    }
+  };
+
+  const rt = runtime(() => json(JSON.stringify({ ok: true, data: { mirrored: true } })));
+  const executionContext = {
+    waitUntil(task) {
+      pendingTasks.push(task);
+    }
+  };
+
+  const run = () => rt.run(req("POST", {
+    url: "https://proxy.test/api/d1/confirmIn",
+    headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify({
+      request_id: "REQ-IN-001",
+      guard_id: "G-001",
+      guard_name: "Guard Test",
+      pin: "1234"
+    })
+  }), {
+    STAGING_ORIGIN: "http://localhost:8000",
+    DB,
+    D1_MIRROR_SECRET: "TEST_SECRET",
+    TELEGRAM_ENABLED: "0"
+  }, executionContext);
+
+  return { ...rt, run, runs, audits, pendingTasks };
+}
+
+test("confirmIn: stores masa_masuk using Malaysia production timestamp format", async () => {
+  const f = confirmInFixture();
+  const response = await f.run();
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+
+  assert.match(
+    body.data.masa_masuk,
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/
+  );
+
+  const update = f.runs.find(item => item.sql.includes("UPDATE OUTING_REQUESTS"));
+  assert.ok(update);
+  assert.equal(update.values[0], body.data.masa_masuk);
+});
+
+test("confirmIn: zero-row conditional update must not audit or report successful transition", async () => {
+  const f = confirmInFixture({ updateChanges: 0 });
+  const response = await f.run();
+
+  assert.equal(response.status, 409);
+  assert.equal(f.audits.length, 0);
+  assert.equal(f.pendingTasks.length, 0);
+});
