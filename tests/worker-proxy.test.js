@@ -860,6 +860,118 @@ test("profile photos: all routes support OPTIONS, reject GET and reject unauthen
   }
 });
 
+function todayRecordsFixture(requests = [], wardens = []) {
+  const queries = [];
+  const statement = (sql, values = []) => ({
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM GUARDS")) return { guard_id: "G-TEST" };
+      throw new Error("Unexpected D1 first query");
+    },
+    async all() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM OUTING_REQUESTS")) {
+        assert.doesNotMatch(sql, /warden_approve_role/);
+        return { results: requests };
+      }
+      if (sql.includes("FROM WARDENS")) return { results: wardens };
+      if (sql.includes("FROM STUDENTS") || sql.includes("FROM OUTING_TYPES") ||
+          sql.includes("FROM AUDIT_LOG")) return { results: [] };
+      throw new Error("Unexpected D1 all query");
+    }
+  });
+  const rt = runtime(() => { throw new Error("Today records must not call GAS"); });
+  const run = (method = "GET", payload = {}) => rt.run(req(method, {
+    url: "https://proxy.test/api/d1/getTodayRecords",
+    headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify(payload)
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB: { prepare: sql => statement(sql) } });
+  return { ...rt, queries, run };
+}
+
+test("today records: public GET selects GAS today, active and open hostel records", async () => {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+  const old = "2000-01-01";
+  const rows = [
+    { nama: "Today date", tarikh: today, status: "SELESAI" },
+    { nama: "Today return", tarikh: old, tarikh_balik: today, status: "SELESAI" },
+    { nama: "Today application", tarikh: old, masa_mohon: `${today} 09:00:00`, status: "SELESAI" },
+    { nama: "Today approval", tarikh: old, masa_approve: `${today} 09:00:00`, status: "SELESAI" },
+    { nama: "Today departure", tarikh: old, masa_keluar: `${today} 09:00:00`, status: "SELESAI" },
+    { nama: "Today arrival", tarikh: old, masa_masuk: `${today} 09:00:00`, status: "SELESAI" },
+    { nama: "Today cancellation", tarikh: old, masa_batal_pelajar: `${today} 09:00:00`, status: "DIBATALKAN_PELAJAR" },
+    { nama: "Pending", tarikh: old, status: "MENUNGGU_KELULUSAN" },
+    { nama: "Approved", tarikh: old, status: "DILULUSKAN_WARDEN" },
+    { nama: "Out", tarikh: old, status: "KELUAR" },
+    { nama: "Open hostel", tarikh: old, jenis_permohonan: "PULANG_BERMALAM", status: "OTHER" },
+    { nama: "Old completed", tarikh: old, status: "SELESAI" },
+    { nama: "Closed hostel", tarikh: old, jenis_permohonan: "CUTI_SEMESTER", status: "DITOLAK_WARDEN" },
+    { nama: "Cancelled hostel", tarikh: old, jenis_permohonan: "OUTING_HUJUNG_MINGGU", status: "DIBATALKAN_PELAJAR" }
+  ];
+  const f = todayRecordsFixture(rows);
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.data.map(row => row.nama), rows.slice(0, 11).map(row => row.nama));
+  assert.equal(f.queries.length, 2);
+  assert.equal(f.calls.length, 0);
+});
+
+test("today records: public GET returns only seven GAS fields and preserves role, lewat and belum_masuk", async () => {
+  const secret = { student_id: "S-PRIVATE", no_matrik: "M-PRIVATE", request_id: "R-PRIVATE",
+    telefon_waris: "0123456789", tujuan: "PRIVATE_DESTINATION", jenis_kenderaan: "PRIVATE_VEHICLE",
+    operational_urgency: { state: "CRITICAL" }, photo_file_id: "PRIVATE_PHOTO" };
+  const f = todayRecordsFixture([
+    { ...secret, nama: "Ali", kelas: "A1", jenis_permohonan: "KECEMASAN", status: "KELUAR",
+      warden_approve_by: " Dr HEP ", lewat: "Tidak", masa_masuk: " " },
+    { ...secret, nama: "Bakar", status: "KELUAR", warden_approve_by: "Warden B",
+      lewat: "Ya", masa_masuk: "2026-09-24 10:00:00" },
+    { ...secret, nama: "Cici", status: "DILULUSKAN_WARDEN", warden_approve_by: "Dr HEP", masa_masuk: "" }
+  ], [{ warden_id: "HEP-1", nama: "Dr HEP" }, { warden_id: "W-1", nama: "Warden B" }]);
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  assert.deepEqual(data[0], { nama: "Ali", kelas: "A1", jenis_permohonan: "KECEMASAN",
+    status: "KELUAR", warden_approve_role: "HEP", lewat: "Tidak", belum_masuk: true });
+  assert.deepEqual(data.slice(1), [
+    { nama: "Bakar", kelas: "", jenis_permohonan: "", status: "KELUAR",
+      warden_approve_role: "WARDEN", lewat: "Ya", belum_masuk: false },
+    { nama: "Cici", kelas: "", jenis_permohonan: "", status: "DILULUSKAN_WARDEN",
+      warden_approve_role: "HEP", lewat: "", belum_masuk: false }
+  ]);
+  assert.deepEqual(Object.keys(data[0]).sort(), ["belum_masuk", "jenis_permohonan", "kelas", "lewat",
+    "nama", "status", "warden_approve_role"]);
+  assert.doesNotMatch(JSON.stringify(data), /PRIVATE|0123456789|operational_urgency|masa_masuk/);
+  assert.equal(f.calls.length, 0);
+});
+
+test("today records: authenticated POST remains available and other methods are rejected", async () => {
+  const f = todayRecordsFixture([{ student_id: "S-1", nama: "Guard view", status: "KELUAR",
+    tarikh: "2000-01-01", telefon_waris: "PRIVATE_CONTACT" }]);
+  const options = await f.run("OPTIONS");
+  assert.equal(options.status, 204);
+  assert.equal(options.headers.get("Access-Control-Allow-Methods"), "GET, POST, OPTIONS");
+  const unsupported = await f.run("PUT");
+  assert.equal(unsupported.status, 405);
+  assert.equal((await unsupported.json()).code, "METHOD_NOT_ALLOWED");
+  assert.equal(f.queries.length, 0);
+  const denied = await f.run("POST");
+  assert.equal(denied.status, 401);
+  assert.equal((await denied.json()).code, "SESSION_REQUIRED");
+  const response = await f.run("POST", { role: "guard", nama_guard: "Guard Test", pin: "1234" });
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  assert.equal(data[0].student_id, "S-1");
+  assert.equal(data[0].nama, "Guard view");
+  assert.equal(data[0].telefon_waris, undefined);
+  assert.ok(data[0].operational_urgency);
+  assert.equal(f.calls.length, 0);
+});
+
 function runtime(fetchImpl, options = {}) {
   const calls = [], logs = [];
   const context = vm.createContext({

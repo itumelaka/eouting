@@ -7283,7 +7283,7 @@ if (url.pathname === "/api/d1/getStudentAnnualSummary") {
 
 if (url.pathname === "/api/d1/getTodayRecords") {
   if (request.method === "OPTIONS") {
-    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     headers.set("Access-Control-Allow-Headers", "Content-Type");
 
     return new Response(null, {
@@ -7292,8 +7292,66 @@ if (url.pathname === "/api/d1/getTodayRecords") {
     });
   }
 
+  if (request.method === "GET") {
+    const malaysiaDateKey = (value) => {
+      if (!value) return "";
+      const text = String(value).trim();
+      const datePrefix = text.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (datePrefix) return datePrefix[1];
+      const date = new Date(text);
+      if (Number.isNaN(date.getTime())) return "";
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit"
+      }).formatToParts(date);
+      const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${values.year}-${values.month}-${values.day}`;
+    };
+    const todayKey = malaysiaDateKey(new Date());
+    const requests = await env.DB.prepare(`SELECT nama, kelas, jenis_permohonan, status,
+      warden_approve_by, lewat, masa_masuk, tarikh, tarikh_balik,
+      masa_mohon, masa_approve, masa_keluar, masa_batal_pelajar
+      FROM OUTING_REQUESTS`).all();
+    const wardens = await env.DB.prepare(
+      "SELECT warden_id, nama FROM WARDENS"
+    ).all();
+    const rolesByName = new Map();
+    for (const warden of wardens.results || []) {
+      const name = String(warden.nama || "").trim().toLowerCase();
+      if (name && !rolesByName.has(name)) {
+        rolesByName.set(name, /^HEP-/i.test(String(warden.warden_id || "").trim()) ? "HEP" : "WARDEN");
+      }
+    }
+    const activeStatuses = new Set(["MENUNGGU_KELULUSAN", "DILULUSKAN_WARDEN", "KELUAR"]);
+    const hostelTypes = new Set(["OUTING_HUJUNG_MINGGU", "PULANG_BERMALAM", "CUTI_SEMESTER"]);
+    const closedHostelStatuses = new Set(["SELESAI", "DITOLAK_WARDEN", "DIBATALKAN_PELAJAR"]);
+    const records = (requests.results || []).filter((row) => {
+      const rowDateKey = malaysiaDateKey(row.tarikh) || malaysiaDateKey(row.masa_mohon);
+      const todayActivity = rowDateKey === todayKey || malaysiaDateKey(row.tarikh_balik) === todayKey ||
+        ["masa_mohon", "masa_approve", "masa_keluar", "masa_masuk", "masa_batal_pelajar"]
+          .some((field) => malaysiaDateKey(row[field]) === todayKey);
+      const active = activeStatuses.has(String(row.status || ""));
+      const openHostelReturn = hostelTypes.has(String(row.jenis_permohonan || "")) &&
+        !closedHostelStatuses.has(String(row.status || ""));
+      return todayActivity || active || openHostelReturn;
+    }).map((row) => {
+      const approverRole = rolesByName.get(String(row.warden_approve_by || "").trim().toLowerCase()) === "HEP"
+        ? "HEP" : "WARDEN";
+      return {
+        nama: String(row.nama || ""),
+        kelas: String(row.kelas || ""),
+        jenis_permohonan: String(row.jenis_permohonan || ""),
+        status: String(row.status || ""),
+        warden_approve_role: approverRole,
+        lewat: String(row.lewat || ""),
+        belum_masuk: String(row.status || "") === "KELUAR" &&
+          (row.masa_masuk === null || row.masa_masuk === undefined || String(row.masa_masuk).trim() === "")
+      };
+    });
+    return new Response(JSON.stringify({ ok: true, data: records }), { status: 200, headers });
+  }
+
   if (request.method !== "POST") {
-    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+    throw fault(405, "METHOD_NOT_ALLOWED", "GET or POST required");
   }
 
   const payload = await request.json();

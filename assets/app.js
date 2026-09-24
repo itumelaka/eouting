@@ -6,6 +6,7 @@ const WORKER_API_BASE_URL = "https://eouting-api-proxy-staging.itumelaka.workers
 const D1_API_BASE_URL = "https://eouting-api-proxy-staging.itumelaka.workers.dev/api/d1";
 const D1_GET_ENDPOINTS = {
   getCurrentHostelSummary: "getCurrentHostelSummary",
+  getTodayRecords: "getTodayRecords",
   getWardens: "wardens",
   getGuards: "guards",
   getStudentLoginDirectory: "studentLoginDirectory",
