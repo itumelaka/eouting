@@ -24,6 +24,7 @@ const D1_POST_ENDPOINTS = {
   updateOutingType: "updateOutingType",
   toggleOutingType: "toggleOutingType",
   getAdminMonitoring: "getAdminMonitoring",
+  getAdminIndividualStats: "getAdminIndividualStats",
   getOutingConfigReadiness: "getOutingConfigReadiness",
   getAdminStaff: "getAdminStaff",
   createStaff: "createStaff",

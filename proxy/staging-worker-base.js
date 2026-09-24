@@ -5539,6 +5539,104 @@ if (url.pathname === "/api/d1/toggleOutingType") {
     headers
   });
 }
+if (url.pathname === "/api/d1/getAdminIndividualStats") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  action = "getAdminIndividualStats";
+  let payload;
+  try { payload = await request.json(); } catch {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(payload.nama_admin || payload.admin_name || payload.name || "").trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(`SELECT admin_id FROM ADMIN_USERS
+    WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+      AND pin = ? AND LOWER(status) = 'aktif' LIMIT 1`).bind(adminId, adminName, pin).first();
+  if (!admin) throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+
+  const malaysiaParts = date => Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+  }).formatToParts(date).map(part => [part.type, part.value]));
+  const now = malaysiaParts(new Date());
+  const numericInput = (value, fallback) => value === undefined ? Number(fallback)
+    : (typeof value === "number" || typeof value === "string" && value.trim()) ? Number(value) : NaN;
+  const month = numericInput(payload.month, now.month);
+  const year = numericInput(payload.year, now.year);
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000) {
+    throw fault(400, "INVALID_STATS_PERIOD", "Bulan atau tahun statistik tidak sah.");
+  }
+  const kelasFilter = String(payload.kelas || "").trim().toLowerCase();
+  const dateKey = value => {
+    if (!value) return "";
+    const text = String(value).trim();
+    // Preserve the written calendar date, including ISO strings crossing a Malaysia midnight.
+    const prefix = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (prefix) return prefix[1];
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return "";
+    const parts = malaysiaParts(parsed);
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  };
+  const timestamp = value => {
+    const text = String(value || "").trim();
+    if (!text) return NaN;
+    // D1's timezone-less wall-clock timestamps are Malaysia local, never the runtime timezone.
+    const local = text.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/);
+    if (local) return Date.parse(`${local[1]}T${local[2]}+08:00`);
+    if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(text)) return NaN;
+    return Date.parse(text);
+  };
+  const formatDuration = total => {
+    const days = Math.floor(total / 1440);
+    const hours = Math.floor((total % 1440) / 60);
+    const minutes = total % 60;
+    const parts = [];
+    if (days) parts.push(`${days} hari`);
+    if (hours) parts.push(`${hours} jam`);
+    if (minutes || !parts.length) parts.push(`${minutes} minit`);
+    return parts.join(" ");
+  };
+  const result = await env.DB.prepare(`SELECT student_id, no_matrik, nama, kelas,
+    tarikh, masa_mohon, masa_keluar, masa_masuk FROM OUTING_REQUESTS WHERE status = 'SELESAI'`).all();
+  const grouped = new Map();
+  for (const row of result.results || []) {
+    const key = dateKey(row.tarikh) || dateKey(row.masa_mohon);
+    if (!key || Number(key.slice(0, 4)) !== year || Number(key.slice(5, 7)) !== month) continue;
+    if (kelasFilter && String(row.kelas || "").trim().toLowerCase() !== kelasFilter) continue;
+    const studentKey = String(row.student_id || row.no_matrik || row.nama || "").trim();
+    if (!studentKey) continue;
+    if (!grouped.has(studentKey)) grouped.set(studentKey, {
+      student_name: String(row.nama || "").trim() || "Tidak Dinyatakan",
+      kelas: String(row.kelas || "").trim() || "Tidak Dinyatakan",
+      total_outings: 0, total_duration_minutes: 0
+    });
+    const student = grouped.get(studentKey);
+    const keluar = timestamp(row.masa_keluar);
+    const masuk = timestamp(row.masa_masuk);
+    student.total_outings += 1;
+    if (Number.isFinite(keluar) && Number.isFinite(masuk) && masuk > keluar) {
+      student.total_duration_minutes += Math.floor((masuk - keluar) / 60000);
+    }
+  }
+  const students = [...grouped.values()].map(student => ({
+    ...student, total_duration: formatDuration(student.total_duration_minutes)
+  })).sort((left, right) => right.total_outings - left.total_outings ||
+    left.student_name.localeCompare(right.student_name, "ms", { sensitivity: "base" }));
+  return finish(JSON.stringify({ ok: true, data: {
+    month, year, kelas: payload.kelas || "",
+    generated_at: `${now.year}-${now.month}-${now.day} ${now.hour}:${now.minute}:${now.second}`, students
+  } }), 200);
+}
+
 if (url.pathname === "/api/d1/getAdminMonitoring") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");

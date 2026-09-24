@@ -9,6 +9,150 @@ const origin = "https://itumelaka.github.io";
 const upstream = "https://script.google.com/macros/s/TEST_DEPLOYMENT/exec";
 const destination = "https://script.googleusercontent.com/macros/echo?user_content_key=SECRET&lib=TEST";
 
+function individualStatsFixture(rows = [], authenticated = true) {
+  const queries = [];
+  const statement = (sql, values = []) => ({
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, values });
+      assert.match(sql, /FROM ADMIN_USERS/);
+      assert.match(sql, /LOWER\(status\) = 'aktif'/);
+      return authenticated ? { admin_id: "ADMIN-TEST" } : null;
+    },
+    async all() {
+      queries.push({ sql, values });
+      assert.match(sql, /FROM OUTING_REQUESTS/);
+      assert.match(sql, /WHERE status = 'SELESAI'/);
+      return { results: rows.filter(row => row.status === "SELESAI") };
+    }
+  });
+  const rt = runtime(() => { throw new Error("Statistics must not call GAS"); });
+  return { ...rt, queries, run: (payload = {}, method = "POST") => rt.run(req(method, {
+    url: "https://proxy.test/api/d1/getAdminIndividualStats",
+    headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify({ admin_id: "ADMIN-TEST", pin: "TEST_PIN", ...payload })
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB: { prepare: sql => statement(sql) } }) };
+}
+
+test("individual stats: D1-only grouping, date fallback, class filter and count/name sorting preserve response", async () => {
+  const base = { status: "SELESAI", tarikh: "2026-08-01", kelas: "A3" };
+  const f = individualStatsFixture([
+    { ...base, student_id: "S1", nama: "Zara" },
+    { ...base, student_id: " S1 ", nama: "New name" },
+    { ...base, no_matrik: "M2", nama: "bakar", kelas: " a3 " },
+    { ...base, nama: "Ali", tarikh: "invalid", masa_mohon: "2026-08-31T23:30:00Z" },
+    { ...base, student_id: "S4", nama: "Other month", tarikh: "2026-07-31", masa_mohon: "2026-08-01" },
+    { ...base, student_id: "S5", nama: "Other year", tarikh: "2025-08-01" },
+    { ...base, student_id: "S6", nama: "Other class", kelas: "A4" },
+    { ...base, student_id: "S7", nama: "Not completed", status: "KELUAR" },
+    { ...base, student_id: "S8", nama: "No date", tarikh: "bad" },
+    { ...base }
+  ]);
+  const response = await f.run({ month: "8", year: "2026", kelas: " a3 " });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.deepEqual(Object.keys(body.data).sort(), ["generated_at", "kelas", "month", "students", "year"]);
+  assert.equal(body.data.month, 8);
+  assert.equal(body.data.year, 2026);
+  assert.equal(body.data.kelas, " a3 ");
+  assert.match(body.data.generated_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  assert.deepEqual(body.data.students, [
+    { student_name: "Zara", kelas: "A3", total_outings: 2, total_duration_minutes: 0, total_duration: "0 minit" },
+    { student_name: "Ali", kelas: "A3", total_outings: 1, total_duration_minutes: 0, total_duration: "0 minit" },
+    { student_name: "bakar", kelas: "a3", total_outings: 1, total_duration_minutes: 0, total_duration: "0 minit" }
+  ]);
+  assert.equal(f.calls.length, 0);
+});
+
+test("individual stats: durations use explicit Malaysia semantics and GAS day/hour/minute formatting", async () => {
+  const cases = [
+    ["Offset", "2026-08-01T08:00:00+08:00", "2026-08-01T00:45:59Z", 45, "45 minit"],
+    ["Local", "2026-08-01 08:00:00", "2026-08-02 02:25:00", 1105, "18 jam 25 minit"],
+    ["Mixed", "2026-08-01 08:00:00", "2026-08-04T04:12:00Z", 4572, "3 hari 4 jam 12 minit"],
+    ["Day", "2026-08-01 08:00:00", "2026-08-02 08:00:00", 1440, "1 hari"],
+    ["Missing", "", "2026-08-01 08:00:00", 0, "0 minit"],
+    ["Invalid", "invalid", "2026-08-01 08:00:00", 0, "0 minit"],
+    ["Reversed", "2026-08-01 09:00:00", "2026-08-01 08:00:00", 0, "0 minit"],
+    ["Equal", "2026-08-01 08:00:00", "2026-08-01T00:00:00Z", 0, "0 minit"]
+  ];
+  const f = individualStatsFixture(cases.map(([nama, masa_keluar, masa_masuk]) => ({
+    nama, masa_keluar, masa_masuk, status: "SELESAI", tarikh: "2026-08-01"
+  })));
+  const response = await f.run({ month: 8, year: 2026 });
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  for (const [name, , , minutes, formatted] of cases) {
+    const student = data.students.find(row => row.student_name === name);
+    assert.equal(student.total_duration_minutes, minutes, name);
+    assert.equal(student.total_duration, formatted, name);
+    assert.equal(student.kelas, "Tidak Dinyatakan");
+  }
+  assert.equal(f.calls.length, 0);
+});
+
+test("individual stats: duration sums per student and unnamed students have safe defaults", async () => {
+  const base = { student_id: "S1", status: "SELESAI", tarikh: "2026-08-01", masa_keluar: "2026-08-01 08:00:00", masa_masuk: "2026-08-01 08:30:00" };
+  const f = individualStatsFixture([base, { ...base }]);
+  assert.deepEqual((await (await f.run({ month: 8, year: 2026 })).json()).data.students, [{
+    student_name: "Tidak Dinyatakan", kelas: "Tidak Dinyatakan", total_outings: 2,
+    total_duration_minutes: 60, total_duration: "1 jam"
+  }]);
+  assert.equal(f.calls.length, 0);
+});
+
+test("individual stats: omitted month/year default to Malaysia now and empty scope is an empty array", async () => {
+  const f = individualStatsFixture();
+  const before = new Date();
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  const keys = [before, new Date()].map(date => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(date));
+  assert.ok(keys.some(key => key.startsWith(`${data.year}-${String(data.month).padStart(2, "0")}`)));
+  assert.ok(keys.some(key => data.generated_at.startsWith(key)));
+  assert.equal(data.kelas, "");
+  assert.deepEqual(data.students, []);
+  assert.equal(f.calls.length, 0);
+});
+
+test("individual stats: invalid month/year return 400 before reading requests", async () => {
+  for (const invalid of [{ month: 0 }, { month: 13 }, { month: 1.5 }, { month: "bad" }, { year: 1999 }, { year: 2026.5 }, { year: "bad" }]) {
+    const f = individualStatsFixture();
+    const response = await f.run({ month: 8, year: 2026, ...invalid });
+    assert.equal(response.status, 400, JSON.stringify(invalid));
+    assert.equal((await response.json()).error, "Bulan atau tahun statistik tidak sah.");
+    assert.equal(f.queries.length, 1);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test("individual stats: admin name aliases and invalid auth follow the monitoring contract", async () => {
+  for (const alias of ["nama_admin", "admin_name", "name"]) {
+    const f = individualStatsFixture();
+    assert.equal((await f.run({ [alias]: " Test Admin ", pin: " TEST_PIN " })).status, 200);
+    assert.deepEqual(f.queries[0].values, ["ADMIN-TEST", "Test Admin", "TEST_PIN"]);
+    assert.equal(f.calls.length, 0);
+  }
+  const f = individualStatsFixture([], false);
+  const response = await f.run();
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).code, "ADMIN_SESSION_INVALID");
+  assert.equal(f.queries.length, 1);
+  assert.equal(f.calls.length, 0);
+});
+
+test("individual stats: OPTIONS supported and GET rejected without DB or GAS access", async () => {
+  const f = individualStatsFixture();
+  const options = await f.run({}, "OPTIONS");
+  assert.equal(options.status, 204);
+  assert.equal(options.headers.get("Access-Control-Allow-Methods"), "POST, OPTIONS");
+  assert.equal((await f.run({}, "GET")).status, 405);
+  assert.equal(f.queries.length, 0);
+  assert.equal(f.calls.length, 0);
+});
+
 function profilePhotoFixture(options = {}) {
   const student = { student_id: "STU-001", no_matrik: "M001", nama: "Test Student",
     status: "Aktif", photo_file_id: "", photo_updated_at: "", ...options.student };
