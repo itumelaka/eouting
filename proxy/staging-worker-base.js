@@ -7086,6 +7086,157 @@ if (url.pathname === "/api/d1/updateNoGuardDepartureConfig") {
     headers
   });
 }
+if ([
+  "/api/d1/getAnnouncementBannerAdmin",
+  "/api/d1/updateAnnouncementBanner",
+  "/api/d1/getAnnouncementBanner"
+].includes(url.pathname)) {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+
+  const authenticateAdmin = async () => {
+    const adminId = String(payload.admin_id || "").trim();
+    const adminName = String(payload.nama_admin || payload.admin_name || payload.name || "").trim();
+    const pin = String(payload.pin || "").trim();
+    if (!pin || (!adminId && !adminName)) {
+      throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+    }
+    const admin = await env.DB.prepare(`SELECT admin_id, nama_admin FROM ADMIN_USERS
+      WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+        AND pin = ? AND LOWER(status) = 'aktif' LIMIT 1`)
+      .bind(adminId, adminName, pin).first();
+    if (!admin) {
+      throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+    }
+    return admin;
+  };
+
+  const adminRoute = url.pathname !== "/api/d1/getAnnouncementBanner";
+  let admin;
+  if (adminRoute) {
+    admin = await authenticateAdmin();
+  } else {
+    const role = String(payload.role || "").trim().toLowerCase();
+    if (role === "admin") {
+      await authenticateAdmin();
+    } else if (role === "student") {
+      const studentId = String(payload.student_id || payload.id || "").trim();
+      const matric = String(payload.no_matrik || payload.matric || "").trim();
+      const student = studentId && matric && await env.DB.prepare(
+        `SELECT student_id FROM STUDENTS
+         WHERE LOWER(TRIM(student_id)) = LOWER(TRIM(?))
+           AND LOWER(TRIM(no_matrik)) = LOWER(TRIM(?))
+           AND LOWER(status) = 'aktif' LIMIT 1`
+      ).bind(studentId, matric).first();
+      if (!student) throw fault(401, "SESSION_INVALID", "Akses sesi diperlukan.");
+    } else if (role === "warden" || role === "guard") {
+      const name = String(role === "warden"
+        ? payload.nama_warden || payload.warden_name || payload.name || ""
+        : payload.nama_guard || payload.guard_name || payload.name || "").trim();
+      const pin = String(payload.pin || "").trim();
+      const table = role === "warden" ? "WARDENS" : "GUARDS";
+      const staff = name && pin && await env.DB.prepare(
+        `SELECT 1 FROM ${table}
+         WHERE LOWER(TRIM(nama)) = LOWER(TRIM(?))
+           AND pin = ? AND LOWER(status) = 'aktif' LIMIT 1`
+      ).bind(name, pin).first();
+      if (!staff) throw fault(401, "SESSION_INVALID", "Akses sesi diperlukan.");
+    } else {
+      throw fault(401, "SESSION_INVALID", "Akses sesi diperlukan.");
+    }
+  }
+
+  const keys = {
+    text: "ANNOUNCEMENT_BANNER_TEXT",
+    active: "ANNOUNCEMENT_BANNER_ACTIVE",
+    important: "ANNOUNCEMENT_BANNER_IMPORTANT",
+    updated_at: "ANNOUNCEMENT_BANNER_UPDATED_AT",
+    updated_by: "ANNOUNCEMENT_BANNER_UPDATED_BY"
+  };
+  const respond = data => new Response(JSON.stringify({ ok: true, data }), {
+    status: 200, headers
+  });
+
+  if (url.pathname === "/api/d1/updateAnnouncementBanner") {
+    const text = String(payload.text == null ? "" : payload.text).trim();
+    if (typeof payload.active !== "boolean" || typeof payload.important !== "boolean") {
+      throw fault(400, "INVALID_REQUEST", "active dan important mesti boolean true atau false.");
+    }
+    if (payload.active && !text) {
+      throw fault(400, "INVALID_REQUEST", "Teks pengumuman diperlukan apabila banner aktif.");
+    }
+    if (text.length > 500) {
+      throw fault(400, "INVALID_REQUEST", "Teks pengumuman tidak boleh melebihi 500 aksara.");
+    }
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit",
+      day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(new Date()).map(part => [part.type, part.value]));
+    const updatedAt = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+    const updatedBy = String(admin.admin_id || admin.nama_admin || "ADMIN").trim().slice(0, 100);
+    const config = {
+      text, active: payload.active, important: payload.important,
+      updated_at: updatedAt, updated_by: updatedBy
+    };
+    const upsert = `INSERT INTO SYSTEM_CONFIG
+      (config_key, config_value, updated_at, updated_by) VALUES (?, ?, ?, ?)
+      ON CONFLICT(config_key) DO UPDATE SET
+        config_value = excluded.config_value,
+        updated_at = excluded.updated_at,
+        updated_by = excluded.updated_by`;
+    const writes = Object.entries(keys).map(([field, key]) =>
+      env.DB.prepare(upsert).bind(key, String(config[field]), updatedAt, updatedBy));
+    writes.push(env.DB.prepare(`INSERT INTO AUDIT_LOG
+      (timestamp, action, request_id, user_role, user_name, details, entity_type, entity_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      updatedAt, "UPDATE_ANNOUNCEMENT_BANNER", "", "Admin", updatedBy,
+      JSON.stringify({
+        active: config.active, important: config.important,
+        text_summary: text.slice(0, 120)
+      }), "SYSTEM_CONFIG", "ANNOUNCEMENT_BANNER"
+    ));
+    await env.DB.batch(writes);
+    return respond(config);
+  }
+
+  const result = await env.DB.prepare(`SELECT config_key, config_value
+    FROM SYSTEM_CONFIG WHERE config_key IN (?, ?, ?, ?, ?)`)
+    .bind(...Object.values(keys)).all();
+  const values = new Map((result.results || []).map(row => [row.config_key, row.config_value]));
+  const stored = field => String(values.get(keys[field]) || "").trim();
+  const storedBoolean = field => ["true", "ya", "1"].includes(stored(field).toLowerCase());
+  const config = {
+    text: stored("text"),
+    active: storedBoolean("active"),
+    important: storedBoolean("important"),
+    updated_at: stored("updated_at"),
+    updated_by: stored("updated_by")
+  };
+  if (adminRoute) return respond(config);
+  return respond(config.active && config.text
+    ? {
+        active: true, important: config.important,
+        text: config.text, updated_at: config.updated_at
+      }
+    : { active: false });
+}
 if (url.pathname === "/api/d1/getStudentAnnualSummary") {
   action = "getStudentAnnualSummary";
   if (request.method === "OPTIONS") {

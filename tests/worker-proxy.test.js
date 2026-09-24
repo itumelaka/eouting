@@ -334,6 +334,196 @@ test("master search: bad periods and JSON return 400; OPTIONS and GET avoid D1 a
   assert.equal(f.calls.length, 0);
 });
 
+function announcementFixture(options = {}) {
+  const values = new Map(Object.entries(options.config || {}));
+  const queries = [], batches = [], audits = [];
+  const statement = (sql, bindings = []) => ({
+    sql, bindings,
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, bindings });
+      const table = ["ADMIN_USERS", "STUDENTS", "WARDENS", "GUARDS"]
+        .find(name => sql.includes(`FROM ${name}`));
+      assert.ok(table, "Unexpected authentication query");
+      assert.match(sql, /LOWER\(status\) = 'aktif'/);
+      return options.invalidRole === table ? null
+        : table === "ADMIN_USERS" ? { admin_id: "ADM-1", nama_admin: "Admin Test" }
+        : { id: "ACTIVE" };
+    },
+    async all() {
+      queries.push({ sql, bindings });
+      assert.match(sql, /FROM SYSTEM_CONFIG/);
+      assert.equal(bindings.length, 5);
+      return { results: [...values].map(([config_key, config_value]) => ({ config_key, config_value })) };
+    }
+  });
+  const DB = {
+    prepare: sql => statement(sql),
+    async batch(statements) {
+      batches.push(statements);
+      assert.equal(statements.length, 6);
+      for (const item of statements) {
+        if (item.sql.includes("INSERT INTO SYSTEM_CONFIG")) {
+          const [key, value, timestamp, actor] = item.bindings;
+          assert.match(key, /^ANNOUNCEMENT_BANNER_/);
+          assert.equal(timestamp, statements[0].bindings[2]);
+          assert.equal(actor, statements[0].bindings[3]);
+          values.set(key, value);
+        } else {
+          assert.match(item.sql, /INSERT INTO AUDIT_LOG/);
+          audits.push(item.bindings);
+        }
+      }
+    }
+  };
+  const rt = runtime(() => { throw new Error("Announcement routes must not call GAS"); });
+  const run = (action, payload = {}, method = "POST", rawBody) => rt.run(req(method, {
+    url: `https://proxy.test/api/d1/${action}`,
+    headers: { Origin: "http://localhost:8000" },
+    body: rawBody ?? JSON.stringify(payload)
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB });
+  return { ...rt, run, values, queries, batches, audits };
+}
+
+const announcementAdmin = { admin_id: "ADM-1", pin: "2468" };
+const announcementUpdate = { ...announcementAdmin, text: "Makluman operasi", active: true, important: false };
+
+test("announcement D1: admin defaults and update use one timestamp, identity and bounded audit", async () => {
+  const f = announcementFixture();
+  const initial = await f.run("getAnnouncementBannerAdmin", announcementAdmin);
+  assert.equal(initial.status, 200);
+  assert.deepEqual((await initial.json()).data, {
+    text: "", active: false, important: false, updated_at: "", updated_by: ""
+  });
+  const saved = await f.run("updateAnnouncementBanner", {
+    ...announcementUpdate, text: `  ${"x".repeat(200)}  `, important: true
+  });
+  assert.equal(saved.status, 200);
+  const config = (await saved.json()).data;
+  assert.equal(config.text, "x".repeat(200));
+  assert.equal(config.active, true);
+  assert.equal(config.important, true);
+  assert.match(config.updated_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  assert.equal(config.updated_by, "ADM-1");
+  assert.equal(f.values.get("ANNOUNCEMENT_BANNER_ACTIVE"), "true");
+  assert.equal(f.values.get("ANNOUNCEMENT_BANNER_IMPORTANT"), "true");
+  assert.equal(f.values.get("ANNOUNCEMENT_BANNER_TEXT"), "x".repeat(200));
+  assert.equal(f.values.get("ANNOUNCEMENT_BANNER_UPDATED_AT"), config.updated_at);
+  assert.equal(f.values.get("ANNOUNCEMENT_BANNER_UPDATED_BY"), config.updated_by);
+  const audit = f.audits[0];
+  assert.deepEqual(audit.slice(0, 5), [
+    config.updated_at, "UPDATE_ANNOUNCEMENT_BANNER", "", "Admin", "ADM-1"
+  ]);
+  assert.deepEqual(audit.slice(6), ["SYSTEM_CONFIG", "ANNOUNCEMENT_BANNER"]);
+  assert.deepEqual(JSON.parse(audit[5]), {
+    active: true, important: true, text_summary: "x".repeat(120)
+  });
+  assert.doesNotMatch(JSON.stringify(f.batches), /2468/);
+  const reread = await f.run("getAnnouncementBannerAdmin", announcementAdmin);
+  assert.deepEqual((await reread.json()).data, config);
+  assert.equal(f.calls.length, 0);
+});
+
+test("announcement D1: update validates exact booleans, active text and maximum length", async () => {
+  for (const [override, message] of [
+    [{ active: "true" }, /boolean/],
+    [{ important: "false" }, /boolean/],
+    [{ active: null }, /boolean/],
+    [{ important: 1 }, /boolean/],
+    [{ text: "   " }, /Teks pengumuman diperlukan/],
+    [{ text: "x".repeat(501) }, /500 aksara/]
+  ]) {
+    const f = announcementFixture();
+    const response = await f.run("updateAnnouncementBanner", { ...announcementUpdate, ...override });
+    assert.equal(response.status, 400);
+    const body = await response.json();
+    assert.equal(body.code, "INVALID_REQUEST");
+    assert.match(body.error, message);
+    assert.equal(f.batches.length, 0);
+    assert.equal(f.calls.length, 0);
+  }
+  const f = announcementFixture();
+  const saved = await f.run("updateAnnouncementBanner", {
+    ...announcementUpdate, text: "", active: false
+  });
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).data.active, false);
+});
+
+test("announcement D1: all authenticated roles receive only the safe viewer projection", async () => {
+  const f = announcementFixture();
+  await f.run("updateAnnouncementBanner", { ...announcementUpdate, important: true });
+  for (const [role, credentials, table] of [
+    ["student", { student_id: "S-1", no_matrik: "M-1" }, "STUDENTS"],
+    ["warden", { nama_warden: "Warden Test", pin: "1357" }, "WARDENS"],
+    ["guard", { nama_guard: "Guard Test", pin: "9753" }, "GUARDS"],
+    ["admin", announcementAdmin, "ADMIN_USERS"]
+  ]) {
+    const response = await f.run("getAnnouncementBanner", { role, ...credentials });
+    assert.equal(response.status, 200, role);
+    const data = (await response.json()).data;
+    assert.deepEqual(data, {
+      active: true, important: true, text: "Makluman operasi",
+      updated_at: f.values.get("ANNOUNCEMENT_BANNER_UPDATED_AT")
+    });
+    assert.ok(f.queries.some(query => query.sql.includes(`FROM ${table}`)));
+    assert.doesNotMatch(JSON.stringify(data), /updated_by|ANNOUNCEMENT_BANNER_|2468|1357|9753/);
+  }
+  assert.equal(f.calls.length, 0);
+});
+
+test("announcement D1: inactive or blank banner is hidden and invalid sessions are rejected", async () => {
+  const f = announcementFixture({ config: {
+    ANNOUNCEMENT_BANNER_ACTIVE: "true", ANNOUNCEMENT_BANNER_TEXT: " "
+  } });
+  const viewer = { role: "student", student_id: "S-1", no_matrik: "M-1" };
+  assert.deepEqual((await (await f.run("getAnnouncementBanner", viewer)).json()).data, { active: false });
+  f.values.set("ANNOUNCEMENT_BANNER_TEXT", "Hidden");
+  f.values.set("ANNOUNCEMENT_BANNER_ACTIVE", "false");
+  assert.deepEqual((await (await f.run("getAnnouncementBanner", viewer)).json()).data, { active: false });
+  for (const role of ["STUDENTS", "WARDENS", "GUARDS", "ADMIN_USERS"]) {
+    const invalid = announcementFixture({ invalidRole: role });
+    const credentials = role === "STUDENTS" ? viewer
+      : role === "WARDENS" ? { role: "warden", nama_warden: "Warden Test", pin: "1357" }
+      : role === "GUARDS" ? { role: "guard", nama_guard: "Guard Test", pin: "9753" }
+      : { role: "admin", ...announcementAdmin };
+    const response = await invalid.run("getAnnouncementBanner", credentials);
+    assert.equal(response.status, 401);
+    assert.equal(invalid.calls.length, 0);
+  }
+  assert.equal((await f.run("getAnnouncementBanner", {})).status, 401);
+  assert.equal((await f.run("getAnnouncementBanner", { role: "student" })).status, 401);
+  assert.equal(f.calls.length, 0);
+});
+
+test("announcement D1: admin routes reject other roles; method and JSON errors avoid D1 and GAS", async () => {
+  for (const action of ["getAnnouncementBannerAdmin", "updateAnnouncementBanner"]) {
+    const invalid = announcementFixture({ invalidRole: "ADMIN_USERS" });
+    const response = await invalid.run(action, {
+      role: "student", student_id: "S-1", no_matrik: "M-1", ...announcementUpdate
+    });
+    assert.equal(response.status, 401);
+    assert.equal(invalid.batches.length, 0);
+    assert.equal(invalid.calls.length, 0);
+  }
+  for (const action of ["getAnnouncementBannerAdmin", "updateAnnouncementBanner", "getAnnouncementBanner"]) {
+    const f = announcementFixture();
+    const options = await f.run(action, {}, "OPTIONS");
+    assert.equal(options.status, 204);
+    assert.equal(options.headers.get("Access-Control-Allow-Methods"), "POST, OPTIONS");
+    const get = await f.run(action, {}, "GET");
+    assert.equal(get.status, 405);
+    assert.equal((await get.json()).code, "METHOD_NOT_ALLOWED");
+    for (const raw of ["{", "null", "[]"]) {
+      const response = await f.run(action, {}, "POST", raw);
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).code, "INVALID_REQUEST");
+    }
+    assert.equal(f.queries.length, 0);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
 function profilePhotoFixture(options = {}) {
   const student = { student_id: "STU-001", no_matrik: "M001", nama: "Test Student",
     status: "Aktif", photo_file_id: "", photo_updated_at: "", ...options.student };
