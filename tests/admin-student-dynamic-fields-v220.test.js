@@ -209,7 +209,7 @@ test("Pulang Bermalam retains its title and configured dynamic fields", () => {
     require_leave_date: true,
     require_return_date: true,
     require_return_time: true,
-    fixed_return_time: "",
+    fixed_return_time: "22:00",
     departure_allowed_days: "JUMAAT",
     require_guardian_phone: true,
     require_guardian_relation: true,
@@ -224,8 +224,28 @@ test("Pulang Bermalam retains its title and configured dynamic fields", () => {
   assert.equal(context.elements.leaveDateInput.hidden, false);
   assert.equal(context.elements.returnDateInput.hidden, false);
   assert.equal(context.elements.expectedReturnTimeInput.hidden, false);
+  assert.equal(context.elements.expectedReturnTimeInput.value, "22:00");
+  assert.equal(context.elements.expectedReturnTimeInput.readOnly, true);
+  assert.equal(context.elements.expectedReturnTimeInput.required, true);
   assert.equal(context.elements.guardianPhoneInput.hidden, false);
   assert.equal(context.elements.guardianRelationSelect.hidden, false);
+});
+
+test("GAS Pulang Bermalam departure-day rule shows Tarikh Keluar even without require_leave_date", () => {
+  const context = createStudentFieldFixture("PULANG_BERMALAM");
+  context.applyConfig({
+    type_code: "PULANG_BERMALAM",
+    same_day_only: false,
+    require_leave_date: false,
+    departure_allowed_days: "AHAD,JUMAAT,SABTU",
+    require_return_date: true,
+    require_return_time: true,
+    fixed_return_time: "22:00"
+  });
+
+  assert.equal(context.elements.leaveDateInput.hidden, false);
+  assert.equal(context.elements.leaveDateInput.required, true);
+  assert.equal(context.elements.expectedReturnTimeInput.value, "22:00");
 });
 
 test("Kecemasan uses its date wording without any Pulang Bermalam heading", () => {

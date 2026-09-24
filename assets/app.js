@@ -5010,7 +5010,7 @@ function normalizeStudentOutingTypesV200(rows) {
       type_code: String(row.type_code || "").trim().toUpperCase(),
       display_name: String(row.display_name || "").trim(),
       sort_order: Number(row.sort_order) || 0,
-	active: Number(row.active) === 1,
+	active: row.active === undefined ? true : Number(row.active) === 1,
 	same_day_only: Number(row.same_day_only) === 1,
 	require_leave_date: Number(row.require_leave_date) === 1,
 	require_return_date: Number(row.require_return_date) === 1,

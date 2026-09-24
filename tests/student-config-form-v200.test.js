@@ -89,6 +89,27 @@ function extractFunction(name) {
   throw new Error(`Unclosed function ${name}`);
 }
 
+function renderPublicStudentTypes(rows) {
+  const select = { value: "PULANG_BERMALAM", innerHTML: "" };
+  const context = vm.createContext({ rows, select });
+  vm.runInContext(`
+    const els = { requestTypeSelect: select };
+    let studentOutingTypesV200;
+    function normalizeStudentConfigDateV240(value) { return value || ""; }
+    function normalizeTimeOnlyValue(value) { return value || ""; }
+    function buildLegacyStudentOutingTypesV200() { throw new Error("Unexpected legacy fallback"); }
+    function escapeHtml(value) { return String(value); }
+    ${extractFunction("normalizeStudentOutingTypesV200")}
+    ${extractFunction("renderStudentOutingTypesV200")}
+    ${extractFunction("getSelectedStudentOutingTypeConfigV200")}
+    studentOutingTypesV200 = normalizeStudentOutingTypesV200(rows);
+    renderStudentOutingTypesV200();
+    globalThis.selectedConfig = getSelectedStudentOutingTypeConfigV200();
+    globalThis.renderedTypes = studentOutingTypesV200;
+  `, context);
+  return context;
+}
+
 test("student config loader runs only after a student session opens", () => {
   assert.match(extractFunction("startStudentSession"), /loadStudentOutingTypesV200\(\)/);
   assert.match(extractFunction("loadStudentOutingTypesV200"), /apiGet\("getOutingTypes"\)/);
@@ -106,6 +127,50 @@ test("dynamic dropdown renders type code and display name in sort order", () => 
 test("inactive config rows are excluded", () => {
   assert.match(extractFunction("normalizeStudentOutingTypesV200"), /row\.active !== false/);
   assert.match(extractFunction("mockPublicOutingTypesV200"), /type\.active === true/);
+});
+
+test("GAS public response without active survives both normalization passes", () => {
+  const context = renderPublicStudentTypes([{
+    type_code: "PULANG_BERMALAM",
+    display_name: "Pulang Bermalam",
+    require_leave_date: false,
+    departure_allowed_days: "AHAD,JUMAAT,SABTU",
+    fixed_return_time: "22:00"
+  }]);
+
+  assert.equal(context.selectedConfig.active, true);
+  assert.equal(context.selectedConfig.departure_allowed_days, "AHAD,JUMAAT,SABTU");
+  assert.equal(context.selectedConfig.fixed_return_time, "22:00");
+  assert.match(context.select.innerHTML, /PULANG_BERMALAM/);
+});
+
+test("D1 public response with active=1 and require_leave_date=1 survives rendering", () => {
+  const context = renderPublicStudentTypes([{
+    type_code: "PULANG_BERMALAM",
+    display_name: "Pulang Bermalam",
+    active: 1,
+    require_leave_date: 1,
+    departure_allowed_days: "AHAD,JUMAAT,SABTU",
+    fixed_return_time: "22:00"
+  }]);
+
+  assert.equal(context.selectedConfig.active, true);
+  assert.equal(context.selectedConfig.require_leave_date, true);
+  assert.equal(context.renderedTypes.length, 1);
+});
+
+test("explicit active=false and active=0 rows stay excluded", () => {
+  for (const inactive of [false, 0]) {
+    const context = renderPublicStudentTypes([
+      { type_code: "PULANG_BERMALAM", display_name: "Pulang Bermalam", active: inactive },
+      { type_code: "OUTING_BIASA", display_name: "Outing Biasa", active: 1 }
+    ]);
+
+    assert.equal(context.selectedConfig, null);
+    assert.equal(context.renderedTypes.length, 1);
+    assert.equal(context.renderedTypes[0].type_code, "OUTING_BIASA");
+    assert.doesNotMatch(context.select.innerHTML, /PULANG_BERMALAM/);
+  }
 });
 
 test("five legacy HTML options and runtime fallback remain available", () => {

@@ -117,14 +117,20 @@ test("dynamic fixed return time overrides the visible return-time value", () => 
   assert.equal(payload.masa_balik_dijangka, "21:15");
 });
 
-test("visible Pulang Bermalam departure date is built directly into payload.tarikh", () => {
-  const context = createFixture();
-  const payload = context.buildPayload(student, "PULANG_BERMALAM");
+test("configured Pulang Bermalam sends the selected departure date and fixed return time", () => {
+  const context = createFixture({ leaveDate: "2026-08-14" });
+  const payload = context.buildPayload(student, "PULANG_BERMALAM", {
+    require_leave_date: true,
+    departure_allowed_days: "AHAD,JUMAAT,SABTU",
+    require_return_date: true,
+    require_return_time: true,
+    fixed_return_time: "22:00"
+  });
 
-  assert.equal(payload.tarikh, "2026-08-12");
-  assert.equal(payload.hari, "Rabu");
+  assert.equal(payload.tarikh, "2026-08-14");
+  assert.equal(payload.hari, "Jumaat");
   assert.equal(payload.tarikh_balik, "2026-08-16");
-  assert.equal(payload.masa_balik_dijangka, "20:30");
+  assert.equal(payload.masa_balik_dijangka, "22:00");
   assert.equal(payload.telefon_waris, "0123456789");
   assert.equal(payload.hubungan_waris, "IBU");
   assert.equal(payload.tujuan, "Balik bersama keluarga");
