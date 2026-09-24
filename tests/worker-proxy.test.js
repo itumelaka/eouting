@@ -524,6 +524,121 @@ test("announcement D1: admin routes reject other roles; method and JSON errors a
   }
 });
 
+function hostelSummaryFixture(options = {}) {
+  const queries = [];
+  const students = options.students || [
+    { student_id: "S1", no_matrik: "M1", nama: "Private Alpha", kelas: "A1", status: "Aktif" },
+    { student_id: "S2", no_matrik: "M2", nama: "Private Bravo", kelas: "A1", status: "Aktif" },
+    { student_id: "S3", no_matrik: "M3", nama: "Private Charlie", kelas: "LI", institution_code: "IA", status: "Aktif" },
+    { student_id: "S4", no_matrik: "M4", nama: "Private Delta", kelas: "LI", institution_code: "IB", status: "Aktif" },
+    { student_id: "S5", no_matrik: "M5", nama: "Private Echo", kelas: "LI", institution_code: "UNKNOWN", status: "Aktif" },
+    { student_id: "S6", no_matrik: "M6", nama: "Private Foxtrot", kelas: "A9", status: "Aktif" },
+    { student_id: "S7", no_matrik: "M7", nama: "Private Inactive", kelas: "A1", status: "Tidak Aktif" }
+  ];
+  const requests = options.requests || [
+    { source_rowid: 1, student_id: "S2", no_matrik: "M2", masa_mohon: "2026-09-24 09:00:00", status: "KELUAR" },
+    { source_rowid: 2, student_id: "S2", no_matrik: "M2", masa_mohon: "2026-09-24 08:00:00", status: "SELESAI" },
+    { source_rowid: 3, student_id: "S3", no_matrik: "M3", masa_mohon: "2026-09-24 09:00:00", status: "KELUAR" },
+    { source_rowid: 4, student_id: "S3", no_matrik: "M3", masa_mohon: "2026-09-24 09:00:00", status: "SELESAI" }
+  ];
+  const groups = options.groups || [
+    { group_code: "A1", display_name: "Asrama A1", institution_required: 0 },
+    { group_code: "LI", display_name: "LI", institution_required: 1 }
+  ];
+  const institutions = options.institutions || [
+    { institution_code: "IA", display_name: "Institusi A" },
+    { institution_code: "IB", display_name: "Institusi B" }
+  ];
+  const statement = (sql, bindings = []) => ({
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, bindings });
+      assert.match(sql, /FROM ADMIN_USERS/);
+      return { admin_id: "ADM-1" };
+    },
+    async all() {
+      queries.push({ sql, bindings });
+      if (sql.includes("FROM STUDENTS")) return { results: students.filter(row => row.status === "Aktif") };
+      if (sql.includes("FROM OUTING_REQUESTS")) return { results: requests };
+      if (sql.includes("FROM STUDENT_GROUPS")) return { results: groups };
+      if (sql.includes("FROM LI_INSTITUTIONS")) return { results: institutions };
+      throw new Error("Unexpected D1 query");
+    }
+  });
+  const rt = runtime(() => { throw new Error("Hostel summary must not call GAS"); });
+  const run = (action = "getCurrentHostelSummary", method = "GET", payload) => rt.run(req(method, {
+    url: `https://proxy.test/api/d1/${action}`,
+    headers: { Origin: "http://localhost:8000" },
+    ...(payload ? { body: JSON.stringify(payload) } : {})
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB: { prepare: sql => statement(sql) } });
+  return { ...rt, run, queries };
+}
+
+test("hostel summary: public totals, configured institution split and unconfigured fallback match roster", async () => {
+  const f = hostelSummaryFixture();
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.deepEqual(Object.keys(body.data).sort(), [
+    "generated_at", "total_active_students", "total_out_now", "total_in_hostel", "hostel_groups"
+  ].sort());
+  assert.match(body.data.generated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00$/);
+  assert.deepEqual([
+    body.data.total_active_students, body.data.total_out_now, body.data.total_in_hostel
+  ], [6, 1, 5]);
+  assert.deepEqual(body.data.hostel_groups, [
+    { key: "resident-group-1", label: "Asrama A1", count: 1 },
+    { key: "resident-group-2", label: "LI Institusi A", count: 1 },
+    { key: "resident-group-3", label: "LI Institusi B", count: 1 },
+    { key: "resident-group-unconfigured", label: "Belum Dikonfigurasi", count: 2 }
+  ]);
+  const serialized = JSON.stringify(body);
+  assert.doesNotMatch(serialized, /Private|"student_id"|"no_matrik"|"students"\s*:|"nama"\s*:|"S[1-7]"|"M[1-7]"/);
+  assert.ok(body.data.hostel_groups.every(group =>
+    Object.keys(group).sort().join(",") === "count,key,label"));
+  const roster = (await (await f.run("getCurrentHostelRoster", "POST", {
+    role: "admin", admin_id: "ADM-1", pin: "2468"
+  })).json()).data;
+  assert.equal(roster.total, body.data.total_in_hostel);
+  assert.deepEqual(roster.groups.map(({ key, label, count }) => ({ key, label, count })),
+    body.data.hostel_groups);
+  assert.equal(f.calls.length, 0);
+});
+
+test("hostel summary: latest request uses student ID, matric and rowid tie break", async () => {
+  const f = hostelSummaryFixture({
+    students: [{ student_id: "SID", no_matrik: "MAT", nama: "Secret", kelas: "A1", status: "Aktif" }],
+    requests: [
+      { source_rowid: 1, student_id: "SID", no_matrik: "MAT", masa_mohon: "2026-09-24 08:00:00", status: "KELUAR" },
+      { source_rowid: 2, student_id: "SID", masa_mohon: "2026-09-24 09:00:00", status: "SELESAI" },
+      { source_rowid: 3, no_matrik: "MAT", masa_mohon: "2026-09-24 09:00:00", status: "KELUAR" }
+    ]
+  });
+  const data = (await (await f.run()).json()).data;
+  assert.equal(data.total_active_students, 1);
+  assert.equal(data.total_out_now, 1);
+  assert.equal(data.total_in_hostel, 0);
+  assert.deepEqual(data.hostel_groups, [{ key: "resident-group-1", label: "Asrama A1", count: 0 }]);
+  assert.equal(f.calls.length, 0);
+});
+
+test("hostel summary: GET is public, OPTIONS allows GET, and POST is rejected before D1", async () => {
+  const f = hostelSummaryFixture();
+  const options = await f.run("getCurrentHostelSummary", "OPTIONS");
+  assert.equal(options.status, 204);
+  assert.equal(options.headers.get("Access-Control-Allow-Methods"), "GET, OPTIONS");
+  const post = await f.run("getCurrentHostelSummary", "POST", { role: "admin" });
+  assert.equal(post.status, 405);
+  assert.equal((await post.json()).code, "METHOD_NOT_ALLOWED");
+  assert.equal((await f.run("getCurrentHostelRoster", "GET")).status, 405);
+  assert.equal((await f.run("getCurrentHostelRoster", "POST", { role: "student" })).status, 401);
+  assert.equal(f.queries.length, 0);
+  assert.equal((await f.run()).status, 200);
+  assert.equal(f.queries.filter(query => /FROM ADMIN_USERS/.test(query.sql)).length, 0);
+  assert.equal(f.calls.length, 0);
+});
+
 function profilePhotoFixture(options = {}) {
   const student = { student_id: "STU-001", no_matrik: "M001", nama: "Test Student",
     status: "Aktif", photo_file_id: "", photo_updated_at: "", ...options.student };

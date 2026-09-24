@@ -7831,9 +7831,11 @@ if (url.pathname === "/api/d1/getTodayRecords") {
   });
 }
 
-if (url.pathname === "/api/d1/getCurrentHostelRoster") {
+if (url.pathname === "/api/d1/getCurrentHostelRoster" ||
+    url.pathname === "/api/d1/getCurrentHostelSummary") {
+  const publicSummary = url.pathname === "/api/d1/getCurrentHostelSummary";
   if (request.method === "OPTIONS") {
-    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Methods", publicSummary ? "GET, OPTIONS" : "POST, OPTIONS");
     headers.set("Access-Control-Allow-Headers", "Content-Type");
 
     return new Response(null, {
@@ -7842,14 +7844,14 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster") {
     });
   }
 
-  if (request.method !== "POST") {
-    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  if (request.method !== (publicSummary ? "GET" : "POST")) {
+    throw fault(405, "METHOD_NOT_ALLOWED", publicSummary ? "GET required" : "POST required");
   }
 
-  const payload = await request.json();
+  const payload = publicSummary ? {} : await request.json();
   const role = String(payload.role || "").trim().toLowerCase();
 
-  if (role === "warden") {
+  if (!publicSummary && role === "warden") {
     const name = String(
       payload.nama_warden ||
       payload.warden_name ||
@@ -7871,7 +7873,7 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster") {
     if (!warden) {
       throw fault(401, "WARDEN_SESSION_INVALID", "Akses sesi warden tidak sah");
     }
-  } else if (role === "guard") {
+  } else if (!publicSummary && role === "guard") {
     const name = String(
       payload.nama_guard ||
       payload.guard_name ||
@@ -7893,7 +7895,7 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster") {
     if (!guard) {
       throw fault(401, "GUARD_SESSION_INVALID", "Akses sesi guard tidak sah");
     }
-  } else if (role === "admin") {
+  } else if (!publicSummary && role === "admin") {
     const adminId = String(payload.admin_id || "").trim();
     const adminName = String(
       payload.nama_admin ||
@@ -7919,7 +7921,7 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster") {
     if (!admin) {
       throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
     }
-  } else {
+  } else if (!publicSummary) {
     throw fault(401, "SESSION_REQUIRED", "Akses staff diperlukan");
   }
 
@@ -8149,16 +8151,23 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster") {
     hour12: false
   }).format(new Date()).replace(" ", "T") + "+08:00";
 
-  return new Response(JSON.stringify({
-    ok: true,
-    data: {
-      generated_at: generatedAt,
-      total: students.length - totalOutNow,
-      total_active_students: students.length,
-      total_out_now: totalOutNow,
-      groups
-    }
-  }), {
+  const totalInHostel = students.length - totalOutNow;
+  const data = publicSummary
+    ? {
+        generated_at: generatedAt,
+        total_active_students: students.length,
+        total_out_now: totalOutNow,
+        total_in_hostel: totalInHostel,
+        hostel_groups: groups.map(({ key, label, count }) => ({ key, label, count }))
+      }
+    : {
+        generated_at: generatedAt,
+        total: totalInHostel,
+        total_active_students: students.length,
+        total_out_now: totalOutNow,
+        groups
+      };
+  return new Response(JSON.stringify({ ok: true, data }), {
     status: 200,
     headers
   });
