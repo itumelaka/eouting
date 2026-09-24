@@ -54,7 +54,7 @@ test("canonical apiPost keeps mock guard before live fetch", () => {
   const source = extractFunction("apiPost");
   const guardIndex = source.indexOf("ALLOW_MOCK_MODE && MOCK_ADMIN_ACTIONS_V200.has(action)");
   const mockReturnIndex = source.indexOf("return mockAdminApiPostV200(action, payload)");
-  const fetchIndex = source.indexOf("fetch(getGasWebAppUrlV200()");
+  const fetchIndex = source.indexOf("fetch(postUrl");
   assert.ok(guardIndex >= 0);
   assert.ok(mockReturnIndex > guardIndex);
   assert.ok(fetchIndex > mockReturnIndex);
@@ -65,7 +65,7 @@ test("canonical live transport is no-store and uses the shared parser", () => {
   assert.match(source, /cache:\s*["']no-store["']/);
   assert.match(source, /\.then\(\(response\) => parseApiResponse\(response, action\)\)/);
   assert.doesNotMatch(source, /response\.json\s*\(/);
-  assert.match(source, /body:\s*JSON\.stringify\(\{ action, \.\.\.payload \}\)/);
+  assert.match(source, /body:\s*JSON\.stringify\(requestPayload\)/);
 });
 
 function deferred() {
@@ -91,7 +91,10 @@ function buildApiPostRuntime(fetch) {
     const ALLOW_MOCK_MODE = false;
     const MOCK_ADMIN_ACTIONS_V200 = new Set();
     let wardenMutationGenerationPerf01 = 0;
-    const getGasWebAppUrlV200 = () => "https://example.test/exec";
+    const USE_D1_STAGING_V300 = false;
+    const D1_POST_ENDPOINTS = {};
+    const D1_API_BASE_URL = 'https://staging.example.test';
+    const getGasWebAppUrlV200 = () => 'https://example.test/exec';
     const mockAdminApiPostV200 = () => null;
     ${source}
     return { apiPost, inFlightApiPostsPerf01 };
@@ -163,9 +166,9 @@ test("all Admin outing and student mock actions are intercepted only behind mock
 
 test("live Admin actions fall through to the single GAS POST transport", () => {
   const source = extractFunction("apiPost");
-  assert.equal((source.match(/fetch\(getGasWebAppUrlV200\(\)/g) || []).length, 1);
+  assert.equal((source.match(/fetch\(postUrl/g) || []).length, 1);
   assert.match(source, /method:\s*["']POST["']/);
-  assert.ok(source.indexOf("fetch(getGasWebAppUrlV200()") > source.indexOf("ALLOW_MOCK_MODE"));
+  assert.ok(source.indexOf("fetch(postUrl") > source.indexOf("ALLOW_MOCK_MODE"));
 });
 
 test("no direct GAS POST exists outside canonical apiPost", () => {

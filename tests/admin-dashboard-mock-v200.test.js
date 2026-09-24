@@ -50,7 +50,7 @@ test("live apiPost cannot use mock credentials and mock writes never call GAS", 
   apiPostDefinitions.forEach((apiPostSource) => {
     assert.match(apiPostSource, /if \(ALLOW_MOCK_MODE && MOCK_ADMIN_ACTIONS_V200\.has\(action\)\)/);
     assert.match(apiPostSource, /return mockAdminApiPostV200\(action, payload\)/);
-    assert.match(apiPostSource, /fetch\(getGasWebAppUrlV200\(\)/);
+    assert.match(apiPostSource, /fetch\(postUrl\s*,/);
   });
 
   const mockSource = sourceBetween("async function mockAdminApiPostV200", "function cloneMockAdminValueV200");

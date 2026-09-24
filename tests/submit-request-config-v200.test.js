@@ -57,7 +57,7 @@ function malaysiaParts(date) {
   };
 }
 
-function createContext({ featureEnabled = false, rows = [] } = {}) {
+function createContext({ featureEnabled = false, rows = [], now = null } = {}) {
   const sheets = new Map();
   if (rows.length) sheets.set("OUTING_TYPES", new FakeSheet([OUTING_HEADERS, ...rows]));
   sheets.set("STUDENTS", new FakeSheet([
@@ -78,6 +78,7 @@ function createContext({ featureEnabled = false, rows = [] } = {}) {
     }
   };
   const context = vm.createContext({
+    ...(now ? { Date: class extends Date { constructor(...args) { super(args.length ? args : [now]); } static now() { return new Date(now).getTime(); } } } : {}),
     console,
     SpreadsheetApp: {
       openById: () => spreadsheet,
@@ -498,10 +499,9 @@ test("date, allowed-day and application-time policies remain additive", () => {
 test("a backend date-window rejection appends no OUTING_REQUESTS row", () => {
   const row = completeConfig({
     allowed_days: "AHAD,ISNIN,SELASA,RABU,KHAMIS,JUMAAT,SABTU",
-    application_open_date: "2026-09-01"
+    application_open_date: "2099-09-01"
   });
   const context = createContext({ featureEnabled: true, rows: [row] });
-  context.now_ = () => testNow(context, "2026-08-31T15:59:00Z");
   assert.throws(() => context.submitRequest({
     student_id: "A3-001",
     no_matrik: "A3001",
@@ -509,7 +509,6 @@ test("a backend date-window rejection appends no OUTING_REQUESTS row", () => {
   }), /dibuka mulai/);
   assert.equal(context.__testSheets.get("OUTING_REQUESTS").rows.length, 0);
 });
-
 test("fixed_return_time overrides client input and required return time is strict", () => {
   const context = createContext();
   const base = Object.fromEntries(OUTING_HEADERS.map((header, index) => [header, completeConfig()[index]]));

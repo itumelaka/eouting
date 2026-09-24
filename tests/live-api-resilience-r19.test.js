@@ -96,6 +96,7 @@ function createRequestRuntime(options = {}) {
     const LIVE_GET_RETRY_MAX_DELAY_MS_V19 = 1200;
     const inFlightApiGetsV19 = new Map();
     const ALLOW_MOCK_MODE = false;
+    const USE_D1_STAGING_V300 = false;
     function getGasWebAppUrlV200() { return "https://script.google.com/macros/s/PRODUCTION/exec"; }
     ${functions}
     this.apiGet = apiGet;
