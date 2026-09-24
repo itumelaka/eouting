@@ -6110,6 +6110,466 @@ if (url.pathname === "/api/d1/getAdminMonitoring") {
     headers
   });
 }
+if (url.pathname === "/api/d1/searchAdminMasterRecords") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah.");
+  }
+
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(payload.nama_admin || payload.admin_name || payload.name || "").trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(`SELECT admin_id FROM ADMIN_USERS
+    WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+      AND pin = ? AND LOWER(status) = 'aktif' LIMIT 1`)
+    .bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const parsePeriod = (value, min, max, label) => {
+    if (value === "" || value === undefined) return 0;
+    const number = typeof value === "number" || typeof value === "string" && value.trim()
+      ? Number(value) : NaN;
+    if (!Number.isInteger(number) || number < min || number > max) {
+      throw fault(400, "INVALID_REQUEST", `${label} tidak sah.`);
+    }
+    return number;
+  };
+  const month = parsePeriod(payload.month, 1, 12, "Bulan");
+  const year = parsePeriod(payload.year, 2000, 2200, "Tahun");
+  const normalizeText = value => String(value || "").trim().toLowerCase();
+  const query = normalizeText(payload.search || payload.query || "");
+  const kelas = normalizeText(payload.kelas);
+  const type = normalizeText(payload.jenis_permohonan || payload.request_type);
+  const status = normalizeText(payload.status);
+  const pageNumber = Math.floor(Number(payload.page) || 1);
+  const pageSizeNumber = Math.floor(Number(payload.page_size) || 50);
+  const page = Number.isFinite(pageNumber) ? Math.max(1, pageNumber) : 1;
+  const pageSize = Number.isFinite(pageSizeNumber)
+    ? Math.min(50, Math.max(1, pageSizeNumber)) : 50;
+  const [requestResult, wardenResult] = await Promise.all([
+    env.DB.prepare("SELECT * FROM OUTING_REQUESTS").all(),
+    env.DB.prepare("SELECT warden_id, nama FROM WARDENS").all()
+  ]);
+
+  const wardenRoleByName = new Map();
+
+  for (const warden of wardenResult.results || []) {
+    wardenRoleByName.set(
+      String(warden.nama || "").trim().toUpperCase(),
+      /^HEP-/i.test(String(warden.warden_id || "").trim())
+        ? "HEP"
+        : "WARDEN"
+    );
+  }
+
+  const normalizeTime = (value) => {
+    const text = String(value || "").trim();
+    const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+
+    if (!match) return "";
+
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+      return "";
+    }
+
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  };
+
+  const normalizeDateKey = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+
+    const direct = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (direct) return direct[1];
+
+    const date = new Date(text.replace(" ", "T"));
+    if (Number.isNaN(date.getTime())) return "";
+
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+
+    const map = {};
+    for (const part of parts) {
+      map[part.type] = part.value;
+    }
+
+    return `${map.year}-${map.month}-${map.day}`;
+  };
+
+  const malaysiaTimestamp = (date) => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).formatToParts(date);
+
+    const map = {};
+    for (const part of parts) {
+      map[part.type] = part.value;
+    }
+
+    return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+08:00`;
+  };
+
+  const legacyDailyTypes = new Set([
+    "OUTING_BIASA",
+    "KECEMASAN",
+    "OUTING_HUJUNG_MINGGU"
+  ]);
+
+  const resolveExpectedReturnTarget = (row) => {
+    const typeCode = String(row.jenis_permohonan || "")
+      .trim()
+      .toUpperCase();
+
+    const legacyDaily = legacyDailyTypes.has(typeCode);
+
+    let returnDate = normalizeDateKey(row.tarikh_balik);
+
+    if (!returnDate && legacyDaily) {
+      returnDate = normalizeDateKey(row.tarikh);
+    }
+
+    if (!returnDate) {
+      return {
+        valid: false,
+        reason_code: "MISSING_EXPECTED_RETURN_DATE"
+      };
+    }
+
+    let returnTime = normalizeTime(row.masa_balik_dijangka);
+
+    if (!returnTime && legacyDaily) {
+      returnTime = "22:00";
+    }
+
+    if (!returnTime) {
+      return {
+        valid: false,
+        reason_code: "MISSING_EXPECTED_RETURN_TIME"
+      };
+    }
+
+    const expectedReturnAt =
+      `${returnDate}T${returnTime}:00+08:00`;
+
+    const target = new Date(expectedReturnAt);
+
+    if (Number.isNaN(target.getTime())) {
+      return {
+        valid: false,
+        reason_code: "INVALID_EXPECTED_RETURN"
+      };
+    }
+
+    return {
+      valid: true,
+      expected_return_at: expectedReturnAt,
+      target_ms: target.getTime(),
+      reason_code: ""
+    };
+  };
+
+  const getOperationalUrgency = (row, now) => {
+    const evaluatedAt = malaysiaTimestamp(now);
+
+    if (String(row.status || "").trim() !== "KELUAR") {
+      return {
+        applicable: false,
+        state: null,
+        severity_rank: 0,
+        expected_return_at: null,
+        evaluated_at: evaluatedAt,
+        minutes_to_due: null,
+        minutes_late: null,
+        next_transition_at: null,
+        timing_valid: false,
+        reason_code: "NOT_APPLICABLE",
+        needs_review: false,
+        next_action_code: "NONE"
+      };
+    }
+
+    const target = resolveExpectedReturnTarget(row);
+
+    if (!target.valid) {
+      return {
+        applicable: true,
+        state: null,
+        severity_rank: 0,
+        expected_return_at: null,
+        evaluated_at: evaluatedAt,
+        minutes_to_due: null,
+        minutes_late: null,
+        next_transition_at: null,
+        timing_valid: false,
+        reason_code:
+          target.reason_code || "INVALID_EXPECTED_RETURN",
+        needs_review: true,
+        next_action_code: "REVIEW_TIMING"
+      };
+    }
+
+    const differenceMs = target.target_ms - now.getTime();
+    const lateMs = Math.max(0, -differenceMs);
+
+    const minutesToDue =
+      Math.max(0, differenceMs) / 60000;
+
+    const minutesLate =
+      lateMs / 60000;
+
+    let state = "NORMAL";
+    let severityRank = 0;
+    let nextActionCode = "NONE";
+    let nextTransitionAt =
+      new Date(target.target_ms - 30 * 60 * 1000);
+
+    if (
+      differenceMs <= 30 * 60 * 1000 &&
+      differenceMs >= 0
+    ) {
+      state = "DUE_SOON";
+      severityRank = 1;
+      nextActionCode = "PREPARE_RETURN";
+      nextTransitionAt = new Date(target.target_ms);
+    } else if (
+      lateMs > 0 &&
+      lateMs < 30 * 60 * 1000
+    ) {
+      state = "LATE";
+      severityRank = 2;
+      nextActionCode = "RETURN_NOW";
+      nextTransitionAt =
+        new Date(target.target_ms + 30 * 60 * 1000);
+    } else if (
+      lateMs >= 30 * 60 * 1000 &&
+      lateMs < 60 * 60 * 1000
+    ) {
+      state = "CRITICAL";
+      severityRank = 3;
+      nextActionCode = "FOLLOW_UP";
+      nextTransitionAt =
+        new Date(target.target_ms + 60 * 60 * 1000);
+    } else if (lateMs >= 60 * 60 * 1000) {
+      state = "ACTION_REQUIRED";
+      severityRank = 4;
+      nextActionCode = "ACTION_REQUIRED";
+      nextTransitionAt = null;
+    }
+
+    return {
+      applicable: true,
+      state,
+      severity_rank: severityRank,
+      expected_return_at: target.expected_return_at,
+      evaluated_at: evaluatedAt,
+      minutes_to_due: minutesToDue,
+      minutes_late: minutesLate,
+      next_transition_at: nextTransitionAt
+        ? malaysiaTimestamp(nextTransitionAt)
+        : null,
+      timing_valid: true,
+      reason_code: "",
+      needs_review: false,
+      next_action_code: nextActionCode
+    };
+  };
+
+  const parseDateForSort = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return null;
+
+    const parsed = new Date(text.replace(" ", "T"));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const calculateDurationMinutes = (row) => {
+    const timestamp = (value) => {
+      const text = String(value || "").trim();
+      if (!text) return NaN;
+      const local = text.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/);
+      if (local) return Date.parse(`${local[1]}T${local[2]}+08:00`);
+      if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(text)) return NaN;
+      return Date.parse(text);
+    };
+    const keluar = timestamp(row.masa_keluar);
+    const masuk = timestamp(row.masa_masuk);
+
+    if (
+      !Number.isFinite(keluar) ||
+      !Number.isFinite(masuk) ||
+      masuk <= keluar
+    ) {
+      return 0;
+    }
+
+    return Math.floor(
+      (masuk - keluar) / 60000
+    );
+  };
+
+  const formatDuration = (totalMinutes) => {
+    const safeMinutes =
+      Math.max(0, Math.floor(Number(totalMinutes) || 0));
+
+    const days = Math.floor(safeMinutes / 1440);
+    const hours = Math.floor((safeMinutes % 1440) / 60);
+    const minutes = safeMinutes % 60;
+
+    const parts = [];
+
+    if (days) parts.push(`${days} hari`);
+    if (hours) parts.push(`${hours} jam`);
+    if (minutes || !parts.length) {
+      parts.push(`${minutes} minit`);
+    }
+
+    return parts.join(" ");
+  };
+
+  const now = new Date();
+
+  const filtered = (requestResult.results || [])
+    .filter(row => !query || [row.nama, row.no_matrik, row.student_id, row.request_id]
+      .some(value => normalizeText(value).includes(query)))
+    .filter(row => !kelas || normalizeText(row.kelas) === kelas)
+    .filter(row => !type || normalizeText(row.jenis_permohonan) === type)
+    .filter(row => !status || normalizeText(row.status) === status)
+    .filter(row => {
+      if (!month && !year) return true;
+      const key = normalizeDateKey(row.tarikh) || normalizeDateKey(row.masa_mohon);
+      if (!key) return false;
+      return (!year || Number(key.slice(0, 4)) === year) &&
+        (!month || Number(key.slice(5, 7)) === month);
+    })
+    .sort((left, right) => {
+      const rightDate = parseDateForSort(right.masa_mohon || right.tarikh) || new Date(0);
+      const leftDate = parseDateForSort(left.masa_mohon || left.tarikh) || new Date(0);
+      return rightDate.getTime() - leftDate.getTime();
+    });
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  const records = filtered.slice(start, start + pageSize)
+    .map((row) => {
+      const urgency = getOperationalUrgency(row, now);
+
+      const overdue =
+        String(row.lewat || "").trim().toLowerCase() === "ya" ||
+        (
+          urgency &&
+          urgency.timing_valid &&
+          Number(urgency.severity_rank || 0) >= 2
+        );
+
+      const returnDate = normalizeDateKey(row.tarikh_balik);
+      const returnTime = normalizeTime(row.masa_balik_dijangka);
+
+      const approverName =
+        String(row.warden_approve_by || "")
+          .trim()
+          .toUpperCase();
+
+      const durationMinutes =
+        calculateDurationMinutes(row);
+
+      return {
+        request_id: row.request_id || "",
+        student_id: row.student_id || "",
+        no_matrik: row.no_matrik || "",
+        nama: row.nama || "",
+        kelas: row.kelas || "",
+        jenis_permohonan: row.jenis_permohonan || "",
+        status: row.status || "",
+        tarikh: row.tarikh || "",
+        masa_mohon: row.masa_mohon || "",
+        masa_keluar: row.masa_keluar || "",
+        masa_masuk: row.masa_masuk || "",
+        tarikh_balik: returnDate,
+        masa_balik_dijangka: returnTime,
+        expected_return_at:
+          returnDate && returnTime
+            ? `${returnDate} ${returnTime}:00`
+            : "",
+        lewat: overdue,
+        tujuan: row.tujuan || "",
+        lokasi: row.lokasi || "",
+        jenis_kenderaan: row.jenis_kenderaan || "",
+        butiran_kenderaan: row.butiran_kenderaan || "",
+        warden_approve_by: row.warden_approve_by || "",
+        warden_approve_role:
+          wardenRoleByName.get(approverName) === "HEP"
+            ? "HEP"
+            : "WARDEN",
+        masa_approve: row.masa_approve || "",
+        guard_keluar_by: row.guard_keluar_by || "",
+        guard_masuk_by: row.guard_masuk_by || "",
+        sebab_batal_pelajar:
+          row.sebab_batal_pelajar || "",
+        masa_batal_pelajar:
+          row.masa_batal_pelajar || "",
+        dibatalkan_oleh:
+          row.dibatalkan_oleh || "",
+        duration_minutes: durationMinutes,
+        duration:
+          durationMinutes > 0
+            ? formatDuration(durationMinutes)
+            : "",
+        operational_urgency: urgency
+      };
+    })
+    .sort((left, right) => {
+      const rightDate =
+        parseDateForSort(right.masa_mohon || right.tarikh) ||
+        new Date(0);
+
+      const leftDate =
+        parseDateForSort(left.masa_mohon || left.tarikh) ||
+        new Date(0);
+
+      return rightDate.getTime() - leftDate.getTime();
+    });
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      generated_at: malaysiaTimestamp(now),
+      page,
+      page_size: pageSize,
+      total,
+      total_pages: Math.max(1, Math.ceil(total / pageSize)),
+      records
+    }
+  }), { status: 200, headers });
+}
 if (url.pathname === "/api/d1/getOutingConfigReadiness") {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");

@@ -153,6 +153,187 @@ test("individual stats: OPTIONS supported and GET rejected without DB or GAS acc
   assert.equal(f.calls.length, 0);
 });
 
+function masterRecordsFixture(rows = [], options = {}) {
+  const queries = [];
+  const statement = (sql, values = []) => ({
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, values });
+      assert.match(sql, /FROM ADMIN_USERS/);
+      assert.match(sql, /LOWER\(status\) = 'aktif'/);
+      return options.authenticated === false ? null : { admin_id: "ADMIN-TEST" };
+    },
+    async all() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM OUTING_REQUESTS")) return { results: rows };
+      if (sql.includes("FROM WARDENS")) return { results: options.wardens || [] };
+      throw new Error("Unexpected D1 query");
+    }
+  });
+  const rt = runtime(() => { throw new Error("Master search must not call GAS"); });
+  const run = (payload = {}, method = "POST", rawBody) => rt.run(req(method, {
+    url: "https://proxy.test/api/d1/searchAdminMasterRecords",
+    headers: { Origin: "http://localhost:8000" },
+    body: rawBody ?? JSON.stringify({ admin_id: "ADMIN-TEST", pin: "TEST_PIN", ...payload })
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB: { prepare: sql => statement(sql) } });
+  return { ...rt, run, queries };
+}
+
+test("master search: admin authentication, name aliases and no GAS call", async () => {
+  for (const alias of ["nama_admin", "admin_name", "name"]) {
+    const f = masterRecordsFixture();
+    assert.equal((await f.run({ admin_id: "", [alias]: " Test Admin ", pin: " TEST_PIN " })).status, 200);
+    assert.deepEqual(f.queries[0].values, ["", "Test Admin", "TEST_PIN"]);
+    assert.match(f.queries[1].sql, /FROM OUTING_REQUESTS/);
+    assert.match(f.queries[2].sql, /FROM WARDENS/);
+    assert.equal(f.calls.length, 0);
+  }
+  const invalid = masterRecordsFixture([], { authenticated: false });
+  const response = await invalid.run();
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).code, "ADMIN_SESSION_INVALID");
+  assert.equal(invalid.queries.length, 1);
+  assert.equal(invalid.calls.length, 0);
+});
+
+test("master search: partial search fields, exact filters and newest-first pagination", async () => {
+  const rows = [
+    { request_id: "REQ-OLD", nama: "Ali Rahman", no_matrik: "M-001", student_id: "S-001",
+      kelas: "A1", jenis_permohonan: "KECEMASAN", status: "SELESAI",
+      tarikh: "2026-08-01", masa_mohon: "2026-08-01 08:00:00" },
+    { request_id: "REQ-NEW", nama: "Ali Zaid", no_matrik: "M-002", student_id: "S-002",
+      kelas: "a1", jenis_permohonan: "kecemasan", status: "selesai",
+      tarikh: "2026-08-02", masa_mohon: "2026-08-02 08:00:00" },
+    { request_id: "REQ-OTHER", nama: "Bakar", kelas: "A2",
+      jenis_permohonan: "OUTING_BIASA", status: "KELUAR", masa_mohon: "2026-08-03 08:00:00" }
+  ];
+  const f = masterRecordsFixture(rows);
+  const filters = { search: "aLi", kelas: " A1 ", request_type: "KeCeMaSaN", status: "SeLeSaI" };
+  const first = (await (await f.run({ ...filters, page_size: 1 })).json()).data;
+  assert.match(first.generated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00$/);
+  assert.deepEqual([first.page, first.page_size, first.total, first.total_pages], [1, 1, 2, 2]);
+  assert.equal(first.records[0].request_id, "REQ-NEW");
+  const second = (await (await f.run({ ...filters, page: 2, page_size: 1 })).json()).data;
+  assert.equal(second.records[0].request_id, "REQ-OLD");
+  for (const [field, value, expected] of [
+    ["query", "m-002", "REQ-NEW"], ["search", "s-001", "REQ-OLD"],
+    ["search", "req-other", "REQ-OTHER"]
+  ]) {
+    const data = (await (await f.run({ [field]: value })).json()).data;
+    assert.deepEqual(data.records.map(row => row.request_id), [expected]);
+  }
+  assert.equal(f.calls.length, 0);
+});
+
+test("master search: optional month/year, Malaysia date fallback, empty results and page cap", async () => {
+  const rows = [
+    { request_id: "DATE-PRIMARY", tarikh: "2026-08-31", masa_mohon: "2026-09-01T01:00:00+08:00" },
+    { request_id: "DATE-FALLBACK", tarikh: "bad", masa_mohon: "2026-08-31T18:30:00Z" },
+    { request_id: "DATE-SEPT", tarikh: "2026-09-01" },
+    ...Array.from({ length: 55 }, (_, i) => ({
+      request_id: `BULK-${i}`, tarikh: "2025-01-01", masa_mohon: `2025-01-01 00:${String(i).padStart(2, "0")}:00`
+    }))
+  ];
+  const f = masterRecordsFixture(rows);
+  const august = (await (await f.run({ month: "8", year: 2026 })).json()).data;
+  assert.deepEqual(august.records.map(row => row.request_id), ["DATE-FALLBACK", "DATE-PRIMARY"]);
+  assert.equal((await (await f.run({ month: 9 })).json()).data.total, 1);
+  assert.equal((await (await f.run({ year: 2025 })).json()).data.total, 55);
+  const all = (await (await f.run({ month: "", year: "", page_size: 999 })).json()).data;
+  assert.equal(all.total, 58);
+  assert.equal(all.page_size, 50);
+  assert.equal(all.total_pages, 2);
+  const last = (await (await f.run({ page: 2, page_size: 50 })).json()).data;
+  assert.equal(last.records.length, 8);
+  const empty = (await (await f.run({ search: "missing", page: 0, page_size: 0 })).json()).data;
+  assert.deepEqual([empty.page, empty.page_size, empty.total, empty.total_pages], [1, 50, 0, 1]);
+  assert.deepEqual(empty.records, []);
+  assert.equal(f.calls.length, 0);
+});
+
+test("master search: operational projection matches monitoring duration, role and urgency shape", async () => {
+  const f = masterRecordsFixture([{
+    request_id: "REQ-1", student_id: "S1", no_matrik: "M1", nama: "Ali", kelas: "A1",
+    jenis_permohonan: "OUTING_BIASA", status: "KELUAR", tarikh: "2020-01-01",
+    masa_mohon: "2020-01-01 08:00:00", masa_keluar: "2020-01-01 08:00:00",
+    masa_masuk: "2020-01-01 09:30:00", warden_approve_by: " Cik HEP ",
+    masa_balik_dijangka: "21:30:00", tujuan: "Lawatan", lokasi: "Melaka"
+  }], { wardens: [{ warden_id: "HEP-1", nama: "Cik HEP" }] });
+  const row = (await (await f.run()).json()).data.records[0];
+  assert.deepEqual(Object.keys(row).sort(), [
+    "request_id", "student_id", "no_matrik", "nama", "kelas", "jenis_permohonan",
+    "status", "tarikh", "masa_mohon", "masa_keluar", "masa_masuk", "tarikh_balik",
+    "masa_balik_dijangka", "expected_return_at", "lewat", "tujuan", "lokasi",
+    "jenis_kenderaan", "butiran_kenderaan", "warden_approve_by", "warden_approve_role",
+    "masa_approve", "guard_keluar_by", "guard_masuk_by", "sebab_batal_pelajar",
+    "masa_batal_pelajar", "dibatalkan_oleh", "duration_minutes", "duration",
+    "operational_urgency"
+  ].sort());
+  assert.equal(row.duration_minutes, 90);
+  assert.equal(row.duration, "1 jam 30 minit");
+  assert.equal(row.warden_approve_role, "HEP");
+  assert.equal(row.masa_balik_dijangka, "21:30");
+  assert.equal(row.operational_urgency.state, "ACTION_REQUIRED");
+  assert.equal(row.operational_urgency.next_action_code, "ACTION_REQUIRED");
+  assert.equal(row.lewat, true);
+  assert.equal(f.calls.length, 0);
+});
+
+test("master search: duration treats local timestamps as Malaysia time and preserves explicit offsets", async () => {
+  const cases = [
+    ["Local to UTC", "2026-08-01 08:00:00", "2026-08-01T00:45:59Z", 45, "45 minit"],
+    ["UTC to local", "2026-08-01T00:00:00Z", "2026-08-01T09:15:00", 75, "1 jam 15 minit"],
+    ["Explicit offset", "2026-08-01T08:00:00+08:00", "2026-08-01T01:30:00+00:00", 90, "1 jam 30 minit"],
+    ["Missing", "", "2026-08-01 08:00:00", 0, ""],
+    ["Invalid", "invalid", "2026-08-01T00:30:00Z", 0, ""],
+    ["Reversed", "2026-08-01 09:00:00", "2026-08-01T00:30:00Z", 0, ""],
+    ["Equal", "2026-08-01 08:00:00", "2026-08-01T00:00:00Z", 0, ""]
+  ];
+  const f = masterRecordsFixture(cases.map(([request_id, masa_keluar, masa_masuk]) => ({
+    request_id, masa_keluar, masa_masuk
+  })));
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  const { records } = (await response.json()).data;
+  for (const [id, , , minutes, duration] of cases) {
+    const row = records.find(record => record.request_id === id);
+    assert.equal(row.duration_minutes, minutes, id);
+    assert.equal(row.duration, duration, id);
+  }
+  assert.equal(f.calls.length, 0);
+});
+
+test("master search: bad periods and JSON return 400; OPTIONS and GET avoid D1 and GAS", async () => {
+  for (const invalid of [
+    { month: 0 }, { month: 13 }, { month: 1.5 }, { month: "bad" },
+    { year: 1999 }, { year: 2201 }, { year: 2026.5 }, { year: "bad" }
+  ]) {
+    const f = masterRecordsFixture();
+    const response = await f.run(invalid);
+    assert.equal(response.status, 400, JSON.stringify(invalid));
+    assert.equal((await response.json()).code, "INVALID_REQUEST");
+    assert.equal(f.queries.length, 1);
+    assert.equal(f.calls.length, 0);
+  }
+  for (const body of ["{", "null", "[]", "42", "\"text\""]) {
+    const f = masterRecordsFixture();
+    const response = await f.run({}, "POST", body);
+    assert.equal(response.status, 400, body);
+    assert.equal((await response.json()).code, "INVALID_REQUEST");
+    assert.equal(f.queries.length, 0);
+    assert.equal(f.calls.length, 0);
+  }
+  const f = masterRecordsFixture();
+  const options = await f.run({}, "OPTIONS");
+  assert.equal(options.status, 204);
+  assert.equal(options.headers.get("Access-Control-Allow-Methods"), "POST, OPTIONS");
+  const get = await f.run({}, "GET");
+  assert.equal(get.status, 405);
+  assert.equal((await get.json()).code, "METHOD_NOT_ALLOWED");
+  assert.equal(f.queries.length, 0);
+  assert.equal(f.calls.length, 0);
+});
+
 function profilePhotoFixture(options = {}) {
   const student = { student_id: "STU-001", no_matrik: "M001", nama: "Test Student",
     status: "Aktif", photo_file_id: "", photo_updated_at: "", ...options.student };
