@@ -26,6 +26,11 @@ function createFixture(featureEnabled = "true") {
       guard_keluar_by TEXT
     );
 
+    CREATE TABLE SYSTEM_CONFIG (
+      config_key TEXT PRIMARY KEY,
+      config_value TEXT
+    );
+
     CREATE TABLE AUDIT_LOG (
       timestamp TEXT NOT NULL,
       action TEXT NOT NULL,
