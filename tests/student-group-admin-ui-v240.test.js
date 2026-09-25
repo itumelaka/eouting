@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
@@ -49,14 +50,120 @@ test("Admin may enter future codes without A4 or IMU being hard-coded in runtime
 test("Student editor uses active config and conditionally shows authoritative institution assignment", () => {
   assert.match(html, /id="adminStudentInstitutionField" hidden/);
   assert.match(html, /id="adminStudentInstitutionInput"[^>]*disabled/);
-  assert.match(app, /adminStudentGroupsV240\.filter\(\(group\) => group\.active\)/);
-  assert.match(app, /group && group\.institution_required/);
+  assert.match(app, /group\.active && isAssignableGroup\(group\)/);
+  assert.match(app, /selectedGroupCode === "LI"/);
+  assert.match(app, /!institutionCodes\.has\(group\.group_code\)/);
   assert.match(app, /adminStudentInstitutionField\.hidden = !requiresInstitution/);
   assert.match(app, /institution_code:[\s\S]*adminStudentInstitutionInput/);
 });
 
+function sourceBetween(start, end) {
+  const from = app.indexOf(start);
+  const to = app.indexOf(end, from);
+  assert.ok(from >= 0 && to > from, `${start} source must exist`);
+  return app.slice(from, to);
+}
+
+function fakeSelect(initialValue = "") {
+  let value = initialValue;
+  let htmlValue = "";
+  return {
+    options: [], disabled: false, required: false,
+    get value() { return value; },
+    set value(next) { value = String(next); },
+    get innerHTML() { return htmlValue; },
+    set innerHTML(next) {
+      htmlValue = String(next);
+      this.options = Array.from(htmlValue.matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g))
+        .map((match) => ({ value: match[1], textContent: match[2] }));
+      if (!this.options.some((option) => option.value === value)) {
+        value = this.options.length ? this.options[0].value : "";
+      }
+    }
+  };
+}
+
+test("real Admin form serializes canonical LI plus UNISZA and routes createStudent payload", async () => {
+  const classInput = fakeSelect();
+  const institutionInput = fakeSelect();
+  const institutionField = { hidden: true };
+  let captured = null;
+  const context = vm.createContext({
+    adminStudentGroupsV240: [
+      { group_code: "A2", display_name: "A2", active: true },
+      { group_code: "A4", display_name: "A4", active: true },
+      { group_code: "LI", display_name: "LI", active: true, institution_required: true },
+      { group_code: "UNISZA", display_name: "LI", active: true, institution_required: true }
+    ],
+    adminLiInstitutionsV240: [
+      { institution_code: "UNISZA", display_name: "UNISZA", active: true }
+    ],
+    adminStudentsV200: [],
+    adminEditingStudentIdV200: "",
+    document: { querySelector: () => null },
+    escapeHtml: (value) => String(value),
+    window: { confirm: () => true },
+    els: {
+      adminStudentClassInput: classInput,
+      adminStudentInstitutionInput: institutionInput,
+      adminStudentInstitutionField: institutionField,
+      adminStudentClassFilter: null,
+      adminMasterClass: null,
+      adminStudentIdInput: { value: "QA-LI-001" },
+      adminStudentMatricInput: { value: "QA-LI-001" },
+      adminStudentNameInput: { value: "QA STUDENT LI UNISZA" },
+      adminStudentEmailInput: { value: "" },
+      adminStudentPhoneInput: { value: "" },
+      adminStudentGenderInput: { value: "LELAKI" },
+      adminStudentStatusInput: { value: "AKTIF" },
+      adminStudentNoteInput: { value: "QA Phase 2 LI" },
+      adminSaveStudentButton: { disabled: false }
+    },
+    buildAdminCredentialPayloadV200: () => ({
+      admin_id: "ADMIN-TEST", nama_admin: "Admin Test", pin: "TEST_PIN"
+    }),
+    apiPost: async (action, payload) => { captured = { action, payload }; },
+    setAdminStudentEditorMessageV200: () => {},
+    safeAdminStudentErrorV200: (error) => error.message,
+    closeAdminStudentEditorV200: () => {},
+    loadAdminStudentsV200: async () => {},
+    refreshPublicStudentsAfterAdminWriteV200: async () => {},
+    setAdminStudentsMessageV200: () => {},
+    setButtonLoadingVisualV220: () => {}
+  });
+  vm.runInContext([
+    sourceBetween("function getAdminStudentGroupV240", "function renderSelectOptionsV240"),
+    sourceBetween("function renderSelectOptionsV240", "function renderAdminStudentGroupOptionsV240"),
+    sourceBetween("function renderAdminStudentGroupOptionsV240", "function updateAdminStudentInstitutionFieldV240"),
+    sourceBetween("function updateAdminStudentInstitutionFieldV240", "function renderAdminStudentGroupListV240"),
+    sourceBetween("function buildAdminStudentFormPayloadV200", "async function handleAdminStudentSubmitV200"),
+    sourceBetween("async function handleAdminStudentSubmitV200", "function setAdminStudentEditorMessageV200")
+  ].join("\n"), context);
+
+  context.renderAdminStudentGroupOptionsV240();
+  assert.deepEqual(classInput.options.map((option) => option.value), ["A2", "A4", "LI"]);
+  classInput.value = "LI";
+  context.updateAdminStudentInstitutionFieldV240();
+  institutionInput.value = "UNISZA";
+  await context.handleAdminStudentSubmitV200({ preventDefault() {} });
+
+  assert.equal(captured.action, "createStudent");
+  assert.deepEqual(JSON.parse(JSON.stringify(captured.payload.student)), {
+    student_id: "QA-LI-001",
+    no_matrik: "QA-LI-001",
+    nama: "QA STUDENT LI UNISZA",
+    email: "",
+    no_tel: "",
+    kelas: "LI",
+    institution_code: "UNISZA",
+    jantina: "LELAKI",
+    status: "AKTIF",
+    catatan: "QA Phase 2 LI"
+  });
+});
+
 test("inactive current group and institution remain available for unrelated edits", () => {
-  assert.match(app, /currentGroup && !currentGroup\.active/);
+  assert.match(app, /currentGroup && currentGroupCode/);
   assert.match(app, /current && !current\.active/);
   assert.match(app, /Tidak Aktif — semasa/);
   assert.match(app, /renderAdminStudentGroupOptionsV240\(student\)/);
@@ -78,6 +185,18 @@ test("readiness indicator remains aggregate-only beside the guarded activation c
   assert.match(panel, /adminDynamicLoginConfirmInput/);
   assert.equal(panel.includes("STUDENT_GROUP_CONFIG_ENABLED"), false);
   assert.equal(app.includes('setProperty("STUDENT_GROUP_CONFIG_ENABLED", "true")'), false);
+});
+
+test("localhost routes Student Group readiness to the direct D1 endpoint", () => {
+  const d1PostMap = app.slice(
+    app.indexOf("const D1_POST_ENDPOINTS"),
+    app.indexOf("const API_OVERRIDE_STORAGE_KEY")
+  );
+  assert.match(
+    d1PostMap,
+    /getStudentGroupConfigReadiness:\s*"getStudentGroupConfigReadiness"/
+  );
+  assert.match(d1PostMap, /createStudent:\s*"createStudent"/);
 });
 
 test("Student login retains legacy A2/A3/LI fallback with unchanged payload boundary", () => {

@@ -86,7 +86,7 @@ test("student management retains config-driven institution visibility, validatio
   const field = sourceBetween("function updateAdminStudentInstitutionFieldV240", "function renderAdminStudentGroupListV240");
   const payload = sourceBetween("function buildAdminStudentFormPayloadV200", "async function handleAdminStudentSubmitV200");
   const submit = sourceBetween("async function handleAdminStudentSubmitV200", "function setAdminStudentEditorMessageV200");
-  assert.match(field, /group\.institution_required/);
+  assert.match(field, /selectedGroupCode === "LI"/);
   assert.match(field, /required = requiresInstitution/);
   for (const key of ["student_id", "no_matrik", "nama", "email", "no_tel", "kelas", "institution_code", "jantina", "status", "catatan"]) assert.match(payload, new RegExp(key));
   assert.match(submit, /ID pelajar, no\. matrik dan nama diperlukan/);

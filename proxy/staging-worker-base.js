@@ -250,6 +250,102 @@ function fault(status, code, message) {
   return Object.assign(new Error(message), { status, code });
 }
 __name(fault, "fault");
+
+const STUDENT_LI_GROUP_CODE = "LI";
+
+function parseStudentAssignmentConfigBoolean(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["true", "ya", "1"].includes(normalized)) return true;
+  if (["false", "tidak", "0"].includes(normalized)) return false;
+  throw new Error("Invalid assignment configuration boolean");
+}
+__name(parseStudentAssignmentConfigBoolean, "parseStudentAssignmentConfigBoolean");
+
+function normalizeStudentAssignmentConfigRow(row, codeField) {
+  const code = String(row[codeField] ?? "").trim().toUpperCase();
+  const displayName = String(row.display_name ?? "").trim();
+  const sortOrder = Number(row.sort_order);
+  const version = Number(row.config_version);
+  if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(code) ||
+      !displayName || displayName.length > 100 ||
+      /[\u0000-\u001F\u007F]/.test(displayName) ||
+      !Number.isInteger(sortOrder) || sortOrder < 1 ||
+      !Number.isInteger(version) || version < 1) {
+    throw new Error("Invalid assignment configuration row");
+  }
+  return {
+    code,
+    active: parseStudentAssignmentConfigBoolean(row.active)
+  };
+}
+__name(normalizeStudentAssignmentConfigRow, "normalizeStudentAssignmentConfigRow");
+
+async function loadStudentAssignmentConfig(env) {
+  try {
+    const [groupResult, institutionResult] = await Promise.all([
+      env.DB.prepare(
+        `SELECT group_code, display_name, active, sort_order, config_version
+         FROM STUDENT_GROUPS`
+      ).all(),
+      env.DB.prepare(
+        `SELECT institution_code, display_name, active, sort_order, config_version
+         FROM LI_INSTITUTIONS`
+      ).all()
+    ]);
+    const groups = (groupResult.results || []).map(row =>
+      normalizeStudentAssignmentConfigRow(row, "group_code")
+    );
+    const institutions = (institutionResult.results || []).map(row =>
+      normalizeStudentAssignmentConfigRow(row, "institution_code")
+    );
+    if (!groups.length ||
+        new Set(groups.map(group => group.code)).size !== groups.length ||
+        new Set(institutions.map(institution => institution.code)).size !== institutions.length) {
+      throw new Error("Invalid or duplicate assignment configuration");
+    }
+    return { groups, institutions };
+  } catch (error) {
+    throw fault(
+      503,
+      "STUDENT_GROUP_CONFIG_UNAVAILABLE",
+      "Konfigurasi kumpulan pelajar tidak dapat dimuatkan dengan selamat."
+    );
+  }
+}
+__name(loadStudentAssignmentConfig, "loadStudentAssignmentConfig");
+
+function validateStudentAssignment(config, kelas, rawInstitutionCode, currentStudent, invalid) {
+  const group = config.groups.find(item => item.code === kelas);
+  if (!group) throw invalid("Kumpulan pelajar tidak dijumpai.");
+  const current = currentStudent || null;
+  const groupChanged = !current || current.kelas !== kelas;
+  const shadowsLiInstitution = kelas !== STUDENT_LI_GROUP_CODE &&
+    config.institutions.some(item => item.code === kelas);
+  if (shadowsLiInstitution && groupChanged) {
+    throw invalid("Institusi LI tidak boleh digunakan sebagai kumpulan pelajar.");
+  }
+  if (!group.active && groupChanged) {
+    throw invalid("Kumpulan tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
+  }
+
+  const institutionCode = String(rawInstitutionCode || "").trim().toUpperCase();
+  if (kelas !== STUDENT_LI_GROUP_CODE) {
+    if (institutionCode) throw invalid("institution_code mesti kosong untuk kumpulan ini.");
+    return "";
+  }
+  if (!institutionCode) throw invalid("Institusi diperlukan untuk kumpulan LI.");
+  if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(institutionCode)) {
+    throw invalid("institution_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
+  }
+  const institution = config.institutions.find(item => item.code === institutionCode);
+  if (!institution) throw invalid("Institusi LI tidak dijumpai.");
+  const institutionChanged = !current || groupChanged || current.institution_code !== institutionCode;
+  if (!institution.active && institutionChanged) {
+    throw invalid("Institusi LI tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
+  }
+  return institutionCode;
+}
+__name(validateStudentAssignment, "validateStudentAssignment");
 async function readBounded(body, limit, tooLarge) {
   if (!body) return new Uint8Array();
   const reader = body.getReader();
@@ -3375,90 +3471,25 @@ if (url.pathname === "/api/d1/updateStudent") {
     throw invalid("status pelajar mesti AKTIF atau TIDAK AKTIF.");
   }
 
-  let assignmentConfig = null;
-  try {
-    const [groupResult, institutionResult] = await Promise.all([
-      env.DB.prepare(
-        `SELECT group_code, display_name, institution_required, active,
-                sort_order, config_version FROM STUDENT_GROUPS`
-      ).all(),
-      env.DB.prepare(
-        `SELECT institution_code, display_name, active,
-                sort_order, config_version FROM LI_INSTITUTIONS`
-      ).all()
-    ]);
-    const strictBoolean = value => {
-      const text = String(value ?? "").trim().toLowerCase();
-      if (["true", "ya", "1"].includes(text)) return true;
-      if (["false", "tidak", "0"].includes(text)) return false;
-      throw new Error("Invalid configuration boolean");
-    };
-    const normalizeConfig = (configRow, codeField, hasInstitutionRequired) => {
-      const code = String(configRow[codeField] ?? "").trim().toUpperCase();
-      const displayName = String(configRow.display_name ?? "").trim();
-      const sortOrder = Number(configRow.sort_order);
-      const version = Number(configRow.config_version);
-      if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(code) ||
-          !displayName || displayName.length > 100 ||
-          /[\u0000-\u001F\u007F]/.test(displayName) ||
-          !Number.isInteger(sortOrder) || sortOrder < 1 ||
-          !Number.isInteger(version) || version < 1) {
-        throw new Error("Invalid assignment configuration");
-      }
-      const active = strictBoolean(configRow.active);
-      const institution_required = hasInstitutionRequired
-        ? strictBoolean(configRow.institution_required) : false;
-      return { code, active, institution_required };
-    };
-    const groups = (groupResult.results || []).map(configRow =>
-      normalizeConfig(configRow, "group_code", true)
-    );
-    const institutions = (institutionResult.results || []).map(configRow =>
-      normalizeConfig(configRow, "institution_code", false)
-    );
-    if (groups.length &&
-        new Set(groups.map(group => group.code)).size === groups.length &&
-        new Set(institutions.map(institution => institution.code)).size === institutions.length) {
-      assignmentConfig = { groups, institutions };
-    }
-  } catch (error) {
-    assignmentConfig = null;
-  }
+  const assignmentConfig = await loadStudentAssignmentConfig(env);
 
   const validated = {
     student_id: current.student_id, no_matrik, nama, email, no_tel,
     kelas, jantina, status, catatan
   };
-  if (assignmentConfig) {
-    const group = assignmentConfig.groups.find(item => item.code === kelas);
-    if (!group) throw invalid("Kumpulan pelajar tidak dijumpai.");
-    const groupChanged = current.kelas !== kelas;
-    if (!group.active && groupChanged) {
-      throw invalid("Kumpulan tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
-    }
-    const submittedCode = String(merged.institution_code || "").trim().toUpperCase();
-    if (!group.institution_required) {
-      if (!groupChanged && current.institution_code && !submittedCode) {
-        throw invalid("Rekod mempunyai institution_code yang tidak sepadan. Betulkan penugasan secara eksplisit sebelum menyimpan perubahan lain.");
-      }
-      if (submittedCode) throw invalid("institution_code mesti kosong untuk kumpulan ini.");
-      validated.institution_code = "";
-    } else {
-      if (!submittedCode) throw invalid("Institusi diperlukan untuk kumpulan ini.");
-      if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(submittedCode)) {
-        throw invalid("institution_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
-      }
-      const institution = assignmentConfig.institutions.find(item => item.code === submittedCode);
-      if (!institution) throw invalid("Institusi LI tidak dijumpai.");
-      const institutionChanged = groupChanged || current.institution_code !== submittedCode;
-      if (!institution.active && institutionChanged) {
-        throw invalid("Institusi LI tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
-      }
-      validated.institution_code = submittedCode;
-    }
-  } else if (!["A2", "A3", "LI"].includes(kelas)) {
-    throw invalid("kelas pelajar mesti A2, A3 atau LI.");
-  }
+  const institutionWasSubmitted = Object.prototype.hasOwnProperty.call(input, "institution_code");
+  const groupChanged = current.kelas !== kelas;
+  const requestedInstitutionCode = groupChanged && kelas !== STUDENT_LI_GROUP_CODE &&
+    !institutionWasSubmitted
+    ? ""
+    : merged.institution_code;
+  validated.institution_code = validateStudentAssignment(
+    assignmentConfig,
+    kelas,
+    requestedInstitutionCode,
+    current,
+    invalid
+  );
 
   const duplicateMatric = await env.DB.prepare(
     `SELECT student_id FROM STUDENTS
@@ -3472,25 +3503,18 @@ if (url.pathname === "/api/d1/updateStudent") {
   const changeFields = [
     "no_matrik", "nama", "email", "no_tel", "kelas", "jantina", "status", "catatan"
   ];
-  if (assignmentConfig) changeFields.push("institution_code");
+  changeFields.push("institution_code");
   const changed_fields = changeFields.filter(field =>
     String(current[field] || "") !== String(validated[field] || "")
   );
   if (!changed_fields.length) throw invalid("Tiada perubahan pelajar untuk disimpan.");
 
-  const update = assignmentConfig
-    ? env.DB.prepare(
-      `UPDATE STUDENTS SET no_matrik = ?, nama = ?, email = ?, no_tel = ?,
-         kelas = ?, jantina = ?, status = ?, catatan = ?, institution_code = ?
-       WHERE student_id = ?`
-    ).bind(no_matrik, nama, email, no_tel, kelas, jantina, status, catatan,
-      validated.institution_code, row.student_id)
-    : env.DB.prepare(
-      `UPDATE STUDENTS SET no_matrik = ?, nama = ?, email = ?, no_tel = ?,
-         kelas = ?, jantina = ?, status = ?, catatan = ?
-       WHERE student_id = ?`
-    ).bind(no_matrik, nama, email, no_tel, kelas, jantina, status, catatan,
-      row.student_id);
+  const update = env.DB.prepare(
+    `UPDATE STUDENTS SET no_matrik = ?, nama = ?, email = ?, no_tel = ?,
+       kelas = ?, jantina = ?, status = ?, catatan = ?, institution_code = ?
+     WHERE student_id = ?`
+  ).bind(no_matrik, nama, email, no_tel, kelas, jantina, status, catatan,
+    validated.institution_code, row.student_id);
   const result = await update.run();
   if (result.meta?.changes !== 1) {
     throw fault(404, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai.");
@@ -3577,81 +3601,16 @@ if (url.pathname === "/api/d1/createStudent") {
     throw invalid("status pelajar mesti AKTIF atau TIDAK AKTIF.");
   }
 
-  let assignmentConfig = null;
-  try {
-    const [groupResult, institutionResult] = await Promise.all([
-      env.DB.prepare(
-        `SELECT group_code, display_name, institution_required, active,
-                sort_order, config_version FROM STUDENT_GROUPS`
-      ).all(),
-      env.DB.prepare(
-        `SELECT institution_code, display_name, active,
-                sort_order, config_version FROM LI_INSTITUTIONS`
-      ).all()
-    ]);
-    const strictBoolean = value => {
-      const text = String(value ?? "").trim().toLowerCase();
-      if (["true", "ya", "1"].includes(text)) return true;
-      if (["false", "tidak", "0"].includes(text)) return false;
-      throw new Error("Invalid configuration boolean");
-    };
-    const normalizeConfig = (row, codeField, hasInstitutionRequired) => {
-      const code = String(row[codeField] ?? "").trim().toUpperCase();
-      const displayName = String(row.display_name ?? "").trim();
-      const sortOrder = Number(row.sort_order);
-      const version = Number(row.config_version);
-      if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(code) ||
-          !displayName || displayName.length > 100 ||
-          /[\u0000-\u001F\u007F]/.test(displayName) ||
-          !Number.isInteger(sortOrder) || sortOrder < 1 ||
-          !Number.isInteger(version) || version < 1) {
-        throw new Error("Invalid assignment configuration");
-      }
-      const active = strictBoolean(row.active);
-      const institution_required = hasInstitutionRequired
-        ? strictBoolean(row.institution_required) : false;
-      return { code, active, institution_required };
-    };
-    const groups = (groupResult.results || []).map(row =>
-      normalizeConfig(row, "group_code", true)
-    );
-    const institutions = (institutionResult.results || []).map(row =>
-      normalizeConfig(row, "institution_code", false)
-    );
-    if (groups.length &&
-        new Set(groups.map(group => group.code)).size === groups.length &&
-        new Set(institutions.map(institution => institution.code)).size === institutions.length) {
-      assignmentConfig = { groups, institutions };
-    }
-  } catch (error) {
-    assignmentConfig = null;
-  }
+  const assignmentConfig = await loadStudentAssignmentConfig(env);
 
   let institution_code = "";
-  if (assignmentConfig) {
-    const group = assignmentConfig.groups.find(item => item.code === kelas);
-    if (!group) throw invalid("Kumpulan pelajar tidak sah.");
-    if (!group.active) {
-      throw invalid("Kumpulan tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
-    }
-    const submittedCode = String(input.institution_code || "").trim().toUpperCase();
-    if (!group.institution_required) {
-      if (submittedCode) throw invalid("institution_code mesti kosong untuk kumpulan ini.");
-    } else {
-      if (!submittedCode) throw invalid("Institusi diperlukan untuk kumpulan ini.");
-      if (!/^[A-Z][A-Z0-9_]{1,31}$/.test(submittedCode)) {
-        throw invalid("institution_code mesti 2-32 aksara A-Z, 0-9 atau garis bawah dan bermula dengan huruf.");
-      }
-      const institution = assignmentConfig.institutions.find(item => item.code === submittedCode);
-      if (!institution) throw invalid("Institusi LI tidak dijumpai.");
-      if (!institution.active) {
-        throw invalid("Institusi LI tidak aktif dan tidak boleh ditugaskan kepada pelajar.");
-      }
-      institution_code = submittedCode;
-    }
-  } else if (!["A2", "A3", "LI"].includes(kelas)) {
-    throw invalid("kelas pelajar mesti A2, A3 atau LI.");
-  }
+  institution_code = validateStudentAssignment(
+    assignmentConfig,
+    kelas,
+    input.institution_code,
+    null,
+    invalid
+  );
 
   const existingId = await env.DB.prepare(
     `SELECT student_id FROM STUDENTS WHERE LOWER(TRIM(student_id)) = LOWER(?) LIMIT 1`
@@ -4171,6 +4130,327 @@ if (url.pathname === "/api/d1/createStudentGroup") {
     status: 200,
     headers
   });
+}
+if (url.pathname === "/api/d1/getStudentGroupConfigReadiness") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") {
+    throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  }
+
+  const payload = await request.json();
+  const adminId = String(payload.admin_id || "").trim();
+  const adminName = String(
+    payload.nama_admin || payload.admin_name || payload.name || ""
+  ).trim();
+  const pin = String(payload.pin || "").trim();
+  const admin = await env.DB.prepare(
+    `SELECT admin_id FROM ADMIN_USERS
+     WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+       AND pin = ? AND LOWER(status) = 'aktif'
+     LIMIT 1`
+  ).bind(adminId, adminName, pin).first();
+  if (!admin) {
+    throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah");
+  }
+
+  const schemaResult = await env.DB.prepare(
+    `SELECT name FROM sqlite_master
+     WHERE type = 'table'
+       AND UPPER(name) IN ('STUDENT_GROUPS', 'LI_INSTITUTIONS', 'STUDENTS', 'SYSTEM_CONFIG')`
+  ).all();
+  const tableNames = new Set((schemaResult.results || []).map(row =>
+    String(row.name || "").trim().toUpperCase()
+  ));
+  const hasGroupTable = tableNames.has("STUDENT_GROUPS");
+  const hasInstitutionTable = tableNames.has("LI_INSTITUTIONS");
+  const hasStudentsTable = tableNames.has("STUDENTS");
+  const hasSystemConfigTable = tableNames.has("SYSTEM_CONFIG");
+  let studentColumns = new Set();
+  if (hasStudentsTable) {
+    const columnResult = await env.DB.prepare("PRAGMA table_info(STUDENTS)").all();
+    studentColumns = new Set((columnResult.results || []).map(row =>
+      String(row.name || "").trim()
+    ));
+  }
+
+  const [config, groupResult, institutionResult, studentResult] = await Promise.all([
+    hasSystemConfigTable
+      ? env.DB.prepare(
+        `SELECT config_value FROM SYSTEM_CONFIG
+         WHERE config_key = ? LIMIT 1`
+      ).bind("STUDENT_GROUP_CONFIG_ENABLED").first()
+      : Promise.resolve(null),
+    hasGroupTable
+      ? env.DB.prepare("SELECT * FROM STUDENT_GROUPS").all()
+      : Promise.resolve({ results: [] }),
+    hasInstitutionTable
+      ? env.DB.prepare("SELECT * FROM LI_INSTITUTIONS").all()
+      : Promise.resolve({ results: [] }),
+    hasStudentsTable
+      ? env.DB.prepare("SELECT * FROM STUDENTS").all()
+      : Promise.resolve({ results: [] })
+  ]);
+
+  const groupRows = groupResult.results || [];
+  const institutionRows = institutionResult.results || [];
+  const studentRows = studentResult.results || [];
+  const issues = [];
+  const migrationIssues = [];
+  const counts = {
+    student_groups: groupRows.length,
+    li_institutions: institutionRows.length,
+    students: studentRows.length,
+    invalid_group_records: 0,
+    invalid_institution_records: 0,
+    duplicate_group_codes: 0,
+    duplicate_institution_codes: 0,
+    students_with_invalid_group: 0,
+    active_students_with_inactive_or_missing_group: 0,
+    li_students_missing_or_invalid_institution: 0,
+    non_li_students_with_institution: 0,
+    active_li_students_with_inactive_or_missing_institution: 0
+  };
+  const addDiagnostic = (target, code, count) => {
+    if (count > 0) target.push({ code, count });
+  };
+  if (!hasGroupTable) addDiagnostic(issues, "MISSING_STUDENT_GROUPS_SHEET", 1);
+  if (!hasInstitutionTable) addDiagnostic(issues, "MISSING_LI_INSTITUTIONS_SHEET", 1);
+  if (!hasStudentsTable) addDiagnostic(issues, "MISSING_STUDENTS_SHEET", 1);
+  if (hasStudentsTable && !studentColumns.has("institution_code")) {
+    addDiagnostic(issues, "MISSING_STUDENTS_INSTITUTION_CODE_HEADER", 1);
+  }
+  const parseStoredBoolean = (value) => {
+    const normalized = String(value === null || value === undefined ? "" : value)
+      .trim().toLowerCase();
+    if (["1", "true", "ya"].includes(normalized)) return true;
+    if (["0", "false", "tidak"].includes(normalized)) return false;
+    return null;
+  };
+  const validCode = (value) => /^[A-Z][A-Z0-9_]{1,31}$/.test(value);
+  const validDisplayName = (value) =>
+    Boolean(value) && value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value);
+
+  const groupMap = new Map();
+  const groupCodeCounts = new Map();
+  for (const row of groupRows) {
+    const code = String(row.group_code === null || row.group_code === undefined
+      ? "" : row.group_code).trim().toUpperCase();
+    if (validCode(code)) groupCodeCounts.set(code, (groupCodeCounts.get(code) || 0) + 1);
+    const active = parseStoredBoolean(row.active);
+    const institutionRequired = parseStoredBoolean(row.institution_required);
+    const displayName = String(row.display_name === null || row.display_name === undefined
+      ? "" : row.display_name).trim();
+    const sortOrder = Number(row.sort_order);
+    const configVersion = Number(row.config_version);
+    if (!validCode(code) || !validDisplayName(displayName) || active === null ||
+        institutionRequired === null || !Number.isInteger(sortOrder) || sortOrder < 1 ||
+        !Number.isInteger(configVersion) || configVersion < 1) {
+      counts.invalid_group_records += 1;
+      continue;
+    }
+    if (!groupMap.has(code)) {
+      groupMap.set(code, { active, institution_required: institutionRequired });
+    }
+  }
+  for (const count of groupCodeCounts.values()) {
+    if (count > 1) counts.duplicate_group_codes += count - 1;
+  }
+  addDiagnostic(issues, "INVALID_STUDENT_GROUP_RECORDS", counts.invalid_group_records);
+  addDiagnostic(issues, "DUPLICATE_STUDENT_GROUP_CODES", counts.duplicate_group_codes);
+
+  const institutionMap = new Map();
+  const institutionCodeCounts = new Map();
+  for (const row of institutionRows) {
+    const code = String(row.institution_code === null || row.institution_code === undefined
+      ? "" : row.institution_code).trim().toUpperCase();
+    if (validCode(code)) institutionCodeCounts.set(code, (institutionCodeCounts.get(code) || 0) + 1);
+    const active = parseStoredBoolean(row.active);
+    const displayName = String(row.display_name === null || row.display_name === undefined
+      ? "" : row.display_name).trim();
+    const sortOrder = Number(row.sort_order);
+    const configVersion = Number(row.config_version);
+    if (!validCode(code) || !validDisplayName(displayName) || active === null ||
+        !Number.isInteger(sortOrder) || sortOrder < 1 ||
+        !Number.isInteger(configVersion) || configVersion < 1) {
+      counts.invalid_institution_records += 1;
+      continue;
+    }
+    if (!institutionMap.has(code)) institutionMap.set(code, { active });
+  }
+  for (const count of institutionCodeCounts.values()) {
+    if (count > 1) counts.duplicate_institution_codes += count - 1;
+  }
+  addDiagnostic(issues, "INVALID_LI_INSTITUTION_RECORDS", counts.invalid_institution_records);
+  addDiagnostic(issues, "DUPLICATE_LI_INSTITUTION_CODES", counts.duplicate_institution_codes);
+
+  for (const code of ["A2", "A3", "LI"]) {
+    if (!groupMap.has(code)) addDiagnostic(issues, `MISSING_REQUIRED_GROUP_${code}`, 1);
+  }
+  for (const code of ["UMK", "UPM"]) {
+    if (!institutionMap.has(code)) addDiagnostic(issues, `MISSING_REQUIRED_INSTITUTION_${code}`, 1);
+  }
+
+  for (const student of studentRows) {
+    const groupCode = String(student.kelas || "").trim().toUpperCase();
+    const institutionCode = String(student.institution_code || "").trim().toUpperCase();
+    const group = groupMap.get(groupCode);
+    const institution = institutionCode ? institutionMap.get(institutionCode) : null;
+    const activeStudent = String(student.status || "").trim().toUpperCase() === "AKTIF";
+    if (!group) counts.students_with_invalid_group += 1;
+    if (activeStudent && (!group || group.active !== true)) {
+      counts.active_students_with_inactive_or_missing_group += 1;
+    }
+    if (group && group.institution_required === true) {
+      if (!institution) counts.li_students_missing_or_invalid_institution += 1;
+      if (activeStudent && (!institution || institution.active !== true)) {
+        counts.active_li_students_with_inactive_or_missing_institution += 1;
+      }
+    } else if (institutionCode) {
+      counts.non_li_students_with_institution += 1;
+    }
+  }
+
+  addDiagnostic(issues, "STUDENTS_WITH_INVALID_GROUP", counts.students_with_invalid_group);
+  addDiagnostic(migrationIssues, "ACTIVE_STUDENTS_WITH_INACTIVE_OR_MISSING_GROUP",
+    counts.active_students_with_inactive_or_missing_group);
+  addDiagnostic(migrationIssues, "LI_STUDENTS_MISSING_OR_INVALID_INSTITUTION",
+    counts.li_students_missing_or_invalid_institution);
+  addDiagnostic(migrationIssues, "NON_LI_STUDENTS_WITH_INSTITUTION",
+    counts.non_li_students_with_institution);
+  addDiagnostic(migrationIssues, "ACTIVE_LI_STUDENTS_WITH_INACTIVE_OR_MISSING_INSTITUTION",
+    counts.active_li_students_with_inactive_or_missing_institution);
+
+  const enabled = String(config && config.config_value || "").trim().toLowerCase() === "true";
+  const setupCodes = new Set([
+    "MISSING_STUDENT_GROUPS_SHEET", "MISSING_LI_INSTITUTIONS_SHEET",
+    "MISSING_STUDENTS_SHEET", "MISSING_STUDENTS_INSTITUTION_CODE_HEADER",
+    "MISSING_REQUIRED_GROUP_A2", "MISSING_REQUIRED_GROUP_A3", "MISSING_REQUIRED_GROUP_LI",
+    "MISSING_REQUIRED_INSTITUTION_UMK", "MISSING_REQUIRED_INSTITUTION_UPM"
+  ]);
+  const hasSetupIssue = issues.some(issue => setupCodes.has(issue.code));
+  const hasFoundationBlocker = issues.some(issue => !setupCodes.has(issue.code));
+  let migrationPreview = null;
+  let migrationVerification = null;
+  if (issues.length === 0 && !enabled) {
+    const preview = {
+      matched_blank: 0,
+      already_populated: 0,
+      unmatched: 0,
+      conflicts: 0,
+      rows_proposed: 0,
+      rows_existing: 0
+    };
+    for (const student of studentRows) {
+      const groupCode = String(student.kelas || "").trim().toUpperCase();
+      if (groupCode !== "LI") continue;
+      const studentId = String(student.student_id || "").trim().toUpperCase();
+      const existingCode = String(student.institution_code || "").trim().toUpperCase();
+      const proposedCode = studentId.startsWith("LIUMK-")
+        ? "UMK"
+        : (studentId.startsWith("LIUPM-") ? "UPM" : "");
+      if (!proposedCode) {
+        if (existingCode) preview.already_populated += 1;
+        else preview.unmatched += 1;
+        continue;
+      }
+      if (existingCode) {
+        if (existingCode === proposedCode) preview.already_populated += 1;
+        else preview.conflicts += 1;
+        continue;
+      }
+      preview.matched_blank += 1;
+      preview.rows_proposed += 1;
+    }
+    preview.rows_existing = preview.already_populated;
+    migrationPreview = preview;
+
+    const verificationCounts = {
+      total_rows: 0,
+      total_li: 0,
+      li_missing_institution: 0,
+      li_invalid_institution: 0,
+      non_li_with_institution: 0,
+      legacy_mapping_conflicts: 0
+    };
+    const validInstitutions = new Set(institutionMap.keys());
+    for (const student of studentRows) {
+      verificationCounts.total_rows += 1;
+      const groupCode = String(student.kelas || "").trim().toUpperCase();
+      const institutionCode = String(student.institution_code || "").trim().toUpperCase();
+      if (groupCode !== "LI") {
+        if (institutionCode) verificationCounts.non_li_with_institution += 1;
+        continue;
+      }
+      verificationCounts.total_li += 1;
+      if (!institutionCode) verificationCounts.li_missing_institution += 1;
+      else if (!validInstitutions.has(institutionCode)) {
+        verificationCounts.li_invalid_institution += 1;
+      }
+      const studentId = String(student.student_id || "").trim().toUpperCase();
+      const legacyCode = studentId.startsWith("LIUMK-")
+        ? "UMK"
+        : (studentId.startsWith("LIUPM-") ? "UPM" : "");
+      if (legacyCode && institutionCode && institutionCode !== legacyCode) {
+        verificationCounts.legacy_mapping_conflicts += 1;
+      }
+    }
+    const verificationIssues = [];
+    for (const [key, count] of Object.entries(verificationCounts)) {
+      if (key !== "total_rows" && key !== "total_li" && count > 0) {
+        verificationIssues.push({ code: key.toUpperCase(), count });
+      }
+    }
+    migrationVerification = {
+      verified: verificationIssues.length === 0,
+      counts: verificationCounts,
+      issues: verificationIssues
+    };
+  }
+  const verificationCounts = migrationVerification && migrationVerification.counts || {};
+  const hasMigrationBlocker = Boolean(
+    (migrationPreview && migrationPreview.unmatched > 0) ||
+    Number(verificationCounts.li_invalid_institution || 0) > 0 ||
+    Number(verificationCounts.non_li_with_institution || 0) > 0 ||
+    counts.active_students_with_inactive_or_missing_group > 0
+  );
+  const migrationNeeded = migrationIssues.length > 0 ||
+    Boolean(migrationPreview && migrationPreview.matched_blank > 0);
+  let operationalState = "READY_FOR_DYNAMIC_LOGIN";
+  if (hasSetupIssue) operationalState = "SETUP_REQUIRED";
+  else if (hasFoundationBlocker || hasMigrationBlocker) operationalState = "MIGRATION_BLOCKED";
+  else if (migrationNeeded) operationalState = "MIGRATION_REQUIRED";
+  const readyForDynamicLogin = operationalState === "READY_FOR_DYNAMIC_LOGIN";
+
+  return new Response(JSON.stringify({
+    ok: true,
+    data: {
+      ready: issues.length === 0 && (!enabled || migrationIssues.length === 0),
+      foundation_ready: issues.length === 0,
+      ready_for_admin_config: issues.length === 0,
+      ready_for_dynamic_login: readyForDynamicLogin,
+      migration_ready: !migrationNeeded && !hasMigrationBlocker,
+      migration_needed: migrationNeeded,
+      migration_blocked: hasFoundationBlocker || hasMigrationBlocker,
+      enabled,
+      mode: enabled ? "CONFIG_ENABLED" : "LEGACY_SAFE",
+      admin_config_state: issues.length === 0 ? "READY_FOR_ADMIN_CONFIG" : operationalState,
+      operational_state: operationalState,
+      counts,
+      issues,
+      migration_issues: migrationIssues,
+      migration_preview: migrationPreview ? {
+        proposed: migrationPreview.rows_proposed,
+        existing: migrationPreview.rows_existing,
+        unmatched: migrationPreview.unmatched,
+        conflicts: migrationPreview.conflicts
+      } : null,
+      migration_verification: migrationVerification
+    }
+  }), { status: 200, headers });
 }
 if (url.pathname === "/api/d1/getAdminStudentGroups") {
   if (request.method === "OPTIONS") {

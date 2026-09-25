@@ -40,6 +40,7 @@ const D1_POST_ENDPOINTS = {
   updateStudent: "updateStudent",
   toggleStudentStatus: "toggleStudentStatus",
   getAdminStudents: "getAdminStudents",
+  getStudentGroupConfigReadiness: "getStudentGroupConfigReadiness",
   getAdminStudentGroups: "getAdminStudentGroups",
   createStudentGroup: "createStudentGroup",
   updateStudentGroup: "updateStudentGroup",
@@ -2200,9 +2201,11 @@ function renderSelectOptionsV240(select, rows, valueField, currentValue, emptyLa
 
 function renderAdminStudentGroupOptionsV240(currentStudent) {
   const currentGroupCode = String(currentStudent && currentStudent.kelas || "").trim().toUpperCase();
-  let groups = adminStudentGroupsV240.filter((group) => group.active);
+  const institutionCodes = new Set(adminLiInstitutionsV240.map((institution) => institution.institution_code));
+  const isAssignableGroup = (group) => group.group_code === "LI" || !institutionCodes.has(group.group_code);
+  let groups = adminStudentGroupsV240.filter((group) => group.active && isAssignableGroup(group));
   const currentGroup = getAdminStudentGroupV240(currentGroupCode);
-  if (currentGroup && !currentGroup.active && !groups.some((group) => group.group_code === currentGroup.group_code)) groups = groups.concat([currentGroup]);
+  if (currentGroup && currentGroupCode && !groups.some((group) => group.group_code === currentGroup.group_code)) groups = groups.concat([currentGroup]);
   if (!groups.length) {
     groups = [
       { group_code: "A2", display_name: "A2", active: true },
@@ -2224,8 +2227,8 @@ function renderAdminStudentGroupOptionsV240(currentStudent) {
 
 function updateAdminStudentInstitutionFieldV240(preferredInstitutionCode) {
   if (!els.adminStudentInstitutionField || !els.adminStudentInstitutionInput) return;
-  const group = getAdminStudentGroupV240(els.adminStudentClassInput && els.adminStudentClassInput.value);
-  const requiresInstitution = Boolean(group && group.institution_required);
+  const selectedGroupCode = String(els.adminStudentClassInput && els.adminStudentClassInput.value || "").trim().toUpperCase();
+  const requiresInstitution = selectedGroupCode === "LI";
   els.adminStudentInstitutionField.hidden = !requiresInstitution;
   els.adminStudentInstitutionInput.disabled = !requiresInstitution;
   els.adminStudentInstitutionInput.required = requiresInstitution;

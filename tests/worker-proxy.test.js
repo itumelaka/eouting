@@ -4,6 +4,16 @@ const path = require("node:path");
 const vm = require("node:vm");
 const test = require("node:test");
 const { webcrypto } = require("node:crypto");
+const {
+  FakeSheet: StudentConfigFakeSheet,
+  GROUP_HEADERS: STUDENT_CONFIG_GROUP_HEADERS,
+  INSTITUTION_HEADERS: STUDENT_CONFIG_INSTITUTION_HEADERS,
+  STUDENT_HEADERS_V240: STUDENT_CONFIG_STUDENT_HEADERS,
+  createRuntime: createStudentConfigGasRuntime,
+  groupRow: studentConfigGroupRow,
+  institutionRow: studentConfigInstitutionRow,
+  studentRow: studentConfigStudentRow
+} = require("./support/student-group-config-runtime");
 const source = fs.readFileSync(path.join(__dirname, "../proxy/staging-worker-base.js"), "utf8");
 const origin = "https://itumelaka.github.io";
 const upstream = "https://script.google.com/macros/s/TEST_DEPLOYMENT/exec";
@@ -1604,4 +1614,548 @@ test("confirmIn: zero-row conditional update must not audit or report successful
   assert.equal(response.status, 409);
   assert.equal(f.audits.length, 0);
   assert.equal(f.pendingTasks.length, 0);
+});
+
+function studentGroupReadinessFixture(options = {}) {
+  const queries = [];
+  const tables = options.tables || [
+    "STUDENT_GROUPS", "LI_INSTITUTIONS", "STUDENTS", "SYSTEM_CONFIG"
+  ];
+  const studentColumns = options.studentColumns || [
+    "student_id", "no_matrik", "nama", "kelas", "status", "institution_code"
+  ];
+  const groups = options.groups || [
+    { group_code: "A2", display_name: "A2", institution_required: 0, active: 1, sort_order: 10, config_version: 1 },
+    { group_code: "A3", display_name: "A3", institution_required: 0, active: 1, sort_order: 20, config_version: 1 },
+    { group_code: "LI", display_name: "LI", institution_required: 1, active: 1, sort_order: 30, config_version: 1 }
+  ];
+  const institutions = options.institutions || [
+    { institution_code: "UMK", display_name: "UMK", active: 1, sort_order: 10, config_version: 1 },
+    { institution_code: "UPM", display_name: "UPM", active: 1, sort_order: 20, config_version: 1 }
+  ];
+  const students = options.students || [
+    { student_id: "A2-001", kelas: "A2", institution_code: "", status: "Aktif" },
+    { student_id: "LI-001", kelas: "LI", institution_code: "UMK", status: "Aktif" }
+  ];
+  const statement = (sql, values = []) => ({
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM ADMIN_USERS")) {
+        return options.authenticated === false ? null : { admin_id: "ADMIN-TEST" };
+      }
+      if (sql.includes("FROM SYSTEM_CONFIG")) {
+        return { config_value: Object.prototype.hasOwnProperty.call(options, "configValue")
+          ? options.configValue
+          : (options.enabled === false ? "false" : "true") };
+      }
+      throw new Error("Unexpected first query: " + sql);
+    },
+    async all() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM sqlite_master")) {
+        return { results: tables.map(name => ({ name })) };
+      }
+      if (sql.includes("PRAGMA table_info(STUDENTS)")) {
+        return { results: studentColumns.map(name => ({ name })) };
+      }
+      if (sql.includes("FROM STUDENT_GROUPS")) return { results: groups };
+      if (sql.includes("FROM LI_INSTITUTIONS")) return { results: institutions };
+      if (sql.includes("FROM STUDENTS")) return { results: students };
+      throw new Error("Unexpected all query: " + sql);
+    }
+  });
+  const rt = runtime(() => { throw new Error("Student Group readiness must not call GAS"); });
+  const run = (method = "POST") => rt.run(req(method, {
+    url: "https://proxy.test/api/d1/getStudentGroupConfigReadiness",
+    headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify({ admin_id: "ADMIN-TEST", pin: "TEST_PIN" })
+  }), {
+    STAGING_ORIGIN: "http://localhost:8000",
+    DB: { prepare: sql => statement(sql) }
+  });
+  return { ...rt, run, queries };
+}
+
+function gasStudentGroupReadiness(options = {}) {
+  const groups = options.groups || [
+    { group_code: "A2", display_name: "A2", institution_required: 0, active: 1, sort_order: 10, config_version: 1 },
+    { group_code: "A3", display_name: "A3", institution_required: 0, active: 1, sort_order: 20, config_version: 1 },
+    { group_code: "LI", display_name: "LI", institution_required: 1, active: 1, sort_order: 30, config_version: 1 }
+  ];
+  const institutions = options.institutions || [
+    { institution_code: "UMK", display_name: "UMK", active: 1, sort_order: 10, config_version: 1 },
+    { institution_code: "UPM", display_name: "UPM", active: 1, sort_order: 20, config_version: 1 }
+  ];
+  const students = options.students || [
+    { student_id: "A2-001", kelas: "A2", institution_code: "", status: "Aktif" },
+    { student_id: "LI-001", kelas: "LI", institution_code: "UMK", status: "Aktif" }
+  ];
+  const gasBoolean = value => value === 1 ? true : (value === 0 ? false : value);
+  const sheets = {
+    STUDENT_GROUPS: new StudentConfigFakeSheet("STUDENT_GROUPS", [
+      STUDENT_CONFIG_GROUP_HEADERS,
+      ...groups.map(row => studentConfigGroupRow(row.group_code, {
+        ...row,
+        institution_required: gasBoolean(row.institution_required),
+        active: gasBoolean(row.active)
+      }))
+    ]),
+    LI_INSTITUTIONS: new StudentConfigFakeSheet("LI_INSTITUTIONS", [
+      STUDENT_CONFIG_INSTITUTION_HEADERS,
+      ...institutions.map(row => studentConfigInstitutionRow(row.institution_code, {
+        ...row,
+        active: gasBoolean(row.active)
+      }))
+    ]),
+    STUDENTS: new StudentConfigFakeSheet("STUDENTS", [
+      STUDENT_CONFIG_STUDENT_HEADERS,
+      ...students.map(row => studentConfigStudentRow(row))
+    ])
+  };
+  const configValue = Object.prototype.hasOwnProperty.call(options, "configValue")
+    ? options.configValue
+    : (options.enabled === false ? "false" : "true");
+  const result = createStudentConfigGasRuntime({
+    sheets,
+    properties: { STUDENT_GROUP_CONFIG_ENABLED: configValue }
+  }).context.assessStudentGroupConfigReadinessV240_();
+  return JSON.parse(JSON.stringify(result));
+}
+
+test("Student Group readiness: direct D1 response is aggregate-only and does not call GAS", async () => {
+  const fixture = studentGroupReadinessFixture();
+  const response = await fixture.run();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.data.enabled, true);
+  assert.equal(body.data.mode, "CONFIG_ENABLED");
+  assert.equal(body.data.operational_state, "READY_FOR_DYNAMIC_LOGIN");
+  assert.equal(body.data.ready_for_dynamic_login, true);
+  assert.deepEqual(body.data.issues, []);
+  assert.deepEqual(body.data.migration_issues, []);
+  assert.deepEqual(
+    [body.data.counts.student_groups, body.data.counts.li_institutions, body.data.counts.students],
+    [3, 2, 2]
+  );
+  assert.equal(JSON.stringify(body).includes("A2-001"), false);
+  assert.equal(fixture.calls.length, 0);
+});
+
+test("Student Group readiness: auth, method, and setup diagnostics fail safely", async () => {
+  const invalidAuth = studentGroupReadinessFixture({ authenticated: false });
+  assert.equal((await invalidAuth.run()).status, 401);
+
+  const methods = studentGroupReadinessFixture();
+  assert.equal((await methods.run("OPTIONS")).status, 204);
+  assert.equal((await methods.run("GET")).status, 405);
+
+  const missingSeed = studentGroupReadinessFixture({
+    groups: [
+      { group_code: "A2", display_name: "A2", institution_required: 0, active: 1, sort_order: 10, config_version: 1 }
+    ]
+  });
+  const body = await (await missingSeed.run()).json();
+  assert.equal(body.data.operational_state, "SETUP_REQUIRED");
+  assert.equal(body.data.ready_for_dynamic_login, false);
+  assert.match(body.data.issues.map(issue => issue.code).join(","), /MISSING_REQUIRED_GROUP_A3/);
+});
+
+test("Student Group readiness: legacy preview and verification preserve GAS migration states", async () => {
+  const proposed = await (await studentGroupReadinessFixture({
+    enabled: false,
+    students: [{ student_id: "LIUMK-001", kelas: "LI", institution_code: "", status: "Aktif" }]
+  }).run()).json();
+  assert.equal(proposed.data.operational_state, "MIGRATION_REQUIRED");
+  assert.equal(proposed.data.migration_blocked, false);
+  assert.equal(proposed.data.migration_needed, true);
+  assert.deepEqual(proposed.data.migration_preview, {
+    proposed: 1, existing: 0, unmatched: 0, conflicts: 0
+  });
+  assert.deepEqual(proposed.data.migration_verification, {
+    verified: false,
+    counts: {
+      total_rows: 1,
+      total_li: 1,
+      li_missing_institution: 1,
+      li_invalid_institution: 0,
+      non_li_with_institution: 0,
+      legacy_mapping_conflicts: 0
+    },
+    issues: [{ code: "LI_MISSING_INSTITUTION", count: 1 }]
+  });
+
+  const unmatched = await (await studentGroupReadinessFixture({
+    enabled: false,
+    students: [{ student_id: "LIUNKNOWN-001", kelas: "LI", institution_code: "", status: "Aktif" }]
+  }).run()).json();
+  assert.equal(unmatched.data.operational_state, "MIGRATION_BLOCKED");
+  assert.equal(unmatched.data.migration_preview.unmatched, 1);
+});
+
+test("Student Group readiness: enabled mode does not run legacy checks or overstate blockers", async () => {
+  for (const student of [
+    { student_id: "LIUNKNOWN-001", kelas: "LI", institution_code: "", status: "Aktif" },
+    { student_id: "LIUMK-001", kelas: "LI", institution_code: "UNKNOWN", status: "Aktif" },
+    { student_id: "A2-001", kelas: "A2", institution_code: "UMK", status: "Aktif" }
+  ]) {
+    const body = await (await studentGroupReadinessFixture({ students: [student] }).run()).json();
+    assert.equal(body.data.operational_state, "MIGRATION_REQUIRED", student.student_id);
+    assert.equal(body.data.migration_blocked, false, student.student_id);
+    assert.equal(body.data.migration_needed, true, student.student_id);
+    assert.equal(body.data.migration_preview, null, student.student_id);
+    assert.equal(body.data.migration_verification, null, student.student_id);
+  }
+});
+
+test("Student Group readiness: legacy conflicts and feature flag parsing match GAS", async () => {
+  const conflict = await (await studentGroupReadinessFixture({
+    enabled: false,
+    students: [{ student_id: "LIUMK-001", kelas: "LI", institution_code: "UPM", status: "Aktif" }]
+  }).run()).json();
+  assert.equal(conflict.data.operational_state, "READY_FOR_DYNAMIC_LOGIN");
+  assert.equal(conflict.data.migration_preview.conflicts, 1);
+  assert.equal(conflict.data.migration_verification.verified, false);
+  assert.equal(conflict.data.migration_verification.counts.legacy_mapping_conflicts, 1);
+
+  const nonGasTrue = await (await studentGroupReadinessFixture({ configValue: "on" }).run()).json();
+  assert.equal(nonGasTrue.data.enabled, false);
+  assert.equal(nonGasTrue.data.mode, "LEGACY_SAFE");
+  assert.notEqual(nonGasTrue.data.migration_verification, null);
+});
+
+test("Student Group readiness: validation and setup diagnostics match GAS edge semantics", async () => {
+  const invalidCodeRow = {
+    group_code: "1BAD", display_name: "Bad", institution_required: 0,
+    active: 1, sort_order: 1, config_version: 1
+  };
+  const invalid = await (await studentGroupReadinessFixture({
+    groups: [
+      { group_code: "A2", display_name: "A2", institution_required: 0, active: 1, sort_order: 10, config_version: 1 },
+      { group_code: "A3", display_name: "A3", institution_required: 0, active: 1, sort_order: 20, config_version: 1 },
+      { group_code: "LI", display_name: "LI", institution_required: 1, active: 1, sort_order: 30, config_version: 1 },
+      invalidCodeRow, { ...invalidCodeRow }
+    ]
+  }).run()).json();
+  assert.equal(invalid.data.counts.invalid_group_records, 2);
+  assert.equal(invalid.data.counts.duplicate_group_codes, 0);
+
+  const missing = await (await studentGroupReadinessFixture({
+    tables: ["STUDENT_GROUPS", "STUDENTS", "SYSTEM_CONFIG"],
+    studentColumns: ["student_id", "kelas", "status"]
+  }).run()).json();
+  const issueCodes = missing.data.issues.map(issue => issue.code);
+  assert.equal(missing.data.operational_state, "SETUP_REQUIRED");
+  assert.ok(issueCodes.includes("MISSING_LI_INSTITUTIONS_SHEET"));
+  assert.ok(issueCodes.includes("MISSING_STUDENTS_INSTITUTION_CODE_HEADER"));
+  assert.ok(issueCodes.includes("MISSING_REQUIRED_INSTITUTION_UMK"));
+  assert.ok(issueCodes.includes("MISSING_REQUIRED_INSTITUTION_UPM"));
+});
+
+test("Student Group readiness: complete D1 contract equals GAS for migration state matrix", async () => {
+  const cases = [
+    {
+      enabled: false,
+      students: [{ student_id: "LIUMK-001", kelas: "LI", institution_code: "", status: "Aktif" }]
+    },
+    {
+      enabled: false,
+      students: [{ student_id: "LIUNKNOWN-001", kelas: "LI", institution_code: "", status: "Aktif" }]
+    },
+    {
+      enabled: false,
+      students: [{ student_id: "LIUMK-001", kelas: "LI", institution_code: "UNKNOWN", status: "Aktif" }]
+    },
+    {
+      enabled: false,
+      students: [{ student_id: "A2-001", kelas: "A2", institution_code: "UMK", status: "Aktif" }]
+    },
+    {
+      enabled: false,
+      students: [{ student_id: "LIUMK-001", kelas: "LI", institution_code: "UPM", status: "Aktif" }]
+    },
+    {
+      configValue: "on",
+      students: [{ student_id: "LIUPM-001", kelas: "LI", institution_code: "UPM", status: "Aktif" }]
+    },
+    {
+      enabled: true,
+      students: [{ student_id: "LIUNKNOWN-001", kelas: "LI", institution_code: "", status: "Aktif" }]
+    },
+    {
+      enabled: true,
+      institutions: [
+        { institution_code: "UMK", display_name: "UMK", active: 0, sort_order: 10, config_version: 1 },
+        { institution_code: "UPM", display_name: "UPM", active: 1, sort_order: 20, config_version: 1 }
+      ],
+      students: [{ student_id: "LIUMK-001", kelas: "LI", institution_code: "UMK", status: "Aktif" }]
+    }
+  ];
+  for (const options of cases) {
+    const d1 = await (await studentGroupReadinessFixture(options).run()).json();
+    assert.deepEqual(d1.data, gasStudentGroupReadiness(options), JSON.stringify(options));
+  }
+});
+
+function studentAssignmentMutationFixture(options = {}) {
+  const groups = options.groups || [
+    { group_code: "A2", display_name: "A2", institution_required: 0, active: 1, sort_order: 10, config_version: 1 },
+    { group_code: "A4", display_name: "A4", institution_required: 0, active: 1, sort_order: 20, config_version: 1 },
+    { group_code: "LI", display_name: "LI", institution_required: 1, active: 1, sort_order: 30, config_version: 1 },
+    { group_code: "UNISZA", display_name: "Legacy LI", institution_required: 1, active: 1, sort_order: 40, config_version: 1 }
+  ];
+  const institutions = options.institutions || [
+    { institution_code: "UNISZA", display_name: "UNISZA", active: 1, sort_order: 10, config_version: 1 },
+    { institution_code: "UMK", display_name: "UMK", active: 0, sort_order: 20, config_version: 1 }
+  ];
+  const current = options.current || {
+    student_id: "STUDENT-001", no_matrik: "M001", nama: "Pelajar Asal",
+    email: "", no_tel: "", kelas: "A2", jantina: "", status: "Aktif",
+    catatan: "", institution_code: "", photo_file_id: "", photo_updated_at: ""
+  };
+  const writes = [];
+  const queries = [];
+  const statement = (sql, values = []) => ({
+    bind(...args) { return statement(sql, args); },
+    async all() {
+      queries.push({ sql, values });
+      if (options.configError && sql.includes("FROM STUDENT_GROUPS")) {
+        throw new Error("missing config table");
+      }
+      if (sql.includes("FROM STUDENT_GROUPS")) return { results: groups };
+      if (sql.includes("FROM LI_INSTITUTIONS")) return { results: institutions };
+      throw new Error("Unexpected all query: " + sql);
+    },
+    async first() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM ADMIN_USERS")) return { admin_id: "ADMIN-TEST", nama_admin: "Admin Test" };
+      if (sql.includes("SELECT student_id, no_matrik") && sql.includes("FROM STUDENTS")) {
+        return options.missingCurrent ? null : current;
+      }
+      if (sql.includes("SELECT student_id FROM STUDENTS WHERE LOWER(TRIM(student_id))")) {
+        return options.duplicateId ? { student_id: "DUPLICATE" } : null;
+      }
+      if (sql.includes("SELECT no_matrik FROM STUDENTS WHERE LOWER(TRIM(no_matrik))")) {
+        return options.duplicateMatric ? { no_matrik: "DUPLICATE" } : null;
+      }
+      if (sql.includes("SELECT student_id FROM STUDENTS") && sql.includes("LOWER(TRIM(no_matrik))")) {
+        return options.duplicateMatric ? { student_id: "DUPLICATE" } : null;
+      }
+      throw new Error("Unexpected first query: " + sql);
+    },
+    async run() {
+      writes.push({ sql, values });
+      return { meta: { changes: 1 } };
+    }
+  });
+  const rt = runtime(() => { throw new Error("Student assignment mutation must not call GAS"); });
+  const run = (action, student, studentId = current.student_id) => rt.run(req("POST", {
+    url: `https://proxy.test/api/d1/${action}`,
+    headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify({
+      admin_id: "ADMIN-TEST",
+      pin: "TEST_PIN",
+      ...(action === "updateStudent" ? { student_id: studentId } : {}),
+      student
+    })
+  }), {
+    STAGING_ORIGIN: "http://localhost:8000",
+    DB: { prepare: sql => statement(sql) }
+  });
+  return { ...rt, run, writes, queries };
+}
+
+function validStudent(overrides = {}) {
+  return {
+    student_id: "NEW-001", no_matrik: "NEW001", nama: "Pelajar Baharu",
+    email: "", no_tel: "", kelas: "A4", institution_code: "", jantina: "",
+    status: "AKTIF", catatan: "", ...overrides
+  };
+}
+
+test("D1 student assignment: create accepts dynamic normal groups and canonical LI institution", async () => {
+  const a4 = studentAssignmentMutationFixture();
+  const a4Response = await a4.run("createStudent", validStudent());
+  assert.equal(a4Response.status, 200);
+  assert.equal((await a4Response.json()).data.institution_code, "");
+  assert.ok(a4.writes.some(write => write.sql.includes("INSERT INTO STUDENTS")));
+
+  const li = studentAssignmentMutationFixture();
+  const liResponse = await li.run("createStudent", validStudent({
+    student_id: "LI-NEW", no_matrik: "LINEW", kelas: "LI", institution_code: "UNISZA"
+  }));
+  assert.equal(liResponse.status, 200);
+  assert.equal((await liResponse.json()).data.institution_code, "UNISZA");
+});
+
+test("D1 student assignment: create rejects invalid LI/non-LI combinations regardless of legacy flag", async () => {
+  for (const [student, message] of [
+    [validStudent({ kelas: "LI" }), /Institusi diperlukan/],
+    [validStudent({ kelas: "A4", institution_code: "UNISZA" }), /mesti kosong/],
+    [validStudent({ kelas: "UNISZA", institution_code: "UNISZA" }), /Institusi LI tidak boleh digunakan/],
+    [validStudent({ kelas: "UNISZA", institution_code: "" }), /Institusi LI tidak boleh digunakan/]
+  ]) {
+    const fixture = studentAssignmentMutationFixture();
+    const response = await fixture.run("createStudent", student);
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, message);
+    assert.equal(fixture.writes.length, 0);
+  }
+});
+
+test("D1 student assignment: create rejects inactive group and inactive LI institution", async () => {
+  const inactiveGroup = studentAssignmentMutationFixture({
+    groups: [
+      { group_code: "A4", display_name: "A4", active: 0, sort_order: 10, config_version: 1 },
+      { group_code: "LI", display_name: "LI", active: 1, sort_order: 20, config_version: 1 }
+    ]
+  });
+  let response = await inactiveGroup.run("createStudent", validStudent());
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Kumpulan tidak aktif/);
+
+  const inactiveInstitution = studentAssignmentMutationFixture();
+  response = await inactiveInstitution.run("createStudent", validStudent({
+    kelas: "LI", institution_code: "UMK"
+  }));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Institusi LI tidak aktif/);
+});
+
+test("D1 student assignment: update supports A2 to A4, requires LI institution, and clears LI institution", async () => {
+  const toA4 = studentAssignmentMutationFixture();
+  let response = await toA4.run("updateStudent", { kelas: "A4" });
+  assert.equal(response.status, 200);
+  let body = await response.json();
+  assert.equal(body.data.kelas, "A4");
+  assert.equal(body.data.institution_code, "");
+
+  const toLiMissing = studentAssignmentMutationFixture();
+  response = await toLiMissing.run("updateStudent", { kelas: "LI" });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Institusi diperlukan/);
+
+  const toLi = studentAssignmentMutationFixture();
+  response = await toLi.run("updateStudent", { kelas: "LI", institution_code: "UNISZA" });
+  assert.equal(response.status, 200);
+  body = await response.json();
+  assert.equal(body.data.institution_code, "UNISZA");
+
+  const fromLi = studentAssignmentMutationFixture({
+    current: {
+      student_id: "LI-001", no_matrik: "LI001", nama: "Pelajar LI", email: "", no_tel: "",
+      kelas: "LI", jantina: "", status: "Aktif", catatan: "", institution_code: "UNISZA",
+      photo_file_id: "", photo_updated_at: ""
+    }
+  });
+  response = await fromLi.run("updateStudent", { kelas: "A4" }, "LI-001");
+  assert.equal(response.status, 200);
+  body = await response.json();
+  assert.equal(body.data.kelas, "A4");
+  assert.equal(body.data.institution_code, "");
+
+  const fromLiWithInstitution = studentAssignmentMutationFixture({
+    current: {
+      student_id: "LI-001", no_matrik: "LI001", nama: "Pelajar LI", email: "", no_tel: "",
+      kelas: "LI", jantina: "", status: "Aktif", catatan: "", institution_code: "UNISZA",
+      photo_file_id: "", photo_updated_at: ""
+    }
+  });
+  response = await fromLiWithInstitution.run("updateStudent", {
+    kelas: "A4", institution_code: "UNISZA"
+  }, "LI-001");
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /mesti kosong/);
+});
+
+test("D1 student assignment: unchanged inactive assignments remain editable but new inactive assignments fail", async () => {
+  const inactiveGroups = [
+    { group_code: "A2", display_name: "A2", active: 0, sort_order: 10, config_version: 1 },
+    { group_code: "A4", display_name: "A4", active: 0, sort_order: 20, config_version: 1 },
+    { group_code: "LI", display_name: "LI", active: 1, sort_order: 30, config_version: 1 }
+  ];
+  const existing = studentAssignmentMutationFixture({ groups: inactiveGroups });
+  let response = await existing.run("updateStudent", { nama: "Nama Dikemas Kini" });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.nama, "Nama Dikemas Kini");
+
+  const changed = studentAssignmentMutationFixture({ groups: inactiveGroups });
+  response = await changed.run("updateStudent", { kelas: "A4" });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Kumpulan tidak aktif/);
+
+  const existingInactiveInstitution = studentAssignmentMutationFixture({
+    current: {
+      student_id: "LI-001", no_matrik: "LI001", nama: "Pelajar LI", email: "", no_tel: "",
+      kelas: "LI", jantina: "", status: "Aktif", catatan: "", institution_code: "UMK",
+      photo_file_id: "", photo_updated_at: ""
+    }
+  });
+  response = await existingInactiveInstitution.run("updateStudent", { nama: "LI Dikemas Kini" }, "LI-001");
+  assert.equal(response.status, 200);
+
+  const changedInactiveInstitution = studentAssignmentMutationFixture({
+    current: {
+      student_id: "LI-001", no_matrik: "LI001", nama: "Pelajar LI", email: "", no_tel: "",
+      kelas: "LI", jantina: "", status: "Aktif", catatan: "", institution_code: "UNISZA",
+      photo_file_id: "", photo_updated_at: ""
+    }
+  });
+  response = await changedInactiveInstitution.run("updateStudent", { institution_code: "UMK" }, "LI-001");
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Institusi LI tidak aktif/);
+});
+
+test("D1 student assignment: invalid or unavailable config fails closed without writes", async () => {
+  for (const options of [
+    { configError: true },
+    { groups: [] },
+    { groups: [
+      { group_code: "A2", display_name: "A2", active: 1, sort_order: 10, config_version: 1 },
+      { group_code: "A2", display_name: "Duplicate", active: 1, sort_order: 20, config_version: 1 }
+    ] }
+  ]) {
+    const fixture = studentAssignmentMutationFixture(options);
+    const response = await fixture.run("createStudent", validStudent({ kelas: "A2" }));
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.code, "STUDENT_GROUP_CONFIG_UNAVAILABLE");
+    assert.equal(fixture.writes.length, 0);
+  }
+
+  const updateFixture = studentAssignmentMutationFixture({ configError: true });
+  const updateResponse = await updateFixture.run("updateStudent", { nama: "Tidak Disimpan" });
+  assert.equal(updateResponse.status, 503);
+  assert.equal((await updateResponse.json()).code, "STUDENT_GROUP_CONFIG_UNAVAILABLE");
+  assert.equal(updateFixture.writes.length, 0);
+});
+
+test("D1 student assignment: immutable ID, duplicate matric, audit and no-op protections remain intact", async () => {
+  const immutable = studentAssignmentMutationFixture();
+  let response = await immutable.run("updateStudent", {
+    student_id: "DIFFERENT-ID", nama: "Tidak Disimpan"
+  });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /student_id tidak boleh diubah/);
+  assert.equal(immutable.writes.length, 0);
+
+  const duplicate = studentAssignmentMutationFixture({ duplicateMatric: true });
+  response = await duplicate.run("updateStudent", { no_matrik: "DUPLICATE" });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).code, "STUDENT_MATRIC_EXISTS");
+  assert.equal(duplicate.writes.length, 0);
+
+  const noOp = studentAssignmentMutationFixture();
+  response = await noOp.run("updateStudent", { nama: "Pelajar Asal" });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Tiada perubahan/);
+  assert.equal(noOp.writes.length, 0);
+
+  const audited = studentAssignmentMutationFixture();
+  response = await audited.run("updateStudent", { kelas: "A4" });
+  assert.equal(response.status, 200);
+  const audit = audited.writes.find(write => write.sql.includes("INSERT INTO AUDIT_LOG"));
+  assert.ok(audit);
+  assert.deepEqual(JSON.parse(audit.values[5]).changed_fields, ["kelas"]);
 });
