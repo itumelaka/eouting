@@ -346,6 +346,46 @@ function validateStudentAssignment(config, kelas, rawInstitutionCode, currentStu
   return institutionCode;
 }
 __name(validateStudentAssignment, "validateStudentAssignment");
+
+function buildCanonicalStudentRuntimeGroups(groupRows, institutionRows, students) {
+  const normalize = (value) => String(value || "").trim();
+  const groups = [];
+
+  for (const group of groupRows || []) {
+    const groupCode = normalize(group.group_code).toUpperCase();
+    const groupStudents = (students || []).filter(
+      (student) => normalize(student.kelas).toUpperCase() === groupCode
+    );
+
+    if (groupCode !== STUDENT_LI_GROUP_CODE) {
+      if (groupStudents.length) {
+        groups.push({
+          key: `GROUP:${groupCode}`,
+          label: normalize(group.display_name),
+          students: groupStudents
+        });
+      }
+      continue;
+    }
+
+    for (const institution of institutionRows || []) {
+      const institutionCode = normalize(institution.institution_code).toUpperCase();
+      const institutionStudents = groupStudents.filter(
+        (student) => normalize(student.institution_code).toUpperCase() === institutionCode
+      );
+      if (!institutionStudents.length) continue;
+
+      groups.push({
+        key: `GROUP:${STUDENT_LI_GROUP_CODE}:${institutionCode}`,
+        label: `${normalize(group.display_name)} ${normalize(institution.display_name)}`.trim(),
+        students: institutionStudents
+      });
+    }
+  }
+
+  return groups;
+}
+__name(buildCanonicalStudentRuntimeGroups, "buildCanonicalStudentRuntimeGroups");
 async function readBounded(body, limit, tooLarge) {
   if (!body) return new Uint8Array();
   const reader = body.getReader();
@@ -1952,7 +1992,7 @@ async function handleRequest(request, env = {}, context = {}) {
 if (url.pathname === "/api/d1/studentLoginDirectory") {
   const [groupResult, institutionResult, studentResult] = await Promise.all([
     env.DB.prepare(
-      `SELECT group_code, display_name, institution_required
+      `SELECT group_code, display_name
        FROM STUDENT_GROUPS
        WHERE active = 1
        ORDER BY sort_order, group_code`
@@ -1973,8 +2013,6 @@ if (url.pathname === "/api/d1/studentLoginDirectory") {
   const groupRows = groupResult.results || [];
   const institutionRows = institutionResult.results || [];
   const students = studentResult.results || [];
-  const groups = [];
-
   const sortStudents = (items) => items
     .filter((student) => student.student_id && student.nama)
     .sort((left, right) => {
@@ -1988,44 +2026,15 @@ if (url.pathname === "/api/d1/studentLoginDirectory") {
       nama: String(student.nama || "").trim()
     }));
 
-  for (const group of groupRows) {
-    const groupCode = String(group.group_code || "").trim().toUpperCase();
-    const groupStudents = students.filter(
-      (student) => String(student.kelas || "").trim().toUpperCase() === groupCode
-    );
-
-    if (Number(group.institution_required || 0) !== 1) {
-      if (groupStudents.length) {
-        groups.push({
-          key: `GROUP:${groupCode}`,
-          label: String(group.display_name || "").trim(),
-          students: sortStudents(groupStudents)
-        });
-      }
-      continue;
-    }
-
-    for (const institution of institutionRows) {
-      const institutionCode = String(institution.institution_code || "")
-        .trim()
-        .toUpperCase();
-
-      const institutionStudents = groupStudents.filter(
-        (student) =>
-          String(student.institution_code || "").trim().toUpperCase() === institutionCode
-      );
-
-      if (!institutionStudents.length) continue;
-
-      groups.push({
-        key: `GROUP:${groupCode}:${institutionCode}`,
-        label: `${String(group.display_name || "").trim()} ${String(
-          institution.display_name || ""
-        ).trim()}`.trim(),
-        students: sortStudents(institutionStudents)
-      });
-    }
-  }
+  const groups = buildCanonicalStudentRuntimeGroups(
+    groupRows,
+    institutionRows,
+    students
+  ).map((group) => ({
+    key: group.key,
+    label: group.label,
+    students: sortStudents(group.students)
+  }));
 
   return new Response(JSON.stringify({
     ok: true,
@@ -8285,7 +8294,7 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster" ||
     ).all(),
 
     env.DB.prepare(
-      `SELECT group_code, display_name, institution_required
+      `SELECT group_code, display_name
        FROM STUDENT_GROUPS
        WHERE active = 1
        ORDER BY sort_order, group_code`
@@ -8371,53 +8380,17 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster" ||
     return selected;
   };
 
-  const configuredGroups = [];
   const groupByStudentId = new Map();
-
-  for (const group of groupRows) {
-    const groupCode = normalize(group.group_code).toUpperCase();
-
-    const groupStudents = students.filter(
-      (student) =>
-        normalize(student.kelas).toUpperCase() === groupCode
-    );
-
-    if (Number(group.institution_required || 0) !== 1) {
-      if (!groupStudents.length) continue;
-
-      configuredGroups.push({
-        label: normalize(group.display_name) || "Kumpulan Pelajar",
-        students: groupStudents
-      });
-
-      continue;
-    }
-
-    for (const institution of institutionRows) {
-      const institutionCode =
-        normalize(institution.institution_code).toUpperCase();
-
-      const institutionStudents = groupStudents.filter(
-        (student) =>
-          normalize(student.institution_code).toUpperCase() ===
-          institutionCode
-      );
-
-      if (!institutionStudents.length) continue;
-
-      configuredGroups.push({
-        label: `${normalize(group.display_name)} ${normalize(
-          institution.display_name
-        )}`.trim() || "Kumpulan Pelajar",
-        students: institutionStudents
-      });
-    }
-  }
+  const configuredGroups = buildCanonicalStudentRuntimeGroups(
+    groupRows,
+    institutionRows,
+    students
+  );
 
   const groups = configuredGroups.map((group, index) => {
     const projected = {
       key: `resident-group-${index + 1}`,
-      label: group.label,
+      label: group.label || "Kumpulan Pelajar",
       count: 0,
       students: []
     };

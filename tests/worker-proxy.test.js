@@ -616,6 +616,69 @@ test("hostel summary: public totals, configured institution split and unconfigur
   assert.equal(f.calls.length, 0);
 });
 
+test("student runtime directories: exact LI code is the only institution-aware group", async () => {
+  const f = hostelSummaryFixture({
+    groups: [
+      { group_code: "A2", display_name: "A2", institution_required: 1 },
+      { group_code: "A4", display_name: "A4", institution_required: 1 },
+      { group_code: "LI", display_name: "LI", institution_required: 0 }
+    ],
+    institutions: [
+      { institution_code: "UNISZA", display_name: "UNISZA" }
+    ],
+    students: [
+      { student_id: "A2-1", no_matrik: "M-A2", nama: "Student A2", kelas: "A2", institution_code: "UNISZA", status: "Aktif" },
+      { student_id: "A4-1", no_matrik: "M-A4", nama: "Student A4", kelas: "A4", institution_code: "", status: "Aktif" },
+      { student_id: "LI-1", no_matrik: "M-LI-1", nama: "Student LI UNISZA", kelas: "LI", institution_code: "UNISZA", status: "Aktif" },
+      { student_id: "LI-2", no_matrik: "M-LI-2", nama: "Student LI Inactive", kelas: "LI", institution_code: "INACTIVE", status: "Aktif" },
+      { student_id: "LI-3", no_matrik: "M-LI-3", nama: "Student LI Unknown", kelas: "LI", institution_code: "UNKNOWN", status: "Aktif" }
+    ],
+    requests: []
+  });
+
+  const directoryResponse = await f.run("studentLoginDirectory", "GET");
+  assert.equal(directoryResponse.status, 200);
+  const directory = (await directoryResponse.json()).data;
+  assert.deepEqual(Object.keys(directory).sort(), ["groups", "mode"]);
+  assert.equal(directory.mode, "dynamic");
+  assert.deepEqual(directory.groups, [
+    { key: "GROUP:A2", label: "A2", students: [{ student_id: "A2-1", nama: "Student A2" }] },
+    { key: "GROUP:A4", label: "A4", students: [{ student_id: "A4-1", nama: "Student A4" }] },
+    { key: "GROUP:LI:UNISZA", label: "LI UNISZA", students: [{ student_id: "LI-1", nama: "Student LI UNISZA" }] }
+  ]);
+  assert.ok(directory.groups.every(group =>
+    Object.keys(group).sort().join(",") === "key,label,students"));
+  assert.ok(directory.groups.flatMap(group => group.students).every(student =>
+    Object.keys(student).sort().join(",") === "nama,student_id"));
+  assert.doesNotMatch(JSON.stringify(directory), /LI-2|LI-3|INACTIVE|UNKNOWN/);
+
+  const summary = (await (await f.run()).json()).data;
+  const roster = (await (await f.run("getCurrentHostelRoster", "POST", {
+    role: "admin", admin_id: "ADM-1", pin: "2468"
+  })).json()).data;
+  const expectedGrouping = [
+    { key: "resident-group-1", label: "A2", count: 1 },
+    { key: "resident-group-2", label: "A4", count: 1 },
+    { key: "resident-group-3", label: "LI UNISZA", count: 1 },
+    { key: "resident-group-unconfigured", label: "Belum Dikonfigurasi", count: 2 }
+  ];
+  assert.deepEqual(summary.hostel_groups, expectedGrouping);
+  assert.deepEqual(
+    roster.groups.map(({ key, label, count }) => ({ key, label, count })),
+    expectedGrouping
+  );
+  const fallback = roster.groups.find(group => group.key === "resident-group-unconfigured");
+  assert.deepEqual(fallback.students.map(student => student.nama), [
+    "Student LI Inactive",
+    "Student LI Unknown"
+  ]);
+
+  const groupQueries = f.queries.filter(query => query.sql.includes("FROM STUDENT_GROUPS"));
+  assert.equal(groupQueries.length, 3);
+  assert.ok(groupQueries.every(query => !query.sql.includes("institution_required")));
+  assert.equal(f.calls.length, 0);
+});
+
 test("hostel summary: latest request uses student ID, matric and rowid tie break", async () => {
   const f = hostelSummaryFixture({
     students: [{ student_id: "SID", no_matrik: "MAT", nama: "Secret", kelas: "A1", status: "Aktif" }],
