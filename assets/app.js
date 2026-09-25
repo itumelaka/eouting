@@ -1473,7 +1473,10 @@ function setAdminSectionV200(section) {
     if (panel) panel.hidden = name !== nextSection;
   });
   if (nextSection === "monitoring" && !adminMonitoringV210) loadAdminMonitoringV210();
-  if (nextSection === "master" && !adminMasterV210.records.length) loadAdminMasterV210(1);
+  if (nextSection === "master") {
+    if (!adminMasterV210.records.length) loadAdminMasterV210(1);
+    if (!adminOutingTypes.length) loadAdminOutingTypesV200();
+  }
   if (nextSection === "students") {
     if (!adminStudentsV200.length) loadAdminStudentsV200();
     if (!adminStudentConfigLoadedV240) loadAdminStudentConfigV240();
