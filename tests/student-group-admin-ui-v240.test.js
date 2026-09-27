@@ -26,14 +26,14 @@ test("Tetapan Pelajar contains compact Pelajar, Kumpulan, Institusi LI sub-tabs 
   assert.match(css, /\.admin-student-subtabs[\s\S]*grid-template-columns: repeat\(3/);
 });
 
-test("Group and institution lists, generic create editors, edit, toggle and versions are wired", () => {
+test("Group and institution lists keep safe create, edit and status operations", () => {
   [
     "getAdminStudentGroups", "createStudentGroup", "updateStudentGroup", "toggleStudentGroupStatus",
     "getAdminLiInstitutions", "createLiInstitution", "updateLiInstitution", "toggleLiInstitutionStatus"
   ].forEach((action) => assert.match(app, new RegExp(`apiPost\\(\\"${action}\\"|\\"${action}\\"`)));
   assert.match(html, /id="adminStudentGroupCodeInput"/);
   assert.match(html, /id="adminLiInstitutionCodeInput"/);
-  assert.match(app, /config_version/);
+  assert.match(app, /expected_config_version/);
   assert.match(app, /data-config-toggle/);
   assert.equal(html.includes("deleteStudentGroup"), false);
   assert.equal(html.includes("deleteLiInstitution"), false);
@@ -160,6 +160,16 @@ test("real Admin form serializes canonical LI plus UNISZA and routes createStude
     status: "AKTIF",
     catatan: "QA Phase 2 LI"
   });
+
+  classInput.value = "A4";
+  context.updateAdminStudentInstitutionFieldV240("UNISZA");
+  assert.equal(institutionField.hidden, true);
+  assert.equal(institutionInput.disabled, true);
+  assert.equal(institutionInput.required, false);
+  assert.equal(institutionInput.value, "");
+  await context.handleAdminStudentSubmitV200({ preventDefault() {} });
+  assert.equal(captured.payload.student.kelas, "A4");
+  assert.equal(captured.payload.student.institution_code, "");
 });
 
 test("inactive current group and institution remain available for unrelated edits", () => {
@@ -176,15 +186,89 @@ test("Admin-only Student and Master filters derive their options from group conf
   assert.match(app, /referencedCodes/);
 });
 
-test("readiness indicator remains aggregate-only beside the guarded activation control", () => {
+test("normal Tetapan Pelajar UI omits rollout, migration and technical metadata", () => {
   const panel = html.slice(html.indexOf('id="adminStudentManagementPanel"'), html.indexOf('id="adminMasterPanel"'));
-  assert.match(panel, /Student Group Config/);
+  [
+    "Student Group Config", "Refresh readiness", "Dry-run", "Apply migrasi",
+    "Dynamic Student Login", "adminDynamicLogin", "adminStudentMigration",
+    "Institusi diperlukan", "Tanpa institusi", "adminStudentGroupInstitutionRequiredInput"
+  ].forEach((text) => assert.equal(panel.includes(text), false, `${text} must not be shown`));
+  assert.doesNotMatch(panel, /Versi\s+\d/);
+  const loader = sourceBetween("async function loadAdminStudentConfigV240", "function setAdminStudentConfigBusyV240");
+  assert.match(loader, /getAdminStudentGroups/);
+  assert.match(loader, /getAdminLiInstitutions/);
+  assert.doesNotMatch(loader, /getStudentGroupConfigReadiness|renderAdminStudentReadinessV240/);
   assert.match(app, /getStudentGroupConfigReadiness/);
-  assert.match(app, /readiness\.counts/);
-  assert.match(panel, /adminDynamicLoginEnableButton/);
-  assert.match(panel, /adminDynamicLoginConfirmInput/);
-  assert.equal(panel.includes("STUDENT_GROUP_CONFIG_ENABLED"), false);
-  assert.equal(app.includes('setProperty("STUDENT_GROUP_CONFIG_ENABLED", "true")'), false);
+  assert.match(app, /setStudentGroupConfigEnabled/);
+  assert.match(app, /runStudentInstitutionMigration/);
+});
+
+test("group cards keep inactive legacy rows visible without legacy flags or versions", () => {
+  const context = vm.createContext({
+    adminStudentGroupsV240: [
+      { group_code: "A4", display_name: "A4", active: true, sort_order: 40, config_version: 2, institution_required: false },
+      { group_code: "UNISZA", display_name: "Legacy UNISZA", active: false, sort_order: 90, config_version: 7, institution_required: true }
+    ],
+    adminLiInstitutionsV240: [],
+    escapeHtml: (value) => String(value),
+    els: { adminStudentGroupList: { innerHTML: "" }, adminLiInstitutionList: null }
+  });
+  vm.runInContext(
+    sourceBetween("function renderAdminStudentGroupListV240", "function openAdminStudentGroupEditorV240"),
+    context
+  );
+  context.renderAdminStudentGroupListV240();
+  const cards = context.els.adminStudentGroupList.innerHTML;
+  assert.match(cards, /UNISZA/);
+  assert.match(cards, /Legacy UNISZA/);
+  assert.match(cards, /Tidak Aktif/);
+  assert.match(cards, /data-config-edit="group"/);
+  assert.match(cards, /data-config-toggle="group"/);
+  assert.doesNotMatch(cards, /Versi|Institusi diperlukan|Tanpa institusi/);
+});
+
+test("group editor derives the hidden compatibility flag only when creating exact LI", async () => {
+  const calls = [];
+  const context = vm.createContext({
+    adminEditingStudentGroupCodeV240: "",
+    els: {
+      adminStudentGroupCodeInput: { value: "LI" },
+      adminStudentGroupNameInput: { value: "Latihan Industri" },
+      adminStudentGroupSortInput: { value: "30" },
+      adminStudentGroupActiveInput: { checked: true },
+      adminStudentGroupVersionInput: { value: "7" },
+      adminSaveStudentGroupButton: { disabled: false },
+      adminStudentGroupsMessage: {},
+      adminStudentGroupEditorMessage: {}
+    },
+    buildAdminCredentialPayloadV200: () => ({ admin_id: "ADMIN-TEST", pin: "TEST_PIN" }),
+    apiPost: async (action, payload) => { calls.push({ action, payload }); },
+    closeAdminStudentGroupEditorV240: () => {},
+    loadAdminStudentConfigV240: async () => {},
+    refreshPublicStudentsAfterAdminWriteV200: async () => {},
+    setStudentConfigMessageV240: () => {},
+    cleanApiError: (value) => value
+  });
+  vm.runInContext(
+    sourceBetween("async function saveAdminStudentGroupV240", "async function saveAdminLiInstitutionV240"),
+    context
+  );
+
+  await context.saveAdminStudentGroupV240({ preventDefault() {} });
+  assert.equal(calls[0].action, "createStudentGroup");
+  assert.equal(calls[0].payload.student_group.institution_required, true);
+
+  context.els.adminStudentGroupCodeInput.value = "A4";
+  await context.saveAdminStudentGroupV240({ preventDefault() {} });
+  assert.equal(calls[1].payload.student_group.institution_required, false);
+
+  vm.runInContext('adminEditingStudentGroupCodeV240 = "UNISZA"', context);
+  context.els.adminStudentGroupCodeInput.value = "UNISZA";
+  await context.saveAdminStudentGroupV240({ preventDefault() {} });
+  assert.equal(calls[2].action, "updateStudentGroup");
+  assert.equal(calls[2].payload.group_code, "UNISZA");
+  assert.equal(calls[2].payload.expected_config_version, 7);
+  assert.equal(Object.prototype.hasOwnProperty.call(calls[2].payload.student_group, "institution_required"), false);
 });
 
 test("localhost routes Student Group readiness to the direct D1 endpoint", () => {

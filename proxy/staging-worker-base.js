@@ -2143,7 +2143,7 @@ if (url.pathname === "/api/d1/studentLoginDirectory") {
     env.DB.prepare(
       `SELECT student_id, nama, kelas, institution_code
        FROM STUDENTS
-       WHERE status = 'Aktif'`
+       WHERE LOWER(TRIM(status)) = 'aktif'`
     ).all()
   ]);
 
@@ -2249,12 +2249,12 @@ if (url.pathname === "/api/d1/loginStudent") {
   const noMatrik = String(payload.no_matrik || "").trim();
 
   const row = await env.DB.prepare(
-    `SELECT student_id, no_matrik, nama, email, no_tel, kelas,
+    `SELECT student_id, no_matrik, nama, email, no_tel, kelas, institution_code,
             jantina, status, photo_file_id, photo_updated_at
      FROM STUDENTS
      WHERE student_id = ?
        AND no_matrik = ?
-       AND LOWER(status) = 'aktif'
+       AND LOWER(TRIM(status)) = 'aktif'
      LIMIT 1`
   ).bind(studentId, noMatrik).first();
 
@@ -2273,7 +2273,7 @@ if (url.pathname === "/api/d1/loginStudent") {
     data: {
       student_id: row.student_id, no_matrik: row.no_matrik, nama: row.nama,
       email: row.email, no_tel: row.no_tel, kelas: row.kelas,
-      jantina: row.jantina,
+      institution_code: row.institution_code, jantina: row.jantina,
       status: row.status, photo_updated_at: row.photo_updated_at,
       has_profile_photo: Boolean(row.photo_file_id)
     }
@@ -2438,7 +2438,7 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
     let student, admin, credentials;
     if (role === "student") {
       student = await env.DB.prepare(
-        "SELECT student_id, no_matrik, nama, photo_file_id, photo_updated_at FROM STUDENTS WHERE student_id = ? AND no_matrik = ? AND status = 'Aktif' LIMIT 1"
+        "SELECT student_id, no_matrik, nama, photo_file_id, photo_updated_at FROM STUDENTS WHERE student_id = ? AND no_matrik = ? AND LOWER(TRIM(status)) = 'aktif' LIMIT 1"
       ).bind(studentId, noMatrik).first();
       if (!student || !studentId || !noMatrik) throw fault(401, "STUDENT_SESSION_INVALID", "Akses sesi pelajar tidak sah.");
       credentials = { student_id: student.student_id, no_matrik: student.no_matrik };
@@ -2962,7 +2962,7 @@ if (url.pathname === "/api/d1/submitReturnSelfie") {
     throw fault(400, "SELFIE_INVALID_IMAGE", "Gambar tidak sah atau terlalu besar.");
   }
   const student = await env.DB.prepare(
-    "SELECT student_id, no_matrik FROM STUDENTS WHERE student_id = ? AND no_matrik = ? AND status = 'Aktif' LIMIT 1"
+    "SELECT student_id, no_matrik FROM STUDENTS WHERE student_id = ? AND no_matrik = ? AND LOWER(TRIM(status)) = 'aktif' LIMIT 1"
   ).bind(studentId, noMatrik).first();
   if (!student) throw fault(401, "STUDENT_SESSION_INVALID", "Akses sesi pelajar tidak sah.");
   const readRecord = () => env.DB.prepare(
@@ -7871,7 +7871,7 @@ if ([
         `SELECT student_id FROM STUDENTS
          WHERE LOWER(TRIM(student_id)) = LOWER(TRIM(?))
            AND LOWER(TRIM(no_matrik)) = LOWER(TRIM(?))
-           AND LOWER(status) = 'aktif' LIMIT 1`
+           AND LOWER(TRIM(status)) = 'aktif' LIMIT 1`
       ).bind(studentId, matric).first();
       if (!student) throw fault(401, "SESSION_INVALID", "Akses sesi diperlukan.");
     } else if (role === "warden" || role === "guard") {
@@ -7985,7 +7985,7 @@ if (url.pathname === "/api/d1/getStudentAnnualSummary") {
   }
   const student = await env.DB.prepare(
     `SELECT student_id FROM STUDENTS
-     WHERE student_id = ? AND no_matrik = ? AND status = 'Aktif'
+     WHERE student_id = ? AND no_matrik = ? AND LOWER(TRIM(status)) = 'aktif'
      LIMIT 1`
   ).bind(studentId, noMatrik).first();
   if (!student) {
@@ -8097,7 +8097,7 @@ if (url.pathname === "/api/d1/getTodayRecords") {
        FROM STUDENTS
        WHERE student_id = ?
          AND no_matrik = ?
-         AND status = 'Aktif'
+         AND LOWER(TRIM(status)) = 'aktif'
        LIMIT 1`
     ).bind(studentId, noMatrik).first();
 
@@ -8721,7 +8721,7 @@ if (url.pathname === "/api/d1/getCurrentHostelRoster" ||
     env.DB.prepare(
       `SELECT student_id, no_matrik, nama, kelas, institution_code
        FROM STUDENTS
-       WHERE status = 'Aktif'`
+       WHERE LOWER(TRIM(status)) = 'aktif'`
     ).all(),
 
     env.DB.prepare(

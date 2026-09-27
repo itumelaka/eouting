@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
@@ -9,6 +10,14 @@ const css = fs.readFileSync(path.join(root, "assets", "style.css"), "utf8");
 const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
 const premiumCss = css.slice(css.indexOf("Premium Institutional Access UI — r13"));
+
+function extractAppFunction(name, nextName) {
+  const start = app.indexOf(`function ${name}(`);
+  const end = app.indexOf(`\nfunction ${nextName}(`, start);
+  assert.notEqual(start, -1, `${name} must exist`);
+  assert.notEqual(end, -1, `${nextName} must follow ${name}`);
+  return vm.runInNewContext(`(${app.slice(start, end)})`);
+}
 
 test("access header starts with the primary heading and keeps the integrated Admin action", () => {
   const headingStart = html.indexOf('<div class="section-heading access-heading">');
@@ -72,6 +81,15 @@ test("authentication and public monitoring call boundaries remain unchanged", ()
   assert.match(app, /function openMonitoringPage\(eventOrOptions\)/);
   assert.match(app, /apiGet\("getTodayRecords"\)/);
   assert.match(app, /apiGet\("getCurrentHostelSummary"\)/);
+});
+
+test("live Student session mapping preserves authoritative institution context", () => {
+  const mapLiveStudent = extractAppFunction("mapLiveStudent", "mapLiveStaffSessionUser");
+  const a4 = mapLiveStudent({ student_id: "QA-A4-001", kelas: "A4", institution_code: "" });
+  const li = mapLiveStudent({ student_id: "QA-LI-001", kelas: "LI", institution_code: "UNISZA" });
+
+  assert.equal(a4.institution_code, "");
+  assert.equal(li.institution_code, "UNISZA");
 });
 
 test("premium access layer uses real local assets without remote image or font dependencies", () => {

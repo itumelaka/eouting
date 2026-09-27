@@ -677,40 +677,6 @@
                 <button class="admin-student-subtab" id="adminLiInstitutionsSubtab" type="button" role="tab"
                   aria-selected="false" aria-controls="adminLiInstitutionsPanel">Institusi LI</button>
               </nav>
-              <details class="admin-config-status" id="adminStudentConfigStatus" data-state="legacy">
-                <summary><span class="admin-config-status-dot" aria-hidden="true"></span><span id="adminStudentConfigStatusLabel">Student Group Config: Semakan</span></summary>
-                <div class="admin-config-status-popover">
-                  <p id="adminStudentConfigStatusDetail">Memuatkan status konfigurasi...</p>
-                  <ul id="adminStudentConfigIssues" hidden></ul>
-                  <section class="admin-migration-tools" aria-label="Alat penyelenggaraan migrasi institusi pelajar">
-                    <p class="admin-migration-title">Penyelenggaraan institusi LI</p>
-                    <div class="admin-migration-actions">
-                      <button class="secondary-action compact-action" id="adminStudentReadinessRefreshButton" type="button">Refresh readiness</button>
-                      <button class="secondary-action compact-action" id="adminStudentMigrationDryRunButton" type="button">Dry-run</button>
-                    </div>
-                    <dl class="admin-migration-result" id="adminStudentMigrationResult" hidden></dl>
-                    <label class="admin-migration-confirm">
-                      <input id="adminStudentMigrationConfirmInput" type="checkbox" disabled>
-                      Saya mengesahkan apply selepas dry-run bersih.
-                    </label>
-                    <button class="danger-action compact-action" id="adminStudentMigrationApplyButton" type="button" disabled>Apply migrasi</button>
-                    <p class="form-message" id="adminStudentMigrationMessage" aria-live="polite"></p>
-                  </section>
-                  <section class="admin-dynamic-login-tools" aria-label="Kawalan Dynamic Student Login">
-                    <div class="admin-dynamic-login-heading">
-                      <p class="admin-migration-title">Dynamic Student Login</p>
-                      <strong id="adminDynamicLoginStatus">Status: OFF</strong>
-                    </div>
-                    <label class="admin-migration-confirm" id="adminDynamicLoginConfirmLabel">
-                      <input id="adminDynamicLoginConfirmInput" type="checkbox" disabled>
-                      Saya faham login Pelajar akan menggunakan kumpulan dinamik.
-                    </label>
-                    <button class="primary-action compact-action" id="adminDynamicLoginEnableButton" type="button" disabled>Aktifkan Dynamic Login</button>
-                    <button class="secondary-action compact-action" id="adminDynamicLoginDisableButton" type="button" hidden>Kembali ke Login Legacy</button>
-                    <p class="form-message" id="adminDynamicLoginMessage" aria-live="polite"></p>
-                  </section>
-                </div>
-              </details>
             </div>
 
             <section class="admin-student-inner-panel" id="adminStudentPeoplePanel" role="tabpanel"
@@ -718,7 +684,7 @@
             <div class="admin-section-toolbar admin-student-toolbar">
               <div>
                 <h3>Pengurusan Pelajar</h3>
-                <p>Urus rekod dan penugasan kumpulan, termasuk Pelajar Latihan Industri (LI). Paparan login Pelajar mengikuti mod rollout semasa.</p>
+                <p>Urus rekod dan penugasan kumpulan. Pelajar Latihan Industri (LI) perlu dipadankan dengan Institusi LI.</p>
               </div>
               <div class="admin-heading-actions">
                 <button class="secondary-action" id="adminStudentsRefreshButton" type="button">Refresh</button>
@@ -811,7 +777,7 @@
             <section class="admin-student-inner-panel" id="adminStudentGroupsPanel" role="tabpanel"
               aria-labelledby="adminStudentGroupsSubtab" hidden>
               <div class="admin-section-toolbar">
-                <div><h3>Kumpulan Pelajar</h3><p>Urus kod kumpulan, paparan dan keperluan institusi tanpa mengubah log masuk Pelajar.</p></div>
+                <div><h3>Kumpulan Pelajar</h3><p>Urus kumpulan utama seperti A2, A3, LI dan kelas baharu.</p></div>
                 <div class="admin-heading-actions">
                   <button class="secondary-action" id="adminStudentGroupsRefreshButton" type="button">Refresh</button>
                   <button class="primary-action" id="adminAddStudentGroupButton" type="button">+ Tambah Kumpulan</button>
@@ -827,7 +793,6 @@
                     <label>Kod Kumpulan<input id="adminStudentGroupCodeInput" type="text" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_]{1,31}" required></label>
                     <label>Nama Paparan<input id="adminStudentGroupNameInput" type="text" maxlength="100" required></label>
                     <label>Susunan<input id="adminStudentGroupSortInput" type="number" min="1" step="1" required></label>
-                    <label class="admin-student-config-check"><input id="adminStudentGroupInstitutionRequiredInput" type="checkbox"> Institusi diperlukan</label>
                     <label class="admin-student-config-check" id="adminStudentGroupActiveField"><input id="adminStudentGroupActiveInput" type="checkbox" checked> Aktif</label>
                   </div>
                   <p class="form-message" id="adminStudentGroupEditorMessage" aria-live="polite"></p>
@@ -839,7 +804,7 @@
             <section class="admin-student-inner-panel" id="adminLiInstitutionsPanel" role="tabpanel"
               aria-labelledby="adminLiInstitutionsSubtab" hidden>
               <div class="admin-section-toolbar">
-                <div><h3>Institusi LI</h3><p>Urus institusi yang tersedia untuk kumpulan yang memerlukan penempatan institusi.</p></div>
+                <div><h3>Institusi LI</h3><p>Urus institusi yang tersedia khusus untuk pelajar dalam kumpulan LI.</p></div>
                 <div class="admin-heading-actions">
                   <button class="secondary-action" id="adminLiInstitutionsRefreshButton" type="button">Refresh</button>
                   <button class="primary-action" id="adminAddLiInstitutionButton" type="button">+ Tambah Institusi</button>

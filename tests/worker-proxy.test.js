@@ -355,7 +355,8 @@ function announcementFixture(options = {}) {
       const table = ["ADMIN_USERS", "STUDENTS", "WARDENS", "GUARDS"]
         .find(name => sql.includes(`FROM ${name}`));
       assert.ok(table, "Unexpected authentication query");
-      assert.match(sql, /LOWER\(status\) = 'aktif'/);
+      if (table === "STUDENTS") assert.match(sql, /LOWER\(TRIM\(status\)\) = 'aktif'/);
+      else assert.match(sql, /LOWER\(status\) = 'aktif'/);
       return options.invalidRole === table ? null
         : table === "ADMIN_USERS" ? { admin_id: "ADM-1", nama_admin: "Admin Test" }
         : { id: "ACTIVE" };
@@ -568,7 +569,8 @@ function hostelSummaryFixture(options = {}) {
     },
     async all() {
       queries.push({ sql, bindings });
-      if (sql.includes("FROM STUDENTS")) return { results: students.filter(row => row.status === "Aktif") };
+      if (sql.includes("FROM STUDENTS")) return { results: students.filter(row =>
+        String(row.status || "").trim().toLowerCase() === "aktif") };
       if (sql.includes("FROM OUTING_REQUESTS")) return { results: requests };
       if (sql.includes("FROM STUDENT_GROUPS")) return { results: groups };
       if (sql.includes("FROM LI_INSTITUTIONS")) return { results: institutions };
@@ -628,10 +630,11 @@ test("student runtime directories: exact LI code is the only institution-aware g
     ],
     students: [
       { student_id: "A2-1", no_matrik: "M-A2", nama: "Student A2", kelas: "A2", institution_code: "UNISZA", status: "Aktif" },
-      { student_id: "A4-1", no_matrik: "M-A4", nama: "Student A4", kelas: "A4", institution_code: "", status: "Aktif" },
-      { student_id: "LI-1", no_matrik: "M-LI-1", nama: "Student LI UNISZA", kelas: "LI", institution_code: "UNISZA", status: "Aktif" },
+      { student_id: "A4-1", no_matrik: "M-A4", nama: "Student A4", kelas: "A4", institution_code: "", status: "AKTIF" },
+      { student_id: "LI-1", no_matrik: "M-LI-1", nama: "Student LI UNISZA", kelas: "LI", institution_code: "UNISZA", status: "  AKTIF  " },
       { student_id: "LI-2", no_matrik: "M-LI-2", nama: "Student LI Inactive", kelas: "LI", institution_code: "INACTIVE", status: "Aktif" },
-      { student_id: "LI-3", no_matrik: "M-LI-3", nama: "Student LI Unknown", kelas: "LI", institution_code: "UNKNOWN", status: "Aktif" }
+      { student_id: "LI-3", no_matrik: "M-LI-3", nama: "Student LI Unknown", kelas: "LI", institution_code: "UNKNOWN", status: "Aktif" },
+      { student_id: "OFF-1", no_matrik: "M-OFF", nama: "Student Inactive", kelas: "A4", institution_code: "", status: "TIDAK AKTIF" }
     ],
     requests: []
   });
@@ -651,6 +654,7 @@ test("student runtime directories: exact LI code is the only institution-aware g
   assert.ok(directory.groups.flatMap(group => group.students).every(student =>
     Object.keys(student).sort().join(",") === "nama,student_id"));
   assert.doesNotMatch(JSON.stringify(directory), /LI-2|LI-3|INACTIVE|UNKNOWN/);
+  assert.doesNotMatch(JSON.stringify(directory), /OFF-1|Student Inactive/);
 
   const summary = (await (await f.run()).json()).data;
   const roster = (await (await f.run("getCurrentHostelRoster", "POST", {
@@ -662,6 +666,9 @@ test("student runtime directories: exact LI code is the only institution-aware g
     { key: "resident-group-3", label: "LI UNISZA", count: 1 },
     { key: "resident-group-unconfigured", label: "Belum Dikonfigurasi", count: 2 }
   ];
+  assert.equal(summary.total_active_students, 5);
+  assert.equal(summary.total_in_hostel, 5);
+  assert.equal(roster.total, 5);
   assert.deepEqual(summary.hostel_groups, expectedGrouping);
   assert.deepEqual(
     roster.groups.map(({ key, label, count }) => ({ key, label, count })),
@@ -676,6 +683,9 @@ test("student runtime directories: exact LI code is the only institution-aware g
   const groupQueries = f.queries.filter(query => query.sql.includes("FROM STUDENT_GROUPS"));
   assert.equal(groupQueries.length, 3);
   assert.ok(groupQueries.every(query => !query.sql.includes("institution_required")));
+  const studentQueries = f.queries.filter(query => query.sql.includes("FROM STUDENTS"));
+  assert.equal(studentQueries.length, 3);
+  assert.ok(studentQueries.every(query => query.sql.includes("LOWER(TRIM(status)) = 'aktif'")));
   assert.equal(f.calls.length, 0);
 });
 
@@ -713,10 +723,22 @@ test("hostel summary: GET is public, OPTIONS allows GET, and POST is rejected be
 });
 
 function profilePhotoFixture(options = {}) {
-  const student = { student_id: "STU-001", no_matrik: "M001", nama: "Test Student",
-    status: "Aktif", photo_file_id: "", photo_updated_at: "", ...options.student };
-  const queries = [], batches = [], events = [];
+  const student = {
+    student_id: "STU-001",
+    no_matrik: "M001",
+    nama: "Test Student",
+    status: "AKTIF",
+    photo_file_id: "",
+    photo_updated_at: "",
+    ...options.student
+  };
+
+  const queries = [];
+  const batches = [];
+  const events = [];
+
   let photoOperation = null;
+
   const statement = (sql, values = []) => ({
     sql,
     values,
@@ -737,6 +759,13 @@ function profilePhotoFixture(options = {}) {
       }
 
       if (sql.includes("FROM STUDENTS")) {
+        if (
+          sql.includes("LOWER(TRIM(status)) = 'aktif'") &&
+          String(student.status || "").trim().toLowerCase() !== "aktif"
+        ) {
+          return null;
+        }
+
         return student;
       }
 
@@ -1008,8 +1037,20 @@ test("profile photos: student cannot fetch another student's photo", async () =>
   });
   assert.equal(response.status, 403);
   assert.equal(f.calls.length, 0);
-  assert.match(f.queries[0].sql, /student_id = \? AND no_matrik = \? AND status = 'Aktif'/);
+  assert.match(f.queries[0].sql, /student_id = \? AND no_matrik = \? AND LOWER\(TRIM\(status\)\) = 'aktif'/);
   assert.deepEqual(f.queries[0].values, ["STU-001", "M001"]);
+});
+
+test("profile photos: AKTIF student session is accepted and TIDAK AKTIF is rejected", async () => {
+  const active = profilePhotoFixture();
+  const accepted = await active.run("getStudentProfilePhotos", { ...profileStudent, role: "student" });
+  assert.equal(accepted.status, 200);
+  assert.match(active.queries[0].sql, /LOWER\(TRIM\(status\)\) = 'aktif'/);
+
+  const inactive = profilePhotoFixture({ student: { status: "TIDAK AKTIF" } });
+  const rejected = await inactive.run("getStudentProfilePhotos", { ...profileStudent, role: "student" });
+  assert.equal(rejected.status, 401);
+  assert.equal(inactive.calls.length, 0);
 });
 
 for (const role of ["warden", "guard"]) {
@@ -1334,12 +1375,19 @@ test("profile photos: all routes support OPTIONS, reject GET and reject unauthen
   }
 });
 
-function todayRecordsFixture(requests = [], wardens = []) {
+function todayRecordsFixture(requests = [], wardens = [], options = {}) {
   const queries = [];
   const statement = (sql, values = []) => ({
     bind(...args) { return statement(sql, args); },
     async first() {
       queries.push({ sql, values });
+      if (sql.includes("FROM STUDENTS")) {
+        assert.match(sql, /LOWER\(TRIM\(status\)\) = 'aktif'/);
+        return String(options.studentStatus || "").trim().toLowerCase() === "aktif"
+          ? { student_id: values[0] }
+          : null;
+      }
+      if (sql.includes("FROM SYSTEM_CONFIG")) return { config_value: "false" };
       if (sql.includes("FROM GUARDS")) return { guard_id: "G-TEST" };
       throw new Error("Unexpected D1 first query");
     },
@@ -1446,17 +1494,102 @@ test("today records: authenticated POST remains available and other methods are 
   assert.equal(f.calls.length, 0);
 });
 
+test("today records: AKTIF student session is accepted and TIDAK AKTIF remains rejected", async () => {
+  const rows = [{ student_id: "S-1", nama: "Student view", status: "KELUAR", tarikh: "2000-01-01" }];
+  const active = todayRecordsFixture(rows, [], { studentStatus: " AKTIF " });
+  const accepted = await active.run("POST", {
+    role: "student", student_id: "S-1", no_matrik: "M-1"
+  });
+  assert.equal(accepted.status, 200, await accepted.clone().text());
+
+  const inactive = todayRecordsFixture(rows, [], { studentStatus: "TIDAK AKTIF" });
+  const rejected = await inactive.run("POST", {
+    role: "student", student_id: "S-1", no_matrik: "M-1"
+  });
+  assert.equal(rejected.status, 401);
+  assert.equal((await rejected.json()).code, "STUDENT_SESSION_INVALID");
+});
+
+function studentSessionFixture(status, student = {}) {
+  const queries = [];
+  const record = {
+    student_id: "S-1", no_matrik: "M-1", nama: "QA Student",
+    kelas: "A4", institution_code: "", status, ...student
+  };
+  const statement = (sql, values = []) => ({
+    bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, values });
+      if (!sql.includes("FROM STUDENTS")) throw new Error("Unexpected D1 first query");
+      assert.match(sql, /LOWER\(TRIM\(status\)\) = 'aktif'/);
+      if (String(status || "").trim().toLowerCase() !== "aktif") return null;
+      return record;
+    },
+    async all() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM OUTING_REQUESTS")) return { results: [] };
+      throw new Error("Unexpected D1 all query");
+    }
+  });
+  const rt = runtime(() => { throw new Error("Student session routes must not call GAS"); });
+  const run = (action) => rt.run(req("POST", {
+    url: `https://proxy.test/api/d1/${action}`,
+    headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify({ student_id: record.student_id, no_matrik: record.no_matrik })
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB: { prepare: sql => statement(sql) } });
+  return { ...rt, queries, run };
+}
+
+test("student login and annual session accept AKTIF while rejecting TIDAK AKTIF", async () => {
+  for (const action of ["loginStudent", "getStudentAnnualSummary"]) {
+    const active = studentSessionFixture(" AKTIF ");
+    assert.equal((await active.run(action)).status, 200, action);
+
+    const inactive = studentSessionFixture("TIDAK AKTIF");
+    assert.equal((await inactive.run(action)).status, 401, action);
+    assert.equal(inactive.calls.length, 0);
+  }
+});
+
+test("student login preserves authoritative D1 institution context for A4 and LI", async () => {
+  const a4 = studentSessionFixture("AKTIF", {
+    student_id: "QA-A4-001", no_matrik: "QA-A4-001", nama: "QA STUDENT A4",
+    kelas: "A4", institution_code: ""
+  });
+  const a4Response = await a4.run("loginStudent");
+  assert.equal(a4Response.status, 200);
+  assert.equal((await a4Response.json()).data.institution_code, "");
+  assert.match(a4.queries[0].sql, /SELECT[\s\S]*kelas, institution_code,[\s\S]*FROM STUDENTS/);
+
+  const li = studentSessionFixture("AKTIF", {
+    student_id: "QA-LI-001", no_matrik: "QA-LI-001", nama: "QA STUDENT LI UNISZA",
+    kelas: "LI", institution_code: "UNISZA"
+  });
+  const liResponse = await li.run("loginStudent");
+  assert.equal(liResponse.status, 200);
+  assert.equal((await liResponse.json()).data.institution_code, "UNISZA");
+  assert.match(li.queries[0].sql, /SELECT[\s\S]*kelas, institution_code,[\s\S]*FROM STUDENTS/);
+});
 
 test("student login response allowlists photo presence without exposing Drive ID", async () => {
-  const f = profilePhotoFixture({ student: { photo_file_id: "PRIVATE_DRIVE_ID",
-    photo_updated_at: "2026-09-23 13:00:00", private_extra: "NOT_FOR_BROWSER" } });
-  const response = await f.run("loginStudent", { student_id: "STU-001", no_matrik: "M001" });
+  const f = studentSessionFixture("AKTIF", { photo_file_id: "PRIVATE_DRIVE_ID",
+    photo_updated_at: "2026-09-23 13:00:00", private_extra: "NOT_FOR_BROWSER" });
+  const response = await f.run("loginStudent");
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.data.has_profile_photo, true);
   assert.equal(body.data.photo_updated_at, "2026-09-23 13:00:00");
   assert.equal(Object.hasOwn(body.data, "photo_file_id"), false);
   assert.doesNotMatch(JSON.stringify(body), /PRIVATE_DRIVE_ID|NOT_FOR_BROWSER/);
+});
+
+test("STUDENTS active reads use canonical tolerant predicate without changing staff predicates", () => {
+  assert.equal((source.match(/LOWER\(TRIM\(status\)\) = 'aktif'/g) || []).length, 9);
+  assert.doesNotMatch(source, /FROM STUDENTS\s+WHERE status = 'Aktif'/);
+  assert.doesNotMatch(source, /FROM STUDENTS WHERE student_id = \? AND no_matrik = \? AND status = 'Aktif'/);
+  assert.doesNotMatch(source, /FROM STUDENTS[\s\S]{0,100}AND LOWER\(status\) = 'aktif'/);
+  assert.match(source, /FROM WARDENS[\s\S]{0,180}status = 'Aktif'/);
+  assert.match(source, /FROM GUARDS[\s\S]{0,180}status = 'Aktif'/);
 });
 
 function runtime(fetchImpl, options = {}) {
@@ -1919,10 +2052,10 @@ test("staging submitReturnSelfie authenticates eligible student, syncs D1 after 
     bind(...args) { return statement(sql, args); },
     async first() {
       if (sql.includes("FROM STUDENTS")) {
-        assert.match(sql, /student_id = \? AND no_matrik = \? AND status = 'Aktif'/);
+        assert.match(sql, /student_id = \? AND no_matrik = \? AND LOWER\(TRIM\(status\)\) = 'aktif'/);
         assert.deepEqual(values, ["STU-001", "M001"]);
         events.push("authenticate");
-        return { student_id: "STU-001", no_matrik: "M001", status: "Aktif" };
+        return { student_id: "STU-001", no_matrik: "M001", status: "AKTIF" };
       }
       if (sql.includes("FROM OUTING_REQUESTS")) {
         assert.deepEqual(values, ["TEST-SELFIE-001"]);

@@ -202,14 +202,15 @@ test("repeated guarded apply is idempotent and does not create a second audit ro
   assert.equal(sheets.AUDIT_LOG.rows.length, 2);
 });
 
-test("Admin maintenance UI keeps Phase C migration guards without arbitrary property controls", () => {
+test("Admin maintenance APIs remain while normal Tetapan Pelajar hides Phase C controls", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
-  assert.match(html, /adminStudentReadinessRefreshButton/);
-  assert.match(html, /adminStudentMigrationDryRunButton/);
-  assert.match(html, /adminStudentMigrationConfirmInput[^>]*disabled/);
-  assert.match(html, /adminStudentMigrationApplyButton[^>]*disabled/);
+  assert.doesNotMatch(html, /adminStudentReadinessRefreshButton/);
+  assert.doesNotMatch(html, /adminStudentMigrationDryRunButton/);
+  assert.doesNotMatch(html, /adminStudentMigrationConfirmInput/);
+  assert.doesNotMatch(html, /adminStudentMigrationApplyButton/);
   assert.match(app, /confirm_apply:\s*true/);
+  assert.match(app, /runStudentInstitutionMigration/);
   assert.doesNotMatch(html, /Script Property|STUDENT_GROUP_CONFIG_ENABLED/);
 });
 

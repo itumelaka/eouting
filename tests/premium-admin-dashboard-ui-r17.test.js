@@ -135,14 +135,14 @@ test("migration safeguards retain dry-run, confirmation, apply gating and all me
   assert.match(tools, /mode: "apply"/);
 });
 
-test("Dynamic Student Login keeps explicit ON/OFF, confirmation and legacy rollback", () => {
+test("Dynamic Student Login support code remains but its rollout control is absent from normal Admin UI", () => {
   const dynamic = sourceBetween("function renderAdminDynamicLoginControlV240", "async function refreshAdminStudentReadinessV240");
   assert.match(dynamic, /Status: \$\{enabled \? "ON" : "OFF"\}/);
   assert.match(dynamic, /adminDynamicLoginConfirmInput\.checked/);
   assert.match(dynamic, /setStudentGroupConfigEnabled/);
   assert.match(dynamic, /confirm_enable: enabled === true/);
   assert.match(dynamic, /Login legacy telah dipulihkan/);
-  assert.match(html, /id="adminDynamicLoginDisableButton"[^>]*>Kembali ke Login Legacy</);
+  assert.doesNotMatch(html, /id="adminDynamicLoginDisableButton"/);
 });
 
 test("No-Guard remains the existing Admin configuration workflow", () => {

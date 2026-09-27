@@ -163,13 +163,14 @@ test("frontend dynamically renders wrapped groups while sending only canonical l
   assert.match(pillCss, /max-width:\s*100%/);
 });
 
-test("Admin UI exposes acknowledged enable and immediate legacy rollback only", () => {
-  const panel = html.slice(html.indexOf('id="adminStudentConfigStatus"'), html.indexOf('id="adminStudentPeoplePanel"'));
-  assert.match(panel, /adminDynamicLoginStatus/);
-  assert.match(panel, /adminDynamicLoginConfirmInput[^>]*disabled/);
-  assert.match(panel, /adminDynamicLoginEnableButton[^>]*disabled/);
-  assert.match(panel, /adminDynamicLoginDisableButton[^>]*hidden/);
+test("normal Admin UI hides dynamic-login rollout controls while support code remains", () => {
+  const panel = html.slice(html.indexOf('id="adminStudentManagementPanel"'), html.indexOf('id="adminMasterPanel"'));
+  assert.doesNotMatch(panel, /adminDynamicLoginStatus/);
+  assert.doesNotMatch(panel, /adminDynamicLoginConfirmInput/);
+  assert.doesNotMatch(panel, /adminDynamicLoginEnableButton/);
+  assert.doesNotMatch(panel, /adminDynamicLoginDisableButton/);
   assert.doesNotMatch(panel, /STUDENT_GROUP_CONFIG_ENABLED|Script Property/);
+  assert.match(app, /setStudentGroupConfigEnabled/);
   assert.match(app, /await refreshAdminStudentReadinessV240\(\)/);
 });
 
