@@ -1,5 +1,18 @@
 # Architecture eOuting ITU
 
+## Sasaran Phase 6C — photo metadata authoritative dalam D1 (belum production)
+
+```text
+Browser authenticated → staging Worker → D1 STUDENTS (metadata authoritative)
+                              │             photo_file_id + photo_updated_at
+                              ├─ trusted HMAC READ/UPLOAD → staging-only GAS adapter → private Drive binary
+                              └─ PHOTO_OPERATIONS journal → CAS STUDENTS → downstream Sheets mirror (sasaran cutover)
+```
+
+Selepas cutover yang masih belum dibuat, Google Sheets ialah downstream mirror/reporting/audit, bukan writable master kedua. Production semasa tetap Sheets/GAS-authoritative. Trusted READ mesti mengambil real `photo_file_id` daripada D1, bukan browser atau Sheet; adapter menyemak tandatangan HMAC, masa/nonce dan fail dalam folder private. Trusted UPLOAD menggunakan operation ID deterministik untuk dedup/idempotency, menyimpan binari di Drive, merekod hasil dalam `PHOTO_OPERATIONS`, dan mengemas kini metadata `STUDENTS` dengan CAS terhadap nilai lama. Hanya `has_profile_photo`, timestamp dan byte imej yang dibenarkan sampai ke browser; Drive ID, URL, token dan secret kekal server-side. `PHOTO_ADAPTER_UPSTREAM_URL` memisahkan adapter foto daripada `GAS_UPSTREAM_URL` legacy.
+
+Laluan trusted UPLOAD → real Drive ID dalam D1 → `PHOTO_OPERATIONS.COMPLETED` → trusted READ → thumbnail/preview browser telah **disahkan E2E pada staging dalam sesi QA** menggunakan `QA-A4-001`; bukti CLI/browser itu tidak semuanya disimpan sebagai artifact repo. Kod/migration/ujian repo ialah bukti berasingan. Ini bukan migration production. Trusted REMOVE, cleanup/trash fail Drive lama, pemulihan selepas CAS berjaya tetapi audit/journal completion gagal, dan automatic reconciliation bagi upstream rejection yang meninggalkan `PENDING` masih terbuka. Production GAS/deployment belum disentuh. Staging adapter mesti menggunakan Apps Script project, Script Properties dan folder Drive yang terasing daripada production; deployment berasingan dalam project GAS yang sama tidak mengasingkan Script Properties.
+
 Production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets setakat **22 September 2026**. Tiada production cutover ke Cloudflare. Butiran frontend/cache `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21`, GAS Version 57 dan full Node suite **744/744** ialah rekod close-out 27 Ogos 2026, bukan keputusan QA V3 terkini.
 
 ## V3.0 Cloud Architecture Staging — 22 September 2026

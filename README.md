@@ -14,6 +14,8 @@ Versi production semasa: **v2.4.0 — operational, insiden delivery intermittent
 
 ## Status Production v2.4.0
 
+> **Kemas kini Phase 6C / foto — 27 September 2026:** Reka bentuk sasaran ialah D1 sebagai authority metadata pelajar/foto, Google Drive private sebagai storan binari, dan Google Sheets sebagai downstream mirror/audit selepas cutover. Trusted photo UPLOAD dan READ telah **lulus E2E staging yang disahkan dalam sesi QA** untuk `QA-A4-001`; bukti manual CLI/browser itu tidak semuanya tersimpan sebagai repo artifact. Kod, migration dan ujian setempat ialah bukti berasingan yang boleh disemak dalam repo (`worker-proxy` 104/104, trusted adapter 7/7 PASS). Ini **bukan** kelulusan production. Trusted REMOVE, cleanup fail Drive lama dan recovery kegagalan upstream/jurnal belum lengkap. Lihat [status semasa](docs/PROJECT_STATUS.md) dan [seni bina](docs/ARCHITECTURE.md). Production kekal GAS/Sheets; jangan gunakan staging QA records sebagai salinan production.
+
 > **Status 23 September 2026:** production masih kekal GitHub Pages + Google Apps Script + Google Sheets dan belum dipindahkan ke Cloudflare. Migration Cloudflare sedang dibangunkan dan diuji secara berasingan menggunakan Worker staging `eouting-api-proxy-staging` dan D1 `eouting_staging`. Worker/D1 belum menjadi dependency production dan frontend production belum ditukar.
 
 ### V3.0 Cloud Architecture Staging — 22 September 2026

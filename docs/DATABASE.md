@@ -1,5 +1,13 @@
 # Struktur Database Google Sheets
 
+## Sasaran D1 Phase 6C — belum production cutover
+
+Production Sheets kekal sumber authoritative semasa dan sumber migrasi. Sasaran selepas cutover ialah D1 `STUDENTS` sebagai authority tunggal bagi `photo_file_id` (real ID fail Drive) dan `photo_updated_at`; Drive private menyimpan binari, manakala Sheets hanya downstream mirror/audit. Jangan salin placeholder `GAS_MANAGED:PROFILE_PHOTO` sebagai ID sebenar. Snapshot production 25 September mempunyai 34 pelajar, termasuk 32 rujukan foto pelajar aktif; staging D1 mengandungi rekod QA dan bukan replika production.
+
+`proxy/d1/007_photo_operations.sql` mentakrif jurnal `PHOTO_OPERATIONS`: primary key `operation_id`, `student_id`, `operation_type`, `status`, expected old ID/timestamp, new ID/timestamp, attempts, last_error dan audit masa. Kod trusted UPLOAD setempat menggunakan `PENDING`, `CREATED`, `COMPLETED` dan `RECONCILE_REQUIRED`; CAS `STUDENTS` hanya berjaya jika metadata lama masih sepadan. E2E staging yang disahkan dalam sesi QA menunjukkan satu upload QA mencapai `COMPLETED` dan D1 menyimpan real Drive ID/timestamp; rekod manual ini tidak semuanya artifact repo. Jurnal belum menyediakan pemulihan automatik apabila CAS sudah berjaya tetapi audit/completion gagal, atau apabila upstream rejection meninggalkan `PENDING`. Ini tidak membuktikan migration production.
+
+Model pelajar kanonik: `kelas=LI`, `institution_code=UNISZA` untuk pelajar LI UNISZA; `kelas=UNISZA`, `institution_code=UNISZA` bukan penugasan kumpulan baharu yang sah. Hanya LI institution-aware, dan non-LI aktif mesti tiada institusi. Rekod legacy production perlu dipadankan/disahkan sebelum transform; pembetulan staging tidak bermakna production telah dimigrasi.
+
 Google Sheets ialah database dan source of truth eOuting ITU v2.4.0. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
 ## D1 staging — dynamic student groups, 22 September 2026
