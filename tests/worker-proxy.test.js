@@ -716,43 +716,285 @@ function profilePhotoFixture(options = {}) {
   const student = { student_id: "STU-001", no_matrik: "M001", nama: "Test Student",
     status: "Aktif", photo_file_id: "", photo_updated_at: "", ...options.student };
   const queries = [], batches = [], events = [];
+  let photoOperation = null;
   const statement = (sql, values = []) => ({
-    sql, values,
-    bind(...args) { return statement(sql, args); },
+    sql,
+    values,
+
+    bind(...args) {
+      return statement(sql, args);
+    },
+
     async first() {
       queries.push({ sql, values });
+
       if (options.invalidAuth) return null;
-      if (sql.includes("FROM STUDENTS")) return student;
-      if (/FROM (WARDENS|GUARDS)/.test(sql)) return { warden_id: "W-TEST", guard_id: "G-TEST" };
-      if (sql.includes("FROM ADMIN_USERS")) return { admin_id: "ADMIN-TEST", nama_admin: "Test Admin" };
+
+      if (sql.includes("FROM PHOTO_OPERATIONS")) {
+        if (!photoOperation) return null;
+        if (photoOperation.operation_id !== values[0]) return null;
+        return { ...photoOperation };
+      }
+
+      if (sql.includes("FROM STUDENTS")) {
+        return student;
+      }
+
+      if (/FROM (WARDENS|GUARDS)/.test(sql)) {
+        return {
+          warden_id: "W-TEST",
+          guard_id: "G-TEST"
+        };
+      }
+
+      if (sql.includes("FROM ADMIN_USERS")) {
+        return {
+          admin_id: "ADMIN-TEST",
+          nama_admin: "Test Admin"
+        };
+      }
+
       throw new Error("Unexpected query");
     },
+
     async all() {
       queries.push({ sql, values });
-      if (sql.includes("FROM OUTING_REQUESTS")) return { results: options.records || [] };
-      if (sql.includes("FROM STUDENTS")) return { results: options.photos || [] };
+
+      if (sql.includes("FROM OUTING_REQUESTS")) {
+        return { results: options.records || [] };
+      }
+
+      if (sql.includes("FROM STUDENTS")) {
+        return { results: options.photos || [] };
+      }
+
       throw new Error("Unexpected query");
+    },
+
+    async run() {
+      queries.push({ sql, values });
+
+      if (sql.includes("INSERT OR IGNORE INTO PHOTO_OPERATIONS")) {
+        if (!photoOperation) {
+          photoOperation = {
+            operation_id: values[0],
+            student_id: values[1],
+            operation_type: "UPLOAD",
+            status: "PENDING",
+            expected_old_file_id: values[2] || "",
+            expected_old_photo_updated_at: values[3] || "",
+            new_file_id: null,
+            new_photo_updated_at: null,
+            attempts: 0,
+            last_error: null,
+            created_at: values[4],
+            updated_at: values[5]
+          };
+
+          return {
+            success: true,
+            meta: { changes: 1 }
+          };
+        }
+
+        return {
+          success: true,
+          meta: { changes: 0 }
+        };
+      }
+
+      if (
+        sql.includes("UPDATE PHOTO_OPERATIONS") &&
+        sql.includes("attempts = attempts + 1")
+      ) {
+        if (!photoOperation) {
+          return {
+            success: true,
+            meta: { changes: 0 }
+          };
+        }
+
+        photoOperation.attempts += 1;
+        photoOperation.updated_at = values[0];
+
+        return {
+          success: true,
+          meta: { changes: 1 }
+        };
+      }
+
+      if (
+        sql.includes("UPDATE PHOTO_OPERATIONS") &&
+        sql.includes("status = 'CREATED'")
+      ) {
+        if (!photoOperation) {
+          return {
+            success: true,
+            meta: { changes: 0 }
+          };
+        }
+
+        photoOperation.status = "CREATED";
+        photoOperation.new_file_id = values[0];
+        photoOperation.new_photo_updated_at = values[1];
+        photoOperation.last_error = null;
+        photoOperation.updated_at = values[2];
+
+        return {
+          success: true,
+          meta: { changes: 1 }
+        };
+      }
+
+      if (
+        sql.includes("UPDATE PHOTO_OPERATIONS") &&
+        sql.includes("status = 'RECONCILE_REQUIRED'")
+      ) {
+        if (photoOperation) {
+          photoOperation.status = "RECONCILE_REQUIRED";
+          photoOperation.last_error = "D1_CAS_CONFLICT";
+          photoOperation.updated_at = values[0];
+        }
+
+        return {
+          success: true,
+          meta: { changes: photoOperation ? 1 : 0 }
+        };
+      }
+
+      if (sql.includes("UPDATE STUDENTS")) {
+        events.push("sync");
+
+        if (options.syncThrows) {
+          throw new Error(
+            "PRIVATE_FILE YQ== GAS_MANAGED:PROFILE_PHOTO"
+          );
+        }
+
+        const changes = options.changes ?? 1;
+
+        if (changes === 1) {
+          student.photo_file_id = values[0];
+          student.photo_updated_at = values[1];
+        }
+
+        return {
+          success: true,
+          meta: { changes }
+        };
+      }
+
+      throw new Error("Unexpected run");
     }
   });
-  const DB = { prepare: sql => statement(sql), async batch(statements) {
-    events.push("sync"); batches.push(statements);
-    if (options.syncThrows) throw new Error("PRIVATE_FILE YQ== GAS_MANAGED:PROFILE_PHOTO");
-    return [{ success: true, meta: { changes: options.changes ?? 1 } },
-      { success: true, meta: { changes: options.changes ?? 1 } }];
-  } };
+
+  const DB = {
+  prepare: sql => statement(sql),
+
+  async batch(statements) {
+    batches.push(statements);
+
+    const updatesStudent = statements.some(statement =>
+      statement.sql.includes("UPDATE STUDENTS")
+    );
+
+    if (updatesStudent) {
+      events.push("sync");
+
+      if (options.syncThrows) {
+        throw new Error(
+          "PRIVATE_FILE YQ== GAS_MANAGED:PROFILE_PHOTO"
+        );
+      }
+    }
+
+    if (
+      statements.some(statement =>
+        statement.sql.includes("UPDATE PHOTO_OPERATIONS") &&
+        statement.sql.includes("status = 'COMPLETED'")
+      )
+    ) {
+      if (photoOperation) {
+        photoOperation.status = "COMPLETED";
+        photoOperation.last_error = null;
+      }
+    }
+
+    return statements.map((statement, index) => ({
+      success: true,
+      meta: {
+        changes:
+          updatesStudent && index === 0
+            ? (options.changes ?? 1)
+            : 1
+      }
+    }));
+  }
+};
+
   const rt = runtime((url, init, count) => {
     events.push("GAS");
-    if (options.fetch) return options.fetch(url, init, count);
-    return json(JSON.stringify(options.upstream || { ok: true, data: {
-      student_id: "STU-001", has_profile_photo: true, photo_updated_at: "2026-09-23 13:00:00",
-      photo_file_id: "PRIVATE_FILE"
-    } }));
+
+    if (options.fetch) {
+      return options.fetch(url, init, count);
+    }
+
+    if (options.upstream) {
+      return json(JSON.stringify(options.upstream));
+    }
+
+    const envelope = JSON.parse(init.body);
+
+    if (envelope.action === "uploadTrustedProfilePhoto") {
+      return json(JSON.stringify({
+        ok: true,
+        data: {
+          operation_id: envelope.payload.operation_id,
+          student_id: envelope.payload.student_id,
+          has_profile_photo: true,
+          photo_updated_at: "2026-09-23 13:00:00",
+          photo_file_id: "PRIVATE_FILE"
+        }
+      }));
+    }
+
+    return json(JSON.stringify({
+      ok: true,
+      data: {
+        student_id: "STU-001",
+        has_profile_photo: true,
+        photo_updated_at: "2026-09-23 13:00:00",
+        photo_file_id: "PRIVATE_FILE"
+      }
+    }));
   });
-  const run = (action, payload, method = "POST") => rt.run(req(method, {
-    url: `https://proxy.test/api/d1/${action}`, headers: { Origin: "http://localhost:8000" },
+
+  const run = (
+    action,
+    payload,
+    method = "POST"
+  ) => rt.run(req(method, {
+    url: `https://proxy.test/api/d1/${action}`,
+    headers: {
+      Origin: "http://localhost:8000"
+    },
     body: JSON.stringify(payload)
-  }), { STAGING_ORIGIN: "http://localhost:8000", DB });
-  return { ...rt, run, queries, batches, events };
+  }), {
+    STAGING_ORIGIN: "http://localhost:8000",
+    DB,
+    PHOTO_ADAPTER_UPSTREAM_URL:
+      "https://script.google.com/macros/s/TEST_PHOTO_ADAPTER/exec",
+    PHOTO_ADAPTER_KEY_ID: "staging1",
+    PHOTO_ADAPTER_SECRET: "TEST_PHOTO_ADAPTER_SECRET"
+  });
+
+  return {
+    ...rt,
+    run,
+    queries,
+    batches,
+    events
+  };
 }
 
 const profileStudent = { student_id: "STU-001", no_matrik: "M001" };
@@ -789,7 +1031,7 @@ test("profile photos: operational scope includes active, today's activity and op
     { student_id: "ACTIVE", status: "KELUAR", tarikh: "2000-01-01" },
     { student_id: "TODAY", status: "SELESAI", masa_masuk: new Date().toISOString() },
     { student_id: "HOSTEL", status: "OTHER", jenis_permohonan: "PULANG_BERMALAM" }
-  ], photos: [{ student_id: "ACTIVE", photo_file_id: "GAS_MANAGED:PROFILE_PHOTO" }],
+  ], photos: [{ student_id: "ACTIVE", photo_file_id: "DRIVE_ACTIVE", photo_updated_at: "2026-09-23 13:00:00" }],
   upstream: { ok: true, data: { photos: [{ student_id: "ACTIVE", photo_data_uri: "data:image/jpeg;base64,YQ==",
     photo_updated_at: "2026-09-23 13:00:00", photo_file_id: "PRIVATE_FILE" }] } } });
   const response = await f.run("getStudentProfilePhotos", {
@@ -799,28 +1041,145 @@ test("profile photos: operational scope includes active, today's activity and op
   assert.deepEqual(await response.json(), { ok: true, data: { photos: [{ student_id: "ACTIVE",
     photo_data_uri: "data:image/jpeg;base64,YQ==", photo_updated_at: "2026-09-23 13:00:00" }] } });
   assert.equal(f.calls.length, 1);
-  assert.deepEqual(JSON.parse(f.calls[0].init.body).student_ids, ["ACTIVE"]);
-  assert.doesNotMatch(f.calls[0].init.body, /GAS_MANAGED|photo_file_id/);
-  assert.doesNotMatch(f.logs.join(""), /YQ==|PRIVATE_FILE|GAS_MANAGED|TEST_PIN/);
+  const trusted = JSON.parse(f.calls[0].init.body);
+  assert.equal(trusted.action, "getTrustedProfilePhotos");
+  assert.deepEqual(trusted.payload.entries, [{ student_id: "ACTIVE", photo_file_id: "DRIVE_ACTIVE",
+    photo_updated_at: "2026-09-23 13:00:00" }]);
+  assert.doesNotMatch(f.calls[0].init.body, /TEST_PIN|no_matrik/);
+  assert.doesNotMatch(f.logs.join(""), /YQ==|PRIVATE_FILE|DRIVE_ACTIVE|TEST_PHOTO_ADAPTER_SECRET|TEST_PIN/);
+});
+
+test("profile photos: Worker signs D1 photo ID and ignores browser-supplied file ID", async () => {
+  const f = profilePhotoFixture({ photos: [{ student_id: "STU-001", photo_file_id: "D1_REAL_ID",
+    photo_updated_at: "2026-09-23 13:00:00" }], upstream: { ok: true, data: { photos: [] } } });
+  const response = await f.run("getStudentProfilePhotos", { ...profileStudent, role: "student",
+    student_ids: ["STU-001"], photo_file_id: "BROWSER_FAKE_ID" });
+  assert.equal(response.status, 200);
+  const envelope = JSON.parse(f.calls[0].init.body);
+  assert.equal(envelope.action, "getTrustedProfilePhotos");
+  assert.equal(envelope.payload.entries[0].photo_file_id, "D1_REAL_ID");
+  assert.doesNotMatch(f.calls[0].init.body, /BROWSER_FAKE_ID|TEST_PHOTO_ADAPTER_SECRET/);
+  const canonical = JSON.stringify({ photo_variant: "full", entries: [{ student_id: "STU-001",
+    photo_file_id: "D1_REAL_ID", photo_updated_at: "2026-09-23 13:00:00" }] });
+  const { createHash, createHmac } = require("node:crypto");
+  const hash = createHash("sha256").update(canonical, "utf8").digest("hex");
+  const signed = ["1", "staging1", envelope.auth.timestamp, envelope.auth.nonce,
+    "getTrustedProfilePhotos", hash].join("\n");
+  assert.equal(envelope.auth.signature, createHmac("sha256", "TEST_PHOTO_ADAPTER_SECRET")
+    .update(signed, "utf8").digest("hex"));
+  assert.equal(f.batches.length, 0);
+});
+
+test("trusted GAS photo action is not exposed as a browser proxy action", async () => {
+  const rt = runtime(() => { throw Error("Trusted action must not reach GAS from browser"); });
+  const response = await rt.run(req("POST", { body: JSON.stringify({ action: "getTrustedProfilePhotos" }) }));
+  assert.notEqual(response.status, 200);
+  assert.equal(rt.calls.length, 0);
+  assert.doesNotMatch(source.slice(source.indexOf("var POST_ACTIONS"), source.indexOf("var MAX_REQUEST_BYTES")),
+    /"getTrustedProfilePhotos"/);
 });
 
 for (const existing of ["", "PRIVATE_EXISTING_FILE"]) {
-  test(`profile photos: submit calls GAS once then ${existing ? "replaces existing file ID with sentinel" : "sets sentinel"} without leaking metadata`, async () => {
-    const f = profilePhotoFixture({ student: { photo_file_id: existing } });
-    const response = await f.run("submitStudentProfilePhoto", { ...profileUpload, photo_file_id: "UNTRUSTED_FILE" });
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, data: { student_id: "STU-001",
-      has_profile_photo: true, photo_updated_at: "2026-09-23 13:00:00" } });
-    assert.deepEqual(f.events, ["GAS", "sync"]);
-    assert.equal(f.calls.length, 1);
-    assert.deepEqual(JSON.parse(f.calls[0].init.body), { action: "submitStudentProfilePhoto", ...profileUpload });
-    const [update, audit] = f.batches[0];
-    assert.match(update.sql, /UPDATE STUDENTS SET photo_file_id = \?, photo_updated_at = \?/);
-    assert.deepEqual(update.values.slice(0, 3), ["GAS_MANAGED:PROFILE_PHOTO", "2026-09-23 13:00:00", "STU-001"]);
-    assert.match(audit.sql, /WHERE changes\(\) = 1/);
-    assert.equal(audit.values[1], "UPDATE_STUDENT_PROFILE_PHOTO");
-    assert.doesNotMatch(JSON.stringify(audit) + f.logs.join(""), /YQ==|PRIVATE_|GAS_MANAGED|photo_file_id|image_base64/);
-  });
+  test(
+    `profile photos: trusted upload ${existing ? "replaces existing Drive ID" : "stores real Drive ID"} without leaking metadata`,
+    async () => {
+      const f = profilePhotoFixture({
+        student: {
+          photo_file_id: existing
+        }
+      });
+
+      const response = await f.run(
+        "submitStudentProfilePhoto",
+        {
+          ...profileUpload,
+          photo_file_id: "UNTRUSTED_FILE"
+        }
+      );
+
+      assert.equal(response.status, 200);
+
+      assert.deepEqual(
+        await response.json(),
+        {
+          ok: true,
+          data: {
+            student_id: "STU-001",
+            has_profile_photo: true,
+            photo_updated_at: "2026-09-23 13:00:00"
+          }
+        }
+      );
+
+      assert.deepEqual(f.events, ["GAS", "sync"]);
+      assert.equal(f.calls.length, 1);
+
+      const envelope = JSON.parse(f.calls[0].init.body);
+
+      assert.equal(
+        envelope.action,
+        "uploadTrustedProfilePhoto"
+      );
+
+      assert.equal(
+        envelope.payload.student_id,
+        "STU-001"
+      );
+
+      assert.equal(
+        envelope.payload.mime_type,
+        "image/jpeg"
+      );
+
+      assert.equal(
+        envelope.payload.image_base64,
+        "YQ=="
+      );
+
+      assert.equal(
+        envelope.payload.expected_old_file_id,
+        existing
+      );
+
+      assert.equal(
+        envelope.payload.expected_old_photo_updated_at,
+        ""
+      );
+
+      assert.match(
+        envelope.payload.operation_id,
+        /^phu_[a-f0-9]{40}$/
+      );
+
+      assert.equal(envelope.auth.version, "1");
+      assert.equal(envelope.auth.key_id, "staging1");
+
+      assert.doesNotMatch(
+        f.calls[0].init.body,
+        /UNTRUSTED_FILE|M001/
+      );
+
+      const update = f.queries.find(query =>
+        query.sql.includes("UPDATE STUDENTS")
+      );
+
+      assert.ok(update);
+
+      assert.deepEqual(
+        update.values.slice(0, 3),
+        [
+          "PRIVATE_FILE",
+          "2026-09-23 13:00:00",
+          "STU-001"
+        ]
+      );
+
+      assert.doesNotMatch(
+        f.logs.join(""),
+        /PRIVATE_FILE|YQ==|TEST_PHOTO_ADAPTER_SECRET/
+      );
+    }
+  );
 }
 
 test("profile photos: admin removal calls GAS once then clears D1 and audits without file IDs", async () => {
@@ -843,13 +1202,30 @@ test("profile photos: admin removal calls GAS once then clears D1 and audits wit
 for (const action of ["submitStudentProfilePhoto", "removeStudentProfilePhoto"]) {
   for (const failure of [{ syncThrows: true }, { changes: 0 }]) {
     test(`profile photos: ${action} sync failure ${JSON.stringify(failure)} never retries or exposes internals`, async () => {
-      const f = profilePhotoFixture({ ...failure, upstream: { ok: true, data: { student_id: "STU-001",
-        has_profile_photo: action === "submitStudentProfilePhoto", photo_updated_at: action === "submitStudentProfilePhoto" ? "2026-09-23 13:00:00" : "" } } });
+      const f = profilePhotoFixture({
+  ...failure,
+  ...(action === "submitStudentProfilePhoto"
+    ? {}
+    : {
+        upstream: {
+          ok: true,
+          data: {
+            student_id: "STU-001",
+            has_profile_photo: false,
+            photo_updated_at: ""
+          }
+        }
+      })
+});
       const response = await f.run(action, action === "submitStudentProfilePhoto" ? profileUpload : { ...profileAdmin, student_id: "STU-001" });
       assert.equal(response.status, 500);
       const body = await response.json();
       assert.equal(body.code, "PROFILE_PHOTO_D1_SYNC_FAILED");
-      assert.match(body.error, /jangan.*semula/i);
+      if (action === "submitStudentProfilePhoto") {
+  assert.match(body.error, /disimpan untuk pemulihan/i);
+} else {
+  assert.match(body.error, /jangan.*semula/i);
+}
       assert.equal(f.calls.length, 1);
       assert.doesNotMatch(JSON.stringify(body) + f.logs.join(""), /PRIVATE_FILE|YQ==|GAS_MANAGED/);
     });
@@ -877,10 +1253,35 @@ test("profile photos: rejected or malformed GAS result never syncs D1", async ()
 });
 
 test("profile photos: trusted redirect uses one POST and one bodyless GET", async () => {
-  const f = profilePhotoFixture({ fetch: (url, init, count) => count === 1
-    ? new Response(null, { status: 302, headers: { Location: destination } })
-    : json(JSON.stringify({ ok: true, data: { student_id: "STU-001", has_profile_photo: true, photo_updated_at: "2026-09-23 13:00:00" } })) });
-  assert.equal((await f.run("submitStudentProfilePhoto", profileUpload)).status, 200);
+  const f = profilePhotoFixture({
+    fetch: (url, init, count) => {
+      if (count === 1) {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: destination }
+        });
+      }
+
+      const envelope = JSON.parse(f.calls[0].init.body);
+
+      return json(JSON.stringify({
+        ok: true,
+        data: {
+          operation_id: envelope.payload.operation_id,
+          student_id: "STU-001",
+          has_profile_photo: true,
+          photo_updated_at: "2026-09-23 13:00:00",
+          photo_file_id: "PRIVATE_FILE"
+        }
+      }));
+    }
+  });
+
+  assert.equal(
+    (await f.run("submitStudentProfilePhoto", profileUpload)).status,
+    200
+  );
+
   assert.equal(f.calls.length, 2);
   assert.equal(f.calls[0].init.method, "POST");
   assert.equal(f.calls[1].init.method, "GET");
@@ -904,7 +1305,7 @@ test("profile photos: getter filters absent D1 photo presence and validates limi
 });
 
 test("profile photos: unauthorized GAS photos and malformed removal responses fail closed", async () => {
-  const f = profilePhotoFixture({ photos: [{ student_id: "STU-001" }], upstream: { ok: true, data: { photos: [
+  const f = profilePhotoFixture({ photos: [{ student_id: "STU-001", photo_file_id: "DRIVE_FILE", photo_updated_at: "now" }], upstream: { ok: true, data: { photos: [
     { student_id: "OTHER", photo_data_uri: "data:image/jpeg;base64,YQ==", photo_updated_at: "now" }
   ] } } });
   const response = await f.run("getStudentProfilePhotos", { ...profileStudent, role: "student" });
@@ -1045,10 +1446,23 @@ test("today records: authenticated POST remains available and other methods are 
   assert.equal(f.calls.length, 0);
 });
 
+
+test("student login response allowlists photo presence without exposing Drive ID", async () => {
+  const f = profilePhotoFixture({ student: { photo_file_id: "PRIVATE_DRIVE_ID",
+    photo_updated_at: "2026-09-23 13:00:00", private_extra: "NOT_FOR_BROWSER" } });
+  const response = await f.run("loginStudent", { student_id: "STU-001", no_matrik: "M001" });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.data.has_profile_photo, true);
+  assert.equal(body.data.photo_updated_at, "2026-09-23 13:00:00");
+  assert.equal(Object.hasOwn(body.data, "photo_file_id"), false);
+  assert.doesNotMatch(JSON.stringify(body), /PRIVATE_DRIVE_ID|NOT_FOR_BROWSER/);
+});
+
 function runtime(fetchImpl, options = {}) {
   const calls = [], logs = [];
   const context = vm.createContext({
-    URL, Headers, Response, TextDecoder, Uint8Array, AbortController,
+    URL, Headers, Response, TextDecoder, TextEncoder, Uint8Array, AbortController,
     crypto: webcrypto,
 console: {
   info: (value) => logs.push(value),

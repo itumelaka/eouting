@@ -422,6 +422,143 @@ function trustedUrl(value, redirect = false) {
   return url;
 }
 __name(trustedUrl, "trustedUrl");
+// Photo adapter v1: UTF-8 HMAC over five newline-separated fields followed by
+// the lowercase SHA-256 hex of a fixed-order JSON payload (no trailing newline).
+function canonicalPhotoReadPayload(payload) {
+  return JSON.stringify({ photo_variant: payload.photo_variant, entries: payload.entries.map(entry => ({
+    student_id: entry.student_id, photo_file_id: entry.photo_file_id,
+    photo_updated_at: entry.photo_updated_at
+  })) });
+}
+async function signPhotoReadRequest(env, payload) {
+  const keyId = String(env.PHOTO_ADAPTER_KEY_ID || "");
+  const secret = String(env.PHOTO_ADAPTER_SECRET || "");
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(keyId) || !secret) {
+    throw fault(500, "PHOTO_ADAPTER_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
+  }
+  const encoder = new TextEncoder();
+  const hex = bytes => Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+  const payloadHash = hex(await crypto.subtle.digest("SHA-256", encoder.encode(canonicalPhotoReadPayload(payload))));
+  const auth = { version: "1", key_id: keyId, timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(), signature: "" };
+  const signed = [auth.version, auth.key_id, String(auth.timestamp), auth.nonce,
+    "getTrustedProfilePhotos", payloadHash].join("\n");
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  auth.signature = hex(await crypto.subtle.sign("HMAC", key, encoder.encode(signed)));
+  return { action: "getTrustedProfilePhotos", payload, auth };
+}
+function canonicalPhotoUploadPayload(payload) {
+  return JSON.stringify({
+    operation_id: String(payload.operation_id || ""),
+    student_id: String(payload.student_id || ""),
+    mime_type: String(payload.mime_type || ""),
+    image_base64: String(payload.image_base64 || ""),
+    expected_old_file_id: String(payload.expected_old_file_id || ""),
+    expected_old_photo_updated_at: String(payload.expected_old_photo_updated_at || "")
+  });
+}
+
+async function signPhotoUploadRequest(env, payload) {
+  const keyId = String(env.PHOTO_ADAPTER_KEY_ID || "");
+  const secret = String(env.PHOTO_ADAPTER_SECRET || "");
+
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(keyId) || !secret) {
+    throw fault(
+      500,
+      "PHOTO_ADAPTER_NOT_CONFIGURED",
+      "Perkhidmatan foto profil belum disediakan."
+    );
+  }
+
+  const encoder = new TextEncoder();
+
+  const hex = bytes =>
+    Array.from(
+      new Uint8Array(bytes),
+      byte => byte.toString(16).padStart(2, "0")
+    ).join("");
+
+  const payloadHash = hex(
+    await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(canonicalPhotoUploadPayload(payload))
+    )
+  );
+
+  const auth = {
+    version: "1",
+    key_id: keyId,
+    timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(),
+    signature: ""
+  };
+
+  const signed = [
+    auth.version,
+    auth.key_id,
+    String(auth.timestamp),
+    auth.nonce,
+    "uploadTrustedProfilePhoto",
+    payloadHash
+  ].join("\n");
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  auth.signature = hex(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      encoder.encode(signed)
+    )
+  );
+
+  return {
+    action: "uploadTrustedProfilePhoto",
+    payload,
+    auth
+  };
+}
+
+async function createPhotoUploadOperationId(student, mimeType, imageBase64) {
+  const encoder = new TextEncoder();
+
+  const hex = bytes =>
+    Array.from(
+      new Uint8Array(bytes),
+      byte => byte.toString(16).padStart(2, "0")
+    ).join("");
+
+  const imageHash = hex(
+    await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(imageBase64)
+    )
+  );
+
+  const basis = JSON.stringify({
+    student_id: String(student.student_id || ""),
+    expected_old_file_id: String(student.photo_file_id || ""),
+    expected_old_photo_updated_at: String(student.photo_updated_at || ""),
+    mime_type: String(mimeType || ""),
+    image_sha256: imageHash
+  });
+
+  const operationHash = hex(
+    await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(basis)
+    )
+  );
+
+  return "phu_" + operationHash.slice(0, 40);
+}
+
 async function mirrorOutingRequestToSheets(env, record, fetchImpl = fetch) {
   if (!env.GAS_UPSTREAM_URL || !env.D1_MIRROR_SECRET) {
     throw new Error("D1 to Sheets mirror configuration unavailable");
@@ -2134,7 +2271,10 @@ if (url.pathname === "/api/d1/loginStudent") {
   return new Response(JSON.stringify({
     ok: true,
     data: {
-      ...row,
+      student_id: row.student_id, no_matrik: row.no_matrik, nama: row.nama,
+      email: row.email, no_tel: row.no_tel, kelas: row.kelas,
+      jantina: row.jantina,
+      status: row.status, photo_updated_at: row.photo_updated_at,
       has_profile_photo: Boolean(row.photo_file_id)
     }
   }), {
@@ -2325,7 +2465,7 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
       throw fault(401, "SESSION_REQUIRED", "Akses sesi diperlukan.");
     }
 
-    let upstreamPayload, allowedIds, variant;
+    let upstreamPayload, allowedIds, allowedPhotoTimestamps, variant, uploadOperationId;
     if (viewing) {
       variant = String(payload.photo_variant || "full").trim().toLowerCase();
       if (!["thumbnail", "full"].includes(variant)) throw fault(400, "PROFILE_PHOTO_INVALID_VARIANT", "Varian foto profil tidak sah.");
@@ -2366,24 +2506,163 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
       }
       ids = [...new Set(ids.map(key))];
       if (!ids.length) return finish(JSON.stringify({ ok: true, data: { photos: [] } }), 200);
-      const existing = await env.DB.prepare(`SELECT student_id FROM STUDENTS
+      const existing = await env.DB.prepare(`SELECT student_id, photo_file_id, photo_updated_at FROM STUDENTS
         WHERE LOWER(TRIM(student_id)) IN (${ids.map(() => "?").join(",")})
         AND photo_file_id IS NOT NULL AND TRIM(photo_file_id) <> ''`).bind(...ids).all();
       const requested = new Set(ids);
-      const eligibleIds = (existing.results || []).map(row => String(row.student_id).trim()).filter(id => requested.has(key(id)));
-      if (!eligibleIds.length) return finish(JSON.stringify({ ok: true, data: { photos: [] } }), 200);
-      allowedIds = new Set(eligibleIds);
-      upstreamPayload = { action, role, ...credentials, student_ids: eligibleIds, photo_variant: variant };
-    } else if (uploading) {
-      const mimeType = String(payload.mime_type || "").trim().toLowerCase();
-      const imageBase64 = String(payload.image_base64 || "").trim();
-      if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) throw fault(400, "PROFILE_PHOTO_INVALID_MIME", "Format foto profil tidak disokong.");
-      if (!imageBase64 || imageBase64.length > 1100 * 1024 || imageBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
-        throw fault(400, "PROFILE_PHOTO_INVALID_IMAGE", "Foto profil tidak sah atau terlalu besar.");
+      const entries = (existing.results || []).filter(row => requested.has(key(row.student_id)) &&
+        String(row.photo_file_id || "").trim()).map(row => ({
+        student_id: String(row.student_id).trim(), photo_file_id: String(row.photo_file_id).trim(),
+        photo_updated_at: String(row.photo_updated_at || "")
+      }));
+      if (!entries.length) return finish(JSON.stringify({ ok: true, data: { photos: [] } }), 200);
+      allowedIds = new Set(entries.map(entry => entry.student_id));
+      allowedPhotoTimestamps = new Map(entries.map(entry => [entry.student_id, entry.photo_updated_at]));
+      upstreamPayload = await signPhotoReadRequest(env, { photo_variant: variant, entries });
+    }
+    else if (uploading) {
+  const mimeType = String(payload.mime_type || "").trim().toLowerCase();
+  const imageBase64 = String(payload.image_base64 || "").trim();
+
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+    throw fault(
+      400,
+      "PROFILE_PHOTO_INVALID_MIME",
+      "Format foto profil tidak disokong."
+    );
+  }
+
+  if (
+    !imageBase64 ||
+    imageBase64.length > 1100 * 1024 ||
+    imageBase64.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)
+  ) {
+    throw fault(
+      400,
+      "PROFILE_PHOTO_INVALID_IMAGE",
+      "Foto profil tidak sah atau terlalu besar."
+    );
+  }
+
+  const bytes =
+    imageBase64.length / 4 * 3 -
+    (imageBase64.endsWith("==")
+      ? 2
+      : imageBase64.endsWith("=")
+        ? 1
+        : 0);
+
+  if (!bytes || bytes > 800 * 1024) {
+    throw fault(
+      400,
+      "PROFILE_PHOTO_INVALID_IMAGE",
+      "Foto profil tidak sah atau terlalu besar."
+    );
+  }
+
+  uploadOperationId = await createPhotoUploadOperationId(
+    student,
+    mimeType,
+    imageBase64
+  );
+
+  const journalTimestamp = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).format(new Date());
+
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO PHOTO_OPERATIONS (
+      operation_id,
+      student_id,
+      operation_type,
+      status,
+      expected_old_file_id,
+      expected_old_photo_updated_at,
+      attempts,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, 'UPLOAD', 'PENDING', ?, ?, 0, ?, ?)
+  `).bind(
+    uploadOperationId,
+    student.student_id,
+    student.photo_file_id || "",
+    student.photo_updated_at || "",
+    journalTimestamp,
+    journalTimestamp
+  ).run();
+
+  const operation = await env.DB.prepare(`
+    SELECT
+      operation_id,
+      student_id,
+      status,
+      expected_old_file_id,
+      expected_old_photo_updated_at,
+      new_file_id,
+      new_photo_updated_at
+    FROM PHOTO_OPERATIONS
+    WHERE operation_id = ?
+    LIMIT 1
+  `).bind(uploadOperationId).first();
+
+  if (
+    !operation ||
+    operation.student_id !== student.student_id ||
+    String(operation.expected_old_file_id || "") !==
+      String(student.photo_file_id || "") ||
+    String(operation.expected_old_photo_updated_at || "") !==
+      String(student.photo_updated_at || "")
+  ) {
+    throw fault(
+      409,
+      "PROFILE_PHOTO_OPERATION_CONFLICT",
+      "Operasi kemas kini foto profil bercanggah dengan keadaan semasa."
+    );
+  }
+
+  if (
+    operation.status === "COMPLETED" &&
+    operation.new_file_id &&
+    operation.new_photo_updated_at
+  ) {
+    return finish(JSON.stringify({
+      ok: true,
+      data: {
+        student_id: student.student_id,
+        has_profile_photo: true,
+        photo_updated_at: operation.new_photo_updated_at
       }
-      const bytes = imageBase64.length / 4 * 3 - (imageBase64.endsWith("==") ? 2 : imageBase64.endsWith("=") ? 1 : 0);
-      if (!bytes || bytes > 800 * 1024) throw fault(400, "PROFILE_PHOTO_INVALID_IMAGE", "Foto profil tidak sah atau terlalu besar.");
-      upstreamPayload = { action, ...credentials, image_base64: imageBase64, mime_type: mimeType };
+    }), 200);
+  }
+
+  await env.DB.prepare(`
+    UPDATE PHOTO_OPERATIONS
+    SET attempts = attempts + 1,
+        updated_at = ?
+    WHERE operation_id = ?
+  `).bind(
+    journalTimestamp,
+    uploadOperationId
+  ).run();
+
+  upstreamPayload = await signPhotoUploadRequest(env, {
+    operation_id: uploadOperationId,
+    student_id: student.student_id,
+    mime_type: mimeType,
+    image_base64: imageBase64,
+    expected_old_file_id: String(student.photo_file_id || ""),
+    expected_old_photo_updated_at: String(student.photo_updated_at || "")
+  });
+
     } else {
       if (!studentId) throw fault(400, "INVALID_REQUEST", "student_id diperlukan.");
       student = await env.DB.prepare(`SELECT student_id, nama, photo_file_id, photo_updated_at
@@ -2393,10 +2672,16 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
     }
 
     // One GAS POST only; a trusted Apps Script redirect retrieves its result with a bodyless GET.
-    let upstream;
-    try { upstream = trustedUrl(env.GAS_UPSTREAM_URL); } catch {
-      throw fault(500, "UPSTREAM_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
-    }
+let upstream;
+try {
+  upstream = trustedUrl(
+  (viewing || uploading)
+    ? env.PHOTO_ADAPTER_UPSTREAM_URL
+    : env.GAS_UPSTREAM_URL
+);
+} catch {
+  throw fault(500, "UPSTREAM_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
+}
     const invalidResponse = () => fault(502, "PROFILE_PHOTO_UPSTREAM_INVALID", "Respons perkhidmatan foto profil tidak sah.");
     const controller = new AbortController();
     const timeout = new Promise((_, reject) => {
@@ -2446,7 +2731,8 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
       const seen = new Set();
       const photos = result.photos.map(photo => {
         if (!photo || !allowedIds.has(photo.student_id) || seen.has(photo.student_id) ||
-            typeof photo.photo_updated_at !== "string" || typeof photo.photo_data_uri !== "string") throw invalidResponse();
+            photo.photo_updated_at !== allowedPhotoTimestamps.get(photo.student_id) ||
+            typeof photo.photo_data_uri !== "string") throw invalidResponse();
         const match = photo.photo_data_uri.match(/^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
         if (!match || match[1].length % 4 !== 0 || match[1].length > Math.ceil((variant === "thumbnail" ? 256 : 800) * 1024 / 3) * 4) throw invalidResponse();
         seen.add(photo.student_id);
@@ -2454,8 +2740,162 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
       });
       return finish(JSON.stringify({ ok: true, data: { photos } }), 200);
     }
-    if (result.student_id !== student.student_id || result.has_profile_photo !== uploading ||
-        typeof result.photo_updated_at !== "string" || (uploading ? !result.photo_updated_at.trim() : result.photo_updated_at !== "")) throw invalidResponse();
+    if (
+  result.student_id !== student.student_id ||
+  result.has_profile_photo !== uploading ||
+  typeof result.photo_updated_at !== "string" ||
+  (uploading
+    ? !result.photo_updated_at.trim()
+    : result.photo_updated_at !== "")
+) {
+  throw invalidResponse();
+}
+
+if (
+  uploading &&
+  (
+    result.operation_id !== uploadOperationId ||
+    typeof result.photo_file_id !== "string" ||
+    !result.photo_file_id.trim()
+  )
+) {
+  throw invalidResponse();
+}
+
+if (uploading) {
+  const syncError = () => fault(
+    500,
+    "PROFILE_PHOTO_D1_SYNC_FAILED",
+    "Foto profil telah diterima, tetapi penyegerakan D1 belum lengkap. Operasi disimpan untuk pemulihan."
+  );
+
+  const newFileId = result.photo_file_id.trim();
+  const newPhotoUpdatedAt = result.photo_updated_at.trim();
+
+  const syncTimestamp = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).format(new Date());
+
+  try {
+    const journalCreated = await env.DB.prepare(`
+      UPDATE PHOTO_OPERATIONS
+      SET status = 'CREATED',
+          new_file_id = ?,
+          new_photo_updated_at = ?,
+          last_error = NULL,
+          updated_at = ?
+      WHERE operation_id = ?
+        AND student_id = ?
+    `).bind(
+      newFileId,
+      newPhotoUpdatedAt,
+      syncTimestamp,
+      uploadOperationId,
+      student.student_id
+    ).run();
+
+    if (journalCreated?.meta?.changes !== 1) {
+      throw syncError();
+    }
+
+    const updated = await env.DB.prepare(`
+      UPDATE STUDENTS
+      SET photo_file_id = ?,
+          photo_updated_at = ?
+      WHERE student_id = ?
+        AND COALESCE(photo_file_id, '') = ?
+        AND COALESCE(photo_updated_at, '') = ?
+    `).bind(
+      newFileId,
+      newPhotoUpdatedAt,
+      student.student_id,
+      student.photo_file_id ?? "",
+      student.photo_updated_at ?? ""
+    ).run();
+
+    if (updated?.meta?.changes !== 1) {
+      await env.DB.prepare(`
+        UPDATE PHOTO_OPERATIONS
+        SET status = 'RECONCILE_REQUIRED',
+            last_error = 'D1_CAS_CONFLICT',
+            updated_at = ?
+        WHERE operation_id = ?
+      `).bind(
+        syncTimestamp,
+        uploadOperationId
+      ).run();
+
+      throw syncError();
+    }
+
+    const [audited, completed] = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO AUDIT_LOG (
+          timestamp,
+          action,
+          request_id,
+          user_role,
+          user_name,
+          details,
+          entity_type,
+          entity_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        syncTimestamp,
+        "UPDATE_STUDENT_PROFILE_PHOTO",
+        "",
+        "Student",
+        student.nama || "",
+        "",
+        "STUDENT",
+        student.student_id
+      ),
+
+      env.DB.prepare(`
+        UPDATE PHOTO_OPERATIONS
+        SET status = 'COMPLETED',
+            last_error = NULL,
+            updated_at = ?
+        WHERE operation_id = ?
+          AND student_id = ?
+      `).bind(
+        syncTimestamp,
+        uploadOperationId,
+        student.student_id
+      )
+    ]);
+
+    if (
+      audited?.meta?.changes !== 1 ||
+      completed?.meta?.changes !== 1
+    ) {
+      throw syncError();
+    }
+  } catch (error) {
+    if (error && error.code && Number.isInteger(error.status)) {
+      throw error;
+    }
+
+    throw syncError();
+  }
+
+  return finish(JSON.stringify({
+    ok: true,
+    data: {
+      student_id: student.student_id,
+      has_profile_photo: true,
+      photo_updated_at: newPhotoUpdatedAt
+    }
+  }), 200);
+}
 
     const syncError = () => fault(500, "PROFILE_PHOTO_D1_SYNC_FAILED",
       "Perubahan foto profil telah diterima oleh perkhidmatan, tetapi penyegerakan D1 gagal. Hubungi pentadbir; jangan hantar semula permintaan.");
