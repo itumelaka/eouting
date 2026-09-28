@@ -17,7 +17,7 @@
 - [x] Sahkan E2E staging cleanup manual old-photo bagi UPLOAD sebenar `QA-A4-001`: panggilan pertama `TRASHED`, retry `ALREADY_TRASHED`, audit berkorelasi kekal tepat satu, metadata pelajar dan journal UPLOAD tidak berubah.
 - [ ] Uji kegagalan audit selepas Drive trash secara E2E staging dan retry pemulihan audit; setakat ini laluan itu hanya diuji setempat.
 - [ ] Uji kes `RECONCILE_REQUIRED` yang keadaan Drive/D1 berubah selepas kuarantin; hanya kes operasi sebenar yang sudah `EXPECTED_NEW` dan konsisten telah staging-verified.
-- [ ] Uji fault injection crash/timeout sebenar pada boundary adapter, CAS, journal dan audit secara terkawal.
+- [x] Real staging fault injection timeout UPLOAD verified: adapter mencipta fail Drive tetapi Worker timeout, journal kekal PENDING dengan attempts 1 dan last_error=UPSTREAM_OUTCOME_UNKNOWN; inspection menunjukkan EXPECTED_OLD dan audit_recorded=false. Manual recoverPhotoOperation kemudian memulihkan operasi ke COMPLETED dengan attempts kekal 1, last_error=null, new_photo_updated_at terisi dan audit berkorelasi count tepat 1. QA-only timeout hook telah dibuang semula selepas verification.
 - [ ] Rancang dan laksanakan automatic/cron recovery serta failure reconciliation untuk `PENDING`/outcome tidak pasti; cron recovery belum diaktifkan.
 - [ ] Selesaikan pre-flight/parity dan production Sheets → D1 migration terkawal, termasuk canonical LI UNISZA, 32 photo references dan pengecualian rekod QA staging; tiada cutover sehingga invariant, mirror dan rollback disahkan.
 
