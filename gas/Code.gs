@@ -498,6 +498,7 @@ function doPost(e) {
     if (action === "getTrustedProfilePhotos") return getTrustedProfilePhotos_(payload);
     if (action === "uploadTrustedProfilePhoto") return uploadTrustedProfilePhoto_(payload);
     if (action === "removeTrustedProfilePhoto") return removeTrustedProfilePhoto_(payload);
+    if (action === "cleanupTrustedPreviousProfilePhoto") return cleanupTrustedPreviousProfilePhoto_(payload);
     if (action === "probeTrustedPhotoOperation") return probeTrustedPhotoOperation_(payload);
     if (action === "loginStudent") return jsonResponse(loginStudent(payload));
     if (action === "loginWarden") return jsonResponse(loginWarden(payload));
@@ -7242,6 +7243,15 @@ function canonicalPhotoRemovePayload_(payload) {
   });
 }
 
+function canonicalPreviousPhotoCleanupPayload_(payload) {
+  return JSON.stringify({
+    operation_id: String(payload.operation_id || ""),
+    student_id: String(payload.student_id || ""),
+    expected_old_file_id: String(payload.expected_old_file_id || ""),
+    new_file_id: String(payload.new_file_id || "")
+  });
+}
+
 function photoAdapterHex_(bytes) {
   return bytes.map(function (byte) { return (byte & 255).toString(16).padStart(2, "0"); }).join("");
 }
@@ -7259,7 +7269,7 @@ function photoAdapterHasKeys_(value, keys) {
 function verifyTrustedPhotoRequest_(request) {
   const invalid = function () { throw photoAdapterFault_("TRUSTED_REQUEST_INVALID"); };
   if (!request || typeof request !== "object" || Array.isArray(request) ||
-      ["getTrustedProfilePhotos", "uploadTrustedProfilePhoto", "removeTrustedProfilePhoto", "probeTrustedPhotoOperation"].indexOf(request.action) === -1 || !request.auth || !request.payload ||
+      ["getTrustedProfilePhotos", "uploadTrustedProfilePhoto", "removeTrustedProfilePhoto", "probeTrustedPhotoOperation", "cleanupTrustedPreviousProfilePhoto"].indexOf(request.action) === -1 || !request.auth || !request.payload ||
       typeof request.auth !== "object" || Array.isArray(request.auth) ||
       typeof request.payload !== "object" || Array.isArray(request.payload) ||
       !photoAdapterHasKeys_(request, ["action", "payload", "auth"])) invalid();
@@ -7284,12 +7294,15 @@ if (request.action === "getTrustedProfilePhotos") {
     "expected_old_file_id",
     "expected_old_photo_updated_at"
   ])) invalid();
+} else if (request.action === "cleanupTrustedPreviousProfilePhoto") {
+  if (!photoAdapterHasKeys_(request.payload, [
+    "operation_id", "student_id", "expected_old_file_id", "new_file_id"
+  ])) invalid();
 } else {
   if (!photoAdapterHasKeys_(request.payload, [
     "operation_id", "student_id", "operation_type", "expected_old_file_id"
   ])) invalid();
 }
-
   if (auth.version !== "1" || !/^[A-Za-z0-9_-]{1,32}$/.test(auth.key_id || "") ||
       !Number.isSafeInteger(auth.timestamp) ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(auth.nonce || "") ||
@@ -7327,6 +7340,12 @@ if (request.action === "getTrustedProfilePhotos") {
       typeof payload.student_id !== "string" || !payload.student_id.trim() ||
       typeof payload.expected_old_file_id !== "string" || !payload.expected_old_file_id.trim() ||
       typeof payload.expected_old_photo_updated_at !== "string") invalid();
+} else if (request.action === "cleanupTrustedPreviousProfilePhoto") {
+  if (typeof payload.operation_id !== "string" || !/^phu_[0-9a-f]{40}$/.test(payload.operation_id) ||
+      typeof payload.student_id !== "string" || !payload.student_id.trim() ||
+      typeof payload.expected_old_file_id !== "string" || !payload.expected_old_file_id.trim() ||
+      typeof payload.new_file_id !== "string" || !payload.new_file_id.trim() ||
+      payload.expected_old_file_id === payload.new_file_id) invalid();
 } else {
   if (typeof payload.operation_id !== "string" || !/^ph[ur]_[0-9a-f]{40}$/.test(payload.operation_id) ||
       typeof payload.student_id !== "string" || !payload.student_id.trim() ||
@@ -7344,6 +7363,8 @@ if (request.action === "getTrustedProfilePhotos") {
     ? canonicalPhotoUploadPayload_(payload)
     : request.action === "removeTrustedProfilePhoto"
       ? canonicalPhotoRemovePayload_(payload)
+      : request.action === "cleanupTrustedPreviousProfilePhoto"
+        ? canonicalPreviousPhotoCleanupPayload_(payload)
       : canonicalPhotoOperationProbePayload_(payload);
 
 const payloadHash = photoAdapterHex_(Utilities.computeDigest(
@@ -7617,6 +7638,41 @@ function removeTrustedProfilePhoto_(request) {
     return errorResponse(
       safe ? error.code : "PHOTO_ADAPTER_TEMPORARY_ERROR"
     );
+  }
+}
+
+// Post-completion cleanup only: this action never changes the new photo or Sheets.
+function cleanupTrustedPreviousProfilePhoto_(request) {
+  try {
+    const payload = verifyTrustedPhotoRequest_(request);
+    const folder = getProfilePhotoFolder_();
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(30000)) throw photoAdapterFault_("PHOTO_ADAPTER_TEMPORARY_ERROR");
+    let cleanupStatus;
+    try {
+      let file;
+      try { file = DriveApp.getFileById(payload.expected_old_file_id); }
+      catch (error) { throw photoAdapterFault_("PHOTO_ADAPTER_TEMPORARY_ERROR"); }
+      if (!isFileInFolder_(file, folder.getId()) ||
+          ["image/jpeg", "image/png", "image/webp"].indexOf(String(file.getMimeType() || "").toLowerCase()) === -1) {
+        throw photoAdapterFault_("TRUSTED_REQUEST_INVALID");
+      }
+      cleanupStatus = file.isTrashed() ? "ALREADY_TRASHED" : "TRASHED";
+      if (cleanupStatus === "TRASHED") file.setTrashed(true);
+    } finally {
+      try { lock.releaseLock(); } catch (error) { /* Ignore release error. */ }
+    }
+    const data = { operation_id: payload.operation_id, student_id: payload.student_id,
+      cleanup_status: cleanupStatus };
+    const secret = PropertiesService.getScriptProperties().getProperty("PHOTO_ADAPTER_KEY_" + request.auth.key_id);
+    const signed = "photo-cleanup-response\n" + request.auth.nonce + "\n" + JSON.stringify(data);
+    const signature = photoAdapterHex_(Utilities.computeHmacSha256Signature(
+      signed, secret, Utilities.Charset.UTF_8));
+    return jsonResponse({ data: data, signature: signature });
+  } catch (error) {
+    const safe = ["TRUSTED_REQUEST_INVALID", "TRUSTED_REQUEST_EXPIRED", "TRUSTED_REQUEST_REPLAY",
+      "TRUSTED_REQUEST_SIGNATURE_INVALID", "PHOTO_ADAPTER_TEMPORARY_ERROR"].indexOf(error && error.code) !== -1;
+    return errorResponse(safe ? error.code : "PHOTO_ADAPTER_TEMPORARY_ERROR");
   }
 }
 

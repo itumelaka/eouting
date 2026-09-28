@@ -13,7 +13,9 @@
 - [x] Real staging UPLOAD `RECONCILE_REQUIRED + EXPECTED_NEW` recovery verified selepas fault injection journal-only: `D1_CAS_CONFLICT` dibersihkan, journal kembali `COMPLETED`, attempts dan satu audit berkorelasi kekal, tanpa CAS pelajar kedua atau mutation Drive.
 - [ ] Sahkan secara bebas metadata Drive `isTrashed=true` bagi fail QA selepas REMOVE; jangan anggap journal berjaya sahaja sebagai bukti metadata Drive.
 - [ ] Uji duplicate/idempotency retry trusted REMOVE dengan operasi yang sama secara selamat; flow UI biasa tidak lagi boleh retry selepas metadata D1 kosong.
-- [ ] Reka dan uji cleanup fail Drive lama selepas replacement, termasuk kegagalan separa tanpa menghilangkan foto authoritative.
+- [x] Implement cleanup manual selepas UPLOAD `COMPLETED` dengan semakan foto baharu authoritative, adapter bertandatangan, trash fail lama idempotent dan audit berkorelasi; local regression 141/141 focused dan 959/959 full PASS, tanpa cron atau perubahan transaksi UPLOAD.
+- [x] Sahkan E2E staging cleanup manual old-photo bagi UPLOAD sebenar `QA-A4-001`: panggilan pertama `TRASHED`, retry `ALREADY_TRASHED`, audit berkorelasi kekal tepat satu, metadata pelajar dan journal UPLOAD tidak berubah.
+- [ ] Uji kegagalan audit selepas Drive trash secara E2E staging dan retry pemulihan audit; setakat ini laluan itu hanya diuji setempat.
 - [ ] Uji kes `RECONCILE_REQUIRED` yang keadaan Drive/D1 berubah selepas kuarantin; hanya kes operasi sebenar yang sudah `EXPECTED_NEW` dan konsisten telah staging-verified.
 - [ ] Uji fault injection crash/timeout sebenar pada boundary adapter, CAS, journal dan audit secara terkawal.
 - [ ] Rancang dan laksanakan automatic/cron recovery serta failure reconciliation untuk `PENDING`/outcome tidak pasti; cron recovery belum diaktifkan.

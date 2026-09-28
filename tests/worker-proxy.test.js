@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const test = require("node:test");
-const { webcrypto } = require("node:crypto");
+const { webcrypto, createHmac } = require("node:crypto");
 const {
   FakeSheet: StudentConfigFakeSheet,
   GROUP_HEADERS: STUDENT_CONFIG_GROUP_HEADERS,
@@ -1042,6 +1042,146 @@ function profilePhotoFixture(options = {}) {
 const profileStudent = { student_id: "STU-001", no_matrik: "M001" };
 const profileUpload = { ...profileStudent, mime_type: "image/jpeg", image_base64: "YQ==" };
 const profileAdmin = { admin_id: "ADMIN-TEST", nama_admin: "Test Admin", pin: "TEST_PIN" };
+
+function previousPhotoCleanupFixture(options = {}) {
+  const operation = { operation_id: "phu_1234567890abcdef1234567890abcdef12345678",
+    student_id: "STU-001", operation_type: "UPLOAD", status: "COMPLETED",
+    expected_old_file_id: "PRIVATE_OLD_FILE", new_file_id: "PRIVATE_NEW_FILE",
+    new_photo_updated_at: "2026-09-23 13:00:00", ...options.operation };
+  const student = { student_id: "STU-001", photo_file_id: "PRIVATE_NEW_FILE",
+    photo_updated_at: "2026-09-23 13:00:00", ...options.student };
+  const queries = [];
+  let auditCount = options.auditCount || 0;
+  let auditFailures = options.auditFailures || 0;
+  const statement = (sql, values = []) => ({
+    sql, values, bind(...args) { return statement(sql, args); },
+    async first() {
+      queries.push({ sql, values });
+      if (sql.includes("FROM ADMIN_USERS")) return options.invalidAuth ? null : { admin_id: "ADMIN-TEST" };
+      if (sql.includes("FROM PHOTO_OPERATIONS")) return options.missingOperation ? null : { ...operation };
+      if (sql.includes("FROM STUDENTS")) return options.missingStudent ? null : { ...student };
+      if (sql.includes("FROM AUDIT_LOG")) return auditCount ? { 1: 1 } : null;
+      throw Error("unexpected SELECT");
+    },
+    async run() {
+      queries.push({ sql, values });
+      if (!sql.includes("INSERT INTO AUDIT_LOG")) throw Error("unexpected mutation");
+      if (auditFailures-- > 0) throw Error("PRIVATE_OLD_FILE SECRET_PIN");
+      if (!auditCount) auditCount++;
+      return { meta: { changes: auditCount === 1 ? 1 : 0 } };
+    }
+  });
+  const rt = runtime((_url, init) => {
+    const envelope = JSON.parse(init.body);
+    const data = { operation_id: envelope.payload.operation_id, student_id: envelope.payload.student_id,
+      cleanup_status: options.upstreamStatus || "TRASHED" };
+    const signature = createHmac("sha256", "TEST_PHOTO_ADAPTER_SECRET").update(
+      "photo-cleanup-response\n" + envelope.auth.nonce + "\n" + JSON.stringify(data)).digest("hex");
+    const result = { ok: true, data: { data, signature: options.badSignature ? "0".repeat(64) : signature } };
+    return json(JSON.stringify(options.badUpstream || result));
+  });
+  const run = (payload = {}, method = "POST") => rt.run(req(method, {
+    url: "https://proxy.test/api/d1/cleanupPreviousProfilePhoto",
+    headers: { Origin: "http://localhost:8000" },
+    body: JSON.stringify({ ...profileAdmin, operation_id: operation.operation_id, ...payload })
+  }), { STAGING_ORIGIN: "http://localhost:8000", DB: { prepare: sql => statement(sql) },
+    PHOTO_ADAPTER_UPSTREAM_URL: "https://script.google.com/macros/s/TEST_PHOTO_ADAPTER/exec",
+    PHOTO_ADAPTER_KEY_ID: "staging1", PHOTO_ADAPTER_SECRET: "TEST_PHOTO_ADAPTER_SECRET" });
+  return { ...rt, run, queries, operation, student, getAuditCount: () => auditCount };
+}
+
+test("previous-photo cleanup: completed upload sends journal-bound signed old ID and audits once", async () => {
+  const f = previousPhotoCleanupFixture();
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.data, { operation_id: f.operation.operation_id, student_id: "STU-001",
+    cleanup_status: "TRASHED", audit_recorded: true });
+  const envelope = JSON.parse(f.calls[0].init.body);
+  assert.equal(envelope.action, "cleanupTrustedPreviousProfilePhoto");
+  assert.equal(envelope.payload.expected_old_file_id, "PRIVATE_OLD_FILE");
+  assert.equal(envelope.payload.new_file_id, "PRIVATE_NEW_FILE");
+  assert.equal(envelope.pin, undefined);
+  assert.equal(f.getAuditCount(), 1);
+  assert.equal(f.student.photo_file_id, "PRIVATE_NEW_FILE");
+  assert.equal(f.operation.status, "COMPLETED");
+  assert.equal(f.queries.filter(query => query.sql.includes("UPDATE STUDENTS") ||
+    query.sql.includes("UPDATE PHOTO_OPERATIONS")).length, 0);
+  assert.doesNotMatch(JSON.stringify(body), /PRIVATE_OLD_FILE|PRIVATE_NEW_FILE|TEST_PIN|TEST_PHOTO_ADAPTER_SECRET/);
+  assert.equal((await f.run()).status, 200);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.getAuditCount(), 1);
+});
+
+test("previous-photo cleanup: already-trashed adapter result and audit failure retry", async () => {
+  const already = previousPhotoCleanupFixture({ upstreamStatus: "ALREADY_TRASHED" });
+  assert.equal((await (await already.run()).json()).data.cleanup_status, "ALREADY_TRASHED");
+  assert.equal(already.getAuditCount(), 1);
+  const retry = previousPhotoCleanupFixture({ auditFailures: 1, upstreamStatus: "ALREADY_TRASHED" });
+  const first = await retry.run();
+  assert.equal(first.status, 500);
+  assert.doesNotMatch(JSON.stringify(await first.json()), /PRIVATE_OLD_FILE|SECRET_PIN/);
+  assert.equal(retry.getAuditCount(), 0);
+  const second = await retry.run();
+  assert.equal(second.status, 200);
+  assert.equal(retry.calls.length, 2);
+  assert.equal(retry.getAuditCount(), 1);
+  assert.equal(retry.student.photo_file_id, "PRIVATE_NEW_FILE");
+});
+
+test("previous-photo cleanup: no old file is a no-mutation NOOP", async () => {
+  const f = previousPhotoCleanupFixture({ operation: { expected_old_file_id: "" } });
+  const response = await f.run();
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data, { operation_id: f.operation.operation_id,
+    student_id: "STU-001", cleanup_status: "NOOP", audit_recorded: false });
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.getAuditCount(), 0);
+});
+
+test("previous-photo cleanup: stale, incomplete, REMOVE and same-ID operations fail before adapter", async () => {
+  for (const options of [
+    { student: { photo_file_id: "STALE" } },
+    { operation: { new_photo_updated_at: "" } },
+    { operation: { expected_old_file_id: "PRIVATE_NEW_FILE" } },
+    { operation: { status: "CREATED" } },
+    { operation: { operation_type: "REMOVE" } }
+  ]) {
+    const f = previousPhotoCleanupFixture(options);
+    assert.equal((await f.run()).status, 409);
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.getAuditCount(), 0);
+  }
+});
+
+test("previous-photo cleanup: strict payload, auth and signed response fail closed", async () => {
+  for (const field of ["expected_old_file_id", "new_file_id", "photo_file_id"]) {
+    const f = previousPhotoCleanupFixture();
+    assert.equal((await f.run({ [field]: "INJECTED" })).status, 400);
+    assert.equal(f.calls.length, 0);
+  }
+  const unauth = previousPhotoCleanupFixture({ invalidAuth: true });
+  assert.equal((await unauth.run()).status, 401);
+  const forged = previousPhotoCleanupFixture({ badSignature: true });
+  const response = await forged.run();
+  assert.equal(response.status, 502);
+  assert.equal(forged.getAuditCount(), 0);
+  assert.doesNotMatch(JSON.stringify(await response.json()), /PRIVATE_OLD_FILE|PRIVATE_NEW_FILE|TEST_PIN/);
+  for (const badUpstream of [
+    { ok: true, data: { data: { operation_id: "WRONG", student_id: "STU-001", cleanup_status: "TRASHED" },
+      signature: "0".repeat(64) } },
+    { ok: true, data: { data: { operation_id: "phu_1234567890abcdef1234567890abcdef12345678",
+      student_id: "STU-001", cleanup_status: "UNKNOWN" }, signature: "0".repeat(64) } }
+  ]) {
+    const f = previousPhotoCleanupFixture({ badUpstream });
+    assert.equal((await f.run()).status, 502);
+    assert.equal(f.getAuditCount(), 0);
+  }
+  const method = previousPhotoCleanupFixture();
+  assert.equal((await method.run({}, "GET")).status, 405);
+  assert.equal((await method.run({}, "OPTIONS")).status, 204);
+  assert.equal(method.calls.length, 0);
+});
 
 test("profile photos: student cannot fetch another student's photo", async () => {
   const f = profilePhotoFixture();

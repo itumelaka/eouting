@@ -659,6 +659,28 @@ async function createPhotoRemoveOperationId(student) {
   return "phr_" + operationHash.slice(0, 40);
 }
 
+async function signPreviousPhotoCleanupRequest(env, payload) {
+  const keyId = String(env.PHOTO_ADAPTER_KEY_ID || "");
+  const secret = String(env.PHOTO_ADAPTER_SECRET || "");
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(keyId) || !secret) {
+    throw fault(500, "PHOTO_ADAPTER_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
+  }
+  const encoder = new TextEncoder();
+  const hex = bytes => Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+  const canonical = JSON.stringify({ operation_id: payload.operation_id, student_id: payload.student_id,
+    expected_old_file_id: payload.expected_old_file_id, new_file_id: payload.new_file_id });
+  const payloadHash = hex(await crypto.subtle.digest("SHA-256", encoder.encode(canonical)));
+  const auth = { version: "1", key_id: keyId, timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(), signature: "" };
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  auth.signature = hex(await crypto.subtle.sign("HMAC", key, encoder.encode([
+    auth.version, auth.key_id, String(auth.timestamp), auth.nonce,
+    "cleanupTrustedPreviousProfilePhoto", payloadHash
+  ].join("\n"))));
+  return { envelope: { action: "cleanupTrustedPreviousProfilePhoto", payload, auth }, key };
+}
+
 // Recovery is deliberately a manual, server-only path. Its probe never receives
 // a browser-supplied Drive ID and never asks the adapter to mutate Drive.
 async function probePhotoOperation(env, operation) {
@@ -2580,6 +2602,112 @@ const row = await env.DB.prepare(
     status: 200,
     headers
   });
+}
+
+if (url.pathname === "/api/d1/cleanupPreviousProfilePhoto") {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  action = "cleanupPreviousProfilePhoto";
+  try {
+    let payload;
+    try { payload = await request.json(); } catch { throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah."); }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+        Object.keys(payload).some(key => !["admin_id", "nama_admin", "pin", "operation_id"].includes(key))) {
+      throw fault(400, "INVALID_REQUEST", "Payload tidak sah.");
+    }
+    const operationId = String(payload.operation_id || "").trim();
+    if (!/^phu_[0-9a-f]{40}$/.test(operationId)) throw fault(400, "INVALID_REQUEST", "Operation ID tidak sah.");
+    const adminId = String(payload.admin_id || "").trim();
+    const adminName = String(payload.nama_admin || "").trim();
+    const pin = String(payload.pin || "").trim();
+    const admin = await env.DB.prepare(`SELECT admin_id, nama_admin FROM ADMIN_USERS
+      WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+      AND pin = ? AND LOWER(status) = 'aktif' LIMIT 1`).bind(adminId, adminName, pin).first();
+    if (!admin || !(adminId || adminName) || !pin) throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah.");
+    const operation = await env.DB.prepare(`SELECT operation_id, student_id, operation_type, status,
+      expected_old_file_id, new_file_id, new_photo_updated_at
+      FROM PHOTO_OPERATIONS WHERE operation_id = ? LIMIT 1`).bind(operationId).first();
+    if (!operation || operation.operation_type !== "UPLOAD" || operation.status !== "COMPLETED") {
+      throw fault(409, "PHOTO_CLEANUP_CONFLICT", "Operasi foto tidak layak untuk pembersihan.");
+    }
+    const student = await env.DB.prepare(`SELECT student_id, photo_file_id, photo_updated_at
+      FROM STUDENTS WHERE student_id = ? LIMIT 1`).bind(operation.student_id).first();
+    if (!student || !operation.new_file_id || !operation.new_photo_updated_at ||
+        String(student.photo_file_id || "") !== String(operation.new_file_id) ||
+        String(student.photo_updated_at || "") !== String(operation.new_photo_updated_at)) {
+      throw fault(409, "PHOTO_CLEANUP_CONFLICT", "Foto semasa tidak sepadan dengan operasi.");
+    }
+    const oldFileId = String(operation.expected_old_file_id || "");
+    if (oldFileId && oldFileId === operation.new_file_id) {
+      throw fault(409, "PHOTO_CLEANUP_CONFLICT", "Metadata foto lama tidak sah.");
+    }
+    const auditAction = "CLEANUP_PREVIOUS_PROFILE_PHOTO";
+    const existingAudit = await env.DB.prepare(`SELECT 1 FROM AUDIT_LOG WHERE request_id = ? AND action = ?
+      AND entity_type = 'STUDENT' AND entity_id = ? LIMIT 1`)
+      .bind(operationId, auditAction, operation.student_id).first();
+    const publicResult = (cleanupStatus, auditRecorded) => finish(JSON.stringify({ ok: true, data: {
+      operation_id: operationId, student_id: operation.student_id,
+      cleanup_status: cleanupStatus, audit_recorded: auditRecorded } }), 200);
+    if (!oldFileId) return publicResult("NOOP", !!existingAudit);
+    if (existingAudit) return publicResult("ALREADY_TRASHED", true);
+
+    let upstream;
+    try { upstream = trustedUrl(env.PHOTO_ADAPTER_UPSTREAM_URL); } catch {
+      throw fault(500, "UPSTREAM_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
+    }
+    const { envelope, key } = await signPreviousPhotoCleanupRequest(env, {
+      operation_id: operationId, student_id: operation.student_id,
+      expected_old_file_id: oldFileId, new_file_id: operation.new_file_id
+    });
+    const invalid = () => fault(502, "PHOTO_CLEANUP_UPSTREAM_INVALID", "Respons pembersihan foto tidak sah.");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    let data;
+    try {
+      let response = await fetch(upstream.href, { method: "POST", redirect: "manual", signal: controller.signal,
+        headers: { Accept: "application/json", "Content-Type": "text/plain;charset=utf-8", "Cache-Control": "no-store" },
+        body: JSON.stringify(envelope) });
+      if (response.status === 302 || response.status === 303) {
+        let destination;
+        try { destination = trustedUrl(response.headers.get("Location"), true); } catch { throw invalid(); }
+        await response.body?.cancel();
+        response = await fetch(destination.href, { method: "GET", redirect: "manual", signal: controller.signal,
+          headers: { Accept: "application/json", "Cache-Control": "no-store" } });
+      }
+      const bytes = await readBounded(response.body, 16384, invalid());
+      let body;
+      try { body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { throw invalid(); }
+      if (!response.ok || body?.ok !== true || !body.data?.data ||
+          !/^[0-9a-f]{64}$/.test(body.data.signature || "")) throw invalid();
+      data = body.data.data;
+      if (Object.keys(data).sort().join("|") !== ["operation_id", "student_id", "cleanup_status"].sort().join("|") ||
+          data.operation_id !== operationId || data.student_id !== operation.student_id ||
+          !["TRASHED", "ALREADY_TRASHED"].includes(data.cleanup_status)) throw invalid();
+      const signature = Uint8Array.from(body.data.signature.match(/../g), pair => parseInt(pair, 16));
+      const verified = await crypto.subtle.verify("HMAC", key, signature,
+        new TextEncoder().encode("photo-cleanup-response\n" + envelope.auth.nonce + "\n" + JSON.stringify(data)));
+      if (!verified) throw invalid();
+    } catch { throw fault(502, "PHOTO_CLEANUP_UPSTREAM_FAILED", "Pembersihan foto lama belum dapat dipastikan."); }
+    finally { clearTimeout(timer); controller.abort(); }
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare(`INSERT INTO AUDIT_LOG (timestamp, action, request_id, user_role, user_name,
+        details, entity_type, entity_id)
+        SELECT ?, ?, ?, 'Admin', ?, '', 'STUDENT', ?
+        WHERE NOT EXISTS (SELECT 1 FROM AUDIT_LOG WHERE request_id = ? AND action = ?
+          AND entity_type = 'STUDENT' AND entity_id = ?)`)
+        .bind(now, auditAction, operationId, admin.admin_id || "ADMIN", operation.student_id,
+          operationId, auditAction, operation.student_id).run();
+    } catch { throw fault(500, "PHOTO_CLEANUP_AUDIT_FAILED", "Pembersihan foto selesai tetapi audit belum lengkap."); }
+    return publicResult(data.cleanup_status, true);
+  } catch (error) {
+    if (error && error.code && Number.isInteger(error.status)) throw error;
+    throw fault(500, "PHOTO_CLEANUP_FAILED", "Pembersihan foto tidak dapat diproses.");
+  }
 }
 
 if (["/api/d1/inspectPhotoOperation", "/api/d1/recoverPhotoOperation"].includes(url.pathname)) {

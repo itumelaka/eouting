@@ -10,6 +10,10 @@ Manual recovery yang diimplementasi memeriksa state `PENDING`/`CREATED`/`RECONCI
 
 Model pelajar kanonik: `kelas=LI`, `institution_code=UNISZA` untuk pelajar LI UNISZA; `kelas=UNISZA`, `institution_code=UNISZA` bukan penugasan kumpulan baharu yang sah. Hanya LI institution-aware, dan non-LI aktif mesti tiada institusi. Rekod legacy production perlu dipadankan/disahkan sebelum transform; pembetulan staging tidak bermakna production telah dimigrasi.
 
+Cleanup manual foto lama selepas UPLOAD `COMPLETED` menggunakan medan journal sedia ada (`expected_old_file_id`, `new_file_id`, `new_photo_updated_at`) tanpa migration schema. Ia tidak mengubah journal UPLOAD atau `STUDENTS`; audit `CLEANUP_PREVIOUS_PROFILE_PHOTO` menggunakan `request_id = operation_id`, `entity_type = STUDENT` dan `entity_id = student_id` untuk dedup retry. Tiada old file bermakna `NOOP` tanpa mutation Drive. Audit yang gagal selepas trash boleh dicuba semula secara idempotent; jangan tafsir kejayaan upload sebagai cleanup yang sudah siap.
+
+Staging E2E pada satu UPLOAD sebenar `QA-A4-001` menunjukkan cleanup pertama `TRASHED`, retry `ALREADY_TRASHED`, dan satu audit cleanup berkorelasi sahaja. `PHOTO_OPERATIONS` kekal `COMPLETED`, attempts 1, `last_error=null`; `STUDENTS.photo_updated_at` kekal `2026-09-28 16:16:18` sepadan dengan metadata foto baharu. Ini mengesahkan retry selepas cleanup berjaya pada staging; kegagalan audit selepas trash hanya diuji setempat, bukan fault E2E. Production D1/Sheets belum cutover.
+
 Google Sheets ialah database dan source of truth eOuting ITU v2.4.0. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
 
 ## D1 staging — dynamic student groups, 22 September 2026

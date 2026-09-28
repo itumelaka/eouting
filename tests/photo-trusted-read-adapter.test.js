@@ -33,7 +33,7 @@ function signed(payload = { photo_variant: "full", entries: [{
 
 function runtime(options = {}) {
   const cache = new Map();
-  const calls = { sheet: 0, content: 0, mutation: 0, files: 0, nameLookups: 0 };
+  const calls = { sheet: 0, content: 0, mutation: 0, files: 0, nameLookups: 0, requestedIds: [] };
   const file = { getParents: () => {
     let done = false;
     return { hasNext: () => !done && !options.wrongFolder,
@@ -66,7 +66,8 @@ function runtime(options = {}) {
         const count = options.fileCount ?? 1;
         return { hasNext: () => index < count, next: () => { index++; return file; } };
       } }),
-      getFileById: () => { calls.files++; if (options.missingFile) throw Error("PRIVATE DRIVE ID"); return file; } },
+      getFileById: id => { calls.files++; calls.requestedIds.push(id);
+        if (options.missingFile) throw Error("PRIVATE DRIVE ID"); return file; } },
     getSheet_: () => { calls.sheet++; throw Error("Sheet access prohibited"); },
     jsonResponse: data => ({ ok: true, data }), errorResponse: error => ({ ok: false, error }),
     fetchProfilePhotoThumbnails_: () => []
@@ -265,6 +266,75 @@ function signedRemove(payload = {
     auth
   };
 }
+
+function signedCleanup(payload = {
+  operation_id: "phu_1234567890abcdef1234567890abcdef12345678",
+  student_id: "STU-001",
+  expected_old_file_id: "DRIVE-001",
+  new_file_id: "DRIVE-NEW"
+}, overrides = {}) {
+  const auth = { version: "1", key_id: "staging1", timestamp: Math.floor(Date.now() / 1000),
+    nonce: "32345678-1234-4234-8234-123456789abc", ...overrides };
+  const canonical = JSON.stringify({ operation_id: payload.operation_id, student_id: payload.student_id,
+    expected_old_file_id: payload.expected_old_file_id, new_file_id: payload.new_file_id });
+  const hash = createHash("sha256").update(canonical, "utf8").digest("hex");
+  auth.signature = createHmac("sha256", secret).update([
+    auth.version, auth.key_id, auth.timestamp, auth.nonce,
+    "cleanupTrustedPreviousProfilePhoto", hash
+  ].join("\n"), "utf8").digest("hex");
+  return { action: "cleanupTrustedPreviousProfilePhoto", payload, auth };
+}
+
+test("trusted previous-photo cleanup trashes only verified old file and signs sanitized result", () => {
+  const r = runtime();
+  const request = signedCleanup();
+  const result = r.context.cleanupTrustedPreviousProfilePhoto_(request);
+  assert.equal(result.ok, true);
+  assert.equal(result.data.data.cleanup_status, "TRASHED");
+  assert.equal(result.data.data.operation_id, request.payload.operation_id);
+  assert.equal(result.data.signature, createHmac("sha256", secret).update(
+    "photo-cleanup-response\n" + request.auth.nonce + "\n" +
+    JSON.stringify(result.data.data), "utf8").digest("hex"));
+  assert.equal(r.calls.mutation, 1);
+  assert.deepEqual(r.calls.requestedIds, ["DRIVE-001"]);
+  assert.equal(r.calls.sheet, 0);
+  assert.equal(r.calls.content, 0);
+  assert.doesNotMatch(JSON.stringify(result), /DRIVE-001|DRIVE-NEW|STAGING_TEST_PHOTO_SECRET/);
+});
+
+test("trusted previous-photo cleanup is idempotent for trashed old file", () => {
+  const r = runtime({ trashed: true });
+  const result = r.context.cleanupTrustedPreviousProfilePhoto_(signedCleanup());
+  assert.equal(result.ok, true);
+  assert.equal(result.data.data.cleanup_status, "ALREADY_TRASHED");
+  assert.equal(r.calls.mutation, 0);
+  assert.equal(r.calls.sheet, 0);
+});
+
+test("trusted previous-photo cleanup fails closed for invalid contract, folder, MIME and lookup", () => {
+  for (const options of [{ wrongFolder: true }, { mime: "application/pdf" }, { missingFile: true }]) {
+    const r = runtime(options);
+    const result = r.context.cleanupTrustedPreviousProfilePhoto_(signedCleanup());
+    assert.equal(result.ok, false);
+    assert.equal(r.calls.mutation, 0);
+    assert.equal(r.calls.content, 0);
+    assert.equal(r.calls.sheet, 0);
+    assert.doesNotMatch(JSON.stringify(result), /DRIVE-001|DRIVE-NEW|STAGING_TEST_PHOTO_SECRET/);
+  }
+  for (const change of [
+    request => { request.payload.new_file_id = request.payload.expected_old_file_id; },
+    request => { request.payload.extra = "SECRET"; },
+    request => { request.payload.expected_old_file_id = "TAMPERED"; },
+    request => { request.payload.operation_id = "phr_1234567890abcdef1234567890abcdef12345678"; }
+  ]) {
+    const r = runtime();
+    const request = signedCleanup(); change(request);
+    const result = r.context.cleanupTrustedPreviousProfilePhoto_(request);
+    assert.equal(result.ok, false);
+    assert.equal(r.calls.files, 0);
+    assert.equal(r.calls.mutation, 0);
+  }
+});
 
 test("trusted remove accepts signed canonical contract", () => {
   const r = runtime();
