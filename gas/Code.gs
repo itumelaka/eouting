@@ -495,6 +495,8 @@ function doPost(e) {
     const payload = JSON.parse(body);
     const action = payload.action;
 
+    if (action === "getTrustedProfilePhotos") return getTrustedProfilePhotos_(payload);
+    if (action === "uploadTrustedProfilePhoto") return uploadTrustedProfilePhoto_(payload);
     if (action === "loginStudent") return jsonResponse(loginStudent(payload));
     if (action === "loginWarden") return jsonResponse(loginWarden(payload));
     if (action === "loginGuard") return jsonResponse(loginGuard(payload));
@@ -3633,6 +3635,119 @@ function getVerifiedProfilePhotoFile_(fileId, folder) {
   }
 }
 
+function runProfilePhotoMetadataDiagnostic_() {
+  const result = {
+    ok: false,
+    folder_accessible: false,
+    references: {
+      checked: 0,
+      valid: 0,
+      missing_or_inaccessible: 0,
+      trashed: 0,
+      wrong_direct_parent: 0,
+      invalid_mime: 0,
+      metadata_read_error: 0,
+      unresolved: 0
+    },
+    runtime_capability: {
+      read: "UNKNOWN",
+      create_upload: "NOT_PROVEN_WITHOUT_MUTATION",
+      trash_remove: "NOT_PROVEN_WITHOUT_MUTATION"
+    }
+  };
+
+  let folder;
+  try {
+    folder = getProfilePhotoFolder_();
+    result.folder_accessible = true;
+  } catch (error) {
+    console.log(JSON.stringify(result));
+    return result;
+  }
+
+  let rows;
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(SHEETS.students);
+    if (!sheet) {
+      console.log(JSON.stringify(result));
+      return result;
+    }
+    rows = getRowsAsObjects_(sheet);
+  } catch (error) {
+    console.log(JSON.stringify(result));
+    return result;
+  }
+
+  result.references = collectProfilePhotoMetadataDiagnostic_(rows, folder);
+  result.ok = true;
+
+  if (result.references.checked === 0 || result.references.unresolved > 0) {
+    result.runtime_capability.read = "UNKNOWN";
+  } else if (result.references.valid === result.references.checked) {
+    result.runtime_capability.read = "PASS";
+  } else {
+    result.runtime_capability.read = "FAIL";
+  }
+
+  console.log(JSON.stringify(result));
+  return result;
+}
+
+function collectProfilePhotoMetadataDiagnostic_(rows, folder) {
+  const references = {
+    checked: 0,
+    valid: 0,
+    missing_or_inaccessible: 0,
+    trashed: 0,
+    wrong_direct_parent: 0,
+    invalid_mime: 0,
+    metadata_read_error: 0,
+    unresolved: 0
+  };
+
+  (rows || []).forEach(function (row) {
+    if (!isActive_(row && row.status)) return;
+
+    const fileId = String(row && row.photo_file_id || "").trim();
+    if (!fileId) return;
+
+    references.checked += 1;
+    const category = classifyProfilePhotoReference_(fileId, folder);
+    references[category] += 1;
+
+    if (category === "missing_or_inaccessible" ||
+        category === "metadata_read_error") {
+      references.unresolved += 1;
+    }
+  });
+
+  return references;
+}
+
+function classifyProfilePhotoReference_(fileId, folder) {
+  let file;
+
+  try {
+    file = DriveApp.getFileById(String(fileId));
+  } catch (error) {
+    return "missing_or_inaccessible";
+  }
+
+  try {
+    if (file.isTrashed()) return "trashed";
+    if (!isFileInFolder_(file, folder.getId())) return "wrong_direct_parent";
+
+    const mimeType = normalizeText_(file.getMimeType());
+    if (["image/jpeg", "image/png", "image/webp"].indexOf(mimeType) === -1) {
+      return "invalid_mime";
+    }
+  } catch (error) {
+    return "metadata_read_error";
+  }
+
+  return "valid";
+}
 function safelyTrashProfilePhoto_(fileId, folder) {
   const file = getVerifiedProfilePhotoFile_(fileId, folder);
   if (!file) return false;
@@ -7093,4 +7208,305 @@ function createRequestId_(date) {
   const datePart = Utilities.formatDate(date, "Asia/Kuala_Lumpur", "yyyyMMdd-HHmmss");
   const randomPart = Math.floor(Math.random() * 9000) + 1000;
   return "OUT-" + datePart + "-" + randomPart;
+}
+
+// Photo adapter v1 signs UTF-8 fields joined by LF, without a trailing LF:
+// version, key_id, epoch-seconds timestamp, UUID nonce, action,
+// lowercase SHA-256 hex of fixed-order JSON {photo_variant,entries:[
+// {student_id,photo_file_id,photo_updated_at}]}. Never log this envelope.
+function canonicalTrustedPhotoPayload_(payload) {
+  return JSON.stringify({ photo_variant: payload.photo_variant, entries: payload.entries.map(function (entry) {
+    return { student_id: entry.student_id, photo_file_id: entry.photo_file_id,
+      photo_updated_at: entry.photo_updated_at };
+  }) });
+}
+
+function canonicalPhotoUploadPayload_(payload) {
+  return JSON.stringify({
+    operation_id: String(payload.operation_id || ""),
+    student_id: String(payload.student_id || ""),
+    mime_type: String(payload.mime_type || ""),
+    image_base64: String(payload.image_base64 || ""),
+    expected_old_file_id: String(payload.expected_old_file_id || ""),
+    expected_old_photo_updated_at: String(payload.expected_old_photo_updated_at || "")
+  });
+}
+
+function photoAdapterHex_(bytes) {
+  return bytes.map(function (byte) { return (byte & 255).toString(16).padStart(2, "0"); }).join("");
+}
+
+function photoAdapterFault_(code) {
+  const error = new Error(code);
+  error.code = code;
+  return error;
+}
+
+function photoAdapterHasKeys_(value, keys) {
+  return Object.keys(value).sort().join("|") === keys.slice().sort().join("|");
+}
+
+function verifyTrustedPhotoRequest_(request) {
+  const invalid = function () { throw photoAdapterFault_("TRUSTED_REQUEST_INVALID"); };
+  if (!request || typeof request !== "object" || Array.isArray(request) ||
+      ["getTrustedProfilePhotos", "uploadTrustedProfilePhoto"].indexOf(request.action) === -1 || !request.auth || !request.payload ||
+      typeof request.auth !== "object" || Array.isArray(request.auth) ||
+      typeof request.payload !== "object" || Array.isArray(request.payload) ||
+      !photoAdapterHasKeys_(request, ["action", "payload", "auth"])) invalid();
+  const auth = request.auth;
+  if (!photoAdapterHasKeys_(auth, ["version", "key_id", "timestamp", "nonce", "signature"])) invalid();
+
+if (request.action === "getTrustedProfilePhotos") {
+  if (!photoAdapterHasKeys_(request.payload, ["photo_variant", "entries"])) invalid();
+} else {
+  if (!photoAdapterHasKeys_(request.payload, [
+    "operation_id",
+    "student_id",
+    "mime_type",
+    "image_base64",
+    "expected_old_file_id",
+    "expected_old_photo_updated_at"
+  ])) invalid();
+}
+
+  if (auth.version !== "1" || !/^[A-Za-z0-9_-]{1,32}$/.test(auth.key_id || "") ||
+      !Number.isSafeInteger(auth.timestamp) ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(auth.nonce || "") ||
+      !/^[0-9a-f]{64}$/.test(auth.signature || "")) invalid();
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - auth.timestamp) > 60) throw photoAdapterFault_("TRUSTED_REQUEST_EXPIRED");
+  const payload = request.payload;
+
+if (request.action === "getTrustedProfilePhotos") {
+  if (["thumbnail", "full"].indexOf(payload.photo_variant) === -1 ||
+      !Array.isArray(payload.entries) || !payload.entries.length || payload.entries.length > 100) invalid();
+
+  const seen = {};
+
+  payload.entries.forEach(function (entry) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+        typeof entry.student_id !== "string" || !entry.student_id || entry.student_id.length > 128 ||
+        typeof entry.photo_file_id !== "string" || !entry.photo_file_id || entry.photo_file_id.length > 256 ||
+        typeof entry.photo_updated_at !== "string" || entry.photo_updated_at.length > 128 ||
+        seen[entry.student_id] ||
+        !photoAdapterHasKeys_(entry, ["student_id", "photo_file_id", "photo_updated_at"])) invalid();
+
+    seen[entry.student_id] = true;
+  });
+} else {
+  if (typeof payload.operation_id !== "string" || !payload.operation_id.trim() ||
+      typeof payload.student_id !== "string" || !payload.student_id.trim() ||
+      typeof payload.mime_type !== "string" ||
+      ["image/jpeg", "image/png", "image/webp"].indexOf(payload.mime_type.toLowerCase()) === -1 ||
+      typeof payload.image_base64 !== "string" || !payload.image_base64 ||
+      typeof payload.expected_old_file_id !== "string" ||
+      typeof payload.expected_old_photo_updated_at !== "string") invalid();
+}
+  const secret = PropertiesService.getScriptProperties().getProperty("PHOTO_ADAPTER_KEY_" + auth.key_id);
+  if (!secret) throw photoAdapterFault_("TRUSTED_REQUEST_SIGNATURE_INVALID");
+  const canonicalPayload = request.action === "getTrustedProfilePhotos"
+  ? canonicalTrustedPhotoPayload_(payload)
+  : canonicalPhotoUploadPayload_(payload);
+
+const payloadHash = photoAdapterHex_(Utilities.computeDigest(
+  Utilities.DigestAlgorithm.SHA_256,
+  canonicalPayload,
+  Utilities.Charset.UTF_8
+));
+  const signed = [auth.version, auth.key_id, String(auth.timestamp), auth.nonce,
+    request.action, payloadHash].join("\n");
+  const expected = Utilities.computeHmacSha256Signature(signed, secret, Utilities.Charset.UTF_8);
+  const supplied = auth.signature.match(/.{2}/g).map(function (pair) { return parseInt(pair, 16); });
+  let difference = 0;
+  expected.forEach(function (byte, index) { difference |= (byte & 255) ^ supplied[index]; });
+  if (difference !== 0) throw photoAdapterFault_("TRUSTED_REQUEST_SIGNATURE_INVALID");
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) throw photoAdapterFault_("PHOTO_ADAPTER_TEMPORARY_ERROR");
+  try {
+    const cache = CacheService.getScriptCache();
+    const nonceKey = ["photo-adapter", auth.version, auth.key_id, request.action, auth.nonce].join(":");
+    if (cache.get(nonceKey)) throw photoAdapterFault_("TRUSTED_REQUEST_REPLAY");
+    cache.put(nonceKey, "1", 120);
+  } catch (error) {
+    if (error && error.code === "TRUSTED_REQUEST_REPLAY") throw error;
+    throw photoAdapterFault_("PHOTO_ADAPTER_TEMPORARY_ERROR");
+  } finally {
+    lock.releaseLock();
+  }
+  return payload;
+}
+
+function getTrustedProfilePhotos_(request) {
+  try {
+    const payload = verifyTrustedPhotoRequest_(request);
+    const folder = getProfilePhotoFolder_();
+
+    const entries = payload.entries.reduce(function (result, entry) {
+      const file = getVerifiedProfilePhotoFile_(entry.photo_file_id, folder);
+      if (!file) return result;
+
+      const mimeType = String(file.getMimeType() || "").toLowerCase();
+
+      if (["image/jpeg", "image/png", "image/webp"].indexOf(mimeType) === -1) {
+        return result;
+      }
+
+      result.push({
+        studentId: entry.student_id,
+        fileId: entry.photo_file_id,
+        file: file,
+        mimeType: mimeType,
+        photoUpdatedAt: entry.photo_updated_at
+      });
+
+      return result;
+    }, []);
+
+    if (payload.photo_variant === "thumbnail") {
+      return jsonResponse({
+        photos: fetchProfilePhotoThumbnails_(entries)
+      });
+    }
+
+    return jsonResponse({
+      photos: entries.reduce(function (result, entry) {
+        const bytes = entry.file.getBlob().getBytes();
+
+        if (!bytes.length || bytes.length > 800 * 1024) {
+          return result;
+        }
+
+        result.push({
+          student_id: entry.studentId,
+          photo_data_uri:
+            "data:" +
+            entry.mimeType +
+            ";base64," +
+            Utilities.base64Encode(bytes),
+          photo_updated_at: entry.photoUpdatedAt
+        });
+
+        return result;
+      }, [])
+    });
+  } catch (error) {
+    const safe = [
+      "TRUSTED_REQUEST_INVALID",
+      "TRUSTED_REQUEST_EXPIRED",
+      "TRUSTED_REQUEST_REPLAY",
+      "TRUSTED_REQUEST_SIGNATURE_INVALID",
+      "PHOTO_ADAPTER_TEMPORARY_ERROR"
+    ].indexOf(error && error.code) !== -1;
+
+    return errorResponse(
+      safe ? error.code : "PHOTO_ADAPTER_TEMPORARY_ERROR"
+    );
+  }
+}
+
+function uploadTrustedProfilePhoto_(request) {
+  try {
+    const payload = verifyTrustedPhotoRequest_(request);
+
+    const studentId = String(payload.student_id || "").trim();
+    const mimeType = String(payload.mime_type || "").trim().toLowerCase();
+    const imageBase64 = String(payload.image_base64 || "").trim();
+    const operationId = String(payload.operation_id || "").trim();
+
+    if (
+      !studentId ||
+      !operationId ||
+      ["image/jpeg", "image/png", "image/webp"].indexOf(mimeType) === -1 ||
+      !imageBase64 ||
+      imageBase64.length > 1100 * 1024 ||
+      imageBase64.length % 4 !== 0 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)
+    ) {
+      throw photoAdapterFault_("TRUSTED_REQUEST_INVALID");
+    }
+
+    let bytes;
+
+    try {
+      bytes = Utilities.base64Decode(imageBase64);
+    } catch (error) {
+      throw photoAdapterFault_("TRUSTED_REQUEST_INVALID");
+    }
+
+    if (!bytes || !bytes.length || bytes.length > 800 * 1024) {
+      throw photoAdapterFault_("TRUSTED_REQUEST_INVALID");
+    }
+
+    const folder = getProfilePhotoFolder_();
+
+    const safeStudentId = studentId.replace(/[^A-Za-z0-9_]/g, "_");
+    const safeOperationId = operationId.replace(/[^A-Za-z0-9_-]/g, "_");
+    const fileName = "profile_" + safeStudentId + "_" + safeOperationId + ".jpg";
+
+    const lock = LockService.getScriptLock();
+
+    try {
+      lock.waitLock(30000);
+
+      const existingFiles = folder.getFilesByName(fileName);
+
+      if (existingFiles.hasNext()) {
+        const existingFile = existingFiles.next();
+
+        if (existingFile.isTrashed()) {
+          throw photoAdapterFault_("PHOTO_ADAPTER_TEMPORARY_ERROR");
+        }
+
+        return jsonResponse({
+          operation_id: operationId,
+          student_id: studentId,
+          has_profile_photo: true,
+          photo_file_id: existingFile.getId(),
+          photo_updated_at: Utilities.formatDate(
+            existingFile.getDateCreated(),
+            "Asia/Kuala_Lumpur",
+            "yyyy-MM-dd HH:mm:ss"
+          )
+        });
+      }
+
+      const sourceBlob = Utilities.newBlob(bytes, mimeType, fileName);
+
+      const jpegBlob = mimeType === "image/jpeg"
+        ? sourceBlob
+        : sourceBlob.getAs(MimeType.JPEG).setName(fileName);
+
+      const newFile = folder.createFile(jpegBlob);
+
+      return jsonResponse({
+        operation_id: operationId,
+        student_id: studentId,
+        has_profile_photo: true,
+        photo_file_id: newFile.getId(),
+        photo_updated_at: Utilities.formatDate(
+          newFile.getDateCreated(),
+          "Asia/Kuala_Lumpur",
+          "yyyy-MM-dd HH:mm:ss"
+        )
+      });
+    } finally {
+      try {
+        lock.releaseLock();
+      } catch (error) {
+        // Ignore release error.
+      }
+    }
+  } catch (error) {
+    const safe = [
+      "TRUSTED_REQUEST_INVALID",
+      "TRUSTED_REQUEST_EXPIRED",
+      "TRUSTED_REQUEST_REPLAY",
+      "TRUSTED_REQUEST_SIGNATURE_INVALID",
+      "PHOTO_ADAPTER_TEMPORARY_ERROR"
+    ].indexOf(error && error.code) !== -1;
+
+    return errorResponse(
+      safe ? error.code : "PHOTO_ADAPTER_TEMPORARY_ERROR"
+    );
+  }
 }
