@@ -1,14 +1,16 @@
 # TODO eOuting ITU
 
-## Phase 6C / trusted photo — baki kerja selepas kod setempat, 27 September 2026
+## Phase 6C / trusted photo — baki kerja selepas staging E2E, 28 September 2026
 
 - [x] E2E staging disahkan dalam sesi QA: browser `QA-A4-001` **Kemaskini Foto** → Worker → trusted GAS adapter → Drive → real Drive ID/timestamp dalam D1 → `PHOTO_OPERATIONS.COMPLETED` → trusted READ dan thumbnail/preview. Bukti manual CLI/browser tidak semuanya repo artifact; bukan production verification.
-- [ ] Migrasikan trusted REMOVE tanpa bergantung pada legacy GAS/Sheet metadata.
+- [x] Implement trusted REMOVE tanpa bergantung pada legacy GAS/Sheet metadata; satu E2E UI Admin staging untuk `QA-A4-001` disahkan oleh D1 `STUDENTS` kosong, journal `REMOVE/COMPLETED` (1 attempt, `phr_` + 40 hex, old ID/timestamp sepadan) dan audit selamat. HTTP 200 mentah tidak ditangkap; ini bukan production verification.
+- [ ] Sahkan secara bebas metadata Drive `isTrashed=true` bagi fail QA selepas REMOVE; jangan anggap journal berjaya sahaja sebagai bukti metadata Drive.
+- [ ] Uji duplicate/idempotency retry trusted REMOVE dengan operasi yang sama secara selamat; flow UI biasa tidak lagi boleh retry selepas metadata D1 kosong.
 - [ ] Reka dan uji cleanup fail Drive lama selepas replacement, termasuk kegagalan separa tanpa menghilangkan foto authoritative.
 - [ ] Lengkapkan recovery apabila CAS `STUDENTS` berjaya tetapi audit/journal completion gagal, serta automatic failure reconciliation bagi upstream rejection yang boleh meninggalkan `PENDING` (termasuk outcome tidak pasti/`CREATED`/`RECONCILE_REQUIRED`); tetapkan pemilikan, retry dan observability tanpa membocorkan ID.
 - [ ] Selesaikan pre-flight/parity dan production Sheets → D1 migration terkawal, termasuk canonical LI UNISZA, 32 photo references dan pengecualian rekod QA staging; tiada cutover sehingga invariant, mirror dan rollback disahkan.
 
-Trusted READ/UPLOAD, HMAC adapter, real D1 photo ID, `PHOTO_OPERATIONS` dan CAS wujud dalam perubahan kod setempat. Bukti repo-verifiable: `worker-proxy` 104/104 PASS dan trusted adapter 7/7 PASS; bukti session-verified staging: E2E manual di atas. Production GAS/deployment belum disentuh dan production masih GAS/Sheets.
+Trusted READ/UPLOAD/REMOVE, HMAC adapter, real D1 photo ID, `PHOTO_OPERATIONS` dan CAS wujud dalam repo. Bukti repo-verifiable termasuk kod, migration dan regression tests; keputusan terdahulu `worker-proxy` 104/104 PASS dan trusted adapter 7/7 PASS ialah checkpoint READ/UPLOAD, bukan ujian baharu bagi REMOVE. Bukti session-verified staging termasuk READ melalui Worker `c3378a8c-43dd-46bd-ad20-672d63e636c8` ke adapter QA Version 5 (thumbnail/full berjaya tanpa ID Drive dalam respons) dan E2E REMOVE manual di atas. Production GAS/deployment belum disentuh dan production masih GAS/Sheets.
 
 ## Current Status — 22 September 2026
 
