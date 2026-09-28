@@ -7,15 +7,17 @@
 - [x] Implement manual recovery foundation: `inspectPhotoOperation`, `recoverPhotoOperation`, signed metadata-only `probeTrustedPhotoOperation`, fail-closed rules dan audit berkorelasi `request_id=operation_id`; tiada cron atau replay mutation Drive. Local recovery 10/10, recovery + adapter 25/25, Worker proxy 108/108, full Node 951/951 PASS; syntax Worker/GAS PASS.
 - [x] Staging synthetic REMOVE recovery `CREATED + EXPECTED_NEW` disahkan pada GAS QA Version 6 / Worker staging `cfe5f7e4-7384-43d6-9d78-3ff2b9de6b42`: journal `COMPLETED`, D1 metadata kekal kosong, satu audit berkorelasi, attempts kekal 1.
 - [x] Retry manual recovery pada synthetic REMOVE yang sudah `COMPLETED` idempotent: respons berjaya, attempts kekal 1 dan audit count kekal tepat 1. Inspection negative guards 400/401 dan respons tersanitasi turut staging-verified.
+- [x] Staging synthetic UPLOAD `PENDING + EXPECTED_OLD` fail-closed verified: probe tidak menemui fail Drive deterministik; recovery memulangkan `PHOTO_RECOVERY_DRIVE_UNVERIFIED`, journal menjadi `RECONCILE_REQUIRED` / `DRIVE_FILE_NOT_FOUND`, attempts kekal 1, metadata pelajar dan audit tidak berubah, tiada Drive mutation oleh recovery.
 - [ ] Sahkan secara bebas metadata Drive `isTrashed=true` bagi fail QA selepas REMOVE; jangan anggap journal berjaya sahaja sebagai bukti metadata Drive.
 - [ ] Uji duplicate/idempotency retry trusted REMOVE dengan operasi yang sama secara selamat; flow UI biasa tidak lagi boleh retry selepas metadata D1 kosong.
 - [ ] Reka dan uji cleanup fail Drive lama selepas replacement, termasuk kegagalan separa tanpa menghilangkan foto authoritative.
-- [ ] Sahkan UPLOAD recovery dan `RECONCILE_REQUIRED` fail-closed pada staging; kes synthetic REMOVE sahaja telah staging-verified.
+- [ ] Sahkan laluan kejayaan UPLOAD recovery `FOUND_UNIQUE` pada staging; setakat ini hanya kes sintetik UPLOAD fail-closed telah disahkan.
+- [ ] Sahkan pemulihan lanjut daripada `RECONCILE_REQUIRED` pada staging; transition ke state itu sahaja telah disahkan dalam kes sintetik UPLOAD.
 - [ ] Uji fault injection crash/timeout sebenar pada boundary adapter, CAS, journal dan audit secara terkawal.
 - [ ] Rancang dan laksanakan automatic/cron recovery serta failure reconciliation untuk `PENDING`/outcome tidak pasti; cron recovery belum diaktifkan.
 - [ ] Selesaikan pre-flight/parity dan production Sheets → D1 migration terkawal, termasuk canonical LI UNISZA, 32 photo references dan pengecualian rekod QA staging; tiada cutover sehingga invariant, mirror dan rollback disahkan.
 
-Trusted READ/UPLOAD/REMOVE, HMAC adapter, real D1 photo ID, `PHOTO_OPERATIONS`, CAS dan manual recovery wujud dalam repo. Bukti repo-verifiable ialah kod, migration dan regression tests; keputusan setempat recovery terkini disenaraikan di atas. Bukti session-verified staging termasuk READ melalui Worker `c3378a8c-43dd-46bd-ad20-672d63e636c8` ke adapter QA Version 5, E2E REMOVE manual, serta synthetic REMOVE recovery/inspection pada adapter Version 6; bukti CLI/browser tidak semuanya repo artifact. Production GAS/deployment belum disentuh dan production masih GAS/Sheets.
+Trusted READ/UPLOAD/REMOVE, HMAC adapter, real D1 photo ID, `PHOTO_OPERATIONS`, CAS dan manual recovery wujud dalam repo. Bukti repo-verifiable ialah kod, migration dan regression tests; keputusan setempat recovery terkini disenaraikan di atas. Bukti session-verified staging termasuk READ melalui Worker `c3378a8c-43dd-46bd-ad20-672d63e636c8` ke adapter QA Version 5, E2E REMOVE manual, serta kes sintetik REMOVE recovery dan UPLOAD fail-closed pada adapter Version 6; bukti CLI/browser tidak semuanya repo artifact. Production GAS/deployment belum disentuh dan production masih GAS/Sheets.
 
 ## Current Status — 22 September 2026
 
