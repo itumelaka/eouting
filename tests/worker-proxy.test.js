@@ -808,7 +808,7 @@ function profilePhotoFixture(options = {}) {
           photoOperation = {
             operation_id: values[0],
             student_id: values[1],
-            operation_type: "UPLOAD",
+            operation_type: (sql.match(/VALUES\s*\(\?,\s*\?,\s*'(UPLOAD|REMOVE)'/i) || [])[1] || "",
             status: "PENDING",
             expected_old_file_id: values[2] || "",
             expected_old_photo_updated_at: values[3] || "",
@@ -968,11 +968,20 @@ function profilePhotoFixture(options = {}) {
       return options.fetch(url, init, count);
     }
 
-    if (options.upstream) {
-      return json(JSON.stringify(options.upstream));
-    }
-
     const envelope = JSON.parse(init.body);
+
+    if (options.upstream) {
+      const upstream = options.rawUpstream || envelope.action !== "removeTrustedProfilePhoto"
+        ? options.upstream
+        : {
+            ...options.upstream,
+            data: {
+              ...options.upstream.data,
+              operation_id: envelope.payload.operation_id
+            }
+          };
+      return json(JSON.stringify(upstream));
+    }
 
     if (envelope.action === "uploadTrustedProfilePhoto") {
       return json(JSON.stringify({
@@ -1022,7 +1031,8 @@ function profilePhotoFixture(options = {}) {
     run,
     queries,
     batches,
-    events
+    events,
+    getPhotoOperation: () => photoOperation
   };
 }
 
@@ -1232,12 +1242,25 @@ test("profile photos: admin removal calls GAS once then clears D1 and audits wit
     student_id: "STU-001", has_profile_photo: false, photo_updated_at: "" } });
   assert.deepEqual(f.events, ["GAS", "sync"]);
   assert.equal(f.calls.length, 1);
-  assert.deepEqual(JSON.parse(f.calls[0].init.body), { action: "removeStudentProfilePhoto", ...profileAdmin, student_id: "STU-001" });
-  const [update, audit] = f.batches[0];
-  assert.deepEqual(update.values.slice(0, 3), ["", "", "STU-001"]);
+  const envelope = JSON.parse(f.calls[0].init.body);
+  assert.equal(envelope.action, "removeTrustedProfilePhoto");
+  assert.equal(envelope.payload.student_id, "STU-001");
+  assert.equal(envelope.payload.expected_old_file_id, "GAS_MANAGED:PROFILE_PHOTO");
+  assert.equal(envelope.payload.expected_old_photo_updated_at, "");
+  assert.match(envelope.payload.operation_id, /^phr_[a-f0-9]{40}$/);
+  assert.equal(envelope.admin_id, undefined);
+  assert.equal(envelope.nama_admin, undefined);
+  assert.equal(envelope.pin, undefined);  const [audit, completed] = f.batches[0];
+  const casUpdate = f.queries.find(query =>
+    query.sql.includes("UPDATE STUDENTS") &&
+    query.sql.includes("SET photo_file_id = ''")
+  );
+
+  assert.ok(casUpdate);
+  assert.deepEqual(casUpdate.values, ["STU-001", "GAS_MANAGED:PROFILE_PHOTO", ""]);
   assert.equal(audit.values[1], "REMOVE_STUDENT_PROFILE_PHOTO");
-  assert.match(audit.sql, /WHERE changes\(\) = 1/);
-  assert.doesNotMatch(f.calls[0].init.body + JSON.stringify(audit) + f.logs.join(""), /GAS_MANAGED|photo_file_id|YQ==/);
+  assert.match(completed.sql, /status = 'COMPLETED'/);
+  assert.doesNotMatch(JSON.stringify(audit) + f.logs.join(""), /GAS_MANAGED|photo_file_id|YQ==|TEST_PIN/);
 });
 
 for (const action of ["submitStudentProfilePhoto", "removeStudentProfilePhoto"]) {
@@ -1262,11 +1285,7 @@ for (const action of ["submitStudentProfilePhoto", "removeStudentProfilePhoto"])
       assert.equal(response.status, 500);
       const body = await response.json();
       assert.equal(body.code, "PROFILE_PHOTO_D1_SYNC_FAILED");
-      if (action === "submitStudentProfilePhoto") {
-  assert.match(body.error, /disimpan untuk pemulihan/i);
-} else {
-  assert.match(body.error, /jangan.*semula/i);
-}
+      assert.match(body.error, /disimpan untuk pemulihan/i);
       assert.equal(f.calls.length, 1);
       assert.doesNotMatch(JSON.stringify(body) + f.logs.join(""), /PRIVATE_FILE|YQ==|GAS_MANAGED/);
     });
@@ -2768,4 +2787,157 @@ test("D1 student assignment: immutable ID, duplicate matric, audit and no-op pro
   const audit = audited.writes.find(write => write.sql.includes("INSERT INTO AUDIT_LOG"));
   assert.ok(audit);
   assert.deepEqual(JSON.parse(audit.values[5]).changed_fields, ["kelas"]);
+});
+
+test("profile photos: admin removal uses trusted REMOVE contract and operation journal", async () => {
+  const f = profilePhotoFixture({
+    student: {
+      photo_file_id: "PRIVATE_REMOVE_FILE",
+      photo_updated_at: "2026-09-23 12:00:00"
+    },
+    upstream: {
+      ok: true,
+      data: {
+        student_id: "STU-001",
+        has_profile_photo: false,
+        photo_updated_at: ""
+      }
+    }
+  });
+
+  const response = await f.run(
+    "removeStudentProfilePhoto",
+    { ...profileAdmin, student_id: "STU-001" }
+  );
+
+  assert.equal(response.status, 200);
+
+  const envelope = JSON.parse(f.calls[0].init.body);
+
+  assert.equal(envelope.action, "removeTrustedProfilePhoto");
+  assert.equal(envelope.payload.student_id, "STU-001");
+  assert.equal(envelope.payload.expected_old_file_id, "PRIVATE_REMOVE_FILE");
+  assert.equal(
+    envelope.payload.expected_old_photo_updated_at,
+    "2026-09-23 12:00:00"
+  );
+  assert.match(envelope.payload.operation_id, /^phr_[a-f0-9]{40}$/);
+
+  assert.equal(envelope.admin_id, undefined);
+  assert.equal(envelope.nama_admin, undefined);
+  assert.equal(envelope.pin, undefined);
+
+  const journalInsert = f.queries.find(query =>
+    query.sql.includes("INSERT OR IGNORE INTO PHOTO_OPERATIONS") &&
+    query.sql.includes("'REMOVE'")
+  );
+
+  assert.ok(journalInsert);
+});
+
+test("profile photos: successful trusted REMOVE completes operation journal", async () => {
+  const f = profilePhotoFixture({
+    student: {
+      photo_file_id: "PRIVATE_REMOVE_FILE",
+      photo_updated_at: "2026-09-23 12:00:00"
+    },
+    upstream: {
+      ok: true,
+      data: {
+        student_id: "STU-001",
+        has_profile_photo: false,
+        photo_updated_at: ""
+      }
+    }
+  });
+
+  const response = await f.run(
+    "removeStudentProfilePhoto",
+    { ...profileAdmin, student_id: "STU-001" }
+  );
+
+  assert.equal(response.status, 200);
+
+  const operation = f.getPhotoOperation();
+
+  assert.ok(operation);
+  assert.equal(operation.operation_type, "REMOVE");
+  assert.equal(operation.status, "COMPLETED");
+  assert.equal(operation.last_error, null);
+});
+
+test("profile photos: trusted REMOVE CAS conflict requires reconciliation", async () => {
+  const f = profilePhotoFixture({
+    changes: 0,
+    student: {
+      photo_file_id: "PRIVATE_REMOVE_FILE",
+      photo_updated_at: "2026-09-23 12:00:00"
+    },
+    upstream: {
+      ok: true,
+      data: {
+        student_id: "STU-001",
+        has_profile_photo: false,
+        photo_updated_at: ""
+      }
+    }
+  });
+
+  const response = await f.run(
+    "removeStudentProfilePhoto",
+    { ...profileAdmin, student_id: "STU-001" }
+  );
+
+  assert.equal(response.status, 500);
+
+  const body = await response.json();
+  assert.equal(body.code, "PROFILE_PHOTO_D1_SYNC_FAILED");
+  assert.match(body.error, /disimpan untuk pemulihan/i);
+
+  const operation = f.getPhotoOperation();
+
+  assert.ok(operation);
+  assert.equal(operation.operation_type, "REMOVE");
+  assert.equal(operation.status, "RECONCILE_REQUIRED");
+  assert.equal(operation.last_error, "D1_CAS_CONFLICT");
+});
+
+test("profile photos: trusted REMOVE rejects missing or mismatched operation_id before D1 sync", async () => {
+  for (const operationId of [undefined, "phr_wrong_operation"]) {
+    const f = profilePhotoFixture({
+      rawUpstream: true,
+      student: {
+        photo_file_id: "PRIVATE_REMOVE_FILE",
+        photo_updated_at: "2026-09-23 12:00:00"
+      },
+      upstream: {
+        ok: true,
+        data: {
+          ...(operationId === undefined ? {} : { operation_id: operationId }),
+          student_id: "STU-001",
+          has_profile_photo: false,
+          photo_updated_at: ""
+        }
+      }
+    });
+
+    const response = await f.run(
+      "removeStudentProfilePhoto",
+      { ...profileAdmin, student_id: "STU-001" }
+    );
+
+    assert.equal(response.status, 502);
+
+    const body = await response.json();
+    assert.equal(body.code, "PROFILE_PHOTO_UPSTREAM_INVALID");
+
+    assert.equal(
+      f.queries.some(query => query.sql.includes("UPDATE STUDENTS")),
+      false
+    );
+
+    const operation = f.getPhotoOperation();
+    assert.ok(operation);
+    assert.equal(operation.status, "PENDING");
+  }
 });

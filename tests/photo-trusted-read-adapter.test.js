@@ -38,7 +38,12 @@ function runtime(options = {}) {
     let done = false;
     return { hasNext: () => !done && !options.wrongFolder,
       next: () => { done = true; return { getId: () => folderId }; } };
-  }, isTrashed: () => !!options.trashed, getMimeType: () => options.mime || "image/jpeg",
+  }, isTrashed: () => !!options.trashed,
+  setTrashed: value => {
+    calls.mutation++;
+    options.trashed = !!value;
+  },
+  getMimeType: () => options.mime || "image/jpeg",
   getBlob: () => { calls.content++; return { getBytes: () => [1, 2, 3] }; } };
   const context = vm.createContext({
     Date, JSON, String, Number, Array, Object, Error,
@@ -137,4 +142,115 @@ test("trusted read enforces batch limit, full-image size and safe failures", () 
   assert.match(source, /bytes\.length > 800 \* 1024/);
   assert.match(gas, /bytes\.length > 256 \* 1024/);
   assert.doesNotMatch(source, /getSheet_|getRowsAsObjects_|appendRow|setValue|setValues|deleteSheet/);
+});
+
+function canonicalRemove(payload) {
+  return JSON.stringify({
+    operation_id: String(payload.operation_id || ""),
+    student_id: String(payload.student_id || ""),
+    expected_old_file_id: String(payload.expected_old_file_id || ""),
+    expected_old_photo_updated_at: String(payload.expected_old_photo_updated_at || "")
+  });
+}
+
+function signedRemove(payload = {
+  operation_id: "phr_1234567890abcdef1234567890abcdef12345678",
+  student_id: "STU-001",
+  expected_old_file_id: "DRIVE-001",
+  expected_old_photo_updated_at: "2026-09-23 13:00:00"
+}, overrides = {}) {
+  const auth = {
+    version: "1",
+    key_id: "staging1",
+    timestamp: Math.floor(Date.now() / 1000),
+    nonce: "22345678-1234-4234-8234-123456789abc",
+    ...overrides
+  };
+
+  const hash = createHash("sha256")
+    .update(canonicalRemove(payload), "utf8")
+    .digest("hex");
+
+  const message = [
+    auth.version,
+    auth.key_id,
+    auth.timestamp,
+    auth.nonce,
+    "removeTrustedProfilePhoto",
+    hash
+  ].join("\n");
+
+  auth.signature = createHmac("sha256", secret)
+    .update(message, "utf8")
+    .digest("hex");
+
+  return {
+    action: "removeTrustedProfilePhoto",
+    payload,
+    auth
+  };
+}
+
+test("trusted remove accepts signed canonical contract", () => {
+  const r = runtime();
+  const request = signedRemove();
+  const payload = r.context.verifyTrustedPhotoRequest_(request);
+
+  assert.equal(payload.operation_id, request.payload.operation_id);
+  assert.equal(payload.student_id, "STU-001");
+  assert.equal(payload.expected_old_file_id, "DRIVE-001");
+  assert.equal(
+    payload.expected_old_photo_updated_at,
+    "2026-09-23 13:00:00"
+  );
+
+  assert.equal(r.calls.files, 0);
+  assert.equal(r.calls.sheet, 0);
+});
+
+test("trusted remove trashes verified profile file once without Sheet access", () => {
+  const r = runtime();
+
+  const result = r.context.removeTrustedProfilePhoto_(signedRemove());
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.data)), {
+    operation_id: "phr_1234567890abcdef1234567890abcdef12345678",
+    student_id: "STU-001",
+    has_profile_photo: false,
+    photo_updated_at: ""
+  });
+
+  assert.equal(r.calls.files, 1);
+  assert.equal(r.calls.mutation, 1);
+  assert.equal(r.calls.sheet, 0);
+});
+
+test("trusted remove treats an already trashed verified file as idempotent success", () => {
+  const r = runtime({ trashed: true });
+
+  const result = r.context.removeTrustedProfilePhoto_(signedRemove());
+
+  assert.equal(result.ok, true);
+  assert.equal(result.data.has_profile_photo, false);
+  assert.equal(result.data.photo_updated_at, "");
+
+  assert.equal(r.calls.files, 1);
+  assert.equal(r.calls.mutation, 0);
+  assert.equal(r.calls.sheet, 0);
+});
+
+test("trusted remove fails closed for wrong-folder or unavailable files without mutation", () => {
+  for (const option of [
+    { wrongFolder: true },
+    { missingFile: true }
+  ]) {
+    const r = runtime(option);
+
+    const result = r.context.removeTrustedProfilePhoto_(signedRemove());
+
+    assert.equal(result.ok, false);
+    assert.equal(r.calls.mutation, 0);
+    assert.equal(r.calls.sheet, 0);
+  }
 });

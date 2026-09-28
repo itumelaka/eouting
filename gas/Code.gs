@@ -497,6 +497,7 @@ function doPost(e) {
 
     if (action === "getTrustedProfilePhotos") return getTrustedProfilePhotos_(payload);
     if (action === "uploadTrustedProfilePhoto") return uploadTrustedProfilePhoto_(payload);
+    if (action === "removeTrustedProfilePhoto") return removeTrustedProfilePhoto_(payload);
     if (action === "loginStudent") return jsonResponse(loginStudent(payload));
     if (action === "loginWarden") return jsonResponse(loginWarden(payload));
     if (action === "loginGuard") return jsonResponse(loginGuard(payload));
@@ -7231,6 +7232,14 @@ function canonicalPhotoUploadPayload_(payload) {
     expected_old_photo_updated_at: String(payload.expected_old_photo_updated_at || "")
   });
 }
+function canonicalPhotoRemovePayload_(payload) {
+  return JSON.stringify({
+    operation_id: String(payload.operation_id || ""),
+    student_id: String(payload.student_id || ""),
+    expected_old_file_id: String(payload.expected_old_file_id || ""),
+    expected_old_photo_updated_at: String(payload.expected_old_photo_updated_at || "")
+  });
+}
 
 function photoAdapterHex_(bytes) {
   return bytes.map(function (byte) { return (byte & 255).toString(16).padStart(2, "0"); }).join("");
@@ -7249,7 +7258,7 @@ function photoAdapterHasKeys_(value, keys) {
 function verifyTrustedPhotoRequest_(request) {
   const invalid = function () { throw photoAdapterFault_("TRUSTED_REQUEST_INVALID"); };
   if (!request || typeof request !== "object" || Array.isArray(request) ||
-      ["getTrustedProfilePhotos", "uploadTrustedProfilePhoto"].indexOf(request.action) === -1 || !request.auth || !request.payload ||
+      ["getTrustedProfilePhotos", "uploadTrustedProfilePhoto", "removeTrustedProfilePhoto"].indexOf(request.action) === -1 || !request.auth || !request.payload ||
       typeof request.auth !== "object" || Array.isArray(request.auth) ||
       typeof request.payload !== "object" || Array.isArray(request.payload) ||
       !photoAdapterHasKeys_(request, ["action", "payload", "auth"])) invalid();
@@ -7258,12 +7267,19 @@ function verifyTrustedPhotoRequest_(request) {
 
 if (request.action === "getTrustedProfilePhotos") {
   if (!photoAdapterHasKeys_(request.payload, ["photo_variant", "entries"])) invalid();
-} else {
+} else if (request.action === "uploadTrustedProfilePhoto") {
   if (!photoAdapterHasKeys_(request.payload, [
     "operation_id",
     "student_id",
     "mime_type",
     "image_base64",
+    "expected_old_file_id",
+    "expected_old_photo_updated_at"
+  ])) invalid();
+} else {
+  if (!photoAdapterHasKeys_(request.payload, [
+    "operation_id",
+    "student_id",
     "expected_old_file_id",
     "expected_old_photo_updated_at"
   ])) invalid();
@@ -7293,7 +7309,7 @@ if (request.action === "getTrustedProfilePhotos") {
 
     seen[entry.student_id] = true;
   });
-} else {
+} else if (request.action === "uploadTrustedProfilePhoto") {
   if (typeof payload.operation_id !== "string" || !payload.operation_id.trim() ||
       typeof payload.student_id !== "string" || !payload.student_id.trim() ||
       typeof payload.mime_type !== "string" ||
@@ -7301,12 +7317,19 @@ if (request.action === "getTrustedProfilePhotos") {
       typeof payload.image_base64 !== "string" || !payload.image_base64 ||
       typeof payload.expected_old_file_id !== "string" ||
       typeof payload.expected_old_photo_updated_at !== "string") invalid();
+} else {
+  if (typeof payload.operation_id !== "string" || !payload.operation_id.trim() ||
+      typeof payload.student_id !== "string" || !payload.student_id.trim() ||
+      typeof payload.expected_old_file_id !== "string" || !payload.expected_old_file_id.trim() ||
+      typeof payload.expected_old_photo_updated_at !== "string") invalid();
 }
   const secret = PropertiesService.getScriptProperties().getProperty("PHOTO_ADAPTER_KEY_" + auth.key_id);
   if (!secret) throw photoAdapterFault_("TRUSTED_REQUEST_SIGNATURE_INVALID");
   const canonicalPayload = request.action === "getTrustedProfilePhotos"
   ? canonicalTrustedPhotoPayload_(payload)
-  : canonicalPhotoUploadPayload_(payload);
+  : request.action === "uploadTrustedProfilePhoto"
+    ? canonicalPhotoUploadPayload_(payload)
+    : canonicalPhotoRemovePayload_(payload);
 
 const payloadHash = photoAdapterHex_(Utilities.computeDigest(
   Utilities.DigestAlgorithm.SHA_256,
@@ -7488,6 +7511,69 @@ function uploadTrustedProfilePhoto_(request) {
           "Asia/Kuala_Lumpur",
           "yyyy-MM-dd HH:mm:ss"
         )
+      });
+    } finally {
+      try {
+        lock.releaseLock();
+      } catch (error) {
+        // Ignore release error.
+      }
+    }
+  } catch (error) {
+    const safe = [
+      "TRUSTED_REQUEST_INVALID",
+      "TRUSTED_REQUEST_EXPIRED",
+      "TRUSTED_REQUEST_REPLAY",
+      "TRUSTED_REQUEST_SIGNATURE_INVALID",
+      "PHOTO_ADAPTER_TEMPORARY_ERROR"
+    ].indexOf(error && error.code) !== -1;
+
+    return errorResponse(
+      safe ? error.code : "PHOTO_ADAPTER_TEMPORARY_ERROR"
+    );
+  }
+}
+function removeTrustedProfilePhoto_(request) {
+  try {
+    const payload = verifyTrustedPhotoRequest_(request);
+
+    const operationId = String(payload.operation_id || "").trim();
+    const studentId = String(payload.student_id || "").trim();
+    const fileId = String(payload.expected_old_file_id || "").trim();
+
+    if (!operationId || !studentId || !fileId) {
+      throw photoAdapterFault_("TRUSTED_REQUEST_INVALID");
+    }
+
+    const folder = getProfilePhotoFolder_();
+    const lock = LockService.getScriptLock();
+
+    if (!lock.tryLock(30000)) {
+      throw photoAdapterFault_("PHOTO_ADAPTER_TEMPORARY_ERROR");
+    }
+
+    try {
+      let file;
+
+      try {
+        file = DriveApp.getFileById(fileId);
+      } catch (error) {
+        throw photoAdapterFault_("PHOTO_ADAPTER_TEMPORARY_ERROR");
+      }
+
+      if (!isFileInFolder_(file, folder.getId())) {
+        throw photoAdapterFault_("TRUSTED_REQUEST_INVALID");
+      }
+
+      if (!file.isTrashed()) {
+        file.setTrashed(true);
+      }
+
+      return jsonResponse({
+        operation_id: operationId,
+        student_id: studentId,
+        has_profile_photo: false,
+        photo_updated_at: ""
       });
     } finally {
       try {

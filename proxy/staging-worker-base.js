@@ -559,6 +559,105 @@ async function createPhotoUploadOperationId(student, mimeType, imageBase64) {
   return "phu_" + operationHash.slice(0, 40);
 }
 
+function canonicalPhotoRemovePayload(payload) {
+  return JSON.stringify({
+    operation_id: String(payload.operation_id || ""),
+    student_id: String(payload.student_id || ""),
+    expected_old_file_id: String(payload.expected_old_file_id || ""),
+    expected_old_photo_updated_at: String(payload.expected_old_photo_updated_at || "")
+  });
+}
+
+async function signPhotoRemoveRequest(env, payload) {
+  const keyId = String(env.PHOTO_ADAPTER_KEY_ID || "");
+  const secret = String(env.PHOTO_ADAPTER_SECRET || "");
+
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(keyId) || !secret) {
+    throw fault(
+      500,
+      "PHOTO_ADAPTER_NOT_CONFIGURED",
+      "Perkhidmatan foto profil belum disediakan."
+    );
+  }
+
+  const encoder = new TextEncoder();
+  const hex = bytes =>
+    Array.from(
+      new Uint8Array(bytes),
+      byte => byte.toString(16).padStart(2, "0")
+    ).join("");
+
+  const payloadHash = hex(
+    await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(canonicalPhotoRemovePayload(payload))
+    )
+  );
+
+  const auth = {
+    version: "1",
+    key_id: keyId,
+    timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(),
+    signature: ""
+  };
+
+  const signed = [
+    auth.version,
+    auth.key_id,
+    String(auth.timestamp),
+    auth.nonce,
+    "removeTrustedProfilePhoto",
+    payloadHash
+  ].join("\n");
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  auth.signature = hex(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      encoder.encode(signed)
+    )
+  );
+
+  return {
+    action: "removeTrustedProfilePhoto",
+    payload,
+    auth
+  };
+}
+
+async function createPhotoRemoveOperationId(student) {
+  const encoder = new TextEncoder();
+
+  const hex = bytes =>
+    Array.from(
+      new Uint8Array(bytes),
+      byte => byte.toString(16).padStart(2, "0")
+    ).join("");
+
+  const basis = JSON.stringify({
+    student_id: String(student.student_id || ""),
+    expected_old_file_id: String(student.photo_file_id || ""),
+    expected_old_photo_updated_at: String(student.photo_updated_at || "")
+  });
+
+  const operationHash = hex(
+    await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(basis)
+    )
+  );
+
+  return "phr_" + operationHash.slice(0, 40);
+}
 async function mirrorOutingRequestToSheets(env, record, fetchImpl = fetch) {
   if (!env.GAS_UPSTREAM_URL || !env.D1_MIRROR_SECRET) {
     throw new Error("D1 to Sheets mirror configuration unavailable");
@@ -2465,7 +2564,7 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
       throw fault(401, "SESSION_REQUIRED", "Akses sesi diperlukan.");
     }
 
-    let upstreamPayload, allowedIds, allowedPhotoTimestamps, variant, uploadOperationId;
+    let upstreamPayload, allowedIds, allowedPhotoTimestamps, variant, uploadOperationId, removeOperationId;
     if (viewing) {
       variant = String(payload.photo_variant || "full").trim().toLowerCase();
       if (!["thumbnail", "full"].includes(variant)) throw fault(400, "PROFILE_PHOTO_INVALID_VARIANT", "Varian foto profil tidak sah.");
@@ -2668,16 +2767,101 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
       student = await env.DB.prepare(`SELECT student_id, nama, photo_file_id, photo_updated_at
         FROM STUDENTS WHERE LOWER(TRIM(student_id)) = LOWER(?) LIMIT 1`).bind(studentId).first();
       if (!student) throw fault(404, "STUDENT_NOT_FOUND", "Pelajar tidak dijumpai.");
-      upstreamPayload = { action, ...credentials, student_id: student.student_id };
+      removeOperationId = await createPhotoRemoveOperationId(student);
+      const journalTimestamp = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "Asia/Kuala_Lumpur",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23"
+      }).format(new Date());
+
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO PHOTO_OPERATIONS (
+          operation_id,
+          student_id,
+          operation_type,
+          status,
+          expected_old_file_id,
+          expected_old_photo_updated_at,
+          attempts,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, 'REMOVE', 'PENDING', ?, ?, 0, ?, ?)
+      `).bind(
+        removeOperationId,
+        student.student_id,
+        student.photo_file_id || "",
+        student.photo_updated_at || "",
+        journalTimestamp,
+        journalTimestamp
+      ).run();
+
+      const operation = await env.DB.prepare(`
+        SELECT
+          operation_id,
+          student_id,
+          operation_type,
+          status,
+          expected_old_file_id,
+          expected_old_photo_updated_at
+        FROM PHOTO_OPERATIONS
+        WHERE operation_id = ?
+        LIMIT 1
+      `).bind(removeOperationId).first();
+
+      if (
+        !operation ||
+        operation.student_id !== student.student_id ||
+        operation.operation_type !== "REMOVE" ||
+        String(operation.expected_old_file_id || "") !== String(student.photo_file_id || "") ||
+        String(operation.expected_old_photo_updated_at || "") !== String(student.photo_updated_at || "")
+      ) {
+        throw fault(
+          409,
+          "PROFILE_PHOTO_OPERATION_CONFLICT",
+          "Operasi buang foto profil bercanggah dengan keadaan semasa."
+        );
+      }
+
+      if (operation.status === "COMPLETED") {
+        return finish(JSON.stringify({
+          ok: true,
+          data: {
+            student_id: student.student_id,
+            has_profile_photo: false,
+            photo_updated_at: ""
+          }
+        }), 200);
+      }
+
+      await env.DB.prepare(`
+        UPDATE PHOTO_OPERATIONS
+        SET attempts = attempts + 1,
+            updated_at = ?
+        WHERE operation_id = ?
+      `).bind(
+        journalTimestamp,
+        removeOperationId
+      ).run();
+
+      upstreamPayload = await signPhotoRemoveRequest(env, {
+        operation_id: removeOperationId,
+        student_id: student.student_id,
+        expected_old_file_id: String(student.photo_file_id || ""),
+        expected_old_photo_updated_at: String(student.photo_updated_at || "")
+      });
     }
 
     // One GAS POST only; a trusted Apps Script redirect retrieves its result with a bodyless GET.
 let upstream;
 try {
   upstream = trustedUrl(
-  (viewing || uploading)
-    ? env.PHOTO_ADAPTER_UPSTREAM_URL
-    : env.GAS_UPSTREAM_URL
+  env.PHOTO_ADAPTER_UPSTREAM_URL
 );
 } catch {
   throw fault(500, "UPSTREAM_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
@@ -2758,6 +2942,13 @@ if (
     typeof result.photo_file_id !== "string" ||
     !result.photo_file_id.trim()
   )
+) {
+  throw invalidResponse();
+}
+
+if (
+  !uploading &&
+  result.operation_id !== removeOperationId
 ) {
   throw invalidResponse();
 }
@@ -2897,6 +3088,131 @@ if (uploading) {
   }), 200);
 }
 
+if (!uploading) {
+  const syncError = () => fault(
+    500,
+    "PROFILE_PHOTO_D1_SYNC_FAILED",
+    "Foto profil telah dibuang, tetapi penyegerakan D1 belum lengkap. Operasi disimpan untuk pemulihan."
+  );
+
+  const syncTimestamp = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).format(new Date());
+
+  try {
+    const journalCreated = await env.DB.prepare(`
+      UPDATE PHOTO_OPERATIONS
+      SET status = 'CREATED',
+          last_error = NULL,
+          updated_at = ?
+      WHERE operation_id = ?
+        AND student_id = ?
+    `).bind(
+      syncTimestamp,
+      removeOperationId,
+      student.student_id
+    ).run();
+
+    if (journalCreated?.meta?.changes !== 1) {
+      throw syncError();
+    }
+
+    const updated = await env.DB.prepare(`
+      UPDATE STUDENTS
+      SET photo_file_id = '',
+          photo_updated_at = ''
+      WHERE student_id = ?
+        AND COALESCE(photo_file_id, '') = ?
+        AND COALESCE(photo_updated_at, '') = ?
+    `).bind(
+      student.student_id,
+      student.photo_file_id ?? "",
+      student.photo_updated_at ?? ""
+    ).run();
+
+    if (updated?.meta?.changes !== 1) {
+      await env.DB.prepare(`
+        UPDATE PHOTO_OPERATIONS
+        SET status = 'RECONCILE_REQUIRED',
+            last_error = 'D1_CAS_CONFLICT',
+            updated_at = ?
+        WHERE operation_id = ?
+      `).bind(
+        syncTimestamp,
+        removeOperationId
+      ).run();
+
+      throw syncError();
+    }
+
+    const [audited, completed] = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO AUDIT_LOG (
+          timestamp,
+          action,
+          request_id,
+          user_role,
+          user_name,
+          details,
+          entity_type,
+          entity_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        syncTimestamp,
+        "REMOVE_STUDENT_PROFILE_PHOTO",
+        "",
+        "Admin",
+        admin.admin_id || admin.nama_admin || "ADMIN",
+        "",
+        "STUDENT",
+        student.student_id
+      ),
+
+      env.DB.prepare(`
+        UPDATE PHOTO_OPERATIONS
+        SET status = 'COMPLETED',
+            last_error = NULL,
+            updated_at = ?
+        WHERE operation_id = ?
+          AND student_id = ?
+      `).bind(
+        syncTimestamp,
+        removeOperationId,
+        student.student_id
+      )
+    ]);
+
+    if (
+      audited?.meta?.changes !== 1 ||
+      completed?.meta?.changes !== 1
+    ) {
+      throw syncError();
+    }
+  } catch (error) {
+    if (error && error.code && Number.isInteger(error.status)) {
+      throw error;
+    }
+
+    throw syncError();
+  }
+
+  return finish(JSON.stringify({
+    ok: true,
+    data: {
+      student_id: student.student_id,
+      has_profile_photo: false,
+      photo_updated_at: ""
+    }
+  }), 200);
+}
     const syncError = () => fault(500, "PROFILE_PHOTO_D1_SYNC_FAILED",
       "Perubahan foto profil telah diterima oleh perkhidmatan, tetapi penyegerakan D1 gagal. Hubungi pentadbir; jangan hantar semula permintaan.");
     // Presence only, never a Drive ID. Forwarded payloads, responses and audits are explicitly allowlisted.
