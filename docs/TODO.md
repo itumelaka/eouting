@@ -4,13 +4,18 @@
 
 - [x] E2E staging disahkan dalam sesi QA: browser `QA-A4-001` **Kemaskini Foto** → Worker → trusted GAS adapter → Drive → real Drive ID/timestamp dalam D1 → `PHOTO_OPERATIONS.COMPLETED` → trusted READ dan thumbnail/preview. Bukti manual CLI/browser tidak semuanya repo artifact; bukan production verification.
 - [x] Implement trusted REMOVE tanpa bergantung pada legacy GAS/Sheet metadata; satu E2E UI Admin staging untuk `QA-A4-001` disahkan oleh D1 `STUDENTS` kosong, journal `REMOVE/COMPLETED` (1 attempt, `phr_` + 40 hex, old ID/timestamp sepadan) dan audit selamat. HTTP 200 mentah tidak ditangkap; ini bukan production verification.
+- [x] Implement manual recovery foundation: `inspectPhotoOperation`, `recoverPhotoOperation`, signed metadata-only `probeTrustedPhotoOperation`, fail-closed rules dan audit berkorelasi `request_id=operation_id`; tiada cron atau replay mutation Drive. Local recovery 10/10, recovery + adapter 25/25, Worker proxy 108/108, full Node 951/951 PASS; syntax Worker/GAS PASS.
+- [x] Staging synthetic REMOVE recovery `CREATED + EXPECTED_NEW` disahkan pada GAS QA Version 6 / Worker staging `cfe5f7e4-7384-43d6-9d78-3ff2b9de6b42`: journal `COMPLETED`, D1 metadata kekal kosong, satu audit berkorelasi, attempts kekal 1.
+- [x] Retry manual recovery pada synthetic REMOVE yang sudah `COMPLETED` idempotent: respons berjaya, attempts kekal 1 dan audit count kekal tepat 1. Inspection negative guards 400/401 dan respons tersanitasi turut staging-verified.
 - [ ] Sahkan secara bebas metadata Drive `isTrashed=true` bagi fail QA selepas REMOVE; jangan anggap journal berjaya sahaja sebagai bukti metadata Drive.
 - [ ] Uji duplicate/idempotency retry trusted REMOVE dengan operasi yang sama secara selamat; flow UI biasa tidak lagi boleh retry selepas metadata D1 kosong.
 - [ ] Reka dan uji cleanup fail Drive lama selepas replacement, termasuk kegagalan separa tanpa menghilangkan foto authoritative.
-- [ ] Lengkapkan recovery apabila CAS `STUDENTS` berjaya tetapi audit/journal completion gagal, serta automatic failure reconciliation bagi upstream rejection yang boleh meninggalkan `PENDING` (termasuk outcome tidak pasti/`CREATED`/`RECONCILE_REQUIRED`); tetapkan pemilikan, retry dan observability tanpa membocorkan ID.
+- [ ] Sahkan UPLOAD recovery dan `RECONCILE_REQUIRED` fail-closed pada staging; kes synthetic REMOVE sahaja telah staging-verified.
+- [ ] Uji fault injection crash/timeout sebenar pada boundary adapter, CAS, journal dan audit secara terkawal.
+- [ ] Rancang dan laksanakan automatic/cron recovery serta failure reconciliation untuk `PENDING`/outcome tidak pasti; cron recovery belum diaktifkan.
 - [ ] Selesaikan pre-flight/parity dan production Sheets → D1 migration terkawal, termasuk canonical LI UNISZA, 32 photo references dan pengecualian rekod QA staging; tiada cutover sehingga invariant, mirror dan rollback disahkan.
 
-Trusted READ/UPLOAD/REMOVE, HMAC adapter, real D1 photo ID, `PHOTO_OPERATIONS` dan CAS wujud dalam repo. Bukti repo-verifiable termasuk kod, migration dan regression tests; keputusan terdahulu `worker-proxy` 104/104 PASS dan trusted adapter 7/7 PASS ialah checkpoint READ/UPLOAD, bukan ujian baharu bagi REMOVE. Bukti session-verified staging termasuk READ melalui Worker `c3378a8c-43dd-46bd-ad20-672d63e636c8` ke adapter QA Version 5 (thumbnail/full berjaya tanpa ID Drive dalam respons) dan E2E REMOVE manual di atas. Production GAS/deployment belum disentuh dan production masih GAS/Sheets.
+Trusted READ/UPLOAD/REMOVE, HMAC adapter, real D1 photo ID, `PHOTO_OPERATIONS`, CAS dan manual recovery wujud dalam repo. Bukti repo-verifiable ialah kod, migration dan regression tests; keputusan setempat recovery terkini disenaraikan di atas. Bukti session-verified staging termasuk READ melalui Worker `c3378a8c-43dd-46bd-ad20-672d63e636c8` ke adapter QA Version 5, E2E REMOVE manual, serta synthetic REMOVE recovery/inspection pada adapter Version 6; bukti CLI/browser tidak semuanya repo artifact. Production GAS/deployment belum disentuh dan production masih GAS/Sheets.
 
 ## Current Status — 22 September 2026
 
