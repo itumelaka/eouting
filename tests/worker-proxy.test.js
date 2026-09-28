@@ -864,10 +864,12 @@ function profilePhotoFixture(options = {}) {
         }
 
         photoOperation.status = "CREATED";
-        photoOperation.new_file_id = values[0];
-        photoOperation.new_photo_updated_at = values[1];
+        if (sql.includes("new_file_id = ?")) {
+          photoOperation.new_file_id = values[0];
+          photoOperation.new_photo_updated_at = values[1];
+        }
         photoOperation.last_error = null;
-        photoOperation.updated_at = values[2];
+        photoOperation.updated_at = sql.includes("new_file_id = ?") ? values[2] : values[0];
 
         return {
           success: true,
@@ -903,8 +905,8 @@ function profilePhotoFixture(options = {}) {
         const changes = options.changes ?? 1;
 
         if (changes === 1) {
-          student.photo_file_id = values[0];
-          student.photo_updated_at = values[1];
+          student.photo_file_id = sql.includes("SET photo_file_id = ''") ? "" : values[0];
+          student.photo_updated_at = sql.includes("photo_updated_at = ''") ? "" : values[1];
         }
 
         return {
@@ -1032,7 +1034,8 @@ function profilePhotoFixture(options = {}) {
     queries,
     batches,
     events,
-    getPhotoOperation: () => photoOperation
+    getPhotoOperation: () => photoOperation,
+    getStudent: () => student
   };
 }
 
@@ -1224,6 +1227,7 @@ for (const existing of ["", "PRIVATE_EXISTING_FILE"]) {
           "STU-001"
         ]
       );
+      assert.equal(f.batches[0][0].values[2], envelope.payload.operation_id);
 
       assert.doesNotMatch(
         f.logs.join(""),
@@ -1259,6 +1263,7 @@ test("profile photos: admin removal calls GAS once then clears D1 and audits wit
   assert.ok(casUpdate);
   assert.deepEqual(casUpdate.values, ["STU-001", "GAS_MANAGED:PROFILE_PHOTO", ""]);
   assert.equal(audit.values[1], "REMOVE_STUDENT_PROFILE_PHOTO");
+  assert.equal(audit.values[2], envelope.payload.operation_id);
   assert.match(completed.sql, /status = 'COMPLETED'/);
   assert.doesNotMatch(JSON.stringify(audit) + f.logs.join(""), /GAS_MANAGED|photo_file_id|YQ==|TEST_PIN/);
 });
@@ -2864,6 +2869,10 @@ test("profile photos: successful trusted REMOVE completes operation journal", as
   assert.equal(operation.operation_type, "REMOVE");
   assert.equal(operation.status, "COMPLETED");
   assert.equal(operation.last_error, null);
+  assert.equal(operation.new_file_id, null);
+  assert.equal(operation.new_photo_updated_at, null);
+  assert.equal(f.getStudent().photo_file_id, "");
+  assert.equal(f.getStudent().photo_updated_at, "");
 });
 
 test("profile photos: trusted REMOVE CAS conflict requires reconciliation", async () => {

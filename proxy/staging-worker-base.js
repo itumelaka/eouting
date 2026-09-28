@@ -658,6 +658,76 @@ async function createPhotoRemoveOperationId(student) {
 
   return "phr_" + operationHash.slice(0, 40);
 }
+
+// Recovery is deliberately a manual, server-only path. Its probe never receives
+// a browser-supplied Drive ID and never asks the adapter to mutate Drive.
+async function probePhotoOperation(env, operation) {
+  const keyId = String(env.PHOTO_ADAPTER_KEY_ID || "");
+  const secret = String(env.PHOTO_ADAPTER_SECRET || "");
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(keyId) || !secret) {
+    throw fault(500, "PHOTO_ADAPTER_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
+  }
+  let upstream;
+  try { upstream = trustedUrl(env.PHOTO_ADAPTER_UPSTREAM_URL); } catch {
+    throw fault(500, "UPSTREAM_NOT_CONFIGURED", "Perkhidmatan foto profil belum disediakan.");
+  }
+  const payload = {
+    operation_id: operation.operation_id,
+    student_id: operation.student_id,
+    operation_type: operation.operation_type,
+    expected_old_file_id: String(operation.expected_old_file_id || "")
+  };
+  const encoder = new TextEncoder();
+  const hex = bytes => Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+  const auth = { version: "1", key_id: keyId, timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(), signature: "" };
+  const payloadHash = hex(await crypto.subtle.digest("SHA-256", encoder.encode(JSON.stringify(payload))));
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  auth.signature = hex(await crypto.subtle.sign("HMAC", key, encoder.encode([
+    auth.version, auth.key_id, String(auth.timestamp), auth.nonce,
+    "probeTrustedPhotoOperation", payloadHash
+  ].join("\n"))));
+  const invalid = () => fault(502, "PHOTO_RECOVERY_PROBE_UNKNOWN", "Metadata foto tidak dapat dipastikan.");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    let response = await fetch(upstream.href, { method: "POST", redirect: "manual", signal: controller.signal,
+      headers: { Accept: "application/json", "Content-Type": "text/plain;charset=utf-8", "Cache-Control": "no-store" },
+      body: JSON.stringify({ action: "probeTrustedPhotoOperation", payload, auth }) });
+    if (response.status === 302 || response.status === 303) {
+      let destination;
+      try { destination = trustedUrl(response.headers.get("Location"), true); } catch { throw invalid(); }
+      await response.body?.cancel();
+      response = await fetch(destination.href, { method: "GET", redirect: "manual", signal: controller.signal,
+        headers: { Accept: "application/json", "Cache-Control": "no-store" } });
+    }
+    const bytes = await readBounded(response.body, 16384, invalid());
+    let body;
+    try { body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { throw invalid(); }
+    if (!response.ok || body?.ok !== true || !body.data?.data ||
+        !/^[0-9a-f]{64}$/.test(body.data.signature || "")) throw invalid();
+    const data = body.data.data;
+    if (Object.keys(data).sort().join("|") !== ["operation_id", "student_id", "operation_type", "state", "photo_file_id", "photo_updated_at"].sort().join("|") ||
+        data.operation_id !== operation.operation_id || data.student_id !== operation.student_id ||
+        data.operation_type !== operation.operation_type || typeof data.photo_file_id !== "string" ||
+        typeof data.photo_updated_at !== "string") throw invalid();
+    const allowedStates = operation.operation_type === "UPLOAD"
+      ? ["FOUND_UNIQUE", "NOT_FOUND", "AMBIGUOUS", "UNKNOWN"]
+      : ["TRASHED_CONFIRMED", "ACTIVE_CONFIRMED", "UNKNOWN"];
+    if (!allowedStates.includes(data.state) ||
+        (data.state === "FOUND_UNIQUE" ? !data.photo_file_id.trim() || !data.photo_updated_at.trim()
+          : data.photo_file_id !== "" || data.photo_updated_at !== "")) throw invalid();
+    const signature = Uint8Array.from(body.data.signature.match(/../g), pair => parseInt(pair, 16));
+    const verified = await crypto.subtle.verify("HMAC", key, signature,
+      encoder.encode("photo-recovery-response\n" + auth.nonce + "\n" + JSON.stringify(data)));
+    if (!verified) throw invalid();
+    return data;
+  } catch {
+    // Never propagate adapter/Drive exceptions: they may contain identifiers.
+    throw invalid();
+  } finally { clearTimeout(timer); controller.abort(); }
+}
 async function mirrorOutingRequestToSheets(env, record, fetchImpl = fetch) {
   if (!env.GAS_UPSTREAM_URL || !env.D1_MIRROR_SECRET) {
     throw new Error("D1 to Sheets mirror configuration unavailable");
@@ -2512,6 +2582,142 @@ const row = await env.DB.prepare(
   });
 }
 
+if (["/api/d1/inspectPhotoOperation", "/api/d1/recoverPhotoOperation"].includes(url.pathname)) {
+  if (request.method === "OPTIONS") {
+    headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return new Response(null, { status: 204, headers });
+  }
+  if (request.method !== "POST") throw fault(405, "METHOD_NOT_ALLOWED", "POST required");
+  action = url.pathname.split("/").pop();
+  try {
+    let payload;
+    try { payload = await request.json(); } catch { throw fault(400, "INVALID_REQUEST", "Payload JSON tidak sah."); }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+        Object.keys(payload).some(key => !["admin_id", "nama_admin", "pin", "operation_id"].includes(key))) {
+      throw fault(400, "INVALID_REQUEST", "Payload tidak sah.");
+    }
+    const operationId = String(payload.operation_id || "").trim();
+    if (!/^ph[ur]_[0-9a-f]{40}$/.test(operationId)) throw fault(400, "INVALID_REQUEST", "Operation ID tidak sah.");
+    const adminId = String(payload.admin_id || "").trim();
+    const adminName = String(payload.nama_admin || "").trim();
+    const pin = String(payload.pin || "").trim();
+    const admin = await env.DB.prepare(`SELECT admin_id, nama_admin FROM ADMIN_USERS
+      WHERE (LOWER(admin_id) = LOWER(?) OR LOWER(nama_admin) = LOWER(?))
+      AND pin = ? AND LOWER(status) = 'aktif' LIMIT 1`).bind(adminId, adminName, pin).first();
+    if (!admin || !(adminId || adminName) || !pin) throw fault(401, "ADMIN_SESSION_INVALID", "Akses sesi admin tidak sah.");
+    const operation = await env.DB.prepare(`SELECT operation_id, student_id, operation_type, status,
+      expected_old_file_id, expected_old_photo_updated_at, new_file_id, new_photo_updated_at,
+      attempts, last_error, updated_at FROM PHOTO_OPERATIONS WHERE operation_id = ? LIMIT 1`)
+      .bind(operationId).first();
+    if (!operation || !["UPLOAD", "REMOVE"].includes(operation.operation_type) ||
+        !["PENDING", "CREATED", "RECONCILE_REQUIRED", "COMPLETED"].includes(operation.status) ||
+        (operation.operation_type === "UPLOAD" ? !operationId.startsWith("phu_") : !operationId.startsWith("phr_"))) {
+      throw fault(404, "PHOTO_OPERATION_NOT_FOUND", "Operasi foto tidak ditemui.");
+    }
+    const student = await env.DB.prepare(`SELECT student_id, photo_file_id, photo_updated_at
+      FROM STUDENTS WHERE student_id = ? LIMIT 1`).bind(operation.student_id).first();
+    if (!student) throw fault(409, "PHOTO_RECOVERY_CONFLICT", "Keadaan operasi foto tidak sepadan.");
+    const auditAction = operation.operation_type === "UPLOAD" ? "UPDATE_STUDENT_PROFILE_PHOTO" : "REMOVE_STUDENT_PROFILE_PHOTO";
+    const audit = await env.DB.prepare(`SELECT 1 FROM AUDIT_LOG WHERE request_id = ? AND action = ?
+      AND entity_type = 'STUDENT' AND entity_id = ? LIMIT 1`)
+      .bind(operationId, auditAction, operation.student_id).first();
+    const pairMatches = (fileId, updatedAt) => String(student.photo_file_id || "") === String(fileId || "") &&
+      String(student.photo_updated_at || "") === String(updatedAt || "");
+    const oldMatches = pairMatches(operation.expected_old_file_id, operation.expected_old_photo_updated_at);
+    const knownNewMatches = operation.operation_type === "REMOVE" ? pairMatches("", "") :
+      !!operation.new_file_id && !!operation.new_photo_updated_at && pairMatches(operation.new_file_id, operation.new_photo_updated_at);
+    const safeError = ["UPSTREAM_OUTCOME_UNKNOWN", "ADAPTER_REJECTED", "D1_CAS_CONFLICT",
+      "DRIVE_METADATA_UNKNOWN", "DRIVE_FILE_NOT_FOUND", "DRIVE_FILE_AMBIGUOUS", "POSTCONDITION_MISMATCH"]
+      .includes(operation.last_error) ? operation.last_error : null;
+    const publicState = () => ({ operation_id: operationId, student_id: operation.student_id,
+      operation_type: operation.operation_type, status: operation.status, attempts: operation.attempts,
+      last_error: safeError, student_state: knownNewMatches ? "EXPECTED_NEW" : oldMatches ? "EXPECTED_OLD" : "OTHER",
+      audit_recorded: !!audit });
+    if (action === "inspectPhotoOperation") return finish(JSON.stringify({ ok: true, data: publicState() }), 200);
+    const recoveryError = (code = "PHOTO_RECOVERY_CONFLICT") => fault(409, code, "Pemulihan foto memerlukan semakan lanjut.");
+    if (operation.status === "COMPLETED") {
+      if (!knownNewMatches) throw recoveryError("PHOTO_RECOVERY_POSTCONDITION_MISMATCH");
+      return finish(JSON.stringify({ ok: true, data: publicState() }), 200);
+    }
+    // Only a metadata probe is permitted here; never replay UPLOAD or REMOVE.
+    let probe;
+    try { probe = await probePhotoOperation(env, operation); } catch { probe = { state: "UNKNOWN" }; }
+    const stamp = () => new Date().toISOString();
+    const transition = async (nextStatus, errorCode, newFileId, newTime) => {
+      const time = stamp();
+      const result = await env.DB.prepare(`UPDATE PHOTO_OPERATIONS SET status = ?,
+        new_file_id = ?, new_photo_updated_at = ?, last_error = ?, updated_at = ?
+        WHERE operation_id = ? AND student_id = ? AND status = ? AND updated_at = ?`)
+        .bind(nextStatus, newFileId, newTime, errorCode, time, operationId,
+          operation.student_id, operation.status, operation.updated_at).run();
+      if (result?.meta?.changes !== 1) throw recoveryError();
+      operation.status = nextStatus;
+      operation.updated_at = time;
+      operation.last_error = errorCode;
+      operation.new_file_id = newFileId;
+      operation.new_photo_updated_at = newTime;
+    };
+    const validProbe = operation.operation_type === "UPLOAD" ? probe.state === "FOUND_UNIQUE" :
+      probe.state === "TRASHED_CONFIRMED";
+    if (!validProbe) {
+      const errorCode = probe.state === "NOT_FOUND" ? "DRIVE_FILE_NOT_FOUND" :
+        probe.state === "AMBIGUOUS" ? "DRIVE_FILE_AMBIGUOUS" :
+        probe.state === "ACTIVE_CONFIRMED" ? "POSTCONDITION_MISMATCH" : "DRIVE_METADATA_UNKNOWN";
+      await transition("RECONCILE_REQUIRED", errorCode, operation.new_file_id, operation.new_photo_updated_at);
+      throw recoveryError("PHOTO_RECOVERY_DRIVE_UNVERIFIED");
+    }
+    if (operation.operation_type === "UPLOAD" && operation.new_file_id &&
+        (operation.new_file_id !== probe.photo_file_id || operation.new_photo_updated_at !== probe.photo_updated_at)) {
+      await transition("RECONCILE_REQUIRED", "POSTCONDITION_MISMATCH", operation.new_file_id, operation.new_photo_updated_at);
+      throw recoveryError();
+    }
+    const newFileId = operation.operation_type === "UPLOAD" ? probe.photo_file_id : "";
+    const newTime = operation.operation_type === "UPLOAD" ? probe.photo_updated_at : "";
+    const newMatches = pairMatches(newFileId, newTime);
+    if (!oldMatches && !newMatches) {
+      await transition("RECONCILE_REQUIRED", "POSTCONDITION_MISMATCH", operation.new_file_id, operation.new_photo_updated_at);
+      throw recoveryError();
+    }
+    // Claim the observed journal version before any D1 student mutation.
+    await transition("CREATED", null, operation.operation_type === "UPLOAD" ? newFileId : null,
+      operation.operation_type === "UPLOAD" ? newTime : null);
+    if (!newMatches) {
+      const updated = await env.DB.prepare(`UPDATE STUDENTS SET photo_file_id = ?, photo_updated_at = ?
+        WHERE student_id = ? AND COALESCE(photo_file_id, '') = ? AND COALESCE(photo_updated_at, '') = ?`)
+        .bind(newFileId, newTime, operation.student_id, operation.expected_old_file_id || "",
+          operation.expected_old_photo_updated_at || "").run();
+      if (updated?.meta?.changes !== 1) {
+        await transition("RECONCILE_REQUIRED", "D1_CAS_CONFLICT", operation.new_file_id, operation.new_photo_updated_at);
+        throw recoveryError();
+      }
+    }
+    let completed;
+    try {
+      [completed] = await env.DB.batch([
+        env.DB.prepare(`UPDATE PHOTO_OPERATIONS SET status = 'COMPLETED', last_error = NULL, updated_at = ?
+          WHERE operation_id = ? AND student_id = ? AND status = 'CREATED' AND updated_at = ?`)
+          .bind(stamp(), operationId, operation.student_id, operation.updated_at),
+        env.DB.prepare(`INSERT INTO AUDIT_LOG (timestamp, action, request_id, user_role, user_name,
+          details, entity_type, entity_id)
+          SELECT ?, ?, ?, 'Admin', ?, '', 'STUDENT', ?
+          WHERE changes() = 1 AND NOT EXISTS (SELECT 1 FROM AUDIT_LOG
+            WHERE request_id = ? AND action = ? AND entity_type = 'STUDENT' AND entity_id = ?)`)
+          .bind(stamp(), auditAction, operationId, admin.admin_id || "ADMIN", operation.student_id,
+            operationId, auditAction, operation.student_id)
+      ]);
+    } catch { throw fault(500, "PROFILE_PHOTO_D1_SYNC_FAILED", "Penyegerakan pemulihan foto belum lengkap."); }
+    if (completed?.meta?.changes !== 1) throw recoveryError();
+    operation.status = "COMPLETED";
+    return finish(JSON.stringify({ ok: true, data: { operation_id: operationId,
+      student_id: operation.student_id, operation_type: operation.operation_type,
+      status: "COMPLETED", audit_recorded: true } }), 200);
+  } catch (error) {
+    if (error && error.code && Number.isInteger(error.status)) throw error;
+    throw fault(500, "PHOTO_RECOVERY_FAILED", "Pemulihan foto tidak dapat diproses.");
+  }
+}
+
 if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/api/d1/removeStudentProfilePhoto"].includes(url.pathname)) {
   if (request.method === "OPTIONS") {
     headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -2703,6 +2909,7 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
     SELECT
       operation_id,
       student_id,
+      operation_type,
       status,
       expected_old_file_id,
       expected_old_photo_updated_at,
@@ -2716,10 +2923,12 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
   if (
     !operation ||
     operation.student_id !== student.student_id ||
-    String(operation.expected_old_file_id || "") !==
-      String(student.photo_file_id || "") ||
-    String(operation.expected_old_photo_updated_at || "") !==
-      String(student.photo_updated_at || "")
+    operation.operation_type !== "UPLOAD" ||
+    (operation.status === "COMPLETED" ?
+      String(operation.new_file_id || "") !== String(student.photo_file_id || "") ||
+      String(operation.new_photo_updated_at || "") !== String(student.photo_updated_at || "") :
+      String(operation.expected_old_file_id || "") !== String(student.photo_file_id || "") ||
+      String(operation.expected_old_photo_updated_at || "") !== String(student.photo_updated_at || ""))
   ) {
     throw fault(
       409,
@@ -2728,11 +2937,10 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
     );
   }
 
-  if (
-    operation.status === "COMPLETED" &&
-    operation.new_file_id &&
-    operation.new_photo_updated_at
-  ) {
+  if (operation.status === "COMPLETED" && (!operation.new_file_id || !operation.new_photo_updated_at)) {
+    throw fault(409, "PROFILE_PHOTO_OPERATION_CONFLICT", "Operasi foto memerlukan semakan manual.");
+  }
+  if (operation.status === "COMPLETED") {
     return finish(JSON.stringify({
       ok: true,
       data: {
@@ -2741,6 +2949,9 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
         photo_updated_at: operation.new_photo_updated_at
       }
     }), 200);
+  }
+  if (operation.status === "RECONCILE_REQUIRED") {
+    throw fault(409, "PROFILE_PHOTO_OPERATION_CONFLICT", "Operasi foto memerlukan semakan manual.");
   }
 
   await env.DB.prepare(`
@@ -2818,8 +3029,10 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
         !operation ||
         operation.student_id !== student.student_id ||
         operation.operation_type !== "REMOVE" ||
-        String(operation.expected_old_file_id || "") !== String(student.photo_file_id || "") ||
-        String(operation.expected_old_photo_updated_at || "") !== String(student.photo_updated_at || "")
+        (operation.status === "COMPLETED" ?
+          String(student.photo_file_id || "") !== "" || String(student.photo_updated_at || "") !== "" :
+          String(operation.expected_old_file_id || "") !== String(student.photo_file_id || "") ||
+          String(operation.expected_old_photo_updated_at || "") !== String(student.photo_updated_at || ""))
       ) {
         throw fault(
           409,
@@ -2837,6 +3050,9 @@ if (["/api/d1/getStudentProfilePhotos", "/api/d1/submitStudentProfilePhoto", "/a
             photo_updated_at: ""
           }
         }), 200);
+      }
+      if (operation.status === "RECONCILE_REQUIRED") {
+        throw fault(409, "PROFILE_PHOTO_OPERATION_CONFLICT", "Operasi foto memerlukan semakan manual.");
       }
 
       await env.DB.prepare(`
@@ -2904,6 +3120,15 @@ try {
     };
     let result;
     try { result = await Promise.race([delivery(), timeout]); } catch (error) {
+      if (!viewing) {
+        try {
+          await env.DB.prepare(`UPDATE PHOTO_OPERATIONS SET last_error = ?, updated_at = ?
+            WHERE operation_id = ? AND status = 'PENDING'`).bind(
+            error?.code === "PROFILE_PHOTO_UPSTREAM_REJECTED" ? "ADAPTER_REJECTED" : "UPSTREAM_OUTCOME_UNKNOWN",
+            new Date().toISOString(), uploading ? uploadOperationId : removeOperationId
+          ).run();
+        } catch { /* The original error remains authoritative; recovery probes Drive. */ }
+      }
       if (error && error.code && Number.isInteger(error.status)) throw error;
       throw fault(502, "UPSTREAM_DELIVERY_FAILED", "Perkhidmatan foto profil tidak dapat dihubungi.");
     } finally {
@@ -3042,7 +3267,7 @@ if (uploading) {
       `).bind(
         syncTimestamp,
         "UPDATE_STUDENT_PROFILE_PHOTO",
-        "",
+        uploadOperationId,
         "Student",
         student.nama || "",
         "",
@@ -3168,7 +3393,7 @@ if (!uploading) {
       `).bind(
         syncTimestamp,
         "REMOVE_STUDENT_PROFILE_PHOTO",
-        "",
+        removeOperationId,
         "Admin",
         admin.admin_id || admin.nama_admin || "ADMIN",
         "",

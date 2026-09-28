@@ -33,7 +33,7 @@ function signed(payload = { photo_variant: "full", entries: [{
 
 function runtime(options = {}) {
   const cache = new Map();
-  const calls = { sheet: 0, content: 0, mutation: 0, files: 0 };
+  const calls = { sheet: 0, content: 0, mutation: 0, files: 0, nameLookups: 0 };
   const file = { getParents: () => {
     let done = false;
     return { hasNext: () => !done && !options.wrongFolder,
@@ -44,6 +44,8 @@ function runtime(options = {}) {
     options.trashed = !!value;
   },
   getMimeType: () => options.mime || "image/jpeg",
+  getId: () => "DRIVE-001",
+  getDateCreated: () => new Date("2026-09-23T05:00:00Z"),
   getBlob: () => { calls.content++; return { getBytes: () => [1, 2, 3] }; } };
   const context = vm.createContext({
     Date, JSON, String, Number, Array, Object, Error,
@@ -53,10 +55,17 @@ function runtime(options = {}) {
     Utilities: { Charset: { UTF_8: "utf8" }, DigestAlgorithm: { SHA_256: "sha256" },
       computeDigest: (_algorithm, value) => [...createHash("sha256").update(value, "utf8").digest()],
       computeHmacSha256Signature: (value, key) => [...createHmac("sha256", key).update(value, "utf8").digest()],
-      base64Encode: bytes => Buffer.from(bytes).toString("base64") },
+      base64Encode: bytes => Buffer.from(bytes).toString("base64"),
+      formatDate: () => "2026-09-23 13:00:00" },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
     CacheService: { getScriptCache: () => ({ get: key => cache.get(key), put: (key, value) => cache.set(key, value) }) },
-    DriveApp: { getFolderById: () => ({ getName: () => "photos", getId: () => folderId }),
+    DriveApp: { getFolderById: () => ({ getName: () => "photos", getId: () => folderId,
+      getFilesByName: () => {
+        calls.nameLookups++;
+        let index = 0;
+        const count = options.fileCount ?? 1;
+        return { hasNext: () => index < count, next: () => { index++; return file; } };
+      } }),
       getFileById: () => { calls.files++; if (options.missingFile) throw Error("PRIVATE DRIVE ID"); return file; } },
     getSheet_: () => { calls.sheet++; throw Error("Sheet access prohibited"); },
     jsonResponse: data => ({ ok: true, data }), errorResponse: error => ({ ok: false, error }),
@@ -142,6 +151,72 @@ test("trusted read enforces batch limit, full-image size and safe failures", () 
   assert.match(source, /bytes\.length > 800 \* 1024/);
   assert.match(gas, /bytes\.length > 256 \* 1024/);
   assert.doesNotMatch(source, /getSheet_|getRowsAsObjects_|appendRow|setValue|setValues|deleteSheet/);
+});
+
+function signedProbe(type = "UPLOAD", overrides = {}) {
+  const payload = { operation_id: (type === "UPLOAD" ? "phu_" : "phr_") + "a".repeat(40),
+    student_id: "STU-001", operation_type: type,
+    expected_old_file_id: type === "REMOVE" ? "DRIVE-001" : "" };
+  const auth = { version: "1", key_id: "staging1", timestamp: Math.floor(Date.now() / 1000),
+    nonce: "32345678-1234-4234-8234-123456789abc", ...overrides };
+  const hash = createHash("sha256").update(JSON.stringify(payload), "utf8").digest("hex");
+  auth.signature = createHmac("sha256", secret).update([
+    auth.version, auth.key_id, auth.timestamp, auth.nonce,
+    "probeTrustedPhotoOperation", hash
+  ].join("\n"), "utf8").digest("hex");
+  return { action: "probeTrustedPhotoOperation", payload, auth };
+}
+
+test("recovery probe uses HMAC and metadata only; unique upload result is signed", () => {
+  const r = runtime();
+  const request = signedProbe();
+  const result = r.context.probeTrustedPhotoOperation_(request);
+  assert.equal(result.ok, true);
+  assert.equal(result.data.data.state, "FOUND_UNIQUE");
+  assert.equal(result.data.data.photo_file_id, "DRIVE-001");
+  const expected = createHmac("sha256", secret).update(
+    "photo-recovery-response\n" + request.auth.nonce + "\n" + JSON.stringify(result.data.data), "utf8")
+    .digest("hex");
+  assert.equal(result.data.signature, expected);
+  assert.equal(r.calls.sheet, 0);
+  assert.equal(r.calls.content, 0);
+  assert.equal(r.calls.mutation, 0);
+});
+
+test("recovery probe distinguishes upload not-found/ambiguous/unknown without mutation", () => {
+  for (const [options, state] of [[{ fileCount: 0 }, "NOT_FOUND"],
+    [{ fileCount: 2 }, "AMBIGUOUS"], [{ wrongFolder: true }, "UNKNOWN"],
+    [{ mime: "text/html" }, "UNKNOWN"]]) {
+    const r = runtime(options);
+    assert.equal(r.context.probeTrustedPhotoOperation_(signedProbe()).data.data.state, state);
+    assert.equal(r.calls.content, 0);
+    assert.equal(r.calls.mutation, 0);
+  }
+});
+
+test("recovery REMOVE probe confirms active/trashed metadata or returns unknown", () => {
+  for (const [options, state] of [[{}, "ACTIVE_CONFIRMED"], [{ trashed: true }, "TRASHED_CONFIRMED"],
+    [{ missingFile: true }, "UNKNOWN"], [{ wrongFolder: true }, "UNKNOWN"]]) {
+    const r = runtime(options);
+    const result = r.context.probeTrustedPhotoOperation_(signedProbe("REMOVE"));
+    assert.equal(result.data.data.state, state);
+    assert.equal(result.data.data.photo_file_id, "");
+    assert.equal(r.calls.content, 0);
+    assert.equal(r.calls.mutation, 0);
+  }
+});
+
+test("recovery probe rejects tampered or extra fields before Drive and sanitizes failures", () => {
+  for (const change of [request => { request.payload.student_id = "OTHER"; },
+    request => { request.payload.photo_file_id = "PRIVATE_ID"; },
+    request => { request.action = "removeTrustedProfilePhoto"; }]) {
+    const r = runtime();
+    const request = signedProbe(); change(request);
+    const result = r.context.probeTrustedPhotoOperation_(request);
+    assert.equal(result.ok, false);
+    assert.equal(r.calls.files + r.calls.nameLookups, 0);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE_ID|DRIVE-001|STAGING_TEST_PHOTO_SECRET/);
+  }
 });
 
 function canonicalRemove(payload) {
