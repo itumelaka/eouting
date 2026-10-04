@@ -1,326 +1,53 @@
 # eOuting Release Checklist
 
-Dokumen ini ialah runbook terkawal untuk release production dan rekod sejarah rollout. Ia tidak memberi kebenaran automatik untuk migration, deployment atau pengaktifan feature flag.
+Checkpoint **4 Oktober 2026**: production GAS/Sheets kekal; V3 belum cutover. Checklist tidak memberi authorization deployment/import. [Project Status](docs/PROJECT_STATUS.md) ialah rujukan bukti, [Deployment](docs/DEPLOYMENT.md) ialah runbook, [Changelog](docs/CHANGELOG.md) menyimpan sejarah release.
 
-> Catatan semasa (27 Ogos 2026): bahagian release lama di bawah ialah rekod sejarah. Production ialah v2.4.0 dengan frontend/cache `2.4.0-r21`, service worker `eouting-cache-v2.4.0-r21` dan GAS Version 57. Staging juga Version 57; isolated Version 55 ialah rollback/control. Full regression terakhir sebelum release ialah **744/744**.
+## Bukti selesai dengan had skop
 
-## Close-out Production Version 57 — 27 Ogos 2026
+- [x] Rehearsal parity: 34 profil snapshot terdahulu; 34 metadata foto/32 rujukan, 397 request/39 medan dan 3097 audit occurrences matched pada 4 Oktober. Bukan current production parity atau Drive binary/access verification.
+- [x] Comparison live sekitar 12:40 MYT: production 424, D1 412, shared 397, production-only 27, D1-only 15; shared exact 395 dan 2 berbeza (lifecycle/serialization catatan). Daripada 14 production KELUAR, 13 missing dan 1 pending D1.
+- [x] Mirror target production dan snapshot overwrite tanpa freshness guard confirmed; tiada bukti stale overwrite berlaku.
+- [x] Staging mirror disabled pada Worker `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`; cron 13:05:26 MYT SKIPPED, semua counts 0. Queue sebelum deploy 0; direct gate local-tested sahaja, focused 164/164 PASS.
+- [x] Trusted photo staging READ/UPLOAD/REMOVE, manual recovery termasuk real timeout, dan old-photo manual cleanup/retry mempunyai bukti terhad dalam status; open gates kekal unchecked.
+- [x] Diagnostic GAS sementara dibackup/dibuang source local; tiada GAS deploy repair. Tiada sync/import/cutover sesi reconciliation.
 
-- [x] Satu-satunya frontend aktif ialah `itumelaka/eouting` pada `https://itumelaka.github.io/eouting/`; `itumelaka/eoutingV2` retired/archived read-only dan routing `/eoutingV2` dibuang.
-- [x] Existing production deployment dikemas kini kepada GAS Version 57 dengan description `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`; staging turut Version 57.
-- [x] Isolated Version 55 direkod sebagai rollback/control sahaja, bukan active production.
-- [x] Production smoke berjaya dan Admin Config Readiness memaparkan `Config Active`.
-- [x] PERF-01 Phase 1 disahkan bagi directory/login/restore, Warden approve/reject, read-only POST sharing, mutation reads dan hostel/departure projections tanpa perubahan business rules.
-- [x] Readiness same-day `OUTING_BIASA` diperbetulkan tanpa mengubah departure-day enforcement; Pulang Bermalam dan Guard approved-date validation kekal.
-- [x] Global typography, Public Monitoring KPI contrast dan conservative dark-surface brightness refinement lengkap; full regression **744/744**.
-- [x] Tiada claim bahawa Telegram synchronous latency, GET timeout/retry, cache TTL/polling, large first-load assets atau broader lock/index architecture telah diselesaikan.
+## Wajib sebelum V3 Go/No-Go
 
-## Close-out r19/r20 dan Version 56 HOLD — 25 Ogos 2026
+- [ ] Fresh production pre-flight konsisten/bertarikh dan pelan freeze/delta; profile snapshot terdahulu tidak dianggap refreshed.
+- [ ] Reconcile semua missing/mismatch termasuk lifecycle 14 KELUAR dan catatan berdasarkan jenis sel/mapping; classify staging-only students/requests/audits/photos.
+- [ ] Verify invariant lifecycle/latest-request/roster, canonical LI UNISZA dan privacy/role boundaries.
+- [ ] Verify seluruh matriks code/deployed/E2E semua role/config/Guardian/return-selfie/photo; route tersedia bukan bukti parity.
+- [ ] Verify independent Drive trash selepas REMOVE, duplicate trusted REMOVE E2E, cleanup audit-failure/retry E2E dan changed-state RECONCILE_REQUIRED recovery.
+- [ ] Tetapkan acceptance manual pending/outcome-unknown recovery; automatic/cron recovery/cleanup belum tersedia.
+- [ ] Rehearse rollback/restore pada target terasing dan verify hasil, bukan hanya backup/SQL wujud.
+- [ ] Run full suite semasa dan focused suite relevan; record command/tarikh/results dan syntax/diff-check. 164/164 ialah focused; 744/744 ialah sejarah Ogos, bukan assertion PASS semasa.
+- [ ] Sahkan target environment/config/deployment, operational ownership, permissions, monitoring, backup serta rollback owner.
+- [ ] Pemilik release memutuskan Go/No-Go selepas semua gate wajib selesai. **NO-GO cutover sekarang.**
 
-- [x] r19: GET timeout 22 saat per attempt, dua total attempts, transient-only retry + jitter, safe diagnostics dan in-flight identical GET deduplication.
-- [x] r19: kegagalan monitoring/roster Admin diasingkan, last-good Admin data dipelihara, dan Student login directory boleh render sebelum master Warden/Guard selesai; regression **699/699**, GAS kekal Version 55.
-- [x] r20: audit typography/contrast global menutup jadual Statistik Admin, dark/light inheritance, disabled/placeholder/autofill, helper Admin, placeholder Guard dan inactive cards selepas review desktop/mobile; regression **713/713**, frontend-only.
-- [x] P0-1 Current Hostel `O(S×R) -> O(S+R)` + shared 20-second presence cache lulus **720/720** tanpa perubahan schema/privacy/roster/grouping.
-- [x] P0-2 Departure Audit `O(K×A) -> O(K+A)` lulus combined **726/726** tanpa perubahan schema atau semantik Warden/Guard.
-- [x] P0-1/P0-2 direkod sebagai implemented/tested tetapi held from production; Version 56 telah dirollback dan production kekal Version 55.
+## Gate QA konfigurasi
 
-### Gate Version 56 sebelum dipertimbangkan semula — rekod sejarah, superseded oleh rollout Version 57
+Pada fixture/target terasing yang diluluskan, sahkan matriks berikut untuk jenis standard dan sekurang-kurangnya satu jenis custom yang relevan; code/local test sahaja bukan bukti E2E:
 
-- [ ] Tunggu sekurang-kurangnya 24 jam sebelum validation run pada staging Version 56 yang diasingkan.
-- [ ] Lulus 10 health request sequential dengan `_ts` unik, tiga request health concurrency 3 dan lima current-hostel summary request.
-- [ ] Pastikan sifar HTML/404, sifar timeout, semua hostel-summary di bawah 22 saat dan public privacy aggregate-only kekal.
-- [ ] Catat bahawa gate ini operational validation, bukan SLA kekal; controlled production retry memerlukan keputusan release baharu.
+- [ ] Uji semua kombinasi `require_selfie=true/false` dan `require_warden_approval=true/false`; sahkan approval, Guard transition serta selfie required/tidak diperlukan mengikut snapshot request.
+- [ ] Auto-approval menggunakan `AUTO_CONFIG_V2` dan audit `AUTO_APPROVE_REQUEST`, tanpa approval kedua atau bypass checkout authority; human approval kekal apabila diwajibkan.
+- [ ] Missing/inactive/malformed config ditolak selamat sebelum persistence; uji `fixed_return_time`, `same_day_only`, tarikh/hari/application window serta duplicate protection.
+- [ ] Consumer Telegram, statistik dan filter/label Admin/Warden menggunakan jenis/config yang betul, termasuk custom type; semak audit tanpa credential dan privacy projections. Jangan menggunakan operational mirror disabled sebagai cara sync atau proof parity.
 
-## Close-out Premium Institutional UI r13–r17 — 22 Ogos 2026
+## Gate operational mirror staging
 
-- [x] Access/Login, Student r14, Warden/HEP r15, Guard r16 dan Admin r17 menggunakan visual Premium Institutional yang konsisten dan responsif.
-- [x] Student profile card disatukan kepada satu thumbnail/identity card; label `PORTAL AKSES INSTITUSI` dibuang tanpa pengganti.
-- [x] Production smoke berjaya untuk Access/Login, Student, Warden/HEP, Guard dan Admin tanpa visual regression.
-- [x] Display kekal v2.4.0; frontend/cache ialah `2.4.0-r17` / `eouting-cache-v2.4.0-r17`; full regression **656/656**.
-- [x] Release ini frontend-only. GAS kekal Version 55; tiada `clasp push`, GAS version baharu atau deployment backend diperlukan.
+- [ ] Reconcile target spreadsheet/project dan every queued ID terhadap authority terkini; tetapkan freshness/version protection atau target terasing sebelum enable.
+- [ ] Verify direct disabled gate dengan live mutation pada fixture/sasaran terasing yang diluluskan; cron SKIPPED sahaja bukan bukti mutation.
+- [ ] Kekalkan disabled semasa deployment/rollback Worker. Revision lama tanpa gate boleh mengaktifkan penghantaran semula.
+- [ ] Preserve queue; jangan delete/mark success atau manual replay ketika disabled. Mutation D1 masih commit/enqueue; queue 0 sebelum deploy tidak membuktikan queue semasa kosong.
+- [ ] Gunakan explicit `--config proxy/wrangler.toml --env staging` dari root repo bagi deployment yang diluluskan. Jangan deploy default environment.
 
-## Close-out Student Groups / Dynamic Login / Current Hostel Residents — 22 Ogos 2026
+## Guardrails GAS/frontend release berasingan
 
-- [x] Migration LI: 19 written, 0 unmatched, 0 conflicts; readiness Ready.
-- [x] `STUDENT_GROUP_CONFIG_ENABLED=true`; login A2, A3, LI UMK dan LI UPM disahkan production.
-- [x] Rollback tersedia melalui `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
-- [x] Active-request application form suppression disahkan tanpa perubahan backend duplicate authority.
-- [x] Public Current Hostel Residents aggregate-only dan authenticated roster minimum disahkan.
-- [x] Display v2.4.0, frontend/cache r12, GAS Version 55 dan regression 587/587.
+- [ ] Sahkan GAS Code.gs/manifest kanonik dan whitelist; tiada snapshot/diagnostic sementara dalam push.
+- [ ] Preserve manifest timezone/runtime/Web App executeAs/access, target project dan URL sedia ada; immutable deployment version dipilih dengan sengaja.
+- [ ] Jangan rerun helper migration/seed yang sudah selesai tanpa bukti schema gap.
+- [ ] Verify Admin restore backend revalidation, dynamic groups, readiness, Guard primary/No-Guard fallback, Student ownership, public allowlist dan sensitive-cache exclusion.
+- [ ] Selaraskan frontend product/cache metadata dan verify PWA delivery bagi release yang diluluskan.
+- [ ] Preserve schema/data/audit/folders semasa rollback; V2 config/dynamic-login rollback bukan mirror gate.
 
-## Close-out Generic Application Date Window — 22 Ogos 2026
-
-- [x] Commit `76c6898` (`feat: add outing application date window`) pushed ke `main` dan OneDrive reference clone diselaraskan.
-- [x] `application_open_date` dan `application_close_date` ditambah generik kepada `OUTING_TYPES`, bukan khusus `CUTI_SEMESTER`.
-- [x] `setupAdminOutingConfigV200()` dijalankan; migration idempotent menghasilkan `AC`/`AD`, row sedia ada kekal blank dan `OUTING_REQUESTS` tidak berubah.
-- [x] Admin save/reload mengesahkan tarikh sementara, summary `Buka`/`Tutup`, kenaikan config version, kemudian clear/reload kembali kepada `Tiada had tarikh` tanpa current-date fallback.
-- [x] Student smoke sebelum future open date sampai ke backend, memasuki state menghantar, ditolak dengan mesej tarikh yang tepat dan tidak menambah row `OUTING_REQUESTS`.
-- [x] Date bounds inklusif menggunakan `Asia/Kuala_Lumpur`; `allowed_days` dan application time window kekal additive dan backend authoritative.
-- [x] Release sequence mengesahkan clasp user/tracked files/manifest, `clasp push`, migration, schema, GAS Version 52, existing deployment in-place, `@HEAD` untouched dan frontend r7 live.
-- [x] Display version v2.4.0, asset/cache `2.4.0-r7` / `eouting-cache-v2.4.0-r7`, GAS Version 52 dan full regression **501/501**.
-- [x] Tiada auto-population date window, lifecycle/approval/Guard/No-Guard/Guardian Contact/Telegram/trigger/Script Properties atau schema selain additive `OUTING_TYPES` change.
-
-## Close-out Phase 6 — 22 Ogos 2026
-
-- [x] Guardian Contact Shortcut Warden/HEP production verified bagi pending/approved `KECEMASAN` dan `KELUAR + CRITICAL/ACTION_REQUIRED`.
-- [x] Broad projection hanya membawa `guardian_contact_available`; contact sebenar memerlukan authenticated `getGuardianContact`, authoritative recheck dan successful privacy-safe audit.
-- [x] `AUTO_CONFIG_V2` emergency kekal `DILULUSKAN_WARDEN`, muncul di `Telah Diluluskan / Risiko Pulang`, tidak masuk pending queue dan tidak memerlukan approval kedua.
-- [x] Guard kekal normal checkout authority; No-Guard kekal fallback sahaja.
-- [x] Student smoke mengesahkan label Kecemasan, submission/auto-approval dan lifecycle; Warden/HEP smoke mengesahkan card, shortcut, contact reveal dan safe phone link.
-- [x] Commit chain: `9c16f47`, `0caa4fc`, `67d493c`, `3e21c26`, `4c16b0a`.
-- [x] Display version v2.4.0, asset/cache `2.4.0-r6` / `eouting-cache-v2.4.0-r6`, GAS Version 51 dan full regression **490/490**.
-- [x] Tiada schema, lifecycle, trigger, Telegram cadence, Phase 5 threshold, Script Properties atau deployment ID/URL change.
-
-## Guardrail release GAS semasa
-
-Sebelum mencipta immutable version atau mengemas kini deployment Web App production:
-
-- [ ] Sahkan `gas/appsscript.json` valid dan tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` serta `webapp.access=ANYONE_ANONYMOUS`.
-- [ ] Jalankan full regression suite dan pastikan baseline repo semasa sekurang-kurangnya **744/744**, bersama syntax checks dan `git diff --check`.
-- [ ] Sahkan login Admin berjaya dengan No-Guard ON dan OFF; toggle tidak boleh mengubah authentication atau derivation class.
-- [ ] Sahkan pilihan kelas Pelajar datang secara dinamik daripada data, termasuk satu kelas bukan A2/A3 sebagai regression sentinel (contohnya LI), tanpa menjadikannya business rule.
-- [ ] Sahkan flow Guard biasa keluar/masuk kekal laluan utama dan No-Guard hanya fallback yang dikawal Admin serta disahkan Warden.
-- [ ] Kemas kini **deployment Web App production sedia ada** in-place; jangan cipta Web App pendua dan jangan ubah deployment ID/URL.
-- [ ] Pilih immutable version baharu yang dimaksudkan; jangan ubah deployment `@HEAD`.
-- [ ] Selepas deployment, smoke-test Admin, Pelajar dengan class dinamik, Warden, Guard dan endpoint production.
-- [ ] Sahkan hanya satu trigger `scanReturnOperationalNotifications_` kekal, time-driven setiap lima minit.
-
-Version 47 merekodkan pengajaran penting: deployment No-Guard MVP menggunakan immutable manifest tanpa block Web App yang established, lalu Admin login ditolak dan kelas dinamik LI hilang. Ini bukan data corruption dan bukan kegagalan business logic No-Guard; production segera rollback kepada Version 46. Version 48 memulihkan manifest serta login/class dinamik. Version 49 menambah request Telegram/operational URL, dan Version 50 menambah completion Telegram Warden. Version 50 deployed tetapi completion Telegram belum direkod sebagai visually verified live.
-
-## Close-out Production v2.3.2 — 16 Ogos 2026
-
-- [x] Commit `967cfd6` memindahkan `Status Semasa` ke atas borang dan memadatkan bahagian bawah kepada Refresh Status, jumlah tahunan dan `Rekod Outing Saya`.
-- [x] Commit `f2f55cc` menyelaraskan jumlah outing dan sejarah kepada rekod authenticated `SELESAI` bagi tahun semasa.
-- [x] Response sejarah hanya mengandungi `tarikh`, `jenis_permohonan` dan `status`; ownership Pelajar diperkukuh dan rekod disusun paling baharu dahulu.
-- [x] Frontend v2.3.2, revision `2.3.2-r1`, cache `eouting-cache-v2.3.2-r1` dan GAS Version 44 disahkan production.
-- [x] Smoke test production mengesahkan jumlah tahunan dan sejarah tahunan sepadan.
-- [x] Full Node suite lulus **363/363**.
-
-## Close-out Production Fixes v2.2.1 — 14 Ogos 2026 (sejarah)
-
-- [x] Commit `868c323` membezakan `Diluluskan HEP` dan `Diluluskan Warden` menggunakan prefix authoritative `WARDENS.warden_id`, tanpa status lifecycle atau kolum baharu.
-- [x] Commit `67b494c` mengesahkan status awal, memetakan append mengikut header Sheet sebenar dan membaca semula status persisted; status kosong dipaparkan sebagai `Status Tidak Diketahui`.
-- [x] Commit `7d4ad23` menormalkan masa sahaja Sheet kepada `HH:mm`, membetulkan paparan `22:00`, Telegram, Guard timing dan late comparison tanpa offset hack.
-- [x] Helper daypart menggunakan `01:00–11:59` Pagi, `12:00–12:59` Tengah Hari, `13:00–18:59` Petang dan `19:00–00:59` Malam.
-- [x] Frontend v2.2.1, revision `2.2.1-r4`, cache `eouting-cache-v2.2.1-r4` dan GAS Version 43 disahkan production.
-- [x] Full Node suite lulus **353/353** pada 14 Ogos 2026.
-
-## Close-out Optional Application-Time Hotfix v2.2.1 — 14 Ogos 2026 (sejarah)
-
-- [x] Commit `39265f1` (`fix: allow clearing outing application times`) disahkan live.
-- [x] Admin boleh mengosongkan `Masa Permohonan Dibuka` dan `Masa Permohonan Ditutup` melalui butang `Kosongkan`.
-- [x] Empty string menggunakan `clearContent()` supaya nilai Sheet benar-benar kosong dan kekal kosong selepas save/refresh.
-- [x] Blank open/close time bermaksud tiada threshold masa bagi medan itu; `allowed_days` kekal authoritative.
-- [x] Isu permohonan pagi `PULANG_BERMALAM` akibat nilai pembukaan `12:00` telah diselesaikan.
-- [x] Frontend v2.2.1, revision/cache `2.2.1-r1` dan GAS Version 40 disahkan production.
-- [x] Full Node suite lulus **336/336**.
-
-## Close-out Production — 12 Ogos 2026
-
-- [x] Duplicate submission Pelajar dilindungi oleh frontend in-flight state dan atomic backend `ScriptLock` bagi active status.
-- [x] Approve/reject Warden serta confirm-out/confirm-in Guard mempunyai loading/in-flight protection.
-- [x] Dynamic outing payload menggunakan requirement config; standard types dan custom `KLINIK` disahkan.
-- [x] `Masa Keluar Paling Awal` boleh dikosongkan tanpa current-time fallback; readiness mengesan kombinasi config bercanggah.
-- [x] Admin session refresh disahkan melalui sessionStorage tab + mandatory `loginAdmin` revalidation, absolute expiry 12 jam dan tiada PIN dalam localStorage.
-- [x] Global login/restore loader disahkan untuk Pelajar, Warden, Guard dan Admin; Public Pemantauan kekal berasingan.
-- [x] Student profile photo menawarkan `Ambil Foto`, `Pilih dari Galeri` dan `Batal`; kamera/galeri berkongsi pipeline dan return-selfie tidak berubah.
-- [x] Cancellation pending dan selepas approval disahkan menggunakan button/action sheet yang sama bagi standard serta custom type.
-- [x] Sebab wajib 5–500 aksara disahkan frontend/backend; whitespace-only/terlalu pendek/panjang ditolak.
-- [x] `DIBATALKAN_PELAJAR` masuk sejarah, tidak masuk queue Guard/Warden, tidak dikira sedang keluar/selesai dan membenarkan Pelajar memohon semula.
-- [x] Race Guard `confirmOut` disahkan tidak membenarkan `KELUAR` ditimpa cancellation.
-- [x] Telegram cancellation disahkan bagi pending dan approved dengan tepat satu mesej; failure tidak rollback cancellation.
-- [x] Mobile/PWA disahkan pada revision `2.2.0-r6` dengan cache `eouting-cache-v2.2.0-r6`.
-- [x] GAS Version 39 live dan cancellation smoke test production lulus.
-- [x] Full Node suite semasa lulus **332/332**; syntax checks frontend/service worker/GAS lulus.
-
-## Close-out Announcement Banner V1 — 11 Ogos 2026
-
-- [x] `Notis Banner` Admin dan tiga action POST authenticated live pada GAS Version 37.
-- [x] Satu banner global disimpan dalam Script Properties tanpa sheet atau setup property manual.
-- [x] Normal `MAKLUMAN`, Important `PENTING`, timestamp dan current state disahkan.
-- [x] Ticker berterusan, hover/focus/touch pause dan paparan reduced-motion statik disahkan.
-- [x] Pelajar, Warden/HEP, Guard dan Admin authenticated boleh melihat banner; landing dan Public Pemantauan kekal tanpa banner.
-- [x] Ayat panduan Pelajar pendua dibuang; `ruleNotice`, Announcement Banner dan borang outing kekal.
-- [x] Focused tests lulus **12/12** dan full Node suite lulus **287/287**.
-- [x] Displayed version kekal v2.2.0 dan cache revision ditutup pada `2.2.0-r4`.
-
-## Close-out Config-driven Production — 10 Ogos 2026
-
-- [x] `OUTING_CONFIG_V2_ENABLED=true` diaktifkan secara terkawal selepas Admin readiness hijau.
-- [x] `OUTING_TYPES` menjadi source authoritative dan Tetapan Outing menjadi interface konfigurasi operasi.
-- [x] Status Admin dipadatkan kepada `Config Active`, `Legacy` atau `Config Issue` dengan reason access yang accessible.
-- [x] `PULANG_BERMALAM` menerima permohonan pada mana-mana hari, tetapi departure production semasa ialah Jumaat mulai `17:00`; masa boleh diubah Admin mengikut arahan HEP.
-- [x] Submission, Warden approval dan early Guard rejection lulus smoke test production.
-- [x] Bug payload tarikh overnight yang ditemui semasa activation test telah dibaiki dan diuji semula.
-- [x] Guard menerima mesej polisi tarikh/hari/masa yang selamat; error lain kekal generik.
-- [x] GAS Version 36 dideploy tanpa menukar URL production.
-
-Rollback config-driven tidak memerlukan redeployment: tetapkan `OUTING_CONFIG_V2_ENABLED=false` untuk kembali kepada submission/config legacy. Reactivation menggunakan `true` hanya selepas Tetapan Outing menunjukkan readiness hijau.
-
-## Close-out Production v2.2.0 — 9 Ogos 2026
-
-- [x] GAS Version 32 dideploy pada deployment Web App sedia ada tanpa menukar URL/access settings.
-- [x] Flow Pelajar, Warden/HEP, Guard dan enam modul Admin telah melalui smoke test production.
-- [x] Foto profil private, batch thumbnail dan full preview on-demand disahkan live.
-- [x] Public Pemantauan kekal photo-free dan Public Statistik tidak tersedia.
-- [x] Enter UX, rolling KPI dan cache/service-worker delivery disahkan.
-- [x] `APP_VERSION`, `version.json`, footer, asset query strings dan `CACHE_NAME` diselaraskan kepada `2.2.0`.
-- [x] `clasp show-file-status`/`.claspignore` mengehadkan source deploy kepada `gas/appsscript.json` dan `gas/Code.gs`.
-- [x] Dokumentasi current-state dan changelog disatukan untuk release v2.2.0.
-
-Urutan release seterusnya kekal: jalankan tests dan diff/status checks; semak `clasp show-file-status`; jalankan `clasp push` hanya jika GAS berubah; edit deployment Web App sedia ada kepada `New version`; kekalkan URL/access; authorize jika diminta; smoke-test production dan GitHub Pages/cache; kemudian tutup metadata frontend selepas backend production disahkan.
-
-## Keputusan v2.0 — Rekod Sejarah
-
-- Status code: rollout production selesai dan disahkan pada 4 Ogos 2026.
-- Status production frontend v2.0: berjaya.
-- Versi production repo: `v2.0.0`.
-- Backend production: GAS Version 24, telah melalui smoke test Spreadsheet dan login Admin.
-- `OUTING_CONFIG_V2_ENABLED=false`; validation submission legacy kekal aktif.
-- `TELEGRAM_ENABLED=true` kekal aktif.
-
-## Rekod Pengesahan Production — 4 Ogos 2026
-
-- [x] Frontend live di `https://itumelaka.github.io/eouting/`.
-- [x] Footer memaparkan `v2.0.0`.
-- [x] Badge `BETA API` tidak dipaparkan dan data production digunakan.
-- [x] Admin production login berjaya.
-- [x] Flow Pelajar, Warden dan Guard berjaya dimuatkan.
-- [x] Public Monitoring berfungsi pada klik pertama.
-- [x] Statistik berjaya dimuatkan.
-- [x] Intentional auto-scroll mobile berjalan lancar.
-- [x] Backend production kekal GAS Version 24.
-- [x] `OUTING_CONFIG_V2_ENABLED=false`; validator submission legacy masih aktif.
-- [x] `TELEGRAM_ENABLED=true`.
-- [x] Suite automatik penuh lulus **177/177** sebelum deployment.
-- [x] Merge commit production ialah `4eedcbe` (`release: deploy eOuting v2.0.0`).
-
-## Had Beta yang Diketahui — Rekod Sejarah
-
-- Gunakan lima jenis seed dahulu. Jenis custom belum dijamin mempunyai label mesra pengguna dalam semua mesej Telegram.
-- Statistik masih mengira kategori legacy dan belum dinamik sepenuhnya untuk jenis custom.
-- `require_selfie` tersedia dalam schema/Admin tetapi belum mengubah lifecycle selfie. Jangan gunakan nilai ini sebagai kawalan operasi sehingga fasa susulan siap.
-- `require_warden_approval = false` menyebabkan auto-approval backend `AUTO_CONFIG_V2`; kekalkan `true` untuk semua row beta sehingga ujian khusus diluluskan.
-- PIN Admin masih disimpan dalam Sheet. Gunakan PIN unik beta, hadkan editor Sheet dan jangan guna semula PIN peribadi/warden/guard.
-
-## Gate 0 — Kelulusan dan Persekitaran
-
-- [ ] Pemilik release dinamakan.
-- [ ] Tarikh/tetingkap beta dipersetujui.
-- [ ] Tentukan sama ada beta menggunakan salinan Spreadsheet/GAS berasingan atau production secara terkawal.
-- [ ] Untuk ujian pertama, utamakan salinan Spreadsheet dan deployment GAS beta berasingan.
-- [ ] Sahkan URL frontend beta tidak menggantikan GitHub Pages production tanpa kelulusan.
-- [ ] Rekod deployment GAS production semasa dan commit/tag terakhir yang diketahui stabil.
-- [ ] Sahkan semua pihak memahami had beta di atas.
-
-## Gate 1 — Baseline Code dan Versi
-
-- [ ] Branch ialah `feat/admin-outing-config-v2` atau branch release yang diluluskan.
-- [ ] Working tree telah diaudit; tiada fail rahsia, data Sheet atau PIN sebenar.
-- [ ] `node --check assets/app.js` lulus.
-- [ ] `type gas\Code.gs | node --check -` lulus.
-- [ ] `node --test tests/*.test.js` lulus sepenuhnya.
-- [ ] `git diff --check` lulus.
-- [ ] Semak `APP_VERSION`, `version.json`, footer, asset query strings dan `CACHE_NAME` masih konsisten.
-- [x] Metadata runtime, footer, asset query, `version.json` dan cache dibump secara atomik kepada `2.0.0`.
-- [ ] Kemas kini release note beta tanpa menukar manifest identity, scope atau icon secara tidak sengaja.
-- [ ] Jalankan semula semua syntax check dan tests selepas version bump.
-
-## Gate 2 — Backup dan Migration
-
-- [ ] Export/backup keseluruhan Spreadsheet sebelum migration.
-- [ ] Rekod nama fail backup, masa dan pemiliknya.
-- [ ] Sahkan tab `OUTING_REQUESTS`, `STUDENTS`, `WARDENS`, `GUARDS` dan `AUDIT_LOG` boleh dibaca.
-- [ ] Jalankan `setupAdminOutingConfigV200()` sekali pada persekitaran beta/diluluskan.
-- [ ] Jalankan fungsi yang sama kali kedua dan sahkan tiada duplicate seed/header.
-- [ ] Sahkan `OUTING_TYPES` mempunyai tepat lima seed yang dijangka.
-- [ ] Sahkan `ADMIN_USERS` wujud tetapi kosong; migration tidak boleh seed Admin.
-- [ ] Sahkan `AUDIT_LOG` mendapat `entity_type` dan `entity_id` di hujung tanpa susun semula data lama.
-- [ ] Sahkan `OUTING_REQUESTS` dan semua rekod legacy tidak berubah.
-- [ ] Sahkan Script Property `OUTING_CONFIG_V2_ENABLED` ialah `false`.
-
-## Gate 3 — Semakan OUTING_TYPES
-
-- [ ] `OUTING_BIASA` aktif, Selasa/Rabu, buka `17:00`, pulang tetap `22:00`.
-- [ ] `OUTING_HUJUNG_MINGGU` aktif, Sabtu/Ahad, hari sama, pulang tetap `22:00`.
-- [ ] `KECEMASAN` aktif, semua hari, sebab kecemasan wajib.
-- [ ] `PULANG_BERMALAM` aktif, tarikh/masa balik serta waris wajib.
-- [ ] `CUTI_SEMESTER` aktif, tarikh/masa balik serta waris wajib.
-- [ ] Semua row mempunyai `config_version = 1` selepas seed.
-- [ ] Semua `type_code` uppercase, unik dan tidak diubah.
-- [ ] Semua row beta mengekalkan `require_warden_approval = true`.
-- [ ] Jangan tambah jenis custom sebelum lima flow seed lulus hujung-ke-hujung.
-
-## Gate 4 — Admin Sebenar
-
-- [ ] Tambah satu row Admin secara manual; jangan ubah migration untuk seed akaun.
-- [ ] Gunakan `admin_id` unik, `nama_admin`, PIN unik dan `status = AKTIF`.
-- [ ] Jangan commit, screenshot atau log PIN.
-- [ ] Hadkan akses editor Spreadsheet kepada pegawai yang diperlukan sahaja.
-- [ ] Uji login betul, PIN salah dan Admin tidak aktif.
-- [ ] Sahkan response, console, localStorage, sessionStorage dan audit tidak mengandungi PIN.
-- [ ] Sediakan prosedur menukar/menyahaktif PIN selepas beta.
-
-## Gate 5 — Deploy GAS Beta dengan Flag False
-
-- [ ] Cipta version GAS beta baharu tanpa menggantikan deployment production sebelum diluluskan.
-- [ ] Pastikan execute-as/access setting sama seperti polisi sedia ada.
-- [ ] Rekod version/deployment ID beta tanpa merekod credential.
-- [ ] Pastikan frontend beta menunjuk URL GAS beta yang betul.
-- [ ] Sahkan `OUTING_CONFIG_V2_ENABLED = false` selepas deploy.
-- [ ] GET health berjaya.
-- [ ] Public GET `getOutingTypes` memulangkan lima fallback legacy yang selamat.
-- [ ] Admin login dan `getAdminOutingTypes` berfungsi melalui POST.
-- [ ] Create/edit/toggle diuji dengan jenis QA atau salinan data, termasuk conflict version.
-- [ ] Sahkan tiada delete control/API.
-
-## Gate 6 — Regression Semua Role dengan Flag False
-
-- [ ] Pelajar A2 login dan submit setiap jenis yang relevan.
-- [ ] Pelajar A3 login dan rekod dipadankan kepada akaun sendiri.
-- [ ] Duplicate permohonan aktif ditolak.
-- [ ] Warden melihat, meluluskan dan menolak permohonan.
-- [ ] Guard mengesahkan keluar dan masuk.
-- [ ] Selfie pulang berfungsi seperti production semasa.
-- [ ] Public Monitoring tidak mendedahkan data sensitif.
-- [ ] Statistik sedia ada masih berfungsi untuk lima kategori legacy.
-- [ ] Telegram menerima mesej tanpa PIN/config penuh.
-- [ ] Refresh, cache/PWA dan logout semua role diuji pada desktop dan telefon.
-
-## Gate 7 — Activation Terkawal
-
-- [ ] Semua Gate 0–6 ditandatangani oleh pemilik release.
-- [ ] Backup masih tersedia dan boleh dikenal pasti.
-- [ ] Catat nilai flag sebelum perubahan.
-- [ ] Aktifkan `OUTING_CONFIG_V2_ENABLED = true` secara manual sahaja.
-- [ ] Uji public `getOutingTypes`: active sahaja, susunan betul, safe fields sahaja.
-- [ ] Uji submit lima jenis seed dengan validation config-driven.
-- [ ] Uji inactive/missing/malformed config ditolak secara selamat.
-- [ ] Uji `fixed_return_time`, `same_day_only`, hari dan application window.
-- [ ] Uji duplicate protection selepas flag aktif.
-- [ ] Uji Admin edit/toggle dan optimistic conflict.
-- [ ] Uji Warden/Guard/Monitoring/Selfie/Telegram sekali lagi.
-- [ ] Jangan cipta jenis custom atau set `require_warden_approval = false` sehingga ujian berasingan diluluskan.
-
-## Gate 8 — Go/No-Go
-
-- [ ] Tiada ralat kritikal atau kebocoran credential/PII.
-- [ ] Tiada kehilangan atau perubahan rekod legacy.
-- [ ] Semua role lulus pada peranti sasaran.
-- [ ] Rollback telah diuji atau sekurang-kurangnya disimulasikan pada beta.
-- [ ] Jika mana-mana gate gagal, keputusan ialah No-Go dan flag dikekalkan/dikembalikan kepada `false`.
-- [ ] Jika semua gate lulus, rekod keputusan, masa, version GAS dan pegawai yang meluluskan.
-
-## Rollback Plan
-
-Gunakan urutan paling kecil dahulu:
-
-1. Tetapkan `OUTING_CONFIG_V2_ENABLED = false` dan sahkan submission kembali ke validator legacy.
-2. Jika frontend beta bermasalah, pulihkan frontend/tag/version stabil terakhir dan bump cache/asset metadata secara konsisten.
-3. Jika backend masih bermasalah, pilih semula deployment GAS stabil terakhir sambil mengekalkan URL production yang diluluskan.
-4. Uji login Pelajar, submit legacy, Warden approve, Guard keluar/masuk dan Public Monitoring.
-5. Jangan padam `OUTING_TYPES`, `ADMIN_USERS`, kolum tambahan `AUDIT_LOG` atau rekod config semasa rollback.
-6. Nyahaktifkan Admin beta jika akses tidak lagi diperlukan; jangan padam audit.
-7. Rekod insiden, masa rollback, version yang dipulihkan dan pemeriksaan data selepas rollback.
-
-Rollback frontend dan GAS tidak semestinya perlu dilakukan serentak. Flag `false` ialah kill switch pertama kerana ia memulihkan validation submission legacy tanpa memusnahkan schema atau data config.
+Historical release/version/suite details tidak lagi menjadi unchecked checklist aktif; ia kekal bertarikh dalam changelog. Future enhancements disenaraikan dalam [TODO](docs/TODO.md), berasingan daripada gate release ini.

@@ -1,6 +1,14 @@
 # Local Development dan Testing
 
-Panduan ini merujuk eOuting ITU **v2.4.0**, cache revision production `2.4.0-r21`, production GAS Version 57 dan baseline close-out 27 Ogos 2026 **744/744**. Staging juga Version 57; isolated Version 55 ialah rollback/control.
+Checkpoint **4 Oktober 2026**. Production kekal GAS/Sheets, tiada cutover. Version 57/r21 dan full 744/744 ialah close-out 27 Ogos, bukan baseline full suite semasa. [Project Status](PROJECT_STATUS.md) menyimpan bukti runtime/parity dan [Deployment](DEPLOYMENT.md) menyimpan rollback runbook.
+
+## Pengasingan QA dan mirror disabled
+
+Gunakan mock/local tests dahulu. Tanpa mock, localhost memetakan route D1 ke staging; action hybrid yang tidak dipetakan boleh menghubungi GAS. Override GAS beta tidak menukar mapping D1 localhost dan badge BETA API tidak membuktikan semua target terasing. Semak target setiap route sebelum sebarang live QA yang diluluskan.
+
+Staging operational mirror false deployed pada Worker `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`; GAS mirror Version 6 masih menuju spreadsheet production tanpa freshness guard. Jangan enable, menjalankan retry/scheduler atau mutation remote untuk QA local. Gate tidak mengasingkan Telegram/trusted photo/hybrid GAS. Queue 0 sebelum deploy ialah sejarah; mutation D1 baharu tetap enqueue ID, cron disabled preserve queue. Cron 13:05:26 MYT SKIPPED/counts 0 ialah live proof scheduler sahaja; direct gate local-tested, belum live mutation-tested.
+
+Diagnostic GAS sementara telah dibackup dan dibuang source local tanpa GAS deploy; jangan menggunakan wrapper/route QA yang sudah dibuang. Private diagnostic sedia ada bukan arahan memanggil GAS remote dalam local QA.
 
 ## Keperluan
 
@@ -28,9 +36,9 @@ Buka `http://localhost:8080/?mock=1`, pilih `Admin` dan gunakan credential local
 
 - ID: `ADMIN-MOCK`
 - nama alternatif: `Admin Mock QA`
-- PIN: `2468`
+- PIN mock: rujuk fixture mock dalam source local; jangan menyalin credential ke dokumentasi atau logs.
 
-Credential ini hanya dibina apabila query tepat `mock=1` hadir. Tanpa query tersebut, semua action Admin menggunakan GAS live dan credential mock tidak diterima. Mock login response tidak mengandungi PIN; runtime dan dedicated Admin sessionStorage tab dibersihkan semasa logout.
+Credential ini hanya dibina apabila query tepat `mock=1` hadir. Tanpa query tersebut, action Admin mengikut routing D1 staging/GAS hybrid dan credential mock bukan pengasingan target. Mock login response tidak mengandungi PIN; runtime dan dedicated Admin sessionStorage tab dibersihkan semasa logout.
 
 Lima jenis outing dan satu Notis Banner contoh disediakan dalam memory, termasuk `CUTI_SEMESTER` yang tidak aktif untuk QA toggle. Create, edit dan toggle hanya mengubah data memory dan tidak memanggil GAS atau Google Sheets. Refresh page mengembalikan seed asal.
 
@@ -41,7 +49,7 @@ URL senario tambahan:
 
 ### Student Config Mock QA
 
-Login Pelajar mock menggunakan `Ahmad Hakimi` / `M001`. Data mock menggunakan kelas A2/A3.
+Pilih identiti/nombor matrik fixture mock dalam source local. Data mock menggunakan kelas A2/A3; jangan salin data pelajar sebenar ke fixture.
 
 - `http://localhost:8080/?mock=1` — empat config aktif; `CUTI_SEMESTER` inactive dan tidak muncul.
 - `http://localhost:8080/?mock=1&mockOutingTypes=optional` — satu jenis tanpa medan wajib untuk menguji hidden/disabled/required false.
@@ -50,47 +58,13 @@ Login Pelajar mock menggunakan `Ahmad Hakimi` / `M001`. Data mock menggunakan ke
 
 Semak Weekend mengisi `22:00` secara read-only. Tukar kepada Pulang Bermalam dan pastikan masa lama dikosongkan. Field tersembunyi mesti `disabled` serta tidak `required`.
 
-### Localhost Beta GAS QA
+### Credential, config dan live QA
 
-Gunakan override ini hanya untuk menghubungkan frontend localhost kepada deployment GAS beta. Endpoint production kekal default dan query `api` sengaja diabaikan pada GitHub Pages atau hostname selain `localhost`/`127.0.0.1`.
+Admin restore menggunakan runtime credential dan dedicated sessionStorage tab dengan expiry absolute 12 jam serta loginAdmin revalidation; tidak localStorage/URL/log. Mock logout membersihkan saved/runtime state.
 
-Jalankan static server dari root repo:
+Live QA mesti pada target/fixture terasing yang diluluskan, dengan target D1/GAS/Drive/Telegram diperiksa mengikut route. `?api=` localhost hanya override GAS yang diterima, bukan endpoint D1 mapped. Invalid override boleh fallback kepada endpoint default; jangan menganggap URL override sebagai isolation guarantee. Jangan gunakan credential production untuk mock.
 
-```powershell
-py -m http.server 8080
-```
-
-URL pembukaan pertama:
-
-```text
-http://localhost:8080/?api=<URL-ENCODED-BETA-GAS-WEB-APP-URL>
-```
-
-Nilai URL GAS beta mesti di-URL-encode sepenuhnya. Jangan letakkan PIN, token Telegram atau credential lain dalam query string. Selepas URL beta diterima, endpoint disimpan dalam `sessionStorage` untuk tab localhost itu sahaja. Reload tanpa query masih menggunakan endpoint sesi; menutup tab membersihkan override sesi. Override yang mempunyai protocol bukan HTTPS, domain selain `script.google.com`, path bukan `/macros/s/.../exec`, query tambahan atau fragment akan ditolak dan frontend kembali kepada endpoint production.
-
-Apabila override aktif, footer menunjukkan label `BETA API` sahaja. URL GAS penuh tidak dipaparkan. Jangan jalankan ujian ini melalui URL GitHub Pages production.
-
-Ujian Admin beta:
-
-1. buka URL localhost beta dan pastikan label `BETA API` kelihatan;
-2. pilih role Admin;
-3. masukkan `ADMIN-BETA-01`;
-4. baca PIN secara manual daripada tab `ADMIN_USERS` dalam Spreadsheet beta dan taip ke form;
-5. cuba PIN salah dahulu dan pastikan mesej generik `ID atau nama Admin atau PIN tidak sah`;
-6. login dengan PIN beta yang betul dan pastikan input PIN dikosongkan;
-7. semak lima seed, refresh, create/edit/toggle dan conflict handling pada beta sahaja;
-8. logout dan pastikan credential runtime serta senarai Admin dibersihkan.
-
-Backend semasa belum mengeluarkan session token Admin. PIN berada dalam memory runtime untuk authenticated POST dan dedicated `sessionStorage` tab `eouting_admin_session_v1` untuk refresh restore; ia tidak disimpan dalam `localStorage`, URL atau log. Rekod menyimpan original normalized identity, PIN dan absolute `expiresAt` 12 jam. Restore mesti lulus `loginAdmin`, refresh tidak memanjangkan expiry, dan logout membersihkan saved/runtime state.
-
-Untuk QA rollback/beta dengan `OUTING_CONFIG_V2_ENABLED=false` (bukan state production semasa), jangkaan yang betul ialah:
-
-- authentication Admin serta Admin read/create/update/toggle masih boleh berfungsi untuk menyediakan konfigurasi beta;
-- public `getOutingTypes` memulangkan fallback lima jenis legacy;
-- `submitRequest` terus menggunakan validation legacy;
-- konfigurasi v2 belum menjadi production flow.
-
-Jangan aktifkan feature flag hanya untuk membuka atau memuatkan Admin Dashboard. `TELEGRAM_ENABLED` juga mesti kekal `false` sepanjang connection test ini.
+OUTING_CONFIG_V2_ENABLED=false ialah V2 legacy-validation rollback, bukan gate mirror. Jangan tukar property GAS/Telegram/config production untuk menjalankan QA staging. Rehearsal parity bukan current production parity; snapshot comparison local tidak memerlukan live mutation.
 
 ## Automated Tests
 
@@ -100,7 +74,21 @@ Jalankan keseluruhan suite:
 node --test tests/*.test.js
 ```
 
-Baseline kanonik repo semasa ialah **744/744 lulus**. Milestone r19 **699/699**, P0-1 **720/720**, combined P0 **726/726** dan production r20 **713/713** kekal angka sejarah.
+Full **744/744** ialah sejarah release 27 Ogos. Hasil implementation mirror gate 4 Oktober ialah **focused 164/164 PASS**, syntax/diff-check PASS; bukan full suite semasa dan tidak dijalankan semula dalam audit dokumentasi.
+
+Command focused yang menghasilkan checkpoint 164/164:
+
+```powershell
+node --test tests/operational-mirror-gate.test.js tests/staging-mirror-retry-queue.test.js tests/staging-student-cancellation-d1.test.js tests/worker-proxy.test.js tests/staging-submit-request-d1.test.js tests/staging-warden-decisions-d1.test.js tests/staging-no-guard-student-d1.test.js tests/staging-no-guard-warden-d1.test.js
+```
+
+Coverage direct disabled fetch, scheduler early gate, mutation success/enqueue, queue retention dan default environment compatibility menggunakan fixtures local. Gate tests tidak mengakses remote atau membuktikan live mutation. Syntax Worker ES module boleh disemak melalui stdin:
+
+```powershell
+Get-Content proxy/staging-worker-base.js -Raw -Encoding utf8 | node --input-type=module --check -
+```
+
+Untuk photo suites, cari fail `tests/*photo*.test.js` dan jalankan suite relevan setempat. Hasil historical focused/full dan E2E setiap kes ada dalam status/changelog; local contract PASS tidak menutup open photo gates.
 
 Focused date-window coverage berada dalam suite schema/Admin/Student/submission sedia ada. Ia meliputi idempotent header migration, blank compatibility, save/clear/reload, invalid/reversed/same-day ranges, safe projection, inclusive Malaysia midnight boundaries, additive day/time rules dan backend rejection tanpa append.
 
@@ -110,7 +98,7 @@ Focused regression yang paling relevan:
 node --test tests/no-guard-departure-mvp.test.js tests/no-guard-auth-directory-regression.test.js tests/telegram-return-notifications-phase5.test.js
 ```
 
-Coverage meliputi safe-default/config ON-OFF, Student ownership tanpa self-checkout, Warden authentication, dynamic A2/A3/LI fixtures, Guard/Warden race ordering, audit-backed pending/dedup, Telegram failure semantics, completion single-send dan canonical eOuting URL. Nama/PIN fixture seperti `ADMIN-MOCK`/`2468` atau Pelajar LI Regression ialah data test-only, bukan credential production atau business restriction.
+Coverage meliputi safe-default/config ON-OFF, Student ownership tanpa self-checkout, Warden authentication, dynamic A2/A3/LI fixtures, Guard/Warden race ordering, audit-backed pending/dedup, Telegram failure semantics, completion single-send dan canonical eOuting URL. Credential fixtures adalah test-only; jangan mencetak atau memasukkan credential/data production ke test.
 
 Jalankan focused Phase 3 suite:
 
@@ -144,7 +132,7 @@ runReturnOperationalNotificationsDryRun()
 
 Wrapper hard-coded kepada `dryRun: true`, tidak menerima caller options, tidak exposed melalui frontend/`doGet`/`doPost` dan tidak boleh digunakan untuk menukar kepada non-dry mode. Dry-run tidak send Telegram, menulis SENT audit, mengubah request atau memasang trigger. Jangan menjalankan private `scanReturnOperationalNotifications_` secara manual untuk maintenance biasa; production non-dry execution ialah tanggungjawab trigger lima minit yang telah diluluskan.
 
-Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, runtime-only PIN, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
+Suite v2.0 bertambah mengikut fasa. Fasa 4 menambah `tests/admin-dashboard-v200.test.js` untuk login form, credential handling, dashboard/list states, create/edit/toggle wiring, optimistic conflict, larangan delete dan logout cleanup.
 Fasa 4.5 menambah `tests/admin-dashboard-mock-v200.test.js` untuk pengasingan mock/live, lima seed, write tanpa GAS, safe login response serta one-shot error/conflict QA.
 Fasa 5A menambah `tests/student-config-form-v200.test.js` untuk loader, dropdown, sorting, inactive filtering, fallback, field mapping, fixed return time dan mock isolation.
 
@@ -193,18 +181,18 @@ node --test tests/public-monitoring-lifecycle.test.js
 ```powershell
 node --check assets/app.js
 node --check service-worker.js
-Get-Content gas/Code.gs -Raw | node --check -
+Get-Content gas/Code.gs -Raw -Encoding utf8 | node --check -
 Get-Content version.json -Raw | ConvertFrom-Json
 git diff --check
 ```
 
-Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
+Untuk dokumentasi, jalankan diff-check dan semak relative links serta angka/status; jangan menjalankan remote QA hanya untuk documentation edit.
 
-## Smoke Test Pelajar
+## Smoke Test Pelajar (mock/local; live memerlukan target terasing)
 
-0. Selepas login, sahkan `ruleNotice` → identiti → `Status Semasa` → borang → Refresh Status/jumlah tahunan/`Rekod Outing Saya`; ayat panduan pendua tidak wujud.
-1. Pastikan dropdown memaparkan nama dan filter A2/A3 berfungsi.
-2. Pilih pelajar; `student_id` kekal value dalaman.
+0. Selepas login, sahkan ruleNotice besar disembunyikan pada Student authenticated; identiti → `Status Semasa` → borang → Refresh Status/jumlah tahunan/`Rekod Outing Saya`; ayat panduan pendua tidak wujud.
+1. Pastikan dropdown minimum dan kumpulan dinamik berfungsi, termasuk canonical LI UNISZA pada fixture sesuai.
+2. Pilih fixture pelajar; `student_id` kekal value dalaman.
 3. Masukkan nombor matrik betul dan sahkan login berjaya.
 4. Cuba nombor matrik salah dan sahkan login ditolak.
 5. Hantar permohonan dan semak current/action pada `Status Semasa`; sahkan `Rekod Outing Saya` hanya memaparkan tarikh, jenis dan status bagi rekod `SELESAI` tahun semasa.
@@ -264,7 +252,7 @@ Repo tidak mempunyai konfigurasi Markdown lint khusus pada v1.7.0.
 5. Dalam `Notis Banner`, uji teks, `Penting`, `Aktif`, simpan, current state, timestamp dan updater; sahkan Normal/Penting bergerak sama dan viewer authenticated menerima projection selamat.
 6. Refresh berulang selepas login dan sahkan restore loader, backend revalidation, shell selepas auth, default data dahulu serta lazy inactive sections.
 
-## PWA dan Cache
+## PWA dan Cache (metadata r21 close-out 27 Ogos)
 
 - Semak footer v2.4.0 dan popup update.
 - Semak Cache Storage production menggunakan `eouting-cache-v2.4.0-r21` dan asset query `2.4.0-r21`; displayed app version ialah v2.4.0.
@@ -287,7 +275,7 @@ git status --short
 git diff
 ```
 
-Jangan commit token, secret, PIN sebenar, API key atau deployment credential. Untuk backend, `clasp push` mesti diikuti deployment Web App version baharu.
+Jangan commit token, secret, PIN sebenar, API key atau deployment credential. GAS source push tidak menukar immutable Web App deployment. Audit/QA local tidak memberi kebenaran push/deploy.
 
 ## Beta QA — Pengurusan Pelajar LI
 
@@ -299,10 +287,10 @@ Gunakan akaun Admin beta sahaja. Jangan gunakan PIN sebenar dalam Git, nota ujia
    - `student_id`: ID beta unik;
    - `no_matrik`: nilai unik berbentuk teks (uji nilai bermula sifar);
    - `nama`: nama ujian yang jelas;
-   - `kelas`: `LI`;
+   - `kelas`: `LI`, `institution_code`: institusi fixture aktif (model canonical UNISZA jika sesuai);
    - `status`: `AKTIF`.
 4. Semak carian melalui `student_id`, `no_matrik` dan `nama`; semak juga filter `LI` dan `Aktif`.
-5. Log keluar Admin, buka flow `Pelajar` dan sahkan pilihan kelas `LI` muncul kerana sekurang-kurangnya seorang pelajar LI aktif wujud.
+5. Log keluar Admin, buka flow Pelajar dan sahkan kumpulan LI/institusi fixture muncul melalui directory config aktif; legacy fallback perlu diuji berasingan.
 6. Pilih kelas LI, login menggunakan nama dan no. matrik sementara, kemudian sahkan flow Pelajar biasa masih berfungsi.
 7. Login Admin semula, nyahaktifkan pelajar sementara dan refresh flow Pelajar; pilihan/nama LI mesti hilang jika tiada lagi pelajar LI aktif.
 8. Aktifkan semula rekod itu dan sahkan kelas serta nama LI muncul kembali.

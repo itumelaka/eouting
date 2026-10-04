@@ -1,6 +1,49 @@
 # Changelog
 
+Setiap entri ialah checkpoint **pada tarikh tersebut**, termasuk version, counts, branch dan hasil suite; bukan pengesahan runtime semasa. [Project Status](PROJECT_STATUS.md) memegang status 4 Oktober; release lama tidak perlu diulang sebagai migration/QA aktif.
+
+## 2026-10-04 — reconciliation, live gap dan mirror staging disabled
+
+- Source audit docs bermula pada main/HEAD dan origin/main `1e46eb3` (`fix: disable staging operational mirror to production Sheets`); reconciliation dokumentasi terdahulu `cbb4015`. Ini bukan rekod commit baharu audit dokumentasi ini.
+- Production kekal GAS/Sheets, tiada cutover. Rehearsal local matched: profil 34/34 daripada snapshot terdahulu (belum refreshed 4 Oktober); metadata foto 34/34 dan 32/32 refs; request 397/397 pada 39 mapping fields; audit 3097/3097 occurrences melalui ordinal case-sensitive multiset. Foto metadata bukan akses/binari Drive verification.
+- Tambahan staging rehearsal: 3 pelajar, 1 photo ref, 15 request dan 117 audit occurrences; staging request 412/audit3214. Missing/mismatch request/duplicate ID 0, foto tiada duplicate/placeholder/incomplete pair, audit missing/duplicate keys/schema violations 0. Tambahan belum classified untuk cutover.
+- Lima tujuan mismatch eksport awal ialah encoding output PowerShell; UTF-8 reexport membuktikan U+00B2 dan 5/5 matched tanpa database fix.
+- Comparison live sekitar **12:40 MYT**: production **424**, D1 snapshot **412**, shared **397**, production-only **27**, D1-only **15**; shared exact **395**, satu lifecycle mismatch dan satu serialization catatan (numeric raw sama, display TIME Sheets vs string D1). Daripada **14 production KELUAR**, **13 missing D1**, **1 pending D1**. Snapshot terikat waktu semakan; rehearsal PASS bukan parity production terkini.
+- GAS operational mirror deployed **Version 6** confirmed menuju spreadsheet production, snapshot update tanpa freshness guard; **tiada bukti stale overwrite berlaku**. Ia berasingan daripada projek photo adapter QA Version 6.
+- Queue sebelum deploy **0**. Gate `OPERATIONAL_MIRROR_ENABLED=false` deployed **staging sahaja**, Worker `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`. Cron **13:05:26 MYT** log `OUTING_REQUEST_MIRROR_RECONCILIATION_SKIPPED`, processed/succeeded/failed **0**. Direct gate local-tested, belum live mutation-tested.
+- Disabled mutation utama D1 masih commit dan enqueue/retain ID; reconciliation tidak read/delete queue atau mark success. Jangan enable sebelum target/queue reconciled; rollback revision lama tanpa gate boleh re-enable mirror.
+- Implementation validation **focused 164/164 PASS**, syntax/diff-check PASS; bukan full suite. Diagnostic GAS sementara dibackup/dibuang source local tanpa GAS deploy. Production GAS/Sheets tidak dimutasi sesi ini; tiada sync/import/cutover.
+- Audit semua 12 Markdown first-party menyelaraskan status/runbook/TODO, membuang checklist beta obsolete dan repeat histories, membetulkan claim Admin route tiada serta baseline suite/version seolah-olah current. Kod/config/test/snapshot/SQL tidak termasuk perubahan dokumentasi ini.
+
+## 2026-09-28 — trusted photo manual recovery, cleanup dan real timeout
+
+- `16ea4f0` trusted REMOVE, `a6a9a7a` manual recovery, `dc6c9de` old-photo cleanup dan `70e5642` real timeout verification ialah checkpoint source/history. Trusted READ/UPLOAD/REMOVE menggunakan real D1 metadata, HMAC adapter, PHOTO_OPERATIONS journal/CAS dan private Drive; production tetap GAS/Sheets.
+- Staging photo adapter QA Version 5: trusted READ thumbnail/full verified. Satu REMOVE UI Admin: D1 photo pair kosong, journal COMPLETED/attempt1/old metadata matched dan audit; raw HTTP200 tidak ditangkap, independent isTrashed dan duplicate REMOVE E2E masih terbuka.
+- Photo QA Version 6: inspection negative guards/sanitization, synthetic REMOVE recovery/retry, synthetic UPLOAD fail-closed DRIVE_FILE_NOT_FOUND, real UPLOAD expected-new tanpa CAS kedua, expected-old dengan CAS, dan RECONCILE_REQUIRED expected-new recovery verified. Fault injection manual terhad, bukan proof semua crash paths; audit correlation request_id=operation_id dan attempts1 dikekalkan.
+- Real timeout selepas Drive create: Worker PENDING/UPSTREAM_OUTCOME_UNKNOWN/EXPECTED_OLD/no audit; manual recovery menjadi COMPLETED, attempts1, error cleared dan tepat satu audit. QA-only timeout hook dikeluarkan selepas verification.
+- Photo QA Version 7/Worker `2d87c662-f04c-4217-979c-96a7bd88de52`: manual old-photo cleanup TRASHED/retry ALREADY_TRASHED verified, tepat satu audit, journal/foto baharu unchanged. Audit-failure selepas trash E2E dan changed-state quarantine recovery belum verified; automatic recovery/cleanup belum tersedia.
+- Historical local validation: recovery10/10, recovery+adapter25/25, Worker108/108, full951/951; cleanup focused141/141/full959/959. Ini hasil checkpoint, bukan current suite runs. Butiran kes dan had bukti disimpan dalam [Project Status](PROJECT_STATUS.md#phase-6c--trusted-photo-migration--kemas-kini-28-september-2026).
+
+## 2026-09-25 hingga 27 — canonical LI UNISZA dan sumber rehearsal
+
+- `f0b4eaf` (25 September) canonical assignment dan `0e3dcbb` (27 September) runtime canonical grouping. LI UNISZA menggunakan kelas LI/institution UNISZA, key GROUP:LI:UNISZA; non-LI institution kosong, prefix ID migration-only. Legacy key GROUP:UNISZA:UNISZA dalam checkpoint 22 September di bawah ialah sejarah, bukan kontrak current.
+- Snapshot September mempunyai 34 pelajar/32 photo refs dan **371 request**. CSV sumber rehearsal Oktober ialah **397 request**; live 424 pada 4 Oktober bukan count snapshot September/Oktober rehearsal. Pembetulan staging bukan production migration.
+- Insiden lifecycle LI terdahulu belum dibuktikan puncanya; jangan mengaitkan kategori dengan status atau mirror overwrite tanpa bukti. Masih perlu invariant dan fresh-source reconciliation.
+
+## 2026-09-23 — checkpoint Admin D1 createStaff
+
+- Checkpoint source ketika itu `98f2d11` dan perubahan createStaff belum committed pada waktu QA; deployment staging `20a462a5-3fbb-438f-8ed7-3827de6e63b2`, bukan keadaan Git semasa.
+- WARDENS staging ditambah nullable TEXT email/no_tel/catatan, existing rows6 kekal. Manual API QA createStaff lulus persistence/audit, duplicate ID/nama, invalid role/PIN/status dan required PIN; response tidak membawa PIN.
+- updateStaff/toggleStaffStatus belum routed pada checkpoint ini, tetapi **kini wujud dalam source Worker/frontend**. Historical createStaff QA tidak membuktikan route lain deployed/E2E; Admin roster/auth/Guardian/return-selfie source tersedia kini tidak menutup parity.
+
 ## 2026-09-22 — V3 staging: dynamic student groups dan D1 hostel roster
+
+### Milestone No-Guard dan async mirror terdahulu (kini operational mirror disabled)
+
+- Tag v3-no-guard-staging-qa: Student requestDepartureConfirmation/audit dedup/Telegram, Warden pending queue/confirmWardenRemoteCheckout, transition approved -> KELUAR dengan guard_keluar_by kosong, WARDEN_REMOTE_CHECKOUT dan completion Telegram/idempotency serta UI Student verified staging. Commits 22833e2/d6cee79 mengekalkan guidance/context; bukan QA direct disabled gate 4 Oktober.
+- Tag v3-async-mirror-qa: enam mutation utama D1 menggunakan background mirror selepas commit, durable retry/reconciliation setiap lima minit. QA scheduler orphan row sementara lulus dan queue kembali kosong pada checkpoint September. Bukan current queue count dan bukan kebenaran replay ke production kini.
+
+### Checkpoint grouping/roster
 
 - Checkpoint: `e30a0fb feat: add D1 hostel roster parity and dynamic student groups`, branch `wip/eouting_v3_recovery_20260921`. Branch sudah pushed dan working tree bersih pada checkpoint sebelum kemas kini dokumentasi ini; butiran dalam [Project Status](PROJECT_STATUS.md).
 - V3 masih **staging**; production frontend kekal **V2/GAS/Google Sheets**. Staging D1 ialah `eouting_staging`, staging Worker selepas roster deploy ialah `3c5856b5-3515-4098-a578-d3fadb60344c`.
@@ -13,7 +56,7 @@
 
 ### Incident deployment Worker dan rollback
 
-Worker sempat tersalah deploy ke production kerana `wrangler deploy` dijalankan tanpa `--env staging`. Production segera rollback ke versi asal `a483bda0-77db-4189-8d29-1984e2f4f758` dan kekal pada versi tersebut. Ini bukan production V3 cutover. Setakat semakan checkpoint ini, tiada bukti berlaku production data corruption; production Worker telah dipulihkan semula ke versi asal.
+Worker sempat tersalah deploy ke production kerana `wrangler deploy` dijalankan tanpa `--env staging`. Production segera rollback ke versi asal `a483bda0-77db-4189-8d29-1984e2f4f758` pada checkpoint ini; ini bukan semakan deployment semasa. Ini bukan production V3 cutover. Setakat semakan checkpoint ini, tiada bukti berlaku production data corruption; production Worker telah dipulihkan semula ke versi asal.
 
 Selepas incident ini, semua staging deployment mesti menggunakan explicit `npx wrangler deploy --env staging` dari direktori `proxy`. Tiada deployment dijalankan dalam kemas kini dokumentasi ini.
 
@@ -166,21 +209,14 @@ Announcement Banner turut gagal dimuat semasa window insiden. Banner menggunakan
 
 - Production audit established the activation path accurately: historical documented baseline Version 44, actual pre-sync production Version 45 with no description, then controlled in-place synchronization of the existing deployment to Version 46 with description `eOuting v2.4.0 Phase 1-5 operational safety sync`. The Version 45 origin was not determined or inferred.
 - Existing deployment ID `AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f` and production URL were preserved; no new Web App or API executable deployment was created. Canonical timezone was `Asia/Kuala_Lumpur`, with `ANYONE_ANONYMOUS` and `USER_DEPLOYING` Web App behavior.
-- Before synchronization, latest Apps Script HEAD/manual dry-run classified `OUT-20260820-234127-3513` as `ACTION_REQUIRED` while the deployed PWA showed `MAKLUMAT WAKTU PULANG PERLU DISEMAK`. After Version 46, Student and Admin agreed on lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, expected return `2026-08-20 22:00` and Admin `Perlu Tindakan -> Tindakan Segera`. The deployed Web App had been serving an older code revision; this was not data corruption.
+- Before synchronization, latest Apps Script HEAD/manual dry-run classified satu rekod QA terkawal as `ACTION_REQUIRED` while the deployed PWA showed `MAKLUMAT WAKTU PULANG PERLU DISEMAK`. After Version 46, Student and Admin agreed on lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, expected return `2026-08-20 22:00` and Admin `Perlu Tindakan -> Tindakan Segera`. The deployed Web App had been serving an older code revision; this was not data corruption.
 - Parameterless maintenance wrapper `runReturnOperationalNotificationsDryRun()` remains hard-coded to `dryRun: true`, is absent from frontend/`doGet`/`doPost` and is separate from the scheduled trigger. Production dry-run at `2026-08-20T23:49:09+08:00` produced one PREVIEW `ACTION_REQUIRED` batch with zero sends, failures and audit writes; 52 other records were lifecycle-ineligible and trigger count remained zero at that stage.
-- Exactly one controlled real production send targeted `OUT-20260820-234127-3513` at about `2026-08-21 07:27:38 +08:00`: lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, `timing_valid=true`, `needs_review=false`, expected return `2026-08-20T22:00:00+08:00`, approximately 9 jam 27 minit late. The user independently confirmed exactly one Telegram message arrived with the following operational content:
+- Exactly one controlled real production send targeted satu rekod QA terkawal at about `2026-08-21 07:27:38 +08:00`: lifecycle `KELUAR`, urgency `ACTION_REQUIRED`, `timing_valid=true`, `needs_review=false`, expected return `2026-08-20T22:00:00+08:00`, approximately 9 jam 27 minit late. The user independently confirmed exactly one Telegram message arrived with the following operational content:
 
-```text
-🚨 TINDAKAN SEGERA DIPERLUKAN
+Kandungan mesej mengesahkan satu pelajar QA lewat dan arahan menghubungi Warden/HEP; nama/identiti fixture tidak direkodkan semula.
 
-1 pelajar telah lewat 60 minit atau lebih.
-
-• NAMA SAYA TESTING SATU — lewat 9 jam 27 minit
-
-Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.
-```
 - Successful delivery wrote exactly one `RETURN_ACTION_REQUIRED_SENT` at `2026-08-21 07:27:40 +08:00`; `AUDIT_LOG` increased 1036 -> 1037. Same request/stage verification returned `ALREADY_SENT` and caused no second send.
-- Exactly one five-minute time-driven trigger is live for private `scanReturnOperationalNotifications_` (trigger ID `9156626915782557696`). A temporary installer was needed because the trailing-underscore function was not selectable in the trigger UI. It fixed the handler and `everyMinutes(5)`, checked existing project triggers first, refused duplicates, accepted no configurable handler/interval, did not run scanner/Telegram and did not delete triggers. The installer/tests were removed and canonical source restored without removing the trigger. An earlier authorization attempt was cancelled before the installer body executed and created no trigger.
+- Exactly one five-minute time-driven trigger is live for private `scanReturnOperationalNotifications_` . A temporary installer was needed because the trailing-underscore function was not selectable in the trigger UI. It fixed the handler and `everyMinutes(5)`, checked existing project triggers first, refused duplicates, accepted no configurable handler/interval, did not run scanner/Telegram and did not delete triggers. The installer/tests were removed and canonical source restored without removing the trigger. An earlier authorization attempt was cancelled before the installer body executed and created no trigger.
 - First natural scheduled execution ran `21 Aug 2026, 08:10:59`, completed in `21.761` seconds and showed `0%` trigger error rate. `AUDIT_LOG` remained 1037, no new notification was observed and the controlled test request retained one matching SENT audit, providing production evidence of audit-backed dedup.
 - Post-Version-46 browser verification passed at desktop `1280x720` and mobile `390x844`: Student urgency/expected return, Warden approval controls, Guard movement controls, Admin KPIs/`Perlu Tindakan` and Public Monitoring privacy boundary were preserved; no horizontal overflow or browser console error was observed.
 - Practical limitation remains: Telegram delivery and Sheets audit write are not atomic, so Phase 5 offers audit-backed practical idempotency rather than guaranteed transactional exactly-once delivery.
@@ -359,7 +395,7 @@ Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.
 - **Admin:** menambah statistik individu berautentikasi mengikut bulan, tahun dan kelas serta membaiki rendering workspace Statistik Admin.
 - **Tempoh outing:** menjumlahkan tempoh sebenar yang sah daripada `masa_keluar` hingga `masa_masuk`; timestamp tidak lengkap kekal menyumbang sifar tempoh tanpa mengurangkan kiraan outing.
 - **GAS hygiene:** menetapkan `gas/Code.gs` sebagai source executable kanonik dan mengehadkan skop clasp melalui `.claspignore`.
-- **Production:** frontend v2.1.0 menggunakan GAS Version 27, Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg` dan endpoint GAS production yang tidak berubah.
+- **Production:** frontend v2.1.0 menggunakan GAS Version 27, Spreadsheet production sedia ada dan endpoint GAS production yang tidak berubah.
 - **Release commit:** `chore: bump eOuting version to 2.1.0` (commit yang membawa entri ini).
 
 ## v2.0.0 — 2026-08-04
@@ -478,7 +514,7 @@ Sila hubungi Warden/HEP dan sahkan status pelajar dengan segera.
 - **PWA:** menyelaraskan footer, asset version, cache name, `version.json` dan release popup kepada v1.7.0.
 - **Testing:** keseluruhan suite lulus **59/59**.
 - **Deployment:** Pull Request #1 digabungkan ke `main` (`beec1e0`, daripada `21996a2`), frontend live di GitHub Pages dan GAS production dideploy sebagai **Version 21** pada 26 Jul 2026.
-- **Production validation:** request `OUT-20260726-121316-1479` selesai dengan `selfie_status = SUDAH_HANTAR`, metadata Drive terisi, `masa_selfie = 2026-07-26 12:18:00`, Telegram message ID `98`, serta imej berjaya disimpan dan dihantar.
+- **Production validation:** request satu rekod QA terkawal selesai dengan `selfie_status = SUDAH_HANTAR`, metadata Drive terisi, `masa_selfie = 2026-07-26 12:18:00`, Telegram message ID `98`, serta imej berjaya disimpan dan dihantar.
 
 ## v1.6.25
 

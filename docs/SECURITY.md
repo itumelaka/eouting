@@ -1,6 +1,16 @@
 # Security Notes eOuting ITU
 
-Dokumen ini menerangkan boundary keselamatan production **v2.4.0 / GAS Version 57 / frontend r21** pada close-out 27 Ogos 2026. Frontend ialah laman statik yang boleh diperiksa; authorization sebenar berlaku di GAS dan Google Sheets. PERF-01 Phase 1, config-readiness fix dan refinement visual tidak mengubah authentication, permission, API authority atau privacy boundary.
+Dokumen ini menerangkan boundary keselamatan production **v2.4.0 / GAS Version 57 / frontend r21** pada close-out 27 Ogos 2026. Frontend ialah laman statik yang boleh diperiksa; authorization production berlaku di GAS/Sheets; route staging yang dimigrasikan mengesahkan credential/role terhadap D1. PERF-01 Phase 1, config-readiness fix dan refinement visual tidak mengubah authentication, permission, API authority atau privacy boundary.
+
+## Mirror staging dan authority — 4 Oktober 2026
+
+Production kekal GAS/Sheets, tiada cutover. GAS operational mirror deployed Version 6 menunjuk spreadsheet production dan update snapshot ID sedia ada tanpa freshness guard. Secret authentication bukan bukti freshness; D1 mempunyai lifecycle lama, tetapi tiada bukti stale overwrite telah berlaku.
+
+OPERATIONAL_MIRROR_ENABLED=false deployed pada staging Worker `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`. Direct gate menolak sebelum fetch, mutation D1 masih commit/enqueue ID, cron disabled tidak membaca/memadam queue. Runtime 13:05:26 MYT SKIPPED/counts 0; direct gate hanya local-tested, focused 164/164 bukan full suite. Queue 0 sebelum deploy bukan current count. Jangan enable sebelum target/queue reconciled; rollback revision tanpa gate boleh re-enable penghantaran.
+
+Gate ini hanya operational outing mirror/reconciliation; trusted photo, hybrid GAS proxy dan Telegram ialah boundary berasingan. Project/folder/properties QA mesti terasing sebelum live mutation. Source route Admin/Guardian/return-selfie tersedia tidak membuktikan E2E/parity. Snapshot rehearsal PASS tidak membuktikan parity production terkini atau akses/binari Drive. Diagnostic GAS sementara telah dibackup/dibuang local tanpa GAS deploy.
+
+Trusted photo menggunakan server-owned Drive metadata, HMAC/time/nonce/folder validation, journal/CAS dan correlated audit; recovery tidak replay mutation Drive. QA staging yang verified dan open gates disimpan dalam [Project Status](PROJECT_STATUS.md). Automatic recovery/cleanup belum tersedia; independent REMOVE trash proof, duplicate REMOVE E2E, cleanup audit-failure E2E dan changed-state recovery kekal terbuka.
 
 ## Public Data Boundary
 
@@ -87,7 +97,7 @@ Jangan hardcode PIN dalam frontend, test fixture production atau dokumentasi.
 - Cache eOuting lama dibuang semasa activate.
 - Static app shell kekal cacheable.
 - API/external request dan imej selfie sensitif tidak dimasukkan ke Cache Storage.
-- Cache source production semasa ialah `eouting-cache-v2.4.0-r21`; displayed app version ialah v2.4.0 dan backend production ialah Version 57. PERF-01/P0 projection changes tidak mengubah aggregate-only public boundary, authenticated roster authorization atau schema; isolated Version 55 ialah rollback/control.
+- Cache source pada close-out 27 Ogos ialah `eouting-cache-v2.4.0-r21`; displayed app version ialah v2.4.0 dan backend production ialah Version 57. PERF-01/P0 projection changes tidak mengubah aggregate-only public boundary, authenticated roster authorization atau schema; isolated Version 55 ialah rollback/control.
 - Cache operasi backend 20 saat menyimpan source row, bukan derived urgency; `operational_urgency` dihitung selepas cache read menggunakan masa semasa.
 
 Ini menghalang response API lama yang mungkin mengandungi PII daripada kekal dalam Cache Storage selepas deployment.
@@ -181,7 +191,7 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 - `OUTING_TYPES` kini authoritative bagi config-driven production; `ADMIN_USERS` kekal private.
 - `ADMIN_USERS` tidak diseed dengan akaun atau PIN contoh.
 - Fasa 3 menambah `loginAdmin`, public safe config GET dan Admin read/create/update/toggle melalui POST.
-- Tiada Dashboard Admin, butang login Admin atau session token frontend dalam Fasa 3.
+- Fasa 3 asal mendahului Dashboard Admin; kini Dashboard/restore tersedia, tetapi backend-issued session token belum tersedia.
 - `OUTING_CONFIG_V2_ENABLED` default kepada string `false` dan migration tidak pernah menetapkannya kepada `true`.
 - Dalam rekod Fasa 3 asal, `submitRequest` masih menggunakan whitelist dan validation hard-coded v1.7.1; production semasa menggunakan resolver config-driven apabila flag aktif.
 - `type_code` seed tidak ditukar atau ditimpa apabila migration dijalankan semula.
@@ -210,7 +220,7 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 ### Pengasingan Mock Admin Fasa 4.5
 
 - Router Mock Admin hanya aktif apabila URL mempunyai query tepat `mock=1`.
-- Live mode tidak mencipta credential Mock Admin dan terus menghantar action Admin kepada GAS.
+- Live mode tidak mencipta credential Mock Admin; action mengikut mapping D1 pada localhost staging atau GAS production/hybrid.
 - Credential `ADMIN-MOCK` / PIN QA ialah data development sahaja, bukan akaun `ADMIN_USERS` dan tidak diseed ke Google Sheets.
 - Login response mock tidak memulangkan PIN dan router mock tidak log credential.
 - Create, update dan toggle mock hanya menulis array memory tab semasa; tiada `fetch`, GAS atau persistence browser.
@@ -220,7 +230,7 @@ Frontend role hiding, button visibility, PWA install dan local state bukan secur
 ### Canonical POST Router Fasa 4.6
 
 - Frontend mempunyai satu sahaja `apiPost`, mengelakkan security/mock guard ditambah pada declaration yang tidak efektif.
-- Mock guard dinilai sebelum `fetch`; tanpa `mock=1`, action terus menggunakan GAS live.
+- Mock guard dinilai sebelum `fetch`; tanpa `mock=1`, action mengikut mapping D1 staging pada localhost atau GAS production/hybrid.
 - Live POST menggunakan `cache: no-store` dan semua response melalui `parseApiResponse`.
 - HTML, JSON tidak sah, HTTP failure dan backend `ok: false` ditolak secara terkawal tanpa mengubah payload atau authorization GAS.
 
@@ -293,7 +303,7 @@ Selfie dihantar sebagai foto sebenar melalui Telegram `sendPhoto`. Pentadbir ata
 ## Pengurusan Pelajar Beta
 
 - Semua read/write Pengurusan Pelajar memerlukan credential Admin aktif dan menggunakan POST.
-- PIN Admin kekal dalam runtime browser sahaja dan tidak dimasukkan dalam response atau audit.
+- PIN Admin menggunakan runtime dan dedicated sessionStorage tab dengan expiry/revalidation seperti bahagian PIN dan Session; tidak masuk localStorage, response atau audit.
 - Create/update/toggle menggunakan `LockService`; semakan keunikan `student_id` dan `no_matrik` diulang dalam lock.
 - Audit menyimpan identiti Admin, `student_id`, tindakan dan ringkasan medan berubah sahaja.
 - Nyahaktif tidak memadam pelajar atau rekod outing lama; public `getStudents` memang menapis rekod tidak aktif.

@@ -1,6 +1,18 @@
 # Setup Google Apps Script eOuting ITU
 
-Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Production v2.4.0 menggunakan GAS **Version 55**, `OUTING_CONFIG_V2_ENABLED=true` dan `STUDENT_GROUP_CONFIG_ENABLED=true`. Dynamic Student Login dan Current Hostel Residents telah production verified; manifest, Spreadsheet, endpoint dan source backend kanonik kekal sedia ada.
+Google Apps Script ialah backend/API antara frontend GitHub Pages, Google Sheets, Google Drive dan Telegram. Close-out production 27 Ogos 2026 menggunakan GAS **Version 57**, `OUTING_CONFIG_V2_ENABLED=true` dan `STUDENT_GROUP_CONFIG_ENABLED=true`. Dynamic Student Login dan Current Hostel Residents telah production verified; manifest, Spreadsheet, endpoint dan source backend kanonik kekal sedia ada.
+
+## Boundary 4 Oktober 2026
+
+Production masih GAS/Sheets; tiada cutover. GAS operational mirror deployed **Version 6** confirmed menuju spreadsheet production dan update penuh tanpa freshness guard; tiada bukti stale overwrite berlaku. Version mirror ini berasingan daripada QA photo adapter Versions 5/6/7 dan rekod rollout V2 Version 57.
+
+Worker staging `OPERATIONAL_MIRROR_ENABLED=false` deployed `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`; cron 13:05:26 MYT SKIPPED/counts 0, direct gate local-tested sahaja. Mutation D1 ketika disabled tetap queue; jangan enable sebelum target/queue reconciled. Gate Worker tidak menukar GAS code/properties atau mengasingkan semua hybrid GAS/Telegram/photo actions.
+
+Diagnostic GAS sementara dibackup dan dikeluarkan daripada source local, termasuk wrapper/route QA; private `runProfilePhotoMetadataDiagnostic_()` sedia ada kekal. **Tiada GAS deploy repair/cleanup dibuat** dan diagnostic bukan endpoint QA tersedia lagi. Helper schema/profile/selfie yang sudah selesai jangan diulang tanpa bukti gap yang reviewed.
+
+Trusted adapter photo QA mesti menggunakan project/properties/folder terasing; deployment berasingan dalam project sama berkongsi Script Properties. Metadata parity 34/34 dan 32 refs bukan Drive akses/binari verification. Bukti staging photo verified dan open gates: [Project Status](PROJECT_STATUS.md).
+
+Arahan setup/deployment di bawah hanya untuk perubahan yang diluluskan; audit dokumentasi/local QA tidak memanggil helper, scanner, clasp push atau deployment.
 
 ## Tanggungjawab Backend
 
@@ -97,7 +109,7 @@ SELFIE_FOLDER_ID
 Script Property foto profil pelajar:
 
 ```text
-PROFILE_PHOTO_FOLDER_ID=1EpnqLVO8iWHRpF8MuqsyVAN55T7eq5X3
+PROFILE_PHOTO_FOLDER_ID=<PRIVATE_FOLDER_ID>
 ```
 
 Script Property config-driven:
@@ -114,7 +126,7 @@ Script Property No-Guard:
 NO_GUARD_DEPARTURE_ENABLED=true|false
 ```
 
-Parser fail closed: missing, malformed atau nilai selain string tepat `"true"` bermaksud disabled. Safe default ialah false; production close-out kini enabled melalui `Admin > Tetapan Outing > Fallback Pengesahan Keluar Tanpa Guard`. Admin mengawal config sahaja dan tidak memperoleh remote checkout authority. Apabila disabled, request/confirmation baharu disekat tetapi audit history kekal.
+Parser fail closed: missing, malformed atau nilai selain string tepat `"true"` bermaksud disabled. Safe default ialah false; production close-out Ogos merekodkan enabled melalui `Admin > Tetapan Outing > Fallback Pengesahan Keluar Tanpa Guard`. State flag tidak diperiksa semula dalam audit ini. Admin mengawal config sahaja dan tidak memperoleh remote checkout authority. Apabila disabled, request/confirmation baharu disekat tetapi audit history kekal.
 
 Script Properties Notis Banner dicipta secara automatik apabila Admin menyimpan buat kali pertama: teks, status aktif/penting, masa dan identiti pengemas kini. Tiada setup property manual atau sheet `ANNOUNCEMENTS` diperlukan. Jika semua property belum wujud, backend menganggap banner tidak aktif. Nilai ini hanya untuk paparan dan tidak menggantikan konfigurasi `OUTING_TYPES`.
 
@@ -131,7 +143,7 @@ AC: application_open_date
 AD: application_close_date
 ```
 
-Jalankan `setupAdminOutingConfigV200()` menggunakan source baharu selepas authorization yang sah. Helper `ensureHeaders_()` menjadikan migration idempotent: header hilang ditambah tanpa reorder/destructive rewrite, row sedia ada menerima blank, dan rerun tidak menduplikasi kolum. Fungsi tidak mengisi tarikh production, tidak mengubah `OUTING_REQUESTS` dan tidak menetapkan Script Properties baharu.
+Migration ini sudah selesai production pada 22 Ogos. Jalankan helper hanya untuk target terasing/gap schema yang dibuktikan dan diluluskan, bukan ulang checkpoint lama. Helper `ensureHeaders_()` menjadikan migration idempotent: header hilang ditambah tanpa reorder/destructive rewrite, row sedia ada menerima blank, dan rerun tidak menduplikasi kolum. Fungsi tidak mengisi tarikh production, tidak mengubah `OUTING_REQUESTS` dan tidak menetapkan Script Properties baharu.
 
 Production migration telah berjaya pada 22 Ogos 2026. AC/AD disahkan tepat dan semua row production termasuk `CUTI_SEMESTER` disahkan blank selepas migration serta selepas smoke clear. Konfigurasi tarikh mesti dibuat secara manual melalui Admin hanya apabila polisi operasi memerlukannya.
 
@@ -139,7 +151,7 @@ Validation backend menerima blank atau canonical `YYYY-MM-DD`, menolak tarikh ti
 
 ## Setup Bukti Selfie v1.7.0
 
-Jalankan fungsi berikut sekali selepas code GAS v1.7.0 tersedia:
+Setup production ini telah selesai pada rollout v1.7.0; bagi target baharu/gap yang disahkan sahaja, helper ialah:
 
 ```javascript
 setupSelfieProofV170()
@@ -158,7 +170,7 @@ Fungsi ini idempotent dan tidak perlu dipanggil pada setiap request. Folder Driv
 
 ## Setup Foto Profil Pelajar
 
-Selepas source GAS baharu tersedia, jalankan sekali:
+Setup profile production terdahulu telah selesai; bagi target baharu/gap yang disahkan sahaja, helper ialah:
 
 ```javascript
 setupStudentProfilePhotos()
@@ -186,7 +198,7 @@ clasp show-file-status
 Semak syntax GAS:
 
 ```powershell
-Get-Content gas/Code.gs -Raw | node --check -
+Get-Content gas/Code.gs -Raw -Encoding utf8 | node --check -
 ```
 
 `gas/Code.gs` ialah source GAS executable kanonik. `.claspignore` mengehadkan upload kepada fail itu dan `appsscript.json`; jangan letakkan snapshot `.gs` arkib dalam skop clasp kecuali ia diabaikan secara eksplisit. Sebelum version/deploy, validasikan manifest tepat mengekalkan `timeZone=Asia/Kuala_Lumpur`, `runtimeVersion=V8`, `webapp.executeAs=USER_DEPLOYING` dan `webapp.access=ANYONE_ANONYMOUS`. Version 47 membuktikan immutable version boleh gagal walaupun source business logic betul jika Web App block hilang.

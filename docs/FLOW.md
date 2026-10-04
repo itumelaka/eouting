@@ -1,6 +1,20 @@
 # Flow Sistem eOuting ITU
 
-Dokumen ini menerangkan flow production **v2.4.0**, cache `2.4.0-r21`, GAS Version 57, config outing `Config Active` dan Dynamic Student Login ON. Full Node suite terakhir sebelum rollout 27 Ogos 2026 ialah **744/744**. PERF-01 Phase 1 dan readiness fix tidak mengubah lifecycle, role authority, Pulang Bermalam, Guard date validation, schema atau privacy flow di bawah.
+Dokumen ini menerangkan baseline flow production **v2.4.0**, cache `2.4.0-r21`, GAS Version 57, config outing `Config Active` dan Dynamic Student Login ON. Full Node suite terakhir sebelum rollout 27 Ogos 2026 ialah **744/744**. PERF-01 Phase 1 dan readiness fix tidak mengubah lifecycle, role authority, Pulang Bermalam, Guard date validation, schema atau privacy flow di bawah.
+
+## Boundary staging semasa — 4 Oktober 2026
+
+Production tetap GAS/Sheets dan belum cutover. Source localhost memetakan flow D1 termasuk Admin/roster/staff, Guardian Contact dan return-selfie; code tersedia bukan deployment/E2E parity. Flow GAS berikut ialah baseline production, bukan arahan QA mutation remote.
+
+```text
+Mutation D1 -> state/audit utama -> response
+            -> direct mirror disabled -> ID dikekalkan/enqueued untuk retry
+Cron -> OPERATIONAL_MIRROR_ENABLED=false -> SKIPPED (0/0/0, queue tidak dibaca/dipadam)
+```
+
+Gate false staging deployed Worker `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`, runtime 13:05:26 MYT. Direct gate hanya local-tested; queue 0 sebelum deploy bukan semasa. GAS mirror Version 6 menuju production tanpa freshness guard; tiada bukti stale overwrite. Jangan enable sebelum target/queue reconciled. Gate ini tidak mematikan Telegram, trusted photo atau semua hybrid GAS actions.
+
+Rehearsal 34 profil terdahulu, 34 metadata/32 refs, 397 request/39 fields, 3097 audit matched bukan parity live 424 vs 412. Shared exact395/397; 14 production KELUAR terdiri 13 missing dan 1 pending D1. [Project Status](PROJECT_STATUS.md) menyimpan timestamp/had bukti dan QA foto terbuka. Diagnostic GAS sementara dibackup/dibuang local tanpa GAS deploy.
 
 ## Flow keluar normal dan No-Guard
 
@@ -31,7 +45,7 @@ DILULUSKAN_WARDEN
 
 Student tidak pernah self-checkout dan request sahaja tidak menghasilkan `KELUAR`. Eligibility tidak bergantung pada class A2/A3/LI atau jenis outing tertentu. `ScriptLock` dan re-read melindungi race/replay: Guard-first menutup fallback; Warden-first menolak Guard departure kedua. Duplicate pending request tidak mengulang audit/Telegram, dan replay Warden tidak mengulang completion Telegram.
 
-`NO_GUARD_DEPARTURE_ENABLED` hanya aktif bagi nilai tepat `"true"`; safe default ialah false tetapi production close-out kini ON. Apabila OFF, Student request baharu dan Warden fallback confirmation ditolak, sejarah audit kekal, dan unresolved request boleh actionable semula apabila ON. Admin hanya mengawal toggle, bukan authority checkout.
+`NO_GUARD_DEPARTURE_ENABLED` hanya aktif bagi nilai tepat `"true"`; safe default ialah false tetapi production close-out Ogos merekodkan ON; flag tidak diperiksa semula dalam audit dokumentasi. Apabila OFF, Student request baharu dan Warden fallback confirmation ditolak, sejarah audit kekal, dan unresolved request boleh actionable semula apabila ON. Admin hanya mengawal toggle, bukan authority checkout.
 
 Jika request Telegram gagal, request/waiting UI/queue kekal dan tiada retry automatik. Jika completion Telegram gagal selepas transition, audit dan flush, `KELUAR`, `masa_keluar` dan audit kekal committed, `guard_keluar_by` kekal blank, serta tiada rollback atau automatic retry.
 
@@ -46,7 +60,7 @@ GET getStudentLoginDirectory
   -> loginStudent sahkan student_id + no_matrik pada STUDENTS authoritative
 ```
 
-Kumpulan production ialah A2, A3, LI UMK dan LI UPM. Prefix ID tidak digunakan ketika runtime. Jika config tidak valid atau rollback dipilih, backend kembali kepada kumpulan legacy dengan authentication yang sama.
+Kumpulan login data-driven; LI UMK/UPM ialah konfigurasi close-out Ogos. Model kanonik semasa LI UNISZA ialah kelas LI/institution UNISZA, directory GROUP:LI:UNISZA; non-LI institution kosong. Prefix ID tidak digunakan ketika runtime. Jika config tidak valid atau rollback dipilih, backend kembali kepada kumpulan legacy dengan authentication yang sama.
 
 ## Current Hostel Residents
 
@@ -153,7 +167,7 @@ GET gagal atau config kosong
 
 Hidden field dikosongkan apabila tidak lagi relevan dan sentiasa disabled. Payload builder menggunakan konfigurasi terpilih, bukan whitelist type code frontend. Jenis custom boleh menggunakan requirement sedia ada tanpa branch baharu.
 
-`KLINIK` (`Keluar ke Klinik`) menggunakan same-day return, tidak memaparkan tarikh keluar/balik manual, dan memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden serta selfie. Custom section menggunakan `Maklumat Tambahan`; `PULANG_BERMALAM` sahaja mengekalkan `Maklumat Pulang Bermalam`. `earliest_departure_time` kosong bermaksud tiada had masa paling awal dan Admin boleh mengosongkannya melalui `Kosongkan`. Readiness memaparkan `Config Issue / Not Ready` bagi kombinasi tidak konsisten seperti departure days bersama `require_leave_date=false`.
+`KLINIK` (`Keluar ke Klinik`) menggunakan same-day return, tidak memaparkan tarikh keluar/balik manual, dan memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden serta selfie. Custom section menggunakan `Maklumat Tambahan`; `PULANG_BERMALAM` sahaja mengekalkan `Maklumat Pulang Bermalam`. `earliest_departure_time` kosong bermaksud tiada had masa paling awal dan Admin boleh mengosongkannya melalui `Kosongkan`. Readiness memaparkan Config Issue bagi departure days tanpa leave date apabila `same_day_only=false`; same-day jenis tidak memerlukan tarikh manual semata-mata kerana departure days.
 
 ## Admin Dashboard dan Restore Production
 

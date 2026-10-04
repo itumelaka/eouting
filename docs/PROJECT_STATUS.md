@@ -1,32 +1,59 @@
 # Project Status eOuting ITU
 
-## Checkpoint production live dan sekatan mirror staging — 4 Oktober 2026
+Checkpoint dokumentasi: **4 Oktober 2026**. Production kekal GitHub Pages + GAS/Google Sheets; **tiada cutover D1**. Bukti runtime di bawah datang daripada semakan sesi bertarikh, bukan remote check yang dijalankan semula ketika audit dokumentasi. Source pada permulaan audit: main/HEAD dan origin/main `1e46eb3`.
 
-- **Comparison sekitar 12:40 MYT:** production live mempunyai 424 request berbanding 412 dalam snapshot D1; ID bersama 397, production sahaja 27 dan D1 sahaja 15. Daripada 14 request production `KELUAR`, 13 tiada dalam D1 dan 1 masih `MENUNGGU_KELULUSAN` dalam D1. Ini comparison pada waktu semakan, bukan jaminan snapshot kekal current. PASS parity rehearsal di bawah bukan parity production terkini.
-- **Sasaran mirror confirmed:** GAS mirror deployed Version 6 disahkan menunjuk spreadsheet production. `mirrorOutingRequestFromD1` mengemas kini snapshot penuh untuk ID sedia ada tanpa freshness/version guard; tiada bukti stale overwrite telah berlaku. `MIRROR_RETRY_QUEUE` mempunyai 0 row sebelum deploy gate.
-- **Gate staging deployed:** `OPERATIONAL_MIRROR_ENABLED=false` telah deployed kepada Worker staging sahaja, Version ID `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`. Runtime cron pada 13:05:26 MYT menghasilkan `OUTING_REQUEST_MIRROR_RECONCILIATION_SKIPPED`, dengan `processed=0`, `succeeded=0` dan `failed=0`.
-- **Direct mirror dan polisi queue:** gate direct mirror verified melalui local tests, belum melalui live mutation. Mutation utama D1 ketika gate disabled mengekalkan ID dalam retry queue; reconciliation disabled tidak memadam queue atau menandakan mirror berjaya. Jangan enable semula sebelum sasaran mirror dan queue direconcile.
-- **Validation implementation:** focused tests 164/164 PASS, syntax dan `git diff --check` PASS seperti report implementation. Production GAS/Sheets tidak dimutasi dalam sesi ini; tiada sync/import/cutover dibuat.
+## Production live dan mirror staging — 4 Oktober 2026
 
-## Checkpoint reconciliation rehearsal — 4 Oktober 2026
+| Comparison sekitar 12:40 MYT | Jumlah |
+|---|---:|
+| Production request | 424 |
+| D1 snapshot request | 412 |
+| ID bersama | 397 |
+| Production sahaja | 27 |
+| D1 sahaja | 15 |
+| Row bersama exact pada comparison live | 395 |
+| Row bersama berbeza | 2 |
 
-**Skop bukti:** comparison dibuat secara local terhadap CSV production snapshot yang digunakan untuk rehearsal dan eksport staging tempatan. PASS ini bukan reconciliation dengan snapshot production terkini dan bukan kelulusan cutover. Production tidak disentuh; tiada pembetulan database, reimport, deploy atau cutover dibuat dalam sesi ini.
+Dua perbezaan terdiri daripada satu perubahan lifecycle dan satu isu serialization `catatan`: nilai numerik mentah sepadan, tetapi paparan sel Sheets bertipe TIME berbeza daripada string numerik D1. Ia belum dianggap exact-row PASS atau pembetulan database. Daripada **14 production KELUAR**, **13 tiada dalam D1** dan **1 masih MENUNGGU_KELULUSAN dalam D1**. Counts ini terikat pada waktu semakan; snapshot tidak dijamin kekal current.
 
-- **Profil STUDENTS:** 34/34 profil sumber sepadan berdasarkan snapshot terdahulu; profil penuh belum diambil semula pada 4 Oktober.
-- **Metadata foto — snapshot 4 Oktober:** 34/34 pelajar sumber sepadan pada `photo_file_id` dan `photo_updated_at`, termasuk 32/32 rujukan foto sumber. Staging mempunyai 3 pelajar tambahan dan 1 rujukan foto tambahan. Tiada duplicate ID, placeholder `GAS_MANAGED` atau metadata foto tidak lengkap. Ini parity metadata sahaja, bukan verification akses atau binari Google Drive.
-- **OUTING_REQUESTS — snapshot 4 Oktober:** 397/397 row sumber sepadan tepat pada semua 39 medan mapping `proxy/generate_outing_requests_rehearsal.ps1`. Missing ID, mismatch dan duplicate ID semuanya 0; staging mempunyai 15 row tambahan (jumlah 412).
-- **AUDIT_LOG — snapshot 4 Oktober:** 3097/3097 occurrences sumber sepadan melalui ordinal case-sensitive multiset comparison bagi semua lapan medan. NULL dianggap empty string untuk kolum nullable sahaja; teks dan timestamp tidak di-trim atau diubah. Missing occurrences, duplicate keys dan schema violations semuanya 0; staging mempunyai 117 occurrences tambahan (jumlah 3214).
-- **Encoding eksport request:** lima mismatch `tujuan` pada eksport pertama berpunca daripada encoding output PowerShell. Eksport semula menggunakan `Console.OutputEncoding` UTF-8 membuktikan aksara staging ialah `U+00B2` dan kelima-lima row sepadan (5/5); tiada pembetulan database dibuat dalam sesi ini.
+- GAS operational mirror deployed **Version 6** disahkan menunjuk spreadsheet production. `mirrorOutingRequestFromD1` mengemas kini snapshot penuh ID sedia ada tanpa freshness/version guard. **Tiada bukti stale overwrite telah berlaku.** Version ini berasingan daripada nombor version projek trusted photo adapter QA.
+- `MIRROR_RETRY_QUEUE` mempunyai **0 row sebelum deploy gate**; ini bukan bukti queue semasa masih kosong.
+- `OPERATIONAL_MIRROR_ENABLED=false` deployed pada **Worker staging sahaja**, Version ID `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`. Cron **13:05:26 MYT** menghasilkan `OUTING_REQUEST_MIRROR_RECONCILIATION_SKIPPED`; processed/succeeded/failed semuanya **0**.
+- Direct mirror gate **local-tested**, belum live mutation-tested. Mutation utama D1 masih berjalan; ID mutation baharu atau gagal dikekalkan/enqueued dalam retry queue. Reconciliation disabled tidak membaca/memadam queue atau menandakan mirror berjaya. Kegagalan write queue kekal risiko operasi yang perlu dipantau.
+- Jangan enable semula sebelum **sasaran mirror dan queue direconcile**, termasuk freshness state production. Rollback Worker kepada kod lama tanpa gate boleh mengaktifkan penghantaran semula.
+- Implementation gate: **focused 164/164 PASS**, syntax dan diff-check PASS; ini bukan full suite semasa. Production GAS/Sheets tidak dimutasi dalam sesi ini; tiada sync/import/cutover dibuat.
+- Diagnostic GAS sementara telah dibackup dan dikeluarkan daripada source local, termasuk route/wrapper QA sementara; private `runProfilePhotoMetadataDiagnostic_()` sedia ada kekal. **Tiada GAS deploy dibuat** untuk repair/cleanup diagnostic ini.
 
-**Sumber tempatan:** CSV rehearsal dalam `proxy/students_production_snapshot.csv`, `proxy/outing_requests_production_snapshot.csv` dan `proxy/audit_log_production_snapshot.csv`; snapshot 4 Oktober di TEMP luar repo ialah `eouting_photo_staging_20261004.json`, `eouting_requests_staging_utf8_20261004.json` dan `eouting_audit_staging_20261004.json`. Profil penuh menggunakan snapshot terdahulu `proxy/students_staging_snapshot_full.json`. JSON snapshot 4 Oktober disahkan valid dan `success=true` sebelum comparison. ID dipadankan secara ordinal case-sensitive; `staging_rowid` bukan sebahagian key audit.
+## Reconciliation rehearsal — 4 Oktober 2026
 
-**Perbezaan checkpoint:** angka 371 permohonan di bahagian September ialah checkpoint sejarah; CSV sumber rehearsal Oktober mempunyai 397 permohonan. Tambahan staging belum diklasifikasikan sebagai data cutover atau QA hanya berdasarkan counts.
+PASS terhad kepada CSV sumber rehearsal dan snapshot staging tempatan, **bukan parity production terkini atau kelulusan cutover**. JSON staging disahkan valid dan `success=true` sebelum comparison. Matching ID ordinal case-sensitive; tiada trim, case/Unicode conversion atau timestamp reformat di luar mapping.
 
-**Baki sebelum mempertimbangkan cutover:** fresh pre-flight sumber production; verification invariant lifecycle/roster; classification pelajar/request/audit/foto tambahan staging; rollback rehearsal dengan verification hasil restore; serta gate QA foto dan flow yang masih terbuka dalam checkpoint Phase 6C di bawah. Parity rehearsal ini tidak menutup gate tersebut atau membuktikan production sudah migrated.
+| Dataset | Bukti sepadan | Tambahan staging / had bukti |
+|---|---|---|
+| Profil STUDENTS | 34/34 pada snapshot terdahulu | Profil penuh belum diambil semula 4 Oktober |
+| Metadata foto 4 Oktober | 34/34 pelajar; 32/32 rujukan sumber | 3 pelajar + 1 rujukan foto tambahan; bukan verification akses/binari Drive |
+| OUTING_REQUESTS 4 Oktober | 397/397 pada semua 39 medan mapping | 15 tambahan; jumlah staging 412; missing/mismatch/duplicate ID 0 |
+| AUDIT_LOG 4 Oktober | 3097/3097 occurrences, semua 8 medan, ordinal multiset | 117 tambahan; jumlah staging 3214; missing/duplicate keys/schema violations 0 |
+
+Metadata foto tiada duplicate ID, placeholder `GAS_MANAGED` atau pasangan metadata tidak lengkap. Audit menormalkan NULL kepada empty string **untuk kolum nullable sahaja**, mengekalkan duplicate multiplicity; `staging_rowid` dikecualikan daripada key. Count 3214 sahaja bukan bukti parity.
+
+Lima mismatch `tujuan` eksport pertama berpunca daripada encoding output PowerShell. Eksport semula dengan `Console.OutputEncoding` UTF-8 membuktikan **U+00B2** dan **5/5 sepadan**; tiada pembetulan database dibuat dalam sesi ini.
+
+Sumber local: CSV `proxy/students_production_snapshot.csv`, `proxy/outing_requests_production_snapshot.csv`, `proxy/audit_log_production_snapshot.csv` dan mapping `proxy/generate_outing_requests_rehearsal.ps1`. Snapshot TEMP luar repo: `eouting_photo_staging_20261004.json`, `eouting_requests_staging_utf8_20261004.json`, `eouting_audit_staging_20261004.json`. Profil penuh memakai snapshot terdahulu `proxy/students_staging_snapshot_full.json`. Artefak rehearsal local ini tidak menjadi source executable/deploy dan tidak semestinya tersedia dalam clone baharu. Kewujudan SQL sahaja bukan bukti import.
+
+**371 request ialah checkpoint 25 September**; **397 ialah sumber rehearsal Oktober**; **424 ialah production live pada waktu comparison 4 Oktober**. Tambahan staging belum diklasifikasikan sebagai data cutover atau QA melalui counts sahaja.
+
+## Kod tersedia, deployed dan E2E
+
+Source Worker/frontend kini memetakan login Admin, roster Admin/Warden/Guard, staff create/update/toggle, config, Guardian Contact, return-selfie dan trusted photo actions kepada route D1 staging. Ini membatalkan dakwaan lama bahawa route Admin/Guardian/return-selfie tiada; **route tersedia tidak membuktikan seluruh deployment, E2E parity atau kesediaan cutover**. Flow yang belum dipetakan masih boleh menggunakan GAS/hybrid.
+
+- September: lifecycle Student/Warden/Guard, async mirror/retry dan No-Guard mempunyai QA staging manual yang direkod dalam [Changelog](CHANGELOG.md). QA mirror lama tidak membenarkan penghantaran semasa gate disabled.
+- Canonical LI UNISZA: `kelas=LI`, `institution_code=UNISZA`, directory `GROUP:LI:UNISZA`; hanya LI institution-aware dan non-LI memerlukan institution kosong. Prefix ID migration-only. Legacy `kelas=UNISZA` perlu verification row sebelum transform; bukan conversion pukal.
+- Production V2 photo upload/thumbnail/full/removal telah mempunyai smoke QA terdahulu; trusted D1 photo QA di bawah ialah boundary berasingan dan tidak membuktikan metadata production terkini.
 
 ## Phase 6C / trusted photo migration — kemas kini 28 September 2026
 
-**Sempadan status:** production masih menggunakan GAS/Google Sheets; tiada production-to-D1 migration atau cutover. Staging D1 bukan replika production (snapshot 25 September: production `STUDENTS` 34 dan `OUTING_REQUESTS` 371; staging mengandungi rekod QA tambahan). Google Sheets ialah authority sumber migrasi production; selepas cutover yang belum dilaksanakan, D1 disasarkan menjadi satu-satunya authority metadata operasi/foto dan Sheets menjadi downstream mirror/reporting/audit. Binari foto kekal di folder Google Drive private, bukan di D1/Sheets.
+**Sempadan status:** production masih menggunakan GAS/Google Sheets; tiada production cutover; rehearsal staging bukan pemindahan authority production. Staging D1 bukan replika production (snapshot 25 September: production `STUDENTS` 34 dan `OUTING_REQUESTS` 371; staging mengandungi rekod QA tambahan). Google Sheets ialah authority sumber migrasi production; selepas cutover yang belum dilaksanakan, D1 disasarkan menjadi satu-satunya authority metadata operasi/foto dan Sheets menjadi downstream mirror/reporting/audit. Binari foto kekal di folder Google Drive private, bukan di D1/Sheets.
 
 **Bukti yang boleh disemak dalam repo:** kod trusted READ/UPLOAD/REMOVE dan HMAC adapter (checkpoint `16ea4f0 feat: add trusted profile photo removal`), migration `proxy/d1/007_photo_operations.sql` dan regression tests berkaitan. Keputusan ujian terdahulu Worker proxy **104/104 PASS** dan trusted photo adapter **7/7 PASS** ialah bukti contract setempat pada checkpoint READ/UPLOAD; ia bukan ukuran baharu untuk REMOVE dan tidak dengan sendirinya membuktikan E2E atau production readiness.
 
@@ -34,7 +61,7 @@
 
 **Kod Phase 6C setempat:** `proxy/staging-worker-base.js` menggunakan D1 `STUDENTS.photo_file_id` / `photo_updated_at` untuk trusted READ dan membentuk request HMAC ke `PHOTO_ADAPTER_UPSTREAM_URL`; browser menerima imej yang di-allowlist, bukan Drive ID/secret. Trusted UPLOAD mempunyai `operation_id` deterministik, `PHOTO_OPERATIONS` (`PENDING` → `CREATED` → `COMPLETED`, atau `RECONCILE_REQUIRED` pada konflik), respons upstream divalidasi, lalu `STUDENTS` dikemas kini melalui CAS terhadap ID/timestamp lama. Trusted REMOVE juga menggunakan HMAC, semakan respons upstream, operasi Drive terikat pada fail lama, CAS untuk mengosongkan metadata, dan journal/audit. GAS trusted handler menyimpan binari di Drive private dan memulangkan real Drive ID kepada Worker bagi UPLOAD; ID itu disimpan dalam D1, bukan placeholder `GAS_MANAGED:PROFILE_PHOTO`. Skema jurnal berada dalam `proxy/d1/007_photo_operations.sql`. Ini menerangkan kod setempat, bukan jaminan skema telah digunakan pada production.
 
-**Manual recovery Phase 6C — implemented, local-tested, staging-verified secara terhad:** Repo kini mempunyai Admin `inspectPhotoOperation` / `recoverPhotoOperation`, signed read-only `probeTrustedPhotoOperation`, keputusan recovery fail-closed dan audit berkorelasi `request_id=operation_id`; tiada mutation Drive diulang semasa recovery. Sebelum staging, ujian recovery 10/10, recovery + trusted adapter 25/25, Worker proxy 108/108 dan full Node 951/951 PASS; syntax Worker/GAS serta `git diff --check` PASS. Staging menggunakan GAS QA adapter Version 6 (deployment ID `AKfycbw_VE-E6OX_92_gzAOSXF5mOBV4GCjyZCAiuNrpHJIGG_RF2uvs7I2lfhq98enUFzM45g`) dan Worker staging `cfe5f7e4-7384-43d6-9d78-3ff2b9de6b42`. Inspection mengesahkan invalid operation ID → 400, unauthenticated → 401, browser-supplied `photo_file_id` → 400, dan respons sah tersanitasi tanpa Drive ID/secret/PIN. Inspection real REMOVE `QA-A4-001` menunjukkan `COMPLETED`, attempts 1, `last_error=null`, `EXPECTED_NEW`, `audit_recorded=false`; audit legacy itu mendahului correlation baharu dan bukan recovery failure.
+**Manual recovery Phase 6C — implemented, local-tested, staging-verified secara terhad:** Repo kini mempunyai Admin `inspectPhotoOperation` / `recoverPhotoOperation`, signed read-only `probeTrustedPhotoOperation`, keputusan recovery fail-closed dan audit berkorelasi `request_id=operation_id`; tiada mutation Drive diulang semasa recovery. Sebelum staging, ujian recovery 10/10, recovery + trusted adapter 25/25, Worker proxy 108/108 dan full Node 951/951 PASS; syntax Worker/GAS serta `git diff --check` PASS. Staging menggunakan GAS QA adapter Version 6 dan Worker staging `cfe5f7e4-7384-43d6-9d78-3ff2b9de6b42`. Inspection mengesahkan invalid operation ID → 400, unauthenticated → 401, browser-supplied `photo_file_id` → 400, dan respons sah tersanitasi tanpa Drive ID/secret/PIN. Inspection real REMOVE `QA-A4-001` menunjukkan `COMPLETED`, attempts 1, `last_error=null`, `EXPECTED_NEW`, `audit_recorded=false`; audit legacy itu mendahului correlation baharu dan bukan recovery failure.
 
 **Staging fault case sintetik:** Operasi REMOVE `phr_ffffffffffffffffffffffffffffffffffffffff` bagi `QA-A4-001` bermula `CREATED`, attempts 1, `EXPECTED_NEW`, audit belum berkorelasi. Satu manual `recoverPhotoOperation` menukarnya ke `COMPLETED`, `audit_recorded=true`, `last_error=null`, tanpa mengubah metadata foto `STUDENTS` yang sudah kosong; tepat satu audit `REMOVE_STUDENT_PROFILE_PHOTO` mempunyai `request_id=operation_id`, `entity_type=STUDENT`, `entity_id=QA-A4-001`. Retry recovery pada operasi `COMPLETED` berjaya tanpa menambah audit atau attempts (masing-masing kekal 1). Ini ialah bukti sesi staging bagi kes sintetik itu, bukan fault injection crash/timeout sebenar atau pembuktian semua recovery path.
 
@@ -48,358 +75,25 @@
 
 **Real staging timeout recovery — verified:** UPLOAD `phu_068647d1172759ae0153d33f4d24cf3351c772dc` bagi `QA-A4-001` diuji dengan fault injection timeout selepas Drive create. Worker merekod `PENDING`, attempts 1 dan `last_error=UPSTREAM_OUTCOME_UNKNOWN`; inspection authenticated menunjukkan `EXPECTED_OLD` dan `audit_recorded=false`. Manual `recoverPhotoOperation` kemudian memulihkan operasi ke `COMPLETED`, attempts kekal 1, `last_error=null`, `new_photo_updated_at=2026-09-28 19:28:50` dan audit berkorelasi count tepat 1. QA-only timeout hook dibuang semula selepas verification.
 
-**Belum siap / gate sebelum production:** automatic/cron recovery belum implemented/diaktifkan; real perubahan state Drive selepas kuarantin masih belum diuji. Status Drive `isTrashed=true` selepas real E2E REMOVE belum disahkan secara bebas, dan duplicate trusted REMOVE adapter E2E belum diuji. Cleanup manual old-photo telah disahkan E2E pada staging, tetapi rollout production dan cleanup automatik belum dibuat. Production Sheets → D1 migration/cutover belum dibuat; production GAS/deployment tidak disentuh. Masih perlu invariant/rollback serta parity production 34 pelajar, 371 permohonan dan rujukan foto; E2E staging tidak menggantikan reconciliation production.
+**Belum siap / gate sebelum production:** automatic/cron recovery belum implemented/diaktifkan; real perubahan state Drive selepas kuarantin masih belum diuji. Status Drive `isTrashed=true` selepas real E2E REMOVE belum disahkan secara bebas, dan duplicate trusted REMOVE adapter E2E belum diuji. Cleanup manual old-photo telah disahkan E2E pada staging, tetapi rollout production dan cleanup automatik belum dibuat. Production belum cutover ke D1; import rehearsal staging tidak memindahkan authority production. Production GAS/deployment tidak disentuh dalam QA ini. Masih perlu fresh pre-flight production, invariant lifecycle/roster dan rollback rehearsal; 34 pelajar/371 permohonan ialah snapshot September, bukan sasaran parity production terkini. E2E staging tidak menggantikan reconciliation production.
 
-**Cleanup foto lama — implemented dan staging E2E verified:** Endpoint Admin manual `cleanupPreviousProfilePhoto` dan GAS trusted `cleanupTrustedPreviousProfilePhoto` berjalan selepas UPLOAD `COMPLETED`. Browser menghantar admin auth dan operation ID sahaja; Worker mengambil ID Drive daripada journal, mensyaratkan foto baharu masih authoritative dalam D1, dan GAS mengesahkan HMAC, folder terus serta MIME sebelum trash old file. Ujian setempat sebelum deployment: focused 141/141, full regression 959/959, syntax dan `git diff --check` PASS. QA GAS project `eOuting ITU Staging Photo Adapter QA` (Version 7; deployment `AKfycbw_VE-E6OX_92_gzAOSXF5mOBV4GCjyZCAiuNrpHJIGG_RF2uvs7I2lfhq98enUFzM45g`) dan Worker staging `2d87c662-f04c-4217-979c-96a7bd88de52` digunakan untuk E2E sebenar pada UPLOAD `phu_5a96b4cedd28bc89ef965e0f1eca4dd688d6d9b2`, pelajar `QA-A4-001`. Sebelum cleanup, journal `COMPLETED`, attempts 1, `last_error=null`, old/new file wujud, timestamp baharu journal dan `STUDENTS` `2026-09-28 16:16:18`, serta audit cleanup count 0. Panggilan pertama memulangkan `TRASHED`/`audit_recorded=true`; retry memulangkan `ALREADY_TRASHED`/`audit_recorded=true`. Journal kekal `COMPLETED`, attempts 1, `last_error=null`; timestamp D1 tidak berubah dan audit cleanup kekal tepat satu. Ini membuktikan retry selepas cleanup berjaya, bukan fault injection audit failure E2E. `.clasp.qa.json` sementara menghala ke projek QA berasingan; `.clasp.json` utama tidak diubah. Tiada cleanup automatik/cron atau rollout production.
+**Cleanup foto lama — implemented dan staging E2E verified:** Endpoint Admin manual `cleanupPreviousProfilePhoto` dan GAS trusted `cleanupTrustedPreviousProfilePhoto` berjalan selepas UPLOAD `COMPLETED`. Browser menghantar admin auth dan operation ID sahaja; Worker mengambil ID Drive daripada journal, mensyaratkan foto baharu masih authoritative dalam D1, dan GAS mengesahkan HMAC, folder terus serta MIME sebelum trash old file. Ujian setempat sebelum deployment: focused 141/141, full regression 959/959, syntax dan `git diff --check` PASS. QA GAS project `eOuting ITU Staging Photo Adapter QA` (Version 7) dan Worker staging `2d87c662-f04c-4217-979c-96a7bd88de52` digunakan untuk E2E sebenar pada UPLOAD `phu_5a96b4cedd28bc89ef965e0f1eca4dd688d6d9b2`, pelajar `QA-A4-001`. Sebelum cleanup, journal `COMPLETED`, attempts 1, `last_error=null`, old/new file wujud, timestamp baharu journal dan `STUDENTS` `2026-09-28 16:16:18`, serta audit cleanup count 0. Panggilan pertama memulangkan `TRASHED`/`audit_recorded=true`; retry memulangkan `ALREADY_TRASHED`/`audit_recorded=true`. Journal kekal `COMPLETED`, attempts 1, `last_error=null`; timestamp D1 tidak berubah dan audit cleanup kekal tepat satu. Ini membuktikan retry selepas cleanup berjaya, bukan fault injection audit failure E2E. `.clasp.qa.json` sementara menghala ke projek QA berasingan; `.clasp.json` utama tidak diubah. Tiada cleanup automatik/cron atau rollout production.
 
 **Insiden LI UNISZA production dan klasifikasi:** dua permohonan `PULANG_BERMALAM` pelajar LI yang belum pulang fizikal pernah dilaporkan memaparkan `Sudah Pulang` pada dashboard dan Sheet; punca lifecycle tidak dibuktikan oleh kerja Phase 6C ini dan perlu diaudit berasingan. Jangan mengaitkannya secara automatik dengan kategori LI. Di samping itu, rekod legacy boleh menggunakan `kelas=UNISZA` sebagai kumpulan teratas; itu tidak selaras dengan model kanonik. Ketika transform migration, hanya row yang disahkan memang pelajar LI UNISZA boleh dipetakan kepada `kelas=LI`, `institution_code=UNISZA`; jangan ubah secara pukal tanpa semakan row. `LI` ialah satu-satunya kumpulan institution-aware; non-LI perlu `institution_code` kosong. Pembetulan staging yang terdahulu bukan production migration.
 
-Bahagian bertarikh 22 September dan lebih awal di bawah ialah rekod checkpoint sejarah, bukan status semasa Phase 6C.
+## Baki wajib sebelum cutover
 
-Status setakat **22 September 2026**: production **V2 / v2.4.0** kekal GitHub Pages + Google Apps Script + Google Sheets; **V3.0 Cloud Architecture** sedang dibangunkan dalam staging. Tiada production cutover ke Cloudflare.
+1. Fresh pre-flight sumber production yang konsisten dan bertarikh, termasuk profil/config/request/audit/foto; tetapkan window perubahan serta authority semasa reconciliation.
+2. Selesaikan perbezaan lifecycle, missing production requests dan serialization catatan berdasarkan jenis sel/mapping; classify 3 pelajar, 15 request, 117 audit dan 1 photo reference tambahan staging.
+3. Verify invariant lifecycle/roster termasuk 14 KELUAR dan canonical LI UNISZA; audit insiden lifecycle LI terdahulu tanpa menganggap kategori sebagai punca.
+4. Reconcile sasaran mirror dan setiap ID queue sebelum keputusan enable; tentukan freshness/version protection atau sasaran terasing. Direct gate live mutation QA masih belum dibuat.
+5. Lengkapkan gate foto/flow yang terbuka di atas dan bukti parity setiap route/role; route/code/tests sahaja tidak menutup E2E gate.
+6. Jalankan rollback rehearsal dan verify hasil restore, privacy, permissions, logs dan production freeze/cutover plan sebelum Go/No-Go.
 
-## Current Status — checkpoint 22 September 2026
+Langkah seterusnya: sediakan fresh pre-flight read-only yang konsisten sambil mirror staging kekal disabled; jangan reimport atau membetulkan state melalui mirror lama.
 
-- **V3 masih staging** pada Worker `eouting-api-proxy-staging` dan D1 `eouting_staging`. Frontend production kekal **V2 / GAS / Google Sheets**; tiada production cutover V3.
-- Production Worker kekal pada versi asal selepas rollback: `a483bda0-77db-4189-8d29-1984e2f4f758`.
-- Staging Worker selepas hostel roster deploy: `3c5856b5-3515-4098-a578-d3fadb60344c`.
-- Branch checkpoint: `wip/eouting_v3_recovery_20260921`; commit `e30a0fb feat: add D1 hostel roster parity and dynamic student groups`.
-- Branch telah dipush dan working tree bersih pada checkpoint sebelum kemas kini dokumentasi ini. Semakan mengesahkan HEAD `e30a0fb` sepadan dengan remote-tracking branch tempatan (0 ahead / 0 behind). Perubahan dokumentasi ini belum dicommit atau dipush.
+## Sejarah dan enhancements
 
-### Completed — D1 staging
+Close-out production **27 Ogos 2026**: v2.4.0, frontend/cache r21, GAS Version 57 dan full regression **744/744** pada tarikh itu. Angka/version itu bukan verification runtime 4 Oktober. Fasa 1–6 V2, date window, dynamic login, Current Hostel Residents dan PERF-01 telah production-verified pada milestone masing-masing. Sejarah deployment, rollback dan hasil suite terdahulu disimpan dalam [Changelog](CHANGELOG.md); backlog future dipisahkan dalam [TODO](TODO.md).
 
-- Dynamic student grouping menggunakan `STUDENT_GROUPS` dan `LI_INSTITUTIONS`, dengan migration `proxy/d1/002_student_group_config.sql` dan `proxy/d1/003_student_group_config_seed.sql`.
-- Konfigurasi kumpulan production yang telah dimirror ke staging: **A2, A3, LI, TEST, UNISZA**. Institution config aktif termasuk **UNISZA**; **UMK dan UPM inactive**. Dua pelajar LI UNISZA telah dimasukkan ke D1 staging.
-- `studentLoginDirectory` D1 staging kini parity dengan production dynamic directory:
-
-  | Directory key | Label |
-  |---|---|
-  | `GROUP:A2` | A2 |
-  | `GROUP:A3` | A3 |
-  | `GROUP:TEST` | Test Sahaja |
-  | `GROUP:UNISZA:UNISZA` | LI UNISZA |
-
-- `getCurrentHostelRoster` telah implemented dalam D1 staging untuk **Warden/Guard**. Frontend staging menggunakan routing mengikut role: Warden/Guard roster ke **D1**, Admin roster ke **GAS** kerana Admin authentication belum dimigrasi ke D1.
-- Semua pelajar aktif dikira berada di hostel kecuali latest authoritative request mereka berstatus `KELUAR`. Fallback group ialah `Belum Dikonfigurasi`; projection pelajar dalam roster hanya expose `nama`.
-- Async/background operational mirror selepas D1 commit, durable `MIRROR_RETRY_QUEUE` dan reconciliation berjadual setiap 5 minit telah tersedia pada staging. No-Guard Departure telah lulus QA end-to-end staging; butiran milestone sebelumnya ada dalam [README](../README.md).
-
-### QA staging terkini — lulus
-
-Keputusan checkpoint yang dibekalkan pemilik projek (bukan ujian live yang dijalankan semula semasa kemas kini dokumentasi):
-
-| Metrik | Jumlah |
-|---|---:|
-| Total active students | 33 |
-| Total out now | 2 |
-| Total in hostel | 31 |
-| In hostel — A2 | 11 |
-| In hostel — A3 | 18 |
-| In hostel — Test Sahaja | 0 |
-| In hostel — LI UNISZA | 2 |
-
-### Known Gaps / Technical Debt
-
-- Admin D1 authentication/parity belum lengkap; Admin hostel roster masih menggunakan GAS.
-- Dependency GAS masih wujud bagi flow/config yang belum dimigrasikan dan operational mirror. Parity roster Warden/Guard tidak bermaksud keseluruhan V3 sudah production-ready.
-- Migration schema/seed telah direkod, tetapi proses sync data/config D1 yang reproducible masih perlu dilengkapkan.
-- Baki V3 termasuk Guardian Contact, profile-photo storage, return-selfie serta fungsi Admin lain yang belum mencapai parity.
-
-### Next Steps
-
-- Lengkapkan Admin D1 authentication/parity.
-- Kurangkan dependency GAS secara berperingkat mengikut parity dan QA setiap flow.
-- Sediakan proses sync data/config D1 yang reproducible.
-- Sambung V3 migration, regression QA dan perancangan cutover/rollback terkawal; V3 kekal staging sehingga disahkan untuk release.
-
-Incident tersalah deploy Worker dan rollback direkodkan dalam [Changelog](CHANGELOG.md) dan [Deployment](DEPLOYMENT.md). Semua staging deployment mesti menggunakan explicit `npx wrangler deploy --env staging` dari direktori `proxy`.
-
-## V3.0 Cloud Architecture — sejarah checkpoint mirror 21 September 2026
-
-### Operational mirror D1 -> Google Sheets
-
-D1 ialah authoritative operational source untuk flow V3 yang telah dimigrasikan. Frontend localhost menggunakan Cloudflare Worker `eouting-api-proxy-staging` dan D1 `eouting_staging`; Google Sheets menerima operational mirror ke tab `OUTING_REQUESTS` dalam **eOuting ITU Database**.
-
-QA manual end-to-end D1 -> Google Sheets telah **LULUS** pada 21 September 2026 untuk semua mutation utama berikut, berdasarkan pengesahan QA manual pemilik projek:
-
-- `submitRequest`;
-- `cancelStudentRequest`;
-- `approveRequest`;
-- `rejectRequest`;
-- `confirmOut`;
-- `confirmIn`.
-
-GAS menyediakan private action `mirrorOutingRequestFromD1` yang dilindungi `D1_MIRROR_SECRET`. GAS deployment semasa yang menyokong mirror telah dikemas kini pada **21 September 2026**, dan Worker staging telah diarahkan kepada GAS deployment yang betul. Nilai secret tidak disimpan dalam dokumentasi.
-
-Git checkpoint ialah tag `v3-d1-sheets-mirror-qa`, menunjuk kepada `9dc258e`. Commit penting:
-
-- `04368d2 feat: add D1 outing request mirror endpoint`;
-- `2e17068 feat: mirror D1 outing requests to Sheets staging`;
-- `9dc258e fix: point staging worker to current GAS deployment`.
-
-**Known issue ketika checkpoint 21 September (telah ditangani pada staging 22 September):** mirror ke Google Sheets ketika itu masih synchronous. Jika GAS lambat atau unavailable, UI boleh mengalami latency atau `UPSTREAM_DELIVERY_FAILED` / `outcome_unknown` walaupun perubahan D1 mungkin telah disimpan.
-
-**Keutamaan ketika checkpoint 21 September (kini selesai pada staging, termasuk No-Guard QA):** async/background mirror selepas D1 commit, retry queue dan reconciliation supaya kegagalan GAS tidak melambatkan response pengguna. Pengesahan keluar tanpa Guard / remote checkout yang wujud dalam production masih perlu diteliti untuk feature parity kerana belum dipaparkan sepenuhnya dalam staging V3.
-
-V3 masih dalam pembangunan dan QA staging; ia **belum production-ready** dan full migration **belum selesai**. Production V2 kekal GitHub Pages + Google Apps Script + Google Sheets, tanpa production cutover ke Cloudflare.
-
-## eOuting v2.4 Production — rekod close-out 27 Ogos 2026
-
-Frontend v2.4.0 diterbitkan melalui GitHub Pages di `https://itumelaka.github.io/eouting/`.
-
-Verdict close-out pada **27 Ogos 2026** ialah **production verified** pada display v2.4.0, GAS Version 57, cache/asset `2.4.0-r21` dan service worker `eouting-cache-v2.4.0-r21`. Description deployment production ialah `eOuting v2.4.0 production - PERF-01 Phase 1 + config readiness fix`; staging turut menggunakan Version 57 dan isolated Version 55 ialah rollback/control sahaja. Config-driven outing serta Dynamic Student Login aktif, Admin memaparkan `Config Active`, production smoke ialah **VERIFIED**, dan production beroperasi normal.
-
-`Notis Banner` V1 dan Student cancellation kekal live. Fasa 1–6, Generic Application Date Window, Student Group foundation/Admin management, LI migration, Dynamic Student Login, guarded rollback, active-request application-form UX, Current Hostel Residents dan PERF-01 Phase 1 semuanya **COMPLETE / PRODUCTION VERIFIED**. Typography global, Public Monitoring KPI contrast dan conservative dark-surface brightness refinement juga lengkap. Normal Guard flow kekal primary/default. Full regression terakhir sebelum release lulus **744/744** dan pengguna production memerhatikan loading yang lebih pantas/lancar.
-
-Frontend aktif tunggal ialah repository `itumelaka/eouting` dan GitHub Pages `https://itumelaka.github.io/eouting/`. Repository `itumelaka/eoutingV2` telah retired serta diarchive read-only sebagai sejarah; routing `/eoutingV2` tidak lagi wujud dalam active frontend.
-
-Version 56 ialah milestone insiden/rollback sejarah. P0-1/P0-2 dan PERF-01 Phase 1 kini berada dalam production Version 57; Version 55 tidak lagi active production dan dikekalkan secara terasing sebagai rollback/control.
-
-Batch regression UI production commit `996d9c0` (`fix: restore authenticated header and admin mobile ui`) telah lengkap dan berada pada `main`. Header/logo serta metadata tarikh/hari/masa authenticated kini kelihatan dan responsif untuk Student, Warden/HEP, Guard dan Admin; kontras editor Admin serta sub-navigation Admin mobile juga telah diperbaiki dan disahkan melalui verifikasi browser/mobile.
-
-Ayat panduan outing pendua di bawah “Permohonan Pelajar” telah dibuang. Announcement Banner kekal untuk notis operasi semasa; elemen `ruleNotice` serta eligibility/validation yang mendasarinya dikekalkan tetapi banner kuning itu disembunyikan secara visual pada Student authenticated. Behavior ticker desktop sengaja tidak diubah kerana mobile berfungsi dan isu desktop bukan production blocker.
-
-Production boundary yang direkodkan pada close-out 27 Ogos 2026 (butiran versi/deployment di bawah ialah sejarah; kemas kini mirror 21 September dirujuk di atas):
-
-- frontend release aktif tunggal ialah `v2.4.0` di `itumelaka/eouting`; backend production ialah GAS **Version 57** dan staging juga Version 57;
-- isolated GAS Version 55 ialah rollback/control, bukan active production;
-- Spreadsheet production ialah `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`;
-- endpoint GAS production kekal `https://script.google.com/macros/s/AKfycbwZ9VjS-pYd5_GVMcWDLKcDYVzLlvOH4hfBpf5OVE0Pal8qDCoim80I_xcZ4RbWkZ1f/exec`;
-- `OUTING_CONFIG_V2_ENABLED=true`; `OUTING_TYPES` authoritative dan Tetapan Outing ialah interface operasi;
-- `STUDENT_GROUP_CONFIG_ENABLED=true`; migration complete dan Dynamic Student Login production aktif untuk A2, A3, LI UMK dan LI UPM;
-- `TELEGRAM_ENABLED=true` kekal aktif;
-- `NO_GUARD_DEPARTURE_ENABLED` mempunyai safe default false tetapi current production state ialah enabled; Admin hanya mengawal config dan Warden kekal fallback confirmer;
-- canonical Web App contract ialah `Asia/Kuala_Lumpur`, `V8`, `USER_DEPLOYING`, `ANYONE_ANONYMOUS`;
-- readiness hijau dan chip Admin memaparkan `Config Active`;
-- `departure_allowed_days` hanya memerlukan `require_leave_date=true` apabila `same_day_only=false`; same-day `OUTING_BIASA` kekal ready tanpa tarikh keluar manual;
-- `require_selfie`, audit auto-approval, statistik, Telegram, filter operasi dan label contextual membaca config secara dinamik;
-- application rules dan departure rules dipisahkan melalui optional date window + `allowed_days`/time window serta `departure_allowed_days`/`earliest_departure_time`;
-- `application_open_date`/`application_close_date` ialah generic `YYYY-MM-DD`, inklusif dan additive; blank production rows mengekalkan behavior lama dan backend `Asia/Kuala_Lumpur` menguatkuasakan sebelum append;
-- blank `application_open_time` atau `application_close_time` bermaksud tiada threshold bagi medan tersebut; Admin boleh menggunakan `Kosongkan`, blank kekal blank, dan `allowed_days` tetap authoritative;
-- `PULANG_BERMALAM` boleh dipohon pada mana-mana hari, departure semasa ialah Jumaat dan earliest time `17:00`, boleh diubah Admin mengikut arahan HEP.
-- Guard departure-date enforcement kekal authoritative: pengesahan keluar sebelum approved leave date ditolak;
-- custom `KLINIK` (`Keluar ke Klinik`) beroperasi sebagai same-day tanpa tarikh manual, memerlukan masa balik, lokasi, kenderaan, kelulusan Warden dan selfie; shared date-section fallback menggunakan `Maklumat Permohonan` / `Tarikh Keluar` apabila section itu visible;
-- blank `earliest_departure_time` bermaksud tiada sekatan masa paling awal dan Admin boleh mengosongkannya tanpa current-time fallback;
-- operational urgency backend memisahkan `NORMAL`, `DUE_SOON`, `LATE`, `CRITICAL` dan `ACTION_REQUIRED` daripada lifecycle;
-- expected-return mengutamakan snapshot `tarikh_balik + masa_balik_dijangka` bagi standard dan custom type, dengan legacy daily fallback sahaja apabila wajar;
-- active malformed timing menghasilkan `needs_review=true`; `confirmIn()` menggunakan resolver sama dan historical `lewat` kekal `Ya/Tidak`;
-- projection operasi authenticated Pelajar, Warden/HEP, Guard dan Admin boleh menerima nested `operational_urgency`, tetapi Public Monitoring kekal pada allowlist enam medan;
-- urgency diterbitkan selepas cache source operasi 20 saat dibaca dan tidak dicache sebagai state;
-- Student `Status Semasa` merender urgency backend, expected return dan review state tanpa mengira threshold sendiri; local timer hanya mengemas kini wording tempoh dan meminta refresh authoritative selepas `next_transition_at`;
-- Pemantauan Admin merender tujuh KPI operational daripada normalized dataset bersama: semua `KELUAR`, exact `DUE_SOON`, `LATE`, `CRITICAL`, `ACTION_REQUIRED`, active `needs_review=true` dan pending `KECEMASAN`;
-- queue `Perlu Tindakan` menyusun `ACTION_REQUIRED`, `CRITICAL`, `needs_review` dan pending emergency; ordinary `LATE`, `DUE_SOON`, `NORMAL`, pending bukan kecemasan serta record terminal dikecualikan;
-- Admin menggunakan urgency backend authoritative dan tidak mereka threshold/state; pending emergency tidak memberi Admin approval authority atau memintas Warden;
-- No-Guard pending berasal daripada `DEPARTURE_CONFIRMATION_REQUESTED` dalam `AUDIT_LOG`, bukan status/kolum baharu; Student request kekal `DILULUSKAN_WARDEN` dan Warden authenticated menulis `WARDEN_REMOTE_CHECKOUT` ketika transition akhir;
-- request/completion Telegram masing-masing single-send dan replay-safe; failure tidak rollback request atau `KELUAR`, tetapi automatic retry belum tersedia;
-- Version 49 request alert telah visually verified live; Version 50 completion alert deployed + automated-test covered tetapi belum direkod sebagai visually verified live;
-
-Runbook rollout dan rollback: [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
-
-### Performance selepas PERF-01 Phase 1
-
-Directory Pelajar/staff, saved-session startup, Warden approve/reject response, read-only POST in-flight sharing, request-sheet mutation reads serta hostel/departure audit projection telah dioptimumkan tanpa perubahan business rules. Reconciliation Warden kekal eventual tetapi response mutation authoritative menang serta-merta; approve/reject tidak lagi memaksa roster refresh yang tidak berkaitan.
-
-Kerja seterusnya kekal deferred dan **belum selesai**: latency Telegram synchronous, polisi timeout/retry GET, kecekapan TTL cache dan polling, saiz imej/aset first-load, serta architecture lock/index yang lebih luas.
-
-- Metadata displayed frontend/footer/version berada pada `v2.4.0`; asset/cache production revision ialah `2.4.0-r21` dan service worker ialah `eouting-cache-v2.4.0-r21`.
-- Backend GAS production ialah **Version 57** dan source kanonik ialah `gas/Code.gs`; `gas/Code.production-v171.gs` bukan source deploy.
-- Google Sheets kekal database/source of truth.
-- Google Drive private menyimpan bukti selfie dan Telegram `sendPhoto` menghantar imej sebenar.
-- `.claspignore` mengekalkan whitelist/hygiene supaya hanya source GAS kanonik dan manifest berada dalam skop push.
-
-## Fungsi Disahkan
-
-- Landing mempunyai grid kompak 2×2 `Pelajar`, `Warden & HEP`, `Guard`, `Pemantauan Semasa`; Public Statistik tidak lagi tersedia.
-- Warden dan HEP berkongsi role operasi backend `warden`; role paparan diperoleh daripada `WARDENS.warden_id` (`HEP-*` → HEP, `W-*` → WARDEN, unknown → WARDEN) sementara lifecycle kekal `DILULUSKAN_WARDEN`.
-- Jenis `OUTING_BIASA`, `OUTING_HUJUNG_MINGGU`, `KECEMASAN`, `PULANG_BERMALAM`, `CUTI_SEMESTER`.
-- Pelajar login dengan `student_id` dalaman + nombor matrik yang ditaip.
-- `Status Semasa` Pelajar menggunakan rekod operasi live/current dan berada di atas borang; pembatalan serta return-selfie kekal di situ apabila layak.
-- `Rekod Outing Saya` menggunakan response ringkasan tahunan authenticated yang sama dengan jumlah outing: hanya rekod `SELESAI` tahun semasa, tiga medan minimum dan susunan paling baharu dahulu.
-- Warden approve/reject dan Guard confirm keluar/masuk menggunakan POST authenticated.
-- Submission Pelajar mempunyai frontend in-flight guard dan atomic backend active-check + append; Warden/Guard actions mempunyai loading protection terhadap duplicate click.
-- Status awal submission disahkan, ditulis mengikut susunan header Sheet sebenar dan dibaca semula; blank authoritative status dipaparkan sebagai `Status Tidak Diketahui`.
-- Nilai masa sahaja Sheet dinormalkan kepada `HH:mm` dalam `Asia/Kuala_Lumpur`; `22:00` kekal `22:00` bagi paparan, Telegram dan late comparison tanpa tarikh 1899 atau offset manual.
-- Helper daypart BM menggunakan Pagi `01:00–11:59`, Tengah Hari `12:00–12:59`, Petang `13:00–18:59` dan Malam `19:00–00:59`; formatter locale generik masih boleh menggunakan `PTG`.
-- Pelajar melihat `Batal Permohonan` hanya ketika pending/approved; sebab wajib 5–500 aksara, status terminal `DIBATALKAN_PELAJAR`, paparan sejarah dan permohonan baharu telah disahkan live.
-- Cancellation ialah status-driven untuk standard, `KLINIK` dan custom type; ownership serta current status disemak di bawah `ScriptLock`, dan `KELUAR` tidak boleh ditimpa.
-- Cancelled row dikecualikan daripada queue Warden/Guard, outside/completed counts dan Public Monitoring reason; Admin/master authenticated boleh melihat label serta sebab.
-- Setiap cancellation pending/approved menghasilkan tepat satu Telegram dengan previous status human-readable; failure kekal non-blocking.
-- Runtime credential staff dipulihkan selepas fresh login.
-- Tiada fallback authenticated kepada public records.
-- Warden Checklist menggunakan emoji dan status kontekstual.
-- Guard quick filter dan contextual empty-state berfungsi pada kedua-dua seksyen.
-- Commit `d30d8d9` menggunakan grid responsif khusus untuk approved/sedia keluar, sedang keluar/menunggu masuk dan overnight belum pulang: satu kolum di bawah `820px`, dua kolum sama lebar mulai `820px`.
-- Verifikasi browser production pada 20 Ogos 2026 dengan lebar viewport `1707px` menunjukkan computed columns `570px 570px`, posisi kiri berselang sekitar `270px`/`852px` dan lebar kad sekitar `570px`; kad Guard tidak merentasi kedua-dua kolum.
-- Perubahan grid tidak mengubah rendering JavaScript Guard, hook `Sah Keluar`/`Sah Masuk`, backend, GAS, schema atau business rules.
-- Operational Urgency Fasa 1 mengelaskan lebih 30 minit sebelum sebagai `NORMAL`, 0–30 minit sebelum sebagai `DUE_SOON`, selepas target hingga kurang 30 minit sebagai `LATE`, 30–kurang 60 minit sebagai `CRITICAL`, dan sekurang-kurangnya 60 minit sebagai `ACTION_REQUIRED`.
-- Exact expected-return ialah `DUE_SOON`; historical `confirmIn` pada exact target menyimpan `Tidak`, manakala actual selepas target menyimpan `Ya`.
-- Student Live Status Clarity Fasa 2 menggunakan state authoritative itu dalam `Status Semasa`, mengekalkan lifecycle berasingan, memaparkan masa/tarikh expected return dan review guidance, serta tidak membaca semula `OUTING_TYPES` atau reclassify urgency secara local.
-- Timer Student 30 saat sedia ada digunakan semula untuk teks tempoh dan transition refresh; transition key serta single-flight menghalang duplicate/overlap. Tiada timer Student tambahan.
-- Fasa 2 mengekalkan `SELESAI`, cancellation, return-selfie, annual summary/history, profile photo, Announcement Banner/`ruleNotice`, authentication dan privacy boundary.
-- Warden Approval Prioritisation + Emergency Mode Fasa 3 menyusun pending kepada emergency, departure approaching/reached dan ordinary; `masa_mohon` sah oldest-first dalam setiap bucket, kemudian fallback deterministic bagi row tanpa timestamp.
-- Emergency compatibility kekal `jenis_permohonan === KECEMASAN` dan hanya mengubah ordering, visual emphasis serta guidance. Ia tidak sendiri auto-approve, bypass Warden/Guard atau menukar lifecycle. Generic `require_warden_approval=false` dan `AUTO_CONFIG_V2` kekal behavior config sedia ada yang berasingan.
-- Projection departure Warden mengutamakan `earliest_departure_time` request-level dan menggunakan nilai `OUTING_TYPES` semasa hanya sebagai fallback cloned/non-persistent. Tiada write Sheet atau peluasan Student, Guard, Admin dan Public projection.
-- Known limitation: perubahan config selepas submission boleh mentafsir semula priority fallback-only; request dengan snapshot masa request-level sah kekal stabil. Snapshot departure per request ialah pertimbangan schema masa hadapan.
-- Lifecycle, Warden approval priority, return urgency dan Admin action queue kekal empat dimensi berasingan. Approval/reject, actor recording, checklist semester/overnight, filter/counter, Guard authority dan privacy boundary dikekalkan.
-- Admin Operational Intelligence/`Perlu Tindakan` Fasa 4 telah lengkap tanpa schema change, data guardian baharu atau polling agresif.
-- Telegram Return Reminder + Late Escalation Scanner Fasa 5 telah lengkap dan aktif dalam production: `KELUAR + DUE_SOON/CRITICAL/ACTION_REQUIRED`, batching 40/3,500, audit-backed dedup, ScriptLock dan safe manual dry-run wrapper. Scanner menggunakan urgency Fasa 1 dan tidak mempunyai frontend route.
-- Tepat satu trigger time-driven setiap lima minit menyasarkan `scanReturnOperationalNotifications_` (ID `9156626915782557696`), bukan wrapper dry-run. First natural execution pada `21 Aug 2026, 08:10:59` completed dalam `21.761` saat dengan displayed error rate `0%`.
-- Controlled dry-run, controlled real `ACTION_REQUIRED` Telegram send, `RETURN_ACTION_REQUIRED_SENT` dan same-stage `ALREADY_SENT` telah disahkan. Test request kekal mempunyai tepat satu audit selepas trigger activation dan tiada duplicate notification diperhatikan.
-- Guardian Contact Shortcut Fasa 6 telah production verified. Eligibility ialah pending/approved `KECEMASAN` dan `KELUAR + CRITICAL/ACTION_REQUIRED`; direct notification, long-term trigger monitoring dan additional channels kekal future.
-- Public Monitoring membuka inline dalam shell landing, membuat GET awam khusus, mengelakkan overlap dan merender sekali.
-- Public Monitoring mengekalkan data lama apabila refresh gagal.
-- Public Monitoring hanya memaparkan ringkasan dan `Senarai Status Semasa`.
-- Statistik hanya boleh dicapai sebagai modul inline Admin berautentikasi; filter bulan/tahun/kelas, KPI, ringkasan kelas/jenis/status dan statistik individu kekal tersedia.
-- Tujuh modul Admin inline ialah `Pemantauan`, `Statistik`, `Rekod Master`, `Warden, HEP & Guard`, `Tetapan Pelajar`, `Tetapan Outing` dan `Notis Banner`.
-- Rekod Master menyokong carian, filter dan pagination; Pemantauan Admin memaparkan operasi semasa secara baca sahaja; Pelajar melihat jumlah outing tahunan.
-- Foto profil disimpan private melalui `PROFILE_PHOTO_FOLDER_ID` dan metadata `STUDENTS.photo_file_id`/`photo_updated_at`; batch authenticated `thumbnail` membekalkan imej kompak dengan initials fallback kepada Pelajar, Warden/HEP, Guard dan Admin.
-- Foto penuh dimuat untuk satu pelajar sahaja apabila preview dibuka, kemudian dicache sepanjang sesi; placeholder dan Public Monitoring tidak mempunyai preview.
-- API/GAS network-only dalam service worker; cache lama dibersihkan.
-- Displayed version/footer ialah v2.4.0; asset query dan cache source production konsisten pada `2.4.0-r21` / `eouting-cache-v2.4.0-r21`.
-- Config-driven production menggunakan `require_selfie` yang disnapshot; false menghasilkan `TIDAK_DIPERLUKAN`.
-- Status utama kekal `SELESAI`; `selfie_status` menyimpan `BELUM_HANTAR`, `SUDAH_HANTAR` atau `TIDAK_DIPERLUKAN` secara berasingan.
-- Front camera, preview, retake, resize, JPEG compression, loading dan mock submission telah disahkan.
-- Foto profil Pelajar menawarkan action sheet `Ambil Foto`, `Pilih dari Galeri` dan `Batal`; kedua-dua sumber berkongsi pipeline lama dan telah disahkan pada telefon.
-- Admin refresh restore disahkan berulang melalui tab sessionStorage dengan 12-hour absolute expiry dan mandatory `loginAdmin` revalidation; PIN tidak masuk localStorage.
-- Global auth/restore loader disahkan untuk Pelajar, Warden, Guard dan Admin, termasuk cleanup serta reduced-motion; Public Pemantauan kekal berasingan.
-- Admin shell muncul selepas authentication dan tab bukan default lazy-load; public/master bootstrap tidak lagi menghalang restore Admin.
-- Backend mengesahkan pemilikan, status/masa masuk, MIME/base64/saiz dan duplicate submission dengan `LockService`.
-- Cleanup transaksi separa serta audit failure non-fatal selepas submission lengkap telah disahkan.
-- Public Monitoring dan service worker mengekalkan boundary privasi metadata selfie.
-- Controlled smoke test 10 Ogos 2026 lulus bagi config activation, non-Friday rejection, Friday submission, Warden approval dan early Guard rejection.
-- Guard kini memaparkan business-rule tarikh/hari/masa secara selamat; request 14 Ogos 2026 ditolak ketika confirm-out dicuba pada 10 Ogos 2026.
-- Public Monitoring berfungsi pada klik pertama dan Statistik Admin inline berjaya dimuatkan tanpa meninggalkan sesi Admin.
-- Production smoke test mengesahkan upload Pelajar, thumbnail Warden/HEP, Guard, Admin Pemantauan dan Admin Tetapan Pelajar, secure full preview, Public Pemantauan photo-free, keyboard Enter, rolling KPI serta two-tier performance optimisation.
-
-## Student Groups dan Dynamic Student Login — COMPLETE / PRODUCTION VERIFIED
-
-- Foundation `STUDENT_GROUPS`, `LI_INSTITUTIONS` dan `STUDENTS.institution_code`, Admin management, readiness, migration, activation dan rollback telah production verified.
-- Migration menulis 19 rekod LI dengan **0 unmatched** dan **0 conflict**. `institution_code` authoritative; prefix ID ialah migration-only.
-- Login directory dibina backend dengan projection minimum `student_id` + `nama`. Login authentication kekal `student_id` + `no_matrik`, kelas kanonik LI kekal `LI`.
-- Pada close-out 22 Ogos, kumpulan production tersusun A2, A3, LI UMK dan LI UPM. Konfigurasi semasa 22 September dirujuk dalam Current Status di atas; UMK/UPM kini inactive dan UNISZA aktif. Kumpulan/institusi masa hadapan diurus melalui Admin tanpa ordinary source-code change.
-- Rollback terkawal: `Admin -> Tetapan Pelajar -> Kembali ke Login Legacy`.
-
-## Active-request Application-form UX — COMPLETE / PRODUCTION VERIFIED
-
-Apabila canonical current record berada dalam `MENUNGGU_KELULUSAN`, `DILULUSKAN_WARDEN` atau `KELUAR`, borang permohonan baharu disembunyikan dan notis kompak dipaparkan. Borang kembali bagi status terminal atau tiada current request. Ini presentation UX sahaja; backend duplicate protection kekal authoritative.
-
-## Current Hostel Residents — COMPLETE / PRODUCTION VERIFIED
-
-- Rule authoritative ialah Pelajar aktif tolak Pelajar yang current lifecycle-nya ialah `KELUAR`; inactive Student dikecualikan.
-- Presence diturunkan daripada data lifecycle, tidak dipersist, dan tiada `IN_HOSTEL` source of truth kedua.
-- Public menerima aggregate counts/group breakdown sahaja. Admin, Warden/HEP dan Guard authenticated menerima roster minimum nama, dikelompokkan mengikut konfigurasi dynamic.
-- Production endpoint mengesahkan 49 Pelajar aktif = 48 di luar + 1 di asrama; roster authenticated mengenal pasti baki Pelajar ujian aktif tanpa mendedahkan namanya dalam dokumentasi.
-
-## Generic Application Date Window — COMPLETE / PRODUCTION VERIFIED
-
-Commit `76c6898` menambah capability generik bagi semua `OUTING_TYPES`, bukan rule khas `CUTI_SEMESTER`. `application_open_date` dan `application_close_date` optional menggunakan canonical `YYYY-MM-DD`; blank mengekalkan behavior lama, open/close adalah inklusif, same-day sah dan invalid/reversed range ditolak. Tarikh, hari dan masa permohonan semuanya mesti lulus.
-
-Migration production melalui `setupAdminOutingConfigV200()` pada 22 Ogos 2026 menambah AC/AD secara idempotent tanpa reorder destructive, auto-population atau perubahan `OUTING_REQUESTS`. Semua row production disahkan blank. Admin smoke mengesahkan set/save/reload/summary/version increment, kemudian clear/save/reload kepada `Tiada had tarikh` tanpa current-date fallback.
-
-Student smoke dengan future open date memaparkan `Permohonan dibuka mulai 1 Oktober 2026.`, membenarkan attempt mencapai GAS dan menerima backend rejection sebelum persistence. Inspection `OUTING_REQUESTS` mengesahkan zero row test. Safe Student projection membawa dua tarikh bagi guidance sahaja; config version internals, creator/updater dan timestamp tidak diluaskan.
-
-Milestone ini menggunakan frontend/cache r7 dan GAS Version 52; ia kekal rekod sejarah sebelum current production r21 / GAS Version 57.
-
-## Phase 6 — COMPLETE / PRODUCTION VERIFIED
-
-Phase 6 selesai dan disahkan production pada **22 Ogos 2026**. Commit utama ialah `9c16f47` (`feat: add guardian contact safety shortcut`), diikuti `0caa4fc`, `67d493c`, `3e21c26` dan final visibility hardening `4c16b0a`.
-
-- Warden/HEP melihat `📞 Hubungi Penjaga` hanya untuk pending/approved `KECEMASAN` atau `KELUAR` dengan urgency authoritative `CRITICAL`/`ACTION_REQUIRED`.
-- Broad Warden projection membawa boolean `guardian_contact_available` sahaja; `telefon_waris`, `hubungan_waris` dan raw contact tidak berada dalam list payload.
-- POST `getGuardianContact` mengesahkan Warden aktif, memperoleh role Warden/HEP melalui logic sedia ada, membaca semula request, menilai semula urgency dan menulis `GUARDIAN_CONTACT_ACCESSED`. Context audit ialah `EMERGENCY_REQUEST`, `CRITICAL_RETURN` atau `ACTION_REQUIRED_RETURN`; raw phone/relation tidak diaudit dan audit failure menghalang disclosure.
-- Contact dipaparkan on-demand bersama `📞 Telefon Sekarang` melalui URI `tel:` ternormalisasi. Source ialah `OUTING_REQUESTS.telefon_waris`/`hubungan_waris`; tiada guardian-name source, maka UI memaparkan `Tidak direkodkan`. Tiada WhatsApp/SMS atau outbound automation.
-- `require_warden_approval=false` kekal menghasilkan `AUTO_CONFIG_V2` + `DILULUSKAN_WARDEN`. Fix `4c16b0a` memastikan lifecycle authoritative itu masuk `Telah Diluluskan / Risiko Pulang` tanpa bergantung pada actor, tidak masuk pending queue dan tidak memerlukan approval kedua.
-- Guard kekal normal checkout authority; No-Guard kekal fallback sahaja. Lifecycle, global approval rules, Telegram cadence, threshold/trigger Fasa 5, schema dan Script Properties tidak berubah.
-- Student production smoke mengesahkan label `KECEMASAN` (`Maklumat Tarikh Keluar` / `Tarikh Keluar`), submission auto-approved dan Guard requirement. Warden/HEP smoke mengesahkan card/actor/shortcut dan contact retrieval berjaya.
-
-## Privacy Boundary
-
-Public `getStudents`:
-
-```text
-student_id | nama | kelas
-```
-
-Public GET `getTodayRecords`:
-
-```text
-nama | kelas | jenis_permohonan | status | lewat | belum_masuk
-```
-
-Public response tidak mempunyai nombor matrik, internal/request ID, telefon, waris, lokasi, tujuan, kenderaan, credential atau metadata operasi. Nama kekal dibenarkan pada Public Monitoring read-only; boundary ini diperkenalkan pada v1.6.25 dan diteruskan dalam v1.7.0.
-
-Metadata urgency tepat—termasuk `operational_urgency`, expected-return/evaluated timestamp, minit, next transition, action code dan timing diagnostic—juga tidak termasuk dalam projection awam.
-
-Metadata selfie, foto profil, URL/file ID Drive dan Telegram message ID juga tidak termasuk dalam projection awam.
-
-Operational POST kekal berasingan dan memerlukan credential role sebenar.
-
-## Status Kontekstual
-
-- 🟡 Menunggu Kelulusan
-- 🟢 Diluluskan
-- 🚶 Sedang Keluar
-- 🌙 Sedang Bermalam
-- 🏖️ Sedang Bercuti
-- ✅ Sudah Pulang
-- 🔴 Lewat
-
-Nilai backend `KELUAR` tidak berubah.
-
-## Deployment Milestone
-
-- **v1.6.24:** frontend-only Guard filter release.
-- **v1.6.25:** frontend + GAS Public Monitoring/privacy release.
-- **v1.7.0:** frontend + GAS + Google Drive + Telegram return-selfie release; GAS Version 21.
-- **v1.7.1:** menambah Outing Sabtu / Ahad; Pull Request #2 digabungkan melalui `fa7227e` daripada `1e6303c`.
-- **v2.0.0:** production frontend rollout pada 4 Ogos 2026 melalui `4eedcbe`; backend kekal GAS Version 24 dengan feature flag config-driven submission masih `false`.
-- **v2.1.0:** Guard UI diperkemas, jumlah outing tahunan Pelajar, statistik individu Admin berautentikasi, tempoh outing sebenar, hygiene clasp dan pembaikan rendering Statistik Admin. Production kini menggunakan GAS Version 31 dengan foto profil operational; preview besar semasa ialah perubahan frontend-only.
-- **v2.2.0:** tujuh modul Admin inline, pengurusan operasi/master data, foto profil private dengan thumbnail batch/full on-demand, identifikasi Warden/Guard/Admin, rolling KPI, Enter UX dan cache delivery. GAS Version 32 serta semua smoke test ketika rollout awal disahkan live pada 9 Ogos 2026.
-- **10 Ogos 2026:** config-driven production diaktifkan dan disahkan pada GAS Version 36; cache revision `2.2.0-r1`, readiness hijau dan rollback flag-false kekal tersedia tanpa redeployment.
-- **11 Ogos 2026:** Announcement Banner V1 dideploy dan disahkan pada GAS Version 37; ticker serta cleanup panduan Pelajar ditutup pada cache `2.2.0-r4`, dengan config-driven kekal Active + Ready.
-- **12 Ogos 2026:** duplicate/action loading, dynamic custom payload dan KLINIK config fixes, Admin refresh restore, global auth loader serta foto profil camera/gallery disahkan pada cache r5 (rekod sejarah sebelum cancellation).
-- **12 Ogos 2026:** Student cancellation dideploy dan disahkan live untuk pending/approved, mandatory reason, status `DIBATALKAN_PELAJAR`, history/re-request, queue Guard/Warden dan Telegram. Cache r6 serta GAS Version 39 aktif; production beroperasi normal.
-- **14 Ogos 2026:** hotfix `39265f1` dideploy sebagai v2.2.1 / cache r1 / GAS Version 40. Blank application open time disahkan kekal kosong dan isu permohonan pagi `PULANG_BERMALAM` telah diselesaikan; baseline **336/336** lulus.
-- **14 Ogos 2026:** commits `868c323`, `67b494c` dan `7d4ad23` menutup paparan HEP/Warden, persistence status/header-order serta normalisasi masa/daypart. Close-out tersebut menggunakan v2.2.1 / cache r4 / GAS Version 43 dengan baseline **353/353**.
-- **16 Ogos 2026:** commit `967cfd6` menutup hierarki `Status Semasa` dan compact history; commit `f2f55cc` menyelaraskan jumlah/sejarah tahunan. Production v2.3.2 / cache `2.3.2-r1` / GAS Version 44 disahkan melalui smoke test dengan baseline **363/363**.
-- **20 Ogos 2026:** commit `d30d8d9` menambah grid responsif khusus pada tiga senarai operasi Guard dan disahkan sebagai dua kolum sebenar pada production desktop. Milestone v2.4.0 / cache `2.4.0-r1` itu tidak mengubah rendering/action Guard atau backend; baseline ketika itu **385/385**.
-- **20 Ogos 2026:** commit `dde1fc4` menambah Operational Urgency Foundation Fasa 1 pada backend tanpa perubahan schema atau UI; baseline milestone itu ialah **399/399**.
-- **20 Ogos 2026:** commit `89d6b46` melengkapkan Student Live Status Clarity Fasa 2 sebagai presentation frontend yang menggunakan urgency Fasa 1; baseline repo meningkat kepada **410/410** tanpa schema, version atau deployment change.
-- **20 Ogos 2026:** commit `5443375` melengkapkan Warden Approval Prioritisation + Emergency Mode Fasa 3 sebagai repository milestone; baseline repo meningkat kepada **420/420** dan focused suite **10/10** tanpa schema, version atau deployment change.
-- **20 Ogos 2026:** commit `d0be685` (`feat: add admin operational intelligence`) melengkapkan Admin Operational Intelligence + `Perlu Tindakan` Fasa 4 sebagai repository milestone; baseline repo meningkat kepada **429/429** dan focused suite **9/9**. Tiada GAS, schema, lifecycle, threshold, version atau deployment change.
-- **20 Ogos 2026:** commit `54d526b` (`feat: add telegram return escalation scanner`) melengkapkan backend scanner Fasa 5 sebagai repository milestone; baseline repo meningkat kepada **443/443** dan focused suite **14/14**. Tiada frontend, schema, lifecycle, threshold, version, trigger activation, live smoke send atau deployment change.
-- **21 Ogos 2026:** audit production mendapati actual pre-sync Web App ialah Version 45 tanpa description, berbeza daripada historical documented baseline Version 44. Existing deployment dikemas kini in-place kepada Version 46 (`eOuting v2.4.0 Phase 1-5 operational safety sync`) tanpa URL/manifest change. Punca mismatch ialah deployed Web App menggunakan code revision lebih lama daripada latest Apps Script HEAD, bukan data corruption.
-- **21 Ogos 2026:** controlled dry-run dan satu controlled `ACTION_REQUIRED` Telegram send bagi `OUT-20260820-234127-3513` berjaya; audit `RETURN_ACTION_REQUIRED_SENT` ditulis sekali dan retry menghasilkan `ALREADY_SENT`. Tepat satu five-minute scanner trigger kemudian diaktifkan. Natural run pertama completed tanpa notification/audit duplicate. Browser production desktop `1280×720` dan mobile `390×844` mengesahkan Student, Warden, Guard, Admin dan Public Monitoring berfungsi tanpa overflow atau console error.
-- **Version 47:** No-Guard MVP deployment gagal kerana immutable manifest kehilangan Web App block, menyebabkan Admin auth dan dynamic LI regression; rollback segera ke Version 46, tanpa data corruption.
-- **Version 48:** canonical manifest `Asia/Kuala_Lumpur` / `V8` / `USER_DEPLOYING` / `ANYONE_ANONYMOUS` memulihkan login, class dinamik, Admin toggle dan Web App authority.
-- **Version 49:** No-Guard request Telegram + operational eOuting URL deployed; waiting UI dan request alert disahkan live.
-- **Version 50:** Warden remote checkout completion Telegram deployed dengan single-send/failure-safe behavior; automated baseline **465/465**, tetapi live visual confirmation completion message masih outstanding.
-- **Version 51 / 22 Ogos 2026:** Phase 6 Guardian Contact Shortcut, smoke normalization dan auto-approved emergency visibility disahkan production pada deployment ID/URL sedia ada; frontend/cache final milestone `2.4.0-r6`, commit latest ketika itu `4c16b0a` dan regression **490/490**.
-- **Version 52 / 22 Ogos 2026:** Generic Application Date Window commit `76c6898`, migration AC/AD, Admin persistence/clear dan Student backend rejection-before-append disahkan production; frontend/cache `2.4.0-r7` dan regression **501/501**.
-- **22 Ogos 2026:** commit production `996d9c0` menutup regression header authenticated, metadata masa kompak, Student `ruleNotice`, kontras editor Admin dan sub-navigation Admin mobile; visual browser/mobile disahkan dan perubahan telah dipush ke `main`.
-
-## Production Validation v1.7.0
-
-Ujian production berjaya menggunakan request `OUT-20260726-121316-1479`:
-
-- status utama: `SELESAI`;
-- `selfie_status`: `SUDAH_HANTAR`;
-- `selfie_file_id` dan `selfie_url`: terisi;
-- `masa_selfie`: `2026-07-26 12:18:00`;
-- `selfie_telegram_message_id`: `98`;
-- imej berjaya disimpan dalam Drive private dan dihantar ke Telegram.
-
-## Future Work
-
-- Google/domain login atau stronger auth.
-- Hashed PIN storage.
-- Backend-issued session token.
-- Audit log dan selfie retention/deletion policy.
-- Admin/Warden evidence review UI.
-- Automated cleanup selepas retention period.
-- Telegram retry queue.
-- Consent/privacy notice refinement.
-- QR code.
-- Review polisi bagi timing yang benar-benar indeterminate ketika `confirmIn`; sementara ini historical `lewat` disimpan secara konservatif sebagai `Ya`, manakala active malformed record menggunakan `needs_review=true`.
-- Selepas Fasa 6, direct Student/WhatsApp/email notification, Admin acknowledgement, notification observability/long-term trigger monitoring, access scope tambahan serta sebarang notification-state schema/lifecycle/threshold hardening kekal belum dilaksanakan.
-- Pertimbang snapshot `earliest_departure_time` per request dalam schema/version masa hadapan supaya perubahan config tidak mentafsir semula fallback-only Warden priority.
-- Automated reports dan version injection.
+Runbook: [Deployment](DEPLOYMENT.md), [Release Checklist](../RELEASE_CHECKLIST.md), [Local QA](LOCAL_DEV.md), [Security](SECURITY.md). Dokumen ini tidak memberi kebenaran deployment atau mutation.

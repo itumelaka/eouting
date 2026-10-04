@@ -1,30 +1,25 @@
-# Struktur Database Google Sheets
+# Database dan Reconciliation eOuting ITU
 
-## Sasaran D1 Phase 6C — belum production cutover
+Checkpoint **4 Oktober 2026**. Production GAS/Sheets authoritative; D1 staging bukan replika production terkini dan belum cutover. Schema Sheets di bawah menerangkan kontrak V2; migration D1 dalam `proxy/d1/` ialah kod schema, bukan bukti telah applied/import ke setiap environment.
 
-Production Sheets kekal sumber authoritative semasa dan sumber migrasi. Sasaran selepas cutover ialah D1 `STUDENTS` sebagai authority tunggal bagi `photo_file_id` (real ID fail Drive) dan `photo_updated_at`; Drive private menyimpan binari, manakala Sheets hanya downstream mirror/audit. Jangan salin placeholder `GAS_MANAGED:PROFILE_PHOTO` sebagai ID sebenar. Snapshot production 25 September mempunyai 34 pelajar, termasuk 32 rujukan foto pelajar aktif; staging D1 mengandungi rekod QA dan bukan replika production.
+## Checkpoint data
 
-`proxy/d1/007_photo_operations.sql` mentakrif jurnal `PHOTO_OPERATIONS`: primary key `operation_id`, `student_id`, `operation_type`, `status`, expected old ID/timestamp, new ID/timestamp, attempts, last_error dan audit masa. Trusted UPLOAD dan REMOVE staging menggunakan journal `PENDING` → `CREATED` → `COMPLETED`; konflik CAS boleh menghasilkan `RECONCILE_REQUIRED`. Untuk `operation_type=REMOVE`, `operation_id` deterministik berformat `phr_` + 40 aksara hex, dan `expected_old_file_id` / `expected_old_photo_updated_at` mengikat CAS `STUDENTS` kepada metadata lama. E2E staging yang disahkan dalam sesi QA menunjukkan UPLOAD mencapai `COMPLETED` dengan real Drive ID/timestamp dalam D1, kemudian satu REMOVE `QA-A4-001` mencapai `COMPLETED` dengan 1 attempt, `last_error` kosong, metadata `STUDENTS` kosong dan audit `REMOVE_STUDENT_PROFILE_PHOTO` tanpa ID Drive dalam details/request_id. Bukti manual itu tidak semuanya artifact repo. Status Drive `isTrashed=true` selepas REMOVE belum disahkan secara bebas dan duplicate retry E2E belum diuji. Pemulihan automatik/cron belum tersedia; upstream rejection masih boleh meninggalkan `PENDING` sehingga semakan manual. Ini tidak membuktikan migration production.
+- Profil rehearsal **34/34** pada snapshot terdahulu, belum refreshed 4 Oktober. Metadata foto 4 Oktober **34/34**, **32/32 source refs**; 3 pelajar/1 photo ref tambahan staging, tiada duplicate/placeholder/incomplete pair. Ini bukan proof akses/binari Drive.
+- Request rehearsal **397/397**, semua **39 medan** mapping; missing/mismatch/duplicate 0, staging 412 dengan 15 tambahan. **371 ialah snapshot September**.
+- Audit rehearsal **3097/3097 occurrences**, 8 medan ordinal multiset; NULL=empty untuk nullable sahaja, tiada trim/reformat, duplicate multiplicity dikekalkan dan staging_rowid bukan key. Staging 3214/117 tambahan; missing/duplicate/schema violations 0.
+- Live sekitar 12:40 MYT: production 424 vs D1 412/shared397, production-only27/D1-only15; shared exact395, satu lifecycle dan satu serialization catatan. 14 production KELUAR: 13 missing/1 pending D1. Snapshot-bound counts, bukan parity semasa.
+- Lima tujuan mismatch eksport awal selesai dengan UTF-8 output PowerShell (U+00B2/5 of 5 matched), tanpa database mutation sesi reconciliation.
 
-Manual recovery yang diimplementasi memeriksa state `PENDING`/`CREATED`/`RECONCILE_REQUIRED` terhadap metadata probe Drive dan pasangan metadata `STUDENTS`; postcondition yang dapat dibuktikan boleh membawa operasi ke `CREATED` lalu `COMPLETED`, manakala keadaan tidak pasti/mismatch kekal fail closed atau ditandakan `RECONCILE_REQUIRED`. Recovery tidak memainkan semula mutation Drive. Audit pemulihan dikorelasi dengan `AUDIT_LOG.request_id = PHOTO_OPERATIONS.operation_id` bersama action/entity, supaya retry boleh mengelakkan audit pendua. Satu kes sintetik REMOVE staging (`CREATED`, D1 sudah `EXPECTED_NEW`) disahkan menjadi `COMPLETED`: attempts kekal 1, `last_error` null, metadata D1 kekal kosong, tepat satu audit `REMOVE_STUDENT_PROFILE_PHOTO` berkorelasi; retry pada `COMPLETED` mengekalkan satu audit itu. Kes sintetik UPLOAD staging bermula `PENDING`, attempts 1, `last_error=null`, metadata foto lama/kini kosong dan inspection `EXPECTED_OLD` tanpa audit. Apabila fail Drive deterministik tidak ditemui, recovery memulangkan konflik selamat `PHOTO_RECOVERY_DRIVE_UNVERIFIED`, menetapkan `RECONCILE_REQUIRED` / `DRIVE_FILE_NOT_FOUND`, mengekalkan attempts 1 dan metadata `STUDENTS` kosong; audit count kekal 0, tiada CAS pelajar berjaya dan tiada mutation Drive oleh recovery. Operasi UPLOAD sebenar staging pula diuji selepas fault injection terkawal `COMPLETED` → `CREATED` dan pembuangan audit berkorelasi sahaja: `new_file_id`/`new_photo_updated_at` dikekalkan, `STUDENTS` sudah `EXPECTED_NEW`, dan Drive tidak diubah. Probe `FOUND_UNIQUE` mengembalikan journal ke `COMPLETED` tanpa CAS pelajar kedua atau mutation Drive; attempts kekal 1, `last_error=null`, tepat satu audit berkorelasi dan timestamp pelajar/journal kekal `2026-09-28 15:58:52`. Operasi UPLOAD sebenar kedua mempunyai old timestamp `2026-09-28 15:58:52` dan new timestamp `2026-09-28 16:16:18`, dengan fail lama dan baharu wujud dalam journal. Fault injection manual mengembalikan `STUDENTS` ke exact expected-old metadata, journal `COMPLETED` → `CREATED`, dan membuang audit berkorelasi; Drive serta new file metadata kekal. Inspection menunjukkan `EXPECTED_OLD`, attempts 1, `last_error=null`, tanpa audit. Probe `FOUND_UNIQUE` diikuti CAS sebenar mengemas kini `STUDENTS` kepada timestamp baharu dan melengkapkan journal `COMPLETED`; attempts kekal 1, `last_error=null`, audit berkorelasi count tepat 1, tanpa mutation Drive baharu. Audit real REMOVE terdahulu mempunyai `audit_recorded=false` dalam inspection baharu kerana ia mendahului correlation `request_id=operation_id`, bukan bukti kegagalan recovery. Kedua-dua laluan kejayaan UPLOAD (`EXPECTED_NEW` tanpa CAS kedua dan `EXPECTED_OLD` dengan CAS) staging-verified melalui fault injection manual. Operasi UPLOAD sebenar yang sama kemudian diuji lagi dengan fault injection journal-only `COMPLETED` → `RECONCILE_REQUIRED`, `last_error=D1_CAS_CONFLICT`: `STUDENTS` kekal pada metadata baharu `2026-09-28 16:16:18`, audit berkorelasi kekal satu, attempts 1 dan Drive tidak diubah. Inspection `EXPECTED_NEW`/`audit_recorded=true`, diikuti manual recovery dan signed probe, mengembalikan journal ke `COMPLETED` dengan `last_error=null` tanpa CAS pelajar kedua, audit pendua atau mutation Drive. Ini hanya membuktikan recovery daripada `RECONCILE_REQUIRED` apabila postcondition sedia ada boleh dibuktikan; fault crash/timeout sebenar dan cron recovery belum disahkan.
+CSV rehearsal/generator/snapshot local bukan bahan deployment. Generator `proxy/generate_outing_requests_rehearsal.ps1` memetakan 39 named fields; lima kolum CSV unnamed kosong dikecualikan. Bezakan kolum tiada daripada NULL/empty. Excel dates/times perlu berdasarkan jenis sel/mapping; isu serialization catatan numerik vs display TIME belum exact text match. Kewujudan SQL sahaja bukan bukti import. Lihat [Project Status](PROJECT_STATUS.md) untuk provenance dan batas evidence.
 
-Model pelajar kanonik: `kelas=LI`, `institution_code=UNISZA` untuk pelajar LI UNISZA; `kelas=UNISZA`, `institution_code=UNISZA` bukan penugasan kumpulan baharu yang sah. Hanya LI institution-aware, dan non-LI aktif mesti tiada institusi. Rekod legacy production perlu dipadankan/disahkan sebelum transform; pembetulan staging tidak bermakna production telah dimigrasi.
+## Model D1 staging
 
-Cleanup manual foto lama selepas UPLOAD `COMPLETED` menggunakan medan journal sedia ada (`expected_old_file_id`, `new_file_id`, `new_photo_updated_at`) tanpa migration schema. Ia tidak mengubah journal UPLOAD atau `STUDENTS`; audit `CLEANUP_PREVIOUS_PROFILE_PHOTO` menggunakan `request_id = operation_id`, `entity_type = STUDENT` dan `entity_id = student_id` untuk dedup retry. Tiada old file bermakna `NOOP` tanpa mutation Drive. Audit yang gagal selepas trash boleh dicuba semula secara idempotent; jangan tafsir kejayaan upload sebagai cleanup yang sudah siap.
-
-Staging E2E pada satu UPLOAD sebenar `QA-A4-001` menunjukkan cleanup pertama `TRASHED`, retry `ALREADY_TRASHED`, dan satu audit cleanup berkorelasi sahaja. `PHOTO_OPERATIONS` kekal `COMPLETED`, attempts 1, `last_error=null`; `STUDENTS.photo_updated_at` kekal `2026-09-28 16:16:18` sepadan dengan metadata foto baharu. Ini mengesahkan retry selepas cleanup berjaya pada staging; kegagalan audit selepas trash hanya diuji setempat, bukan fault E2E. Production D1/Sheets belum cutover.
-
-Google Sheets ialah database dan source of truth eOuting ITU v2.4.0. Production menggunakan Spreadsheet `1QQ0WKstUTVib6rlMC6TT-mQDAvcSdUGIV2d69no60Pg`; frontend GitHub Pages tidak menyimpan salinan penuh data pelajar atau rekod operasi.
-
-## D1 staging — dynamic student groups, 22 September 2026
-
-V3 menggunakan D1 `eouting_staging` bagi flow yang telah dimigrasikan; production frontend kekal V2/GAS/Google Sheets. Schema grouping ditambah melalui `proxy/d1/002_student_group_config.sql` dan seed config melalui `proxy/d1/003_student_group_config_seed.sql`.
-
-`STUDENT_GROUPS` dan `LI_INSTITUTIONS` menentukan grouping secara dinamik. Config production yang dimirror ke staging mengandungi A2, A3, LI, TEST dan UNISZA. Institution config aktif termasuk UNISZA (seed turut mengekalkan TESTTING); UMK dan UPM inactive. Dua pelajar LI UNISZA telah dimasukkan ke D1 staging sebagai data pelajar; migration config bukan pengganti proses sync `STUDENTS`.
-
-Directory staging parity dengan production: `GROUP:A2`, `GROUP:A3`, `GROUP:TEST` → `Test Sahaja`, `GROUP:UNISZA:UNISZA` → `LI UNISZA`. Roster Warden/Guard membaca D1; Admin roster kekal GAS sehingga Admin auth dimigrasi. Semua pelajar aktif berada di hostel kecuali latest authoritative request `KELUAR`, dengan fallback group `Belum Dikonfigurasi` dan projection pelajar hanya `nama`.
-
-QA checkpoint: 33 aktif, 2 di luar, 31 di hostel (A2 11, A3 18, Test Sahaja 0, LI UNISZA 2). Reproducible D1 data/config sync masih baki kerja. Bahagian Google Sheets di bawah menerangkan baseline V2; hasil QA penuh ada dalam [Project Status](PROJECT_STATUS.md).
+- Canonical LI UNISZA: kelas LI/institution UNISZA, directory GROUP:LI:UNISZA. Hanya LI institution-aware; non-LI institution kosong. Legacy kelas UNISZA perlu semakan row sebelum transform; prefix ID migration-only.
+- Group config `STUDENT_GROUPS`/`LI_INSTITUTIONS` data-driven. Admin roster/auth/staff routes kini wujud dalam source D1; jangan menganggap keseluruhan parity deployed/E2E selesai.
+- `PHOTO_OPERATIONS` migration 007: deterministic operation_id, student/operation/status, expected-old/new metadata, attempts/error dan timestamps. PENDING -> CREATED -> COMPLETED atau RECONCILE_REQUIRED; CAS mengikat metadata STUDENTS. Recovery manual mengesahkan Drive probe/postcondition tanpa replay mutation, audit request_id=operation_id. Cleanup old-photo memakai journal sedia ada dan audit dedup tanpa schema migration atau perubahan foto baharu/journal.
+- Real timeout recovery dan cleanup/retry staging telah verified terhad; automatic recovery/cleanup dan gate foto yang masih terbuka dalam status belum selesai.
+- `MIRROR_RETRY_QUEUE` menyimpan request ID/retry metadata. Operational mirror false staging mengekalkan queue dan mutation D1 enqueue; reconciliation return SKIPPED sebelum queue read/delete. Queue 0 sebelum deploy bukan count semasa. Jangan enable sebelum target/queue reconciled; enabled retry membaca rekod D1 terkini.
+- Mirror GAS Version 6 ke production overwrite snapshot tanpa freshness guard; tiada bukti stale overwrite berlaku. Sheets hanya disasarkan downstream selepas cutover, bukan master kedua staging yang boleh ditimpa sekarang.
 
 ## `STUDENTS`
 
@@ -129,7 +124,7 @@ Cancellation mengekalkan row asal dan hanya mengemas kini status serta metadata;
 
 No-Guard Departure tidak menambah kolum `OUTING_REQUESTS`. Pending fallback ialah derived state daripada `AUDIT_LOG` event `DEPARTURE_CONFIRMATION_REQUESTED` bagi request yang masih `DILULUSKAN_WARDEN`; ia bukan lifecycle status. Warden confirmation menukar row kepada `KELUAR`, menetapkan `masa_keluar` authoritative dan sengaja mengekalkan `guard_keluar_by` kosong. Identiti Warden berada dalam audit `WARDEN_REMOTE_CHECKOUT`, bukan dalam medan Guard.
 
-`OUTING_HUJUNG_MINGGU` hanya menerima tarikh Sabtu atau Ahad, menggunakan tarikh keluar dan balik yang sama, serta masa balik dijangka `22:00`.
+Dalam validator legacy/seed Weekend, `OUTING_HUJUNG_MINGGU` hanya menerima tarikh Sabtu atau Ahad, menggunakan tarikh keluar dan balik yang sama, serta masa balik dijangka `22:00`.
 
 Kolum bukti selfie v1.7.0:
 
@@ -190,12 +185,12 @@ Andaian seed konservatif:
 | `OUTING_BIASA` | Selasa, Rabu | 17:00 | Tiada had tambahan | Tiada | 22:00 | Ya | Tidak | Tidak |
 | `OUTING_HUJUNG_MINGGU` | Sabtu, Ahad | Tiada had dipetakan | Tiada had tambahan | Tiada | 22:00 | Ya | Ya | Tidak |
 | `KECEMASAN` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | 22:00 | Ya | Tidak | Tidak |
-| `PULANG_BERMALAM` | Semua hari | Tiada had dipetakan | Jumaat | 17:00 pada row semasa | Ikut permohonan | Tidak | Ya | Ya |
+| `PULANG_BERMALAM` | Semua hari | Tiada had dipetakan | Jumaat | 17:00 pada checkpoint Ogos | Ikut permohonan | Tidak | Ya | Ya |
 | `CUTI_SEMESTER` | Semua hari | Tiada had dipetakan | Tiada had tambahan | Tiada | Ikut permohonan | Tidak | Ya | Ya |
 
-Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Tarikh keluar yang diminta mesti hari Jumaat. Guard hanya boleh mengesahkan keluar pada tarikh yang diluluskan, hari yang dibenarkan dan pada/selepas `earliest_departure_time`. Row production semasa ialah `17:00`, tetapi Admin boleh mengubahnya mengikut arahan HEP; nilai itu ialah konfigurasi operasi, bukan rule hard-coded kekal.
+Untuk `PULANG_BERMALAM`, permohonan boleh dibuat pada mana-mana hari. Pada konfigurasi checkpoint Ogos, tarikh keluar yang diminta mesti Jumaat; row config aktif semasa ialah authority, bukan polisi statik dokumen. Guard hanya boleh mengesahkan keluar pada tarikh yang diluluskan, hari yang dibenarkan dan pada/selepas `earliest_departure_time`. Row production pada checkpoint Ogos ialah `17:00`, tetapi Admin boleh mengubahnya mengikut arahan HEP; nilai itu ialah konfigurasi operasi, bukan rule hard-coded kekal.
 
-Custom production `KLINIK` mempunyai display name `Keluar ke Klinik`, `same_day_only=true`, tiada tarikh keluar/balik manual, serta memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden dan return selfie. `earliest_departure_time` dan `departure_allowed_days` boleh kosong apabila tiada restriction tarikh/hari keluar. Readiness menolak inconsistency seperti `departure_allowed_days` berisi ketika `require_leave_date=false`.
+Custom production `KLINIK` mempunyai display name `Keluar ke Klinik`, `same_day_only=true`, tiada tarikh keluar/balik manual, serta memerlukan masa balik dijangka, lokasi, kenderaan, kelulusan Warden dan return selfie. `earliest_departure_time` dan `departure_allowed_days` boleh kosong apabila tiada restriction tarikh/hari keluar. Readiness menolak departure days tanpa leave date apabila `same_day_only=false`; same-day jenis kekal ready tanpa tarikh manual.
 
 Semua seed bermula `active = true`, `require_purpose = true`, `require_location = true`, `require_vehicle = true`, `require_warden_approval = true`, `require_selfie = true` dan `config_version = 1`. Dalam config-driven mode, `require_selfie` ialah authoritative: false menghasilkan `selfie_status=TIDAK_DIPERLUKAN`. `require_warden_approval=false` menghasilkan approval `AUTO_CONFIG_V2` dan audit `AUTO_APPROVE_REQUEST`. `created_at`, `created_by`, `updated_at` dan `updated_by` ialah metadata audit config; `config_version` menyokong optimistic concurrency.
 
@@ -234,7 +229,7 @@ V1 menyokong satu banner global, maka ia menggunakan Script Properties dan bukan
 
 Nama property dan nilai dalaman tidak menjadi sebahagian daripada projection viewer. Konfigurasi banner ialah data komunikasi sahaja dan tidak dirujuk oleh `OUTING_TYPES`, submission validation atau enforcement Guard.
 
-No-Guard menggunakan Script Property `NO_GUARD_DEPARTURE_ENABLED`, bukan Sheet atau kolum schema. Parser ialah strict: hanya nilai tepat `"true"` mengaktifkan ciri; property hilang, malformed atau nilai lain bermaksud disabled. Safe default ialah `false`, manakala current production state pada close-out ini ialah enabled melalui Admin UI. Property secret/value mentah tidak dimasukkan ke public projection.
+No-Guard menggunakan Script Property `NO_GUARD_DEPARTURE_ENABLED`, bukan Sheet atau kolum schema. Parser ialah strict: hanya nilai tepat `"true"` mengaktifkan ciri; property hilang, malformed atau nilai lain bermaksud disabled. Safe default ialah `false`, manakala state production pada close-out Ogos ialah enabled; audit dokumentasi tidak menyemaknya semula melalui Admin UI. Property secret/value mentah tidak dimasukkan ke public projection.
 
 ## Kawalan Akses
 
@@ -248,14 +243,14 @@ No-Guard menggunakan Script Property `NO_GUARD_DEPARTURE_ENABLED`, bukan Sheet a
 Pengurusan Pelajar menggunakan schema STUDENTS yang diluaskan secara additive oleh `setupStudentProfilePhotos()`:
 
 ```text
-student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan | photo_file_id | photo_updated_at
+student_id | no_matrik | nama | email | no_tel | kelas | jantina | status | catatan | photo_file_id | photo_updated_at | institution_code
 ```
 
 `kelas` ialah nilai data yang diterbitkan secara dinamik daripada rekod Student; ia tidak dihadkan oleh business rule kepada A2/A3/LI. A2, A3 dan LI digunakan dalam regression fixture untuk memastikan class termasuk non-A2/A3 kekal tersedia. `student_id` immutable dan unik, manakala `no_matrik` juga unik. Nilai no. matrik dan no. telefon dirawat sebagai teks untuk mengekalkan sifar di hadapan. Tiada kolum version ditambah; write serentak dilindungi dengan `LockService` dan duplicate recheck.
 
 ## WARDENS dan GUARDS
 
-Pengurusan staff Admin menggunakan schema sedia ada tanpa migration:
+Pengurusan staff Admin menggunakan schema sedia ada tanpa migration Sheets tambahan; peluasan D1 mesti diperiksa terhadap migration environment:
 
 ```text
 WARDENS: warden_id | nama_warden | email | no_tel | pin | status | catatan
