@@ -750,7 +750,19 @@ async function probePhotoOperation(env, operation) {
     throw invalid();
   } finally { clearTimeout(timer); controller.abort(); }
 }
+function operationalMirrorEnabled(env) {
+  // Preserve existing environments unless mirror is explicitly disabled.
+  return env?.OPERATIONAL_MIRROR_ENABLED !== "false" &&
+    env?.OPERATIONAL_MIRROR_ENABLED !== false;
+}
+
 async function mirrorOutingRequestToSheets(env, record, fetchImpl = fetch) {
+  if (!operationalMirrorEnabled(env)) {
+    // Mutation callers catch this and retain the request in the retry queue.
+    throw Object.assign(new Error("Operational mirror disabled"), {
+      code: "OPERATIONAL_MIRROR_DISABLED"
+    });
+  }
   if (!env.GAS_UPSTREAM_URL || !env.D1_MIRROR_SECRET) {
     throw new Error("D1 to Sheets mirror configuration unavailable");
   }
@@ -904,6 +916,10 @@ async function enqueueMirrorRetry(env, requestId, error, options = {}) {
   return true;
 }
 async function reconcileMirrorRetryQueue(env, options = {}) {
+  if (!operationalMirrorEnabled(env)) {
+    return { processed: 0, succeeded: 0, failed: 0, skipped: true,
+      reason: "OPERATIONAL_MIRROR_DISABLED" };
+  }
   if (!env || !env.DB) {
     throw new Error("D1 mirror retry queue unavailable");
   }

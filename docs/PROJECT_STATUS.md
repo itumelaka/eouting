@@ -1,5 +1,13 @@
 # Project Status eOuting ITU
 
+## Checkpoint production live dan sekatan mirror staging — 4 Oktober 2026
+
+- **Comparison sekitar 12:40 MYT:** production live mempunyai 424 request berbanding 412 dalam snapshot D1; ID bersama 397, production sahaja 27 dan D1 sahaja 15. Daripada 14 request production `KELUAR`, 13 tiada dalam D1 dan 1 masih `MENUNGGU_KELULUSAN` dalam D1. Ini comparison pada waktu semakan, bukan jaminan snapshot kekal current. PASS parity rehearsal di bawah bukan parity production terkini.
+- **Sasaran mirror confirmed:** GAS mirror deployed Version 6 disahkan menunjuk spreadsheet production. `mirrorOutingRequestFromD1` mengemas kini snapshot penuh untuk ID sedia ada tanpa freshness/version guard; tiada bukti stale overwrite telah berlaku. `MIRROR_RETRY_QUEUE` mempunyai 0 row sebelum deploy gate.
+- **Gate staging deployed:** `OPERATIONAL_MIRROR_ENABLED=false` telah deployed kepada Worker staging sahaja, Version ID `8e835591-1d6d-4c48-bf0f-a6cb90d193b1`. Runtime cron pada 13:05:26 MYT menghasilkan `OUTING_REQUEST_MIRROR_RECONCILIATION_SKIPPED`, dengan `processed=0`, `succeeded=0` dan `failed=0`.
+- **Direct mirror dan polisi queue:** gate direct mirror verified melalui local tests, belum melalui live mutation. Mutation utama D1 ketika gate disabled mengekalkan ID dalam retry queue; reconciliation disabled tidak memadam queue atau menandakan mirror berjaya. Jangan enable semula sebelum sasaran mirror dan queue direconcile.
+- **Validation implementation:** focused tests 164/164 PASS, syntax dan `git diff --check` PASS seperti report implementation. Production GAS/Sheets tidak dimutasi dalam sesi ini; tiada sync/import/cutover dibuat.
+
 ## Checkpoint reconciliation rehearsal — 4 Oktober 2026
 
 **Skop bukti:** comparison dibuat secara local terhadap CSV production snapshot yang digunakan untuk rehearsal dan eksport staging tempatan. PASS ini bukan reconciliation dengan snapshot production terkini dan bukan kelulusan cutover. Production tidak disentuh; tiada pembetulan database, reimport, deploy atau cutover dibuat dalam sesi ini.

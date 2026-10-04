@@ -62,7 +62,9 @@ export default {
     const task = reconcileMirrorRetryQueue(env)
       .then((result) => {
         console.info(JSON.stringify({
-          event: "OUTING_REQUEST_MIRROR_RECONCILIATION_COMPLETED",
+          event: result.skipped
+            ? "OUTING_REQUEST_MIRROR_RECONCILIATION_SKIPPED"
+            : "OUTING_REQUEST_MIRROR_RECONCILIATION_COMPLETED",
           cron: controller.cron,
           processed: result.processed,
           succeeded: result.succeeded,
