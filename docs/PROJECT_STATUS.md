@@ -1,5 +1,21 @@
 # Project Status eOuting ITU
 
+## Checkpoint reconciliation rehearsal — 4 Oktober 2026
+
+**Skop bukti:** comparison dibuat secara local terhadap CSV production snapshot yang digunakan untuk rehearsal dan eksport staging tempatan. PASS ini bukan reconciliation dengan snapshot production terkini dan bukan kelulusan cutover. Production tidak disentuh; tiada pembetulan database, reimport, deploy atau cutover dibuat dalam sesi ini.
+
+- **Profil STUDENTS:** 34/34 profil sumber sepadan berdasarkan snapshot terdahulu; profil penuh belum diambil semula pada 4 Oktober.
+- **Metadata foto — snapshot 4 Oktober:** 34/34 pelajar sumber sepadan pada `photo_file_id` dan `photo_updated_at`, termasuk 32/32 rujukan foto sumber. Staging mempunyai 3 pelajar tambahan dan 1 rujukan foto tambahan. Tiada duplicate ID, placeholder `GAS_MANAGED` atau metadata foto tidak lengkap. Ini parity metadata sahaja, bukan verification akses atau binari Google Drive.
+- **OUTING_REQUESTS — snapshot 4 Oktober:** 397/397 row sumber sepadan tepat pada semua 39 medan mapping `proxy/generate_outing_requests_rehearsal.ps1`. Missing ID, mismatch dan duplicate ID semuanya 0; staging mempunyai 15 row tambahan (jumlah 412).
+- **AUDIT_LOG — snapshot 4 Oktober:** 3097/3097 occurrences sumber sepadan melalui ordinal case-sensitive multiset comparison bagi semua lapan medan. NULL dianggap empty string untuk kolum nullable sahaja; teks dan timestamp tidak di-trim atau diubah. Missing occurrences, duplicate keys dan schema violations semuanya 0; staging mempunyai 117 occurrences tambahan (jumlah 3214).
+- **Encoding eksport request:** lima mismatch `tujuan` pada eksport pertama berpunca daripada encoding output PowerShell. Eksport semula menggunakan `Console.OutputEncoding` UTF-8 membuktikan aksara staging ialah `U+00B2` dan kelima-lima row sepadan (5/5); tiada pembetulan database dibuat dalam sesi ini.
+
+**Sumber tempatan:** CSV rehearsal dalam `proxy/students_production_snapshot.csv`, `proxy/outing_requests_production_snapshot.csv` dan `proxy/audit_log_production_snapshot.csv`; snapshot 4 Oktober di TEMP luar repo ialah `eouting_photo_staging_20261004.json`, `eouting_requests_staging_utf8_20261004.json` dan `eouting_audit_staging_20261004.json`. Profil penuh menggunakan snapshot terdahulu `proxy/students_staging_snapshot_full.json`. JSON snapshot 4 Oktober disahkan valid dan `success=true` sebelum comparison. ID dipadankan secara ordinal case-sensitive; `staging_rowid` bukan sebahagian key audit.
+
+**Perbezaan checkpoint:** angka 371 permohonan di bahagian September ialah checkpoint sejarah; CSV sumber rehearsal Oktober mempunyai 397 permohonan. Tambahan staging belum diklasifikasikan sebagai data cutover atau QA hanya berdasarkan counts.
+
+**Baki sebelum mempertimbangkan cutover:** fresh pre-flight sumber production; verification invariant lifecycle/roster; classification pelajar/request/audit/foto tambahan staging; rollback rehearsal dengan verification hasil restore; serta gate QA foto dan flow yang masih terbuka dalam checkpoint Phase 6C di bawah. Parity rehearsal ini tidak menutup gate tersebut atau membuktikan production sudah migrated.
+
 ## Phase 6C / trusted photo migration — kemas kini 28 September 2026
 
 **Sempadan status:** production masih menggunakan GAS/Google Sheets; tiada production-to-D1 migration atau cutover. Staging D1 bukan replika production (snapshot 25 September: production `STUDENTS` 34 dan `OUTING_REQUESTS` 371; staging mengandungi rekod QA tambahan). Google Sheets ialah authority sumber migrasi production; selepas cutover yang belum dilaksanakan, D1 disasarkan menjadi satu-satunya authority metadata operasi/foto dan Sheets menjadi downstream mirror/reporting/audit. Binari foto kekal di folder Google Drive private, bukan di D1/Sheets.
