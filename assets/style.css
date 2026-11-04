@@ -8842,7 +8842,7 @@ body:has(#accessScreen:not(.hidden)) #publicMonitoringPanel #monitorLastUpdated 
 
 
 .trace-summary{display:flex;gap:1rem;flex-wrap:wrap}.trace-summary p{padding:1rem;border:1px solid #bbb;border-radius:8px}
-.trace-report-logo{display:block;width:190mm;max-width:100%;height:auto;margin:0 auto 8px}
+.trace-report-logo{display:block;width:200px;max-width:100%;height:auto;margin:0 auto 8px}
 .trace-metadata{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
 .trace-metadata p{margin:0}
 #adminTraceReport table{width:100%;border-collapse:collapse}#adminTraceReport th,#adminTraceReport td{padding:6px;border:1px solid #bbb;overflow-wrap:anywhere}

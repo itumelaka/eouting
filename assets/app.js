@@ -349,7 +349,6 @@ let adminRuntimeCredential = null;
 let adminOutingTypes = [];
 let operationalOutingTypesV220 = buildLegacyStudentOutingTypesV200();
 let adminEditingTypeCode = "";
-let adminTraceStudents = [];
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
 let adminStudentGroupsV240 = [];
@@ -1213,8 +1212,8 @@ function clearAdminRuntimeCredentialV200() {
   adminOutingTypes = [];
   adminEditingTypeCode = "";
   clearAdminTraceReport();
-  adminTraceStudents = [];
-  renderAdminTraceStudentChoices();
+  const traceStudent = document.querySelector("#adminTraceStudent");
+  if (traceStudent) traceStudent.innerHTML = '<option value="">Pilih pelajar</option>';
   adminStudentsV200 = [];
   adminEditingStudentIdV200 = "";
   adminStudentGroupsV240 = [];
@@ -12656,20 +12655,6 @@ initApp();
 setInterval(updateClock, 1000);
 
 
-function filterAdminTraceStudents(students, query) {
-  const key = String(query || "").trim().toLocaleLowerCase("ms");
-  return students.filter((s) => [s.nama, s.student_id].some((value) => String(value || "").toLocaleLowerCase("ms").includes(key)));
-}
-
-function renderAdminTraceStudentChoices() {
-  const select = document.querySelector("#adminTraceStudent");
-  if (!select) return;
-  const selected = select.value;
-  const choices = filterAdminTraceStudents(adminTraceStudents, document.querySelector("#adminTraceSearch")?.value);
-  select.innerHTML = '<option value="">Pilih pelajar</option>' + choices.map((s) => '<option value="' + escapeHtml(s.student_id) + '">' + escapeHtml(s.nama) + ' (' + escapeHtml(s.student_id) + ')</option>').join("");
-  if (choices.some((s) => s.student_id === selected)) select.value = selected;
-}
-
 function clearAdminTraceReport() {
   const report = document.querySelector("#adminTraceReport"), print = document.querySelector("#adminTracePrint");
   if (report) report.innerHTML = "";
@@ -12681,14 +12666,12 @@ async function loadAdminTraceStudents() {
   const session = currentSession;
   const select = document.querySelector("#adminTraceStudent");
   clearAdminTraceReport();
-  adminTraceStudents = [];
-  document.querySelector("#adminTraceSearch").value = "";
-  renderAdminTraceStudentChoices();
+  select.innerHTML = '<option value="">Pilih pelajar</option>';
   try {
     const response = await apiPost("getAdminStudents", buildAdminCredentialPayloadV200());
     if (currentSession !== session) return;
-    adminTraceStudents = (Array.isArray(response) ? response : response.students || []).map((s) => ({ student_id: s.student_id, nama: s.nama }));
-    renderAdminTraceStudentChoices();
+    const students = Array.isArray(response) ? response : response.students || [];
+    select.innerHTML += students.map((s) => '<option value="' + escapeHtml(s.student_id) + '">' + escapeHtml(s.nama) + ' (' + escapeHtml(s.student_id) + ')</option>').join("");
   } catch (error) { if (currentSession === session) document.querySelector("#adminTraceMessage").textContent = cleanApiError(error.message); }
 }
 
@@ -12713,7 +12696,7 @@ html,body{display:block;width:100%;max-width:none;height:auto;min-height:0;margi
   #adminTracePrintCopy{display:block!important;position:static!important;box-sizing:border-box;width:100%!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;color:#000;background:#fff;font:10pt/1.25 Arial,sans-serif;break-inside:auto}
   #adminTracePrintCopy *{box-sizing:border-box;max-width:none;box-shadow:none;text-shadow:none}
   #adminTracePrintCopy .trace-report-heading{text-align:center;margin:0 0 3mm;padding:0;break-inside:avoid}
-  #adminTracePrintCopy .trace-report-logo{width:150mm;max-width:100%;height:16mm;object-fit:contain;margin:0 auto 1mm}
+  #adminTracePrintCopy .trace-report-logo{display:block;width:200px;max-width:100%;height:auto;object-fit:contain;margin:0 auto 2mm}
   #adminTracePrintCopy h2{font-size:12pt;line-height:1.2;margin:0 0 1mm}
   #adminTracePrintCopy h3{font-size:11pt;line-height:1.2;margin:0}
   #adminTracePrintCopy .trace-metadata{display:grid;grid-template-columns:1fr 1fr;gap:1mm 5mm;margin:0 0 2mm;break-inside:avoid}
@@ -12794,11 +12777,6 @@ function renderAdminTraceReport(data) {
 
 document.querySelector("#adminTraceTab")?.addEventListener("click", () => {
   if (currentSession?.role === "admin") setAdminSectionV200("trace");
-});
-document.querySelector("#adminTraceSearch")?.addEventListener("input", () => {
-  if (currentSession?.role !== "admin") return;
-  renderAdminTraceStudentChoices();
-  clearAdminTraceReport();
 });
 document.querySelector("#adminTraceForm")?.addEventListener("change", clearAdminTraceReport);
 document.querySelector("#adminTraceForm")?.addEventListener("submit", async (event) => {

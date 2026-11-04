@@ -21,17 +21,18 @@ test('no record response does not infer physical location',()=>{assert.equal(con
 test('POST only and read only; no staging mapping',()=>{assert.doesNotMatch(extract(gas,'doGet'),/getAdminStudentMovementTrace/);assert.match(extract(gas,'doPost'),/getAdminStudentMovementTrace/);assert.doesNotMatch(extract(gas,'getAdminStudentMovementTrace'),/append|updateRow|setValue|flush|mirror|DriveApp/);assert.doesNotMatch(app.slice(0,app.indexOf('const SAFE_SESSION')),/getAdminStudentMovementTrace/);});
 test('Admin gating, escaped report, explicit browser print and A4 scoped markup',()=>{assert.match(extract(app,'loadAdminTraceStudents'),/currentSession.role !== "admin"/);assert.match(app,/currentSession\?\.role !== "admin"/);assert.match(html,/id="adminTracePanel"[^>]*hidden/);assert.match(html,/Cetak \/ Simpan PDF/);assert.match(css,/@page \{ size:A4 landscape/);assert.match(app,/buildAdminTracePrintDocument/);const c=vm.createContext({escapeHtml:v=>String(v).replaceAll('<','&lt;'),formatDisplayDateTime:v=>v,formatAdminTraceDateTime:v=>v,requestTypeLabel:v=>v});vm.runInContext(extract(app,'renderAdminTraceReport').split('document.querySelector')[0],c);const r=context().getAdminStudentMovementTrace(input);r.student.name='<script>';assert.doesNotMatch(c.renderAdminTraceReport(r),/<script>/);assert.match(c.renderAdminTraceReport(r),/LAPORAN JEJAK/);});
 
-test('full loaded collection supports immediate case-insensitive name and canonical ID search without mutation', async()=>{
- const select={value:'S-002',innerHTML:''}, search={value:''};
- const students=Array.from({length:140},(_,i)=>({student_id:'S-'+String(i).padStart(3,'0'),nama:i===2?'Nur AISYAH':'Pelajar '+i,pin:'private'}));
- const c=vm.createContext({currentSession:{role:'admin'},adminTraceStudents:[],document:{querySelector:s=>s==='#adminTraceStudent'?select:search},clearAdminTraceReport(){},escapeHtml:v=>String(v),buildAdminCredentialPayloadV200:()=>({}),apiPost:async action=>{assert.equal(action,'getAdminStudents');return students;}});
- for(const name of ['filterAdminTraceStudents','renderAdminTraceStudentChoices','loadAdminTraceStudents'])vm.runInContext((name === 'loadAdminTraceStudents' ? 'async ' : '') + extract(app,name),c);
- await c.loadAdminTraceStudents();assert.equal(c.adminTraceStudents.length,140);assert.match(select.innerHTML,/S-139/);assert.doesNotMatch(JSON.stringify(c.adminTraceStudents),/private|pin/);
- search.value='aIsYaH';c.renderAdminTraceStudentChoices();assert.match(select.innerHTML,/value="S-002"/);assert.doesNotMatch(select.innerHTML,/S-139/);assert.equal(select.value,'S-002');
- search.value='s-139';c.renderAdminTraceStudentChoices();assert.match(select.innerHTML,/value="S-139"/);assert.doesNotMatch(select.innerHTML,/AISYAH/);
- search.value='';c.renderAdminTraceStudentChoices();assert.match(select.innerHTML,/S-139/);assert.match(select.innerHTML,/AISYAH/);assert.equal(c.adminTraceStudents.length,140);
+test('full Admin dropdown loads canonical IDs without search controls or filter state', async()=>{
+ const select={innerHTML:''};
+ const students=Array.from({length:140},(_,i)=>({student_id:'S-'+String(i).padStart(3,'0'),nama:'Pelajar '+i,pin:'private'}));
+ const c=vm.createContext({currentSession:{role:'admin'},document:{querySelector:()=>select},clearAdminTraceReport(){},escapeHtml:v=>String(v),buildAdminCredentialPayloadV200:()=>({}),apiPost:async action=>{assert.equal(action,'getAdminStudents');return students;}});
+ vm.runInContext('async '+extract(app,'loadAdminTraceStudents'),c);
+ await c.loadAdminTraceStudents();assert.match(select.innerHTML,/value="S-000"/);assert.match(select.innerHTML,/value="S-139"/);assert.doesNotMatch(select.innerHTML,/private|pin/);
+ assert.equal((select.innerHTML.match(/<option /g)||[]).length,141);
  c.currentSession.role='student';c.apiPost=()=>assert.fail('must not fetch');await c.loadAdminTraceStudents();
- assert.match(html,/id="adminTraceSearch" type="search"/);assert.match(app,/#adminTraceSearch"\)\?\.addEventListener\("input"/);
+ assert.doesNotMatch(html,/adminTraceSearch|Cari nama \/ Student ID/);
+ assert.doesNotMatch(app,/adminTraceSearch|adminTraceStudents|filterAdminTraceStudents|renderAdminTraceStudentChoices/);
+ const panel=html.slice(html.indexOf('id="adminTraceForm"'),html.indexOf('</form>',html.indexOf('id="adminTraceForm"')));
+ assert.equal((panel.match(/<input /g)||[]).length,2);assert.equal((panel.match(/<select /g)||[]).length,1);
 });
 test('report date/time is compact Malaysia time with no fabricated missing values',()=>{
  const c=vm.createContext({Intl,parseFlexibleDate:v=>{const d=new Date(v);return Number.isFinite(d.getTime())?d:null;}});vm.runInContext(extract(app,'formatAdminTraceDateTime'),c);
@@ -61,8 +62,12 @@ test('standalone print HTML contains only report and inline layout with absolute
  const result=c.buildAdminTracePrintDocument(c.renderAdminTraceReport(context().getAdminStudentMovementTrace(input)));
  assert.match(result,/^<!doctype html><html lang="ms">/);assert.match(result,/<style>[\s\S]*size:A4 landscape; margin:8mm/);
  assert.match(result,/src="https:\/\/itumelaka.github.io\/eouting\/assets\/eouting-header-logo.png"/);
+ assert.equal((result.match(/assets\/eouting-header-logo\.png/g)||[]).length,1);
+ assert.equal((result.match(/<img\b/g)||[]).length,1);
+ assert.match(result,/<img[^>]*class="trace-report-logo"[^>]*><h2>INSTITUT TEKNOLOGI UNGGAS<\/h2><h3>LAPORAN JEJAK PERGERAKAN PELAJAR<\/h3>/);
+ assert.match(result,/.trace-report-logo\{display:block;width:200px;max-width:100%;height:auto/);
  assert.match(result,/<table>/);assert.match(result,/Laporan ini berdasarkan rekod/);assert.match(result,/bukan dipotong kepada julat/);
- assert.doesNotMatch(result,/<form|<button|<nav|adminTraceSearch|app-header|dashboard|admin-subtab|<script|<link/i);
+ assert.doesNotMatch(result,/<form|<button|<nav|adminTraceSearch|app-header|class="header-logo"|currentDate|currentTime|time-card|app-shell|dashboard|admin-subtab|<script|<link/i);
  assert.doesNotMatch(app.slice(app.indexOf('function getAdminTracePrintCss')),/printing-student-trace|cloneNode|document.body.appendChild/);
  assert.match(app,/APP_VERSION\s*=\s*["']2\.4\.0["']/);
 });
