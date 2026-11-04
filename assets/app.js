@@ -12706,6 +12706,83 @@ function formatAdminTraceDateTime(value) {
   return get("day") + "/" + get("month") + "/" + get("year") + ", " + (hour % 12 || 12) + ":" + get("minute") + " " + period;
 }
 
+function getAdminTracePrintCss() {
+  return `@page { size:A4 landscape; margin:8mm; }
+
+html,body{display:block;width:100%;max-width:none;height:auto;min-height:0;margin:0;padding:0;background:#fff}
+  #adminTracePrintCopy{display:block!important;position:static!important;box-sizing:border-box;width:100%!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;color:#000;background:#fff;font:10pt/1.25 Arial,sans-serif;break-inside:auto}
+  #adminTracePrintCopy *{box-sizing:border-box;max-width:none;box-shadow:none;text-shadow:none}
+  #adminTracePrintCopy .trace-report-heading{text-align:center;margin:0 0 3mm;padding:0;break-inside:avoid}
+  #adminTracePrintCopy .trace-report-logo{width:150mm;max-width:100%;height:16mm;object-fit:contain;margin:0 auto 1mm}
+  #adminTracePrintCopy h2{font-size:12pt;line-height:1.2;margin:0 0 1mm}
+  #adminTracePrintCopy h3{font-size:11pt;line-height:1.2;margin:0}
+  #adminTracePrintCopy .trace-metadata{display:grid;grid-template-columns:1fr 1fr;gap:1mm 5mm;margin:0 0 2mm;break-inside:avoid}
+  #adminTracePrintCopy p{margin:0;font-size:inherit;line-height:inherit}
+  #adminTracePrintCopy .trace-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3mm;margin:0 0 3mm;break-inside:avoid}
+  #adminTracePrintCopy .trace-summary p{padding:2mm;border:1px solid #777;border-radius:0}
+  #adminTracePrintCopy .admin-table-wrap{display:block;overflow:visible;max-height:none;margin:0;padding:0;break-inside:auto}
+  #adminTracePrintCopy table{width:100%;border-collapse:collapse;table-layout:fixed;margin:0;font-size:9pt;line-height:1.2;break-inside:auto}
+  #adminTracePrintCopy th,#adminTracePrintCopy td{border:1px solid #777;padding:1.5mm;overflow-wrap:anywhere;vertical-align:top;color:#000}
+  #adminTracePrintCopy th{font-size:9pt;font-weight:700;background:#eee}
+  #adminTracePrintCopy th:nth-child(3){width:24%}
+  #adminTracePrintCopy thead{display:table-header-group}
+  #adminTracePrintCopy tr{break-inside:avoid}
+  #adminTracePrintCopy tbody tr:last-child{break-after:avoid}
+  #adminTracePrintCopy .trace-report-notes{display:block;position:static;margin:2mm 0 0;padding:0;font-size:8.5pt;line-height:1.2;break-inside:avoid;break-before:avoid}
+  #adminTracePrintCopy .trace-report-notes p + p{margin-top:1mm}`;
+}
+
+function buildAdminTracePrintDocument(reportHtml) {
+  // Only the already escaped report markup is copied, never the app document.
+  const logoUrl = escapeHtml(new URL("assets/eouting-header-logo.png", document.baseURI).href);
+  const report = reportHtml.replace('src="assets/eouting-header-logo.png"', 'src="' + logoUrl + '"');
+  return '<!doctype html><html lang="ms"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Laporan Jejak Pergerakan Pelajar</title><style>' + getAdminTracePrintCss() + '</style></head><body><article id="adminTracePrintCopy">' + report + '</article></body></html>';
+}
+
+async function waitForAdminTracePrintReady(printWindow) {
+  const doc = printWindow.document;
+  if (doc.readyState !== "complete") {
+    await new Promise((resolve) => printWindow.addEventListener("load", resolve, { once: true }));
+  }
+  await Promise.all(Array.from(doc.images, (image) => new Promise((resolve, reject) => {
+    const loaded = () => image.naturalWidth > 0 ? resolve() : reject(new Error("Imej laporan gagal dimuatkan."));
+    if (image.complete) loaded();
+    else { image.addEventListener("load", loaded, { once: true }); image.addEventListener("error", () => reject(new Error("Imej laporan gagal dimuatkan.")), { once: true }); }
+  })));
+  if (doc.fonts && doc.fonts.ready) await doc.fonts.ready;
+  // Allow Safari to lay out the fully loaded standalone document before print.
+  await new Promise((resolve) => printWindow.setTimeout(resolve, 100));
+}
+
+async function printAdminTraceReport(reportHtml) {
+  const session = currentSession;
+  if (session?.role !== "admin" || !reportHtml) return;
+  const message = document.querySelector("#adminTraceMessage");
+  const button = document.querySelector("#adminTracePrint");
+  let printWindow;
+  try {
+    // Open before any await, while still in the user's click gesture (iOS).
+    printWindow = window.open("", "_blank");
+    if (!printWindow) throw new Error("Tetingkap cetakan disekat. Benarkan pop-up untuk eOuting dan cuba lagi.");
+    printWindow.opener = null;
+    button.disabled = true;
+    message.textContent = "Menyediakan laporan untuk cetakan...";
+    printWindow.document.open();
+    printWindow.document.write(buildAdminTracePrintDocument(reportHtml));
+    printWindow.document.close();
+    await waitForAdminTracePrintReady(printWindow);
+    if (currentSession !== session || currentSession?.role !== "admin") { printWindow.close(); return; }
+    if (printWindow.closed) throw new Error("Tetingkap cetakan ditutup. Cuba lagi.");
+    printWindow.addEventListener("afterprint", () => printWindow.close(), { once: true });
+    printWindow.focus();
+    printWindow.print();
+    message.textContent = "Jika dialog cetakan tidak muncul, gunakan menu Cetak / Kongsi pada tetingkap laporan.";
+  } catch (error) {
+    // Never fall back to window.print(): it would print the entire application.
+    if (currentSession === session) message.textContent = error.message || "Cetakan gagal. Cuba lagi atau gunakan menu Cetak / Kongsi pada tetingkap laporan.";
+  } finally { button.disabled = false; }
+}
+
 function renderAdminTraceReport(data) {
   const e = escapeHtml;
   return '<header class="trace-report-heading"><img class="trace-report-logo" src="assets/eouting-header-logo.png" alt="eOuting ITU SKM OLP"><h2>INSTITUT TEKNOLOGI UNGGAS</h2><h3>LAPORAN JEJAK PERGERAKAN PELAJAR</h3></header>' +
@@ -12742,10 +12819,5 @@ document.querySelector("#adminTraceForm")?.addEventListener("submit", async (eve
 });
 document.querySelector("#adminTracePrint")?.addEventListener("click", () => {
   if (currentSession?.role !== "admin" || !document.querySelector("#adminTraceReport").innerHTML) return;
-  const copy = document.querySelector("#adminTraceReport").cloneNode(true);
-  copy.id = "adminTracePrintCopy";
-  document.body.appendChild(copy);
-  document.body.classList.add("printing-student-trace");
-  try { window.print(); }
-  finally { copy.remove(); document.body.classList.remove("printing-student-trace"); }
+  printAdminTraceReport(document.querySelector("#adminTraceReport").innerHTML);
 });
