@@ -508,6 +508,7 @@ function doPost(e) {
     if (action === "getCurrentHostelRoster") return jsonResponse(getCurrentHostelRoster(payload));
     if (action === "getGuardianContact") return jsonResponse(getGuardianContact(payload));
     if (action === "getStudentAnnualSummary") return jsonResponse(getStudentAnnualSummary(payload));
+    if (action === "getAdminStudentMovementTrace") return jsonResponse(getAdminStudentMovementTrace(payload));
     if (action === "getAdminIndividualStats") return jsonResponse(getAdminIndividualStats(payload));
     if (action === "getAdminMonitoring") return jsonResponse(getAdminMonitoring(payload));
     if (action === "searchAdminMasterRecords") return jsonResponse(searchAdminMasterRecords(payload));
@@ -4601,6 +4602,47 @@ function getAdminMonitoring(payload) {
     emergency: records.filter((row) => row.jenis_permohonan === REQUEST_TYPE.emergency).length
   };
   return { generated_at: now_(), kpis: kpis, records: records };
+}
+
+// Read-only Admin report. Period applies to request tarikh, inclusive.
+function getAdminStudentMovementTrace(payload) {
+  validateAdminCredentials_(payload);
+  const data = payload || {};
+  const id = String(data.student_id || "").trim();
+  const start = validateMovementTraceDate_(data.start_date);
+  const end = validateMovementTraceDate_(data.end_date);
+  const days = (Date.parse(end) - Date.parse(start)) / 86400000;
+  if (days < 0 || days > 365) throw new Error("Tempoh mesti 1 hingga 366 hari.");
+  const student = id && getRowsAsObjects_(getSheet_(SHEETS.students)).find((row) => String(row.student_id || "").trim() === id);
+  if (!student) throw new Error("student_id tidak sah.");
+  const records = getRowsAsObjects_(getSheet_(SHEETS.requests))
+    .filter((row) => String(row.student_id || "").trim() === id)
+    .filter((row) => { const date = normalizeDateKey_(row.tarikh); return date && date >= start && date <= end; })
+    .map((row) => {
+      const minutes = calculateOutingDurationMinutes_(row);
+      const exit = parseDateForSort_(row.masa_keluar), entry = parseDateForSort_(row.masa_masuk);
+      const valid = exit && entry && entry.getTime() > exit.getTime();
+      return {
+        request_id: row.request_id || "", tarikh: normalizeDateKey_(row.tarikh),
+        jenis_permohonan: row.jenis_permohonan || "", tujuan: row.tujuan || "", lokasi: row.lokasi || "",
+        masa_keluar: row.masa_keluar || "", masa_masuk: row.masa_masuk || "", status: row.status || "",
+        duration_minutes: valid ? minutes : null, duration_label: valid ? formatOutingDuration_(minutes) : ""
+      };
+    }).sort((a, b) => a.tarikh.localeCompare(b.tarikh) || String(a.masa_keluar).localeCompare(String(b.masa_keluar)) || String(a.request_id).localeCompare(String(b.request_id)));
+  const total = records.reduce((sum, row) => sum + (row.duration_minutes || 0), 0);
+  return {
+    student: { student_id: id, name: student.nama || "", class: student.kelas || "" },
+    period: { start_date: start, end_date: end }, generated_at: now_(),
+    summary: { total_records: records.length, completed_outings: records.filter((row) => row.status === STATUS.done).length,
+      total_duration_minutes: total, total_duration_label: formatOutingDuration_(total) }, records: records
+  };
+}
+
+function validateMovementTraceDate_(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Tarikh mesti YYYY-MM-DD.");
+  const date = new Date(value + "T00:00:00Z");
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error("Tarikh tidak sah.");
+  return value;
 }
 
 function searchAdminMasterRecords(payload) {

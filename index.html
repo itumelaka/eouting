@@ -406,6 +406,7 @@
           <nav class="admin-subnav" role="tablist" aria-label="Bahagian Admin">
             <button class="admin-subtab active" id="adminMonitoringTab" type="button" role="tab" aria-selected="true" aria-controls="adminMonitoringPanel" data-admin-section="monitoring">Pemantauan</button>
             <button class="admin-subtab" id="adminStatisticsButton" type="button" role="tab" aria-selected="false" aria-controls="adminStatisticsPanel" data-admin-section="statistics">Statistik</button>
+            <button class="admin-subtab" id="adminTraceTab" type="button" role="tab" aria-selected="false" aria-controls="adminTracePanel" data-admin-section="trace">Jejak Pergerakan Pelajar</button>
             <button class="admin-subtab" id="adminMasterTab" type="button" role="tab" aria-selected="false" aria-controls="adminMasterPanel" data-admin-section="master">Rekod Master</button>
             <button class="admin-subtab" id="adminStaffTab" type="button" role="tab" aria-selected="false" aria-controls="adminStaffPanel" data-admin-section="staff">Warden, HEP &amp; Guard</button>
             <button class="admin-subtab" id="adminStudentsTab" type="button" role="tab" aria-selected="false" aria-controls="adminStudentManagementPanel" data-admin-section="students">Tetapan Pelajar</button>
@@ -827,6 +828,20 @@
                 </form>
               </section>
             </section>
+          </section>
+
+
+          <section class="admin-subpanel" id="adminTracePanel" role="tabpanel" aria-labelledby="adminTraceTab" hidden>
+            <h3>Jejak Pergerakan Pelajar</h3>
+            <form id="adminTraceForm" class="admin-master-filters">
+              <label>Pelajar<select id="adminTraceStudent" required><option value="">Pilih pelajar</option></select></label>
+              <label>Tarikh mula<input id="adminTraceStart" type="date" required></label>
+              <label>Tarikh akhir<input id="adminTraceEnd" type="date" required></label>
+              <button type="submit">Jana Jejak</button>
+            </form>
+            <p id="adminTraceMessage" role="status"></p>
+            <button id="adminTracePrint" type="button" hidden>Cetak / Simpan PDF</button>
+            <article id="adminTraceReport"></article>
           </section>
 
           <section class="admin-subpanel" id="adminMasterPanel" role="tabpanel" aria-labelledby="adminMasterTab" hidden>

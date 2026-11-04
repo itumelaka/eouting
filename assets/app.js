@@ -193,6 +193,7 @@ const MOCK_ADMIN_ACTIONS_V200 = new Set([
   "createOutingType",
   "updateOutingType",
   "toggleOutingType",
+  "getAdminStudentMovementTrace",
   "getAdminIndividualStats",
   "getAdminMonitoring",
   "searchAdminMasterRecords",
@@ -1210,6 +1211,7 @@ function clearAdminRuntimeCredentialV200() {
   staffCurrentHostelRosterV240 = null;
   adminOutingTypes = [];
   adminEditingTypeCode = "";
+  clearAdminTraceReport();
   adminStudentsV200 = [];
   adminEditingStudentIdV200 = "";
   adminStudentGroupsV240 = [];
@@ -1456,12 +1458,13 @@ async function saveAdminAnnouncementV1(event) {
 window.addEventListener("resize", updateAnnouncementTickerV1);
 
 function setAdminSectionV200(section) {
-  const allowed = ["monitoring", "statistics", "master", "students", "staff", "outing", "announcement"];
+  const allowed = ["trace", "monitoring", "statistics", "master", "students", "staff", "outing", "announcement"];
   const nextSection = allowed.indexOf(section) === -1 ? "monitoring" : section;
   activeAdminSectionV200 = nextSection;
   const map = [
     ["monitoring", els.adminMonitoringTab, els.adminMonitoringPanel],
     ["statistics", els.adminStatisticsButton, els.adminStatisticsPanel],
+    ["trace", document.querySelector("#adminTraceTab"), document.querySelector("#adminTracePanel")],
     ["master", els.adminMasterTab, els.adminMasterPanel],
     ["students", els.adminStudentsTab, els.adminStudentManagementPanel],
     ["staff", els.adminStaffTab, els.adminStaffPanel],
@@ -1473,6 +1476,7 @@ function setAdminSectionV200(section) {
     if (panel) panel.hidden = name !== nextSection;
   });
   if (nextSection === "monitoring" && !adminMonitoringV210) loadAdminMonitoringV210();
+  if (nextSection === "trace") loadAdminTraceStudents();
   if (nextSection === "master") {
     if (!adminMasterV210.records.length) loadAdminMasterV210(1);
     if (!adminOutingTypes.length) loadAdminOutingTypesV200();
@@ -3855,6 +3859,13 @@ async function mockAdminApiPostV200(action, payload) {
     if (typeof request.enabled !== "boolean") throw new Error("enabled mesti boolean.");
     mockNoGuardDepartureEnabled = request.enabled;
     return { enabled: mockNoGuardDepartureEnabled };
+  }
+  if (action === "getAdminStudentMovementTrace") {
+    const student = mockAdminStudentsV200.find((row) => row.student_id === request.student_id);
+    if (!student) throw new Error("student_id tidak sah.");
+    const start = request.start_date, end = request.end_date;
+    if (![start, end].every((v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0,10) === v) || end < start || (Date.parse(end)-Date.parse(start))/86400000 > 365) throw new Error("Tempoh tidak sah.");
+    return { student: { student_id: student.student_id, name: student.nama, class: student.kelas }, period: { start_date: start, end_date: end }, generated_at: new Date().toISOString(), summary: { total_records: 0, completed_outings: 0, total_duration_minutes: 0, total_duration_label: "0 minit" }, records: [] };
   }
   if (action === "getAdminIndividualStats") {
     return buildMockAdminIndividualStatsV200(request);
@@ -12640,3 +12651,64 @@ async function initApp() {
 
 initApp();
 setInterval(updateClock, 1000);
+
+
+function clearAdminTraceReport() {
+  const report = document.querySelector("#adminTraceReport"), print = document.querySelector("#adminTracePrint");
+  if (report) report.innerHTML = "";
+  if (print) print.hidden = true;
+}
+
+async function loadAdminTraceStudents() {
+  if (!currentSession || currentSession.role !== "admin") return;
+  const session = currentSession;
+  const select = document.querySelector("#adminTraceStudent");
+  clearAdminTraceReport();
+  select.innerHTML = '<option value="">Pilih pelajar</option>';
+  try {
+    const response = await apiPost("getAdminStudents", buildAdminCredentialPayloadV200());
+    if (currentSession !== session) return;
+    const students = Array.isArray(response) ? response : response.students || [];
+    select.innerHTML += students.map((s) => '<option value="' + escapeHtml(s.student_id) + '">' + escapeHtml(s.nama) + ' (' + escapeHtml(s.student_id) + ')</option>').join("");
+  } catch (error) { if (currentSession === session) document.querySelector("#adminTraceMessage").textContent = cleanApiError(error.message); }
+}
+
+function renderAdminTraceReport(data) {
+  const e = escapeHtml;
+  return '<h2>INSTITUT TEKNOLOGI UNGGAS</h2><h3>LAPORAN JEJAK PERGERAKAN PELAJAR</h3>' +
+    '<p>Nama Pelajar: ' + e(data.student.name) + '<br>Student ID: ' + e(data.student.student_id) + '<br>Kelas: ' + e(data.student.class) +
+    '<br>Tempoh Semakan: ' + e(data.period.start_date) + ' hingga ' + e(data.period.end_date) + '<br>Tarikh/Masa Laporan Dijana: ' + e(formatDisplayDateTime(data.generated_at)) + '</p>' +
+    '<div class="trace-summary"><p>Jumlah rekod: ' + e(data.summary.total_records) + '</p><p>Outing selesai: ' + e(data.summary.completed_outings) + '</p><p>Jumlah tempoh direkodkan: ' + e(data.summary.total_duration_label) + '</p></div>' +
+    (data.records.length ? '<div class="admin-table-wrap"><table><thead><tr><th>Tarikh</th><th>Jenis Outing</th><th>Tujuan / Lokasi</th><th>Masa Keluar</th><th>Masa Masuk</th><th>Tempoh</th><th>Status</th></tr></thead><tbody>' + data.records.map((r) => '<tr>' + [r.tarikh, requestTypeLabel(r.jenis_permohonan), [r.tujuan,r.lokasi].filter(Boolean).join(' / '), r.masa_keluar ? formatDisplayDateTime(r.masa_keluar) : '-', r.masa_masuk ? formatDisplayDateTime(r.masa_masuk) : '-', r.duration_label || '-', r.status].map((v) => '<td>' + e(v || '-') + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '<p>Tiada rekod pergerakan keluar direkodkan dalam eOuting bagi tempoh ini.</p>') +
+    '<p>Laporan ini berdasarkan rekod pergerakan yang direkodkan dalam sistem eOuting sahaja.</p><p>Julat ditapis mengikut tarikh permohonan; tempoh ialah keseluruhan pasangan masa keluar/masuk yang sah, bukan dipotong kepada julat.</p>';
+}
+
+document.querySelector("#adminTraceTab")?.addEventListener("click", () => {
+  if (currentSession?.role === "admin") setAdminSectionV200("trace");
+});
+document.querySelector("#adminTraceForm")?.addEventListener("change", clearAdminTraceReport);
+document.querySelector("#adminTraceForm")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (currentSession?.role !== "admin") return;
+  const session = currentSession, button = event.currentTarget.querySelector("button");
+  const message = document.querySelector("#adminTraceMessage");
+  clearAdminTraceReport(); button.disabled = true; message.textContent = "Memuatkan jejak...";
+  const payload = { ...buildAdminCredentialPayloadV200(), student_id: document.querySelector("#adminTraceStudent").value, start_date: document.querySelector("#adminTraceStart").value, end_date: document.querySelector("#adminTraceEnd").value };
+  try {
+    const data = await apiPost("getAdminStudentMovementTrace", payload);
+    if (currentSession !== session || currentSession?.role !== "admin" || activeAdminSectionV200 !== "trace") return;
+    if (payload.student_id !== document.querySelector("#adminTraceStudent").value || payload.start_date !== document.querySelector("#adminTraceStart").value || payload.end_date !== document.querySelector("#adminTraceEnd").value) return;
+    document.querySelector("#adminTraceReport").innerHTML = renderAdminTraceReport(data);
+    document.querySelector("#adminTracePrint").hidden = false; message.textContent = "";
+  } catch (error) { if (currentSession === session) message.textContent = cleanApiError(error.message); }
+  finally { button.disabled = false; }
+});
+document.querySelector("#adminTracePrint")?.addEventListener("click", () => {
+  if (currentSession?.role !== "admin" || !document.querySelector("#adminTraceReport").innerHTML) return;
+  const copy = document.querySelector("#adminTraceReport").cloneNode(true);
+  copy.id = "adminTracePrintCopy";
+  document.body.appendChild(copy);
+  document.body.classList.add("printing-student-trace");
+  try { window.print(); }
+  finally { copy.remove(); document.body.classList.remove("printing-student-trace"); }
+});
