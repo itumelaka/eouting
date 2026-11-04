@@ -8840,25 +8840,35 @@ body:has(#accessScreen:not(.hidden)) #publicMonitoringPanel #monitorLastUpdated 
   -webkit-text-fill-color: #0b263d;
 }
 
+
 .trace-summary{display:flex;gap:1rem;flex-wrap:wrap}.trace-summary p{padding:1rem;border:1px solid #bbb;border-radius:8px}
+.trace-report-logo{display:block;width:190mm;max-width:100%;height:auto;margin:0 auto 8px}
+.trace-metadata{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+.trace-metadata p{margin:0}
 #adminTraceReport table{width:100%;border-collapse:collapse}#adminTraceReport th,#adminTraceReport td{padding:6px;border:1px solid #bbb;overflow-wrap:anywhere}
 @media print {
-  @page { size:A4 landscape; margin:12mm; }
-  body.printing-student-trace *{visibility:hidden!important}
-  body.printing-student-trace #adminTraceReport,body.printing-student-trace #adminTraceReport *{visibility:visible!important}
-  body.printing-student-trace #adminTraceReport{position:absolute;left:0;top:0;width:100%;color:#000;background:#fff;font-size:10pt}
-  body.printing-student-trace #adminTraceReport .admin-table-wrap{overflow:visible}
-  body.printing-student-trace #adminTraceReport tr{break-inside:avoid}
-  body.printing-student-trace #adminTraceReport thead{display:table-header-group}
-}
-
-@media print {
-body.printing-student-trace > :not(#adminTracePrintCopy){display:none!important}
-body.printing-student-trace #adminTracePrintCopy,body.printing-student-trace #adminTracePrintCopy *{visibility:visible!important}
-#adminTracePrintCopy{color:#000;background:#fff;font-size:10pt}
-#adminTracePrintCopy .admin-table-wrap{overflow:visible}
-#adminTracePrintCopy table{width:100%;border-collapse:collapse;table-layout:fixed}
-#adminTracePrintCopy th,#adminTracePrintCopy td{border:1px solid #777;padding:5px;overflow-wrap:anywhere}
-#adminTracePrintCopy thead{display:table-header-group}
-#adminTracePrintCopy tr{break-inside:avoid}
+  @page { size:A4 landscape; margin:8mm; }
+  html:has(body.printing-student-trace),body.printing-student-trace{display:block!important;width:100%!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
+  body.printing-student-trace::before,body.printing-student-trace::after{display:none!important}
+  body.printing-student-trace > :not(#adminTracePrintCopy){display:none!important}
+  body.printing-student-trace #adminTracePrintCopy{display:block!important;position:static!important;box-sizing:border-box;width:100%!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;color:#000;background:#fff;font:10pt/1.25 Arial,sans-serif;break-inside:auto}
+  #adminTracePrintCopy *{box-sizing:border-box;max-width:none;box-shadow:none;text-shadow:none}
+  #adminTracePrintCopy .trace-report-heading{text-align:center;margin:0 0 3mm;padding:0;break-inside:avoid}
+  #adminTracePrintCopy .trace-report-logo{width:150mm;max-width:100%;height:16mm;object-fit:contain;margin:0 auto 1mm}
+  #adminTracePrintCopy h2{font-size:12pt;line-height:1.2;margin:0 0 1mm}
+  #adminTracePrintCopy h3{font-size:11pt;line-height:1.2;margin:0}
+  #adminTracePrintCopy .trace-metadata{display:grid;grid-template-columns:1fr 1fr;gap:1mm 5mm;margin:0 0 2mm;break-inside:avoid}
+  #adminTracePrintCopy p{margin:0;font-size:inherit;line-height:inherit}
+  #adminTracePrintCopy .trace-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3mm;margin:0 0 3mm;break-inside:avoid}
+  #adminTracePrintCopy .trace-summary p{padding:2mm;border:1px solid #777;border-radius:0}
+  #adminTracePrintCopy .admin-table-wrap{display:block;overflow:visible;max-height:none;margin:0;padding:0;break-inside:auto}
+  #adminTracePrintCopy table{width:100%;border-collapse:collapse;table-layout:fixed;margin:0;font-size:9pt;line-height:1.2;break-inside:auto}
+  #adminTracePrintCopy th,#adminTracePrintCopy td{border:1px solid #777;padding:1.5mm;overflow-wrap:anywhere;vertical-align:top;color:#000}
+  #adminTracePrintCopy th{font-size:9pt;font-weight:700;background:#eee}
+  #adminTracePrintCopy th:nth-child(3){width:24%}
+  #adminTracePrintCopy thead{display:table-header-group}
+  #adminTracePrintCopy tr{break-inside:avoid}
+  #adminTracePrintCopy tbody tr:last-child{break-after:avoid}
+  #adminTracePrintCopy .trace-report-notes{display:block;position:static;margin:2mm 0 0;padding:0;font-size:8.5pt;line-height:1.2;break-inside:avoid;break-before:avoid}
+  #adminTracePrintCopy .trace-report-notes p + p{margin-top:1mm}
 }

@@ -349,6 +349,7 @@ let adminRuntimeCredential = null;
 let adminOutingTypes = [];
 let operationalOutingTypesV220 = buildLegacyStudentOutingTypesV200();
 let adminEditingTypeCode = "";
+let adminTraceStudents = [];
 let adminStudentsV200 = [];
 let adminEditingStudentIdV200 = "";
 let adminStudentGroupsV240 = [];
@@ -1212,6 +1213,8 @@ function clearAdminRuntimeCredentialV200() {
   adminOutingTypes = [];
   adminEditingTypeCode = "";
   clearAdminTraceReport();
+  adminTraceStudents = [];
+  renderAdminTraceStudentChoices();
   adminStudentsV200 = [];
   adminEditingStudentIdV200 = "";
   adminStudentGroupsV240 = [];
@@ -12653,6 +12656,20 @@ initApp();
 setInterval(updateClock, 1000);
 
 
+function filterAdminTraceStudents(students, query) {
+  const key = String(query || "").trim().toLocaleLowerCase("ms");
+  return students.filter((s) => [s.nama, s.student_id].some((value) => String(value || "").toLocaleLowerCase("ms").includes(key)));
+}
+
+function renderAdminTraceStudentChoices() {
+  const select = document.querySelector("#adminTraceStudent");
+  if (!select) return;
+  const selected = select.value;
+  const choices = filterAdminTraceStudents(adminTraceStudents, document.querySelector("#adminTraceSearch")?.value);
+  select.innerHTML = '<option value="">Pilih pelajar</option>' + choices.map((s) => '<option value="' + escapeHtml(s.student_id) + '">' + escapeHtml(s.nama) + ' (' + escapeHtml(s.student_id) + ')</option>').join("");
+  if (choices.some((s) => s.student_id === selected)) select.value = selected;
+}
+
 function clearAdminTraceReport() {
   const report = document.querySelector("#adminTraceReport"), print = document.querySelector("#adminTracePrint");
   if (report) report.innerHTML = "";
@@ -12664,27 +12681,47 @@ async function loadAdminTraceStudents() {
   const session = currentSession;
   const select = document.querySelector("#adminTraceStudent");
   clearAdminTraceReport();
-  select.innerHTML = '<option value="">Pilih pelajar</option>';
+  adminTraceStudents = [];
+  document.querySelector("#adminTraceSearch").value = "";
+  renderAdminTraceStudentChoices();
   try {
     const response = await apiPost("getAdminStudents", buildAdminCredentialPayloadV200());
     if (currentSession !== session) return;
-    const students = Array.isArray(response) ? response : response.students || [];
-    select.innerHTML += students.map((s) => '<option value="' + escapeHtml(s.student_id) + '">' + escapeHtml(s.nama) + ' (' + escapeHtml(s.student_id) + ')</option>').join("");
+    adminTraceStudents = (Array.isArray(response) ? response : response.students || []).map((s) => ({ student_id: s.student_id, nama: s.nama }));
+    renderAdminTraceStudentChoices();
   } catch (error) { if (currentSession === session) document.querySelector("#adminTraceMessage").textContent = cleanApiError(error.message); }
+}
+
+function formatAdminTraceDateTime(value) {
+  if (!value) return "-";
+  const text = String(value);
+  const dateOnly = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) return dateOnly[3] + "/" + dateOnly[2] + "/" + dateOnly[1];
+  const date = parseFlexibleDate(value);
+  if (!date || !Number.isFinite(date.getTime())) return text;
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const get = (type) => parts.find((p) => p.type === type).value;
+  const hour = Number(get("hour"));
+  const period = hour < 12 ? "PG" : hour < 19 ? "PTG" : "MLM";
+  return get("day") + "/" + get("month") + "/" + get("year") + ", " + (hour % 12 || 12) + ":" + get("minute") + " " + period;
 }
 
 function renderAdminTraceReport(data) {
   const e = escapeHtml;
-  return '<h2>INSTITUT TEKNOLOGI UNGGAS</h2><h3>LAPORAN JEJAK PERGERAKAN PELAJAR</h3>' +
-    '<p>Nama Pelajar: ' + e(data.student.name) + '<br>Student ID: ' + e(data.student.student_id) + '<br>Kelas: ' + e(data.student.class) +
-    '<br>Tempoh Semakan: ' + e(data.period.start_date) + ' hingga ' + e(data.period.end_date) + '<br>Tarikh/Masa Laporan Dijana: ' + e(formatDisplayDateTime(data.generated_at)) + '</p>' +
+  return '<header class="trace-report-heading"><img class="trace-report-logo" src="assets/eouting-header-logo.png" alt="eOuting ITU SKM OLP"><h2>INSTITUT TEKNOLOGI UNGGAS</h2><h3>LAPORAN JEJAK PERGERAKAN PELAJAR</h3></header>' +
+    '<div class="trace-metadata"><p><strong>Nama Pelajar:</strong> ' + e(data.student.name) + '</p><p><strong>Student ID:</strong> ' + e(data.student.student_id) + '</p><p><strong>Kelas:</strong> ' + e(data.student.class) + '</p><p><strong>Tempoh Semakan:</strong> ' + e(formatAdminTraceDateTime(data.period.start_date)) + ' hingga ' + e(formatAdminTraceDateTime(data.period.end_date)) + '</p><p><strong>Tarikh/Masa Laporan Dijana:</strong> ' + e(formatAdminTraceDateTime(data.generated_at)) + '</p></div>' +
     '<div class="trace-summary"><p>Jumlah rekod: ' + e(data.summary.total_records) + '</p><p>Outing selesai: ' + e(data.summary.completed_outings) + '</p><p>Jumlah tempoh direkodkan: ' + e(data.summary.total_duration_label) + '</p></div>' +
-    (data.records.length ? '<div class="admin-table-wrap"><table><thead><tr><th>Tarikh</th><th>Jenis Outing</th><th>Tujuan / Lokasi</th><th>Masa Keluar</th><th>Masa Masuk</th><th>Tempoh</th><th>Status</th></tr></thead><tbody>' + data.records.map((r) => '<tr>' + [r.tarikh, requestTypeLabel(r.jenis_permohonan), [r.tujuan,r.lokasi].filter(Boolean).join(' / '), r.masa_keluar ? formatDisplayDateTime(r.masa_keluar) : '-', r.masa_masuk ? formatDisplayDateTime(r.masa_masuk) : '-', r.duration_label || '-', r.status].map((v) => '<td>' + e(v || '-') + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '<p>Tiada rekod pergerakan keluar direkodkan dalam eOuting bagi tempoh ini.</p>') +
-    '<p>Laporan ini berdasarkan rekod pergerakan yang direkodkan dalam sistem eOuting sahaja.</p><p>Julat ditapis mengikut tarikh permohonan; tempoh ialah keseluruhan pasangan masa keluar/masuk yang sah, bukan dipotong kepada julat.</p>';
+    (data.records.length ? '<div class="admin-table-wrap"><table><thead><tr><th>Tarikh</th><th>Jenis Outing</th><th>Tujuan / Lokasi</th><th>Masa Keluar</th><th>Masa Masuk</th><th>Tempoh</th><th>Status</th></tr></thead><tbody>' + data.records.map((r) => '<tr>' + [formatAdminTraceDateTime(r.tarikh), requestTypeLabel(r.jenis_permohonan), [r.tujuan,r.lokasi].filter(Boolean).join(' / '), r.masa_keluar ? formatAdminTraceDateTime(r.masa_keluar) : '-', r.masa_masuk ? formatAdminTraceDateTime(r.masa_masuk) : '-', r.duration_label || '-', r.status].map((v) => '<td>' + e(v || '-') + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' : '<p>Tiada rekod pergerakan keluar direkodkan dalam eOuting bagi tempoh ini.</p>') +
+    '<footer class="trace-report-notes"><p>Laporan ini berdasarkan rekod pergerakan yang direkodkan dalam sistem eOuting sahaja.</p><p>Julat ditapis mengikut tarikh permohonan; tempoh ialah keseluruhan pasangan masa keluar/masuk yang sah, bukan dipotong kepada julat.</p></footer>';
 }
 
 document.querySelector("#adminTraceTab")?.addEventListener("click", () => {
   if (currentSession?.role === "admin") setAdminSectionV200("trace");
+});
+document.querySelector("#adminTraceSearch")?.addEventListener("input", () => {
+  if (currentSession?.role !== "admin") return;
+  renderAdminTraceStudentChoices();
+  clearAdminTraceReport();
 });
 document.querySelector("#adminTraceForm")?.addEventListener("change", clearAdminTraceReport);
 document.querySelector("#adminTraceForm")?.addEventListener("submit", async (event) => {
